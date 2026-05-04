@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="fr">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>sound_algo / control</title>
+    <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+    <header>
+        <h1>sound_algo / control</h1>
+        <div class="status">
+            <span id="ws-status" class="dot offline"></span>
+            <span id="ws-label">connecting…</span>
+        </div>
+    </header>
+
+    <main>
+        <!-- ============ TRANSPORT ============ -->
+        <section class="panel" id="transport">
+            <h2>Transport</h2>
+            <div class="row">
+                <label class="control">
+                    <span>BPM <output data-output="bpm">128</output></span>
+                    <input type="range" min="60" max="200" step="1" value="128"
+                           data-osc="/control/bpm" data-output="bpm"/>
+                </label>
+                <label class="control">
+                    <span>Master <output data-output="masterVol">1.00</output></span>
+                    <input type="range" min="0" max="1.5" step="0.01" value="1"
+                           data-osc="/control/masterVol" data-output="masterVol"/>
+                </label>
+                <button class="btn" data-osc="/control/masterFadeOut" data-args="8">Fade out 8s</button>
+                <button class="btn danger" data-osc="/control/teardown">Teardown</button>
+            </div>
+        </section>
+
+        <!-- ============ MIXER ============ -->
+        <section class="panel" id="mixer">
+            <h2>Mixer (8 voies)</h2>
+            <div class="mixer-grid"></div>
+        </section>
+
+        <!-- ============ KICKS / PATTERNS ============ -->
+        <section class="panel" id="kicks">
+            <h2>Kicks (~kk)</h2>
+            <div class="chips" id="kicks-chips"></div>
+        </section>
+
+        <section class="panel" id="patterns">
+            <h2>Patterns (~p)</h2>
+            <div class="row">
+                <div class="chips" id="pkit-chips"></div>
+            </div>
+            <div class="row">
+                <div class="chips" id="pgenre-chips"></div>
+            </div>
+        </section>
+
+        <!-- ============ STEP SEQUENCER ============ -->
+        <section class="panel" id="seq">
+            <h2>Step sequencer (16 pas)</h2>
+            <div class="seq-grid" id="seq-grid"></div>
+            <div class="row">
+                <button class="btn" data-action="seq-clear">Clear</button>
+                <button class="btn" data-action="seq-random">Random</button>
+                <button class="btn" data-action="seq-send">Send to SC</button>
+            </div>
+        </section>
+
+        <!-- ============ FX ============ -->
+        <section class="panel" id="fx">
+            <h2>FX par voie</h2>
+            <div class="fx-grid"></div>
+            <h3>LFO</h3>
+            <div class="row">
+                <select id="lfo-target">
+                    <option value="\\melodyCutoff">melodyCutoff</option>
+                    <option value="\\acidCutoff">acidCutoff</option>
+                    <option value="\\acidAmp">acidAmp</option>
+                    <option value="\\kickAmp">kickAmp</option>
+                    <option value="\\hatAmp">hatAmp</option>
+                    <option value="\\acidDrive">acidDrive</option>
+                </select>
+                <label class="control">
+                    <span>Rate Hz <output data-output="lfoRate">0.5</output></span>
+                    <input type="range" min="0.05" max="8" step="0.05" value="0.5"
+                           data-output="lfoRate"/>
+                </label>
+                <label class="control">
+                    <span>Depth <output data-output="lfoDepth">1500</output></span>
+                    <input type="range" min="0" max="3000" step="10" value="1500"
+                           data-output="lfoDepth"/>
+                </label>
+                <button class="btn" data-action="lfo-on">LFO on</button>
+                <button class="btn" data-action="lfo-off">LFO off</button>
+                <button class="btn" data-action="lfo-stop-all">Stop all</button>
+            </div>
+        </section>
+
+        <!-- ============ TRICKS ============ -->
+        <section class="panel" id="tricks">
+            <h2>Tricks scéniques</h2>
+            <div class="chips">
+                <button class="chip" data-osc="/control/drop">Drop</button>
+                <button class="chip" data-osc="/control/breakdown" data-args="8">Breakdown 8</button>
+                <button class="chip" data-osc="/control/buildup" data-args="8">Buildup 8</button>
+                <button class="chip" data-osc="/control/glitch" data-args="2">Glitch 2s</button>
+                <button class="chip" data-osc="/control/stutter" data-args="8 1">Stutter 8/1s</button>
+                <button class="chip" data-osc="/control/freeze">Freeze</button>
+                <button class="chip" data-osc="/control/tapeStop" data-args="2">Tape stop</button>
+                <button class="chip" data-osc="/control/tapeReverse" data-args="4">Tape rev</button>
+                <button class="chip" data-osc="/control/handsUp">Hands up</button>
+                <button class="chip" data-osc="/control/jumpCut" data-args="0.5">Jump cut</button>
+                <button class="chip" data-osc="/control/bitCrushNow" data-args="6 6000 1">Bit crush</button>
+            </div>
+        </section>
+
+        <!-- ============ FX preset ============ -->
+        <section class="panel" id="fxpreset">
+            <h2>FX preset (~ff)</h2>
+            <div class="chips" id="ff-chips"></div>
+        </section>
+
+    </main>
+
+    <script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,300 @@
+:root {
+    color-scheme: dark;
+    --bg: #0b0b0f;
+    --panel: #14141c;
+    --panel-2: #1b1b27;
+    --border: #2c2c36;
+    --accent: #5b5bff;
+    --accent-2: #ff5b8e;
+    --danger: #ff5151;
+    --text: #e8e8e8;
+    --muted: #9c9ca6;
+}
+
+* { box-sizing: border-box; }
+
+body {
+    margin: 0;
+    min-height: 100vh;
+    font-family: ui-sans-serif, system-ui, -apple-system, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    font-size: 14px;
+}
+
+header {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 1rem 1.5rem;
+    background: rgba(11,11,15,0.85);
+    backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--border);
+}
+
+h1 {
+    font-size: 1.1rem;
+    margin: 0;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+}
+
+h2 {
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--muted);
+    margin: 0 0 1rem;
+}
+
+h3 {
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--muted);
+    margin: 1.5rem 0 0.75rem;
+}
+
+.status {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.8rem;
+    color: var(--muted);
+}
+
+.dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--danger);
+    box-shadow: 0 0 8px var(--danger);
+}
+.dot.online { background: #38d977; box-shadow: 0 0 8px #38d977; }
+
+main {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 1rem;
+    padding: 1rem 1.5rem 4rem;
+    max-width: 1400px;
+    margin: 0 auto;
+}
+
+.panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 1rem;
+}
+
+.panel#mixer, .panel#seq, .panel#fx {
+    grid-column: 1 / -1;
+}
+
+.row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    align-items: center;
+    margin-bottom: 0.5rem;
+}
+
+.row:last-child { margin-bottom: 0; }
+
+.control {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    flex: 1 1 140px;
+    min-width: 140px;
+}
+.control span {
+    font-size: 0.75rem;
+    color: var(--muted);
+    display: flex;
+    justify-content: space-between;
+}
+.control output {
+    color: var(--accent);
+    font-variant-numeric: tabular-nums;
+}
+
+input[type="range"] {
+    appearance: none;
+    width: 100%;
+    height: 4px;
+    background: var(--panel-2);
+    border-radius: 2px;
+    outline: none;
+}
+input[type="range"]::-webkit-slider-thumb {
+    appearance: none;
+    width: 14px;
+    height: 14px;
+    background: var(--accent);
+    border-radius: 50%;
+    cursor: pointer;
+    transition: transform .1s;
+}
+input[type="range"]::-webkit-slider-thumb:hover { transform: scale(1.2); }
+input[type="range"]::-moz-range-thumb {
+    width: 14px;
+    height: 14px;
+    background: var(--accent);
+    border-radius: 50%;
+    cursor: pointer;
+    border: none;
+}
+
+select {
+    background: var(--panel-2);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 0.4rem 0.6rem;
+    font-size: 0.85rem;
+    cursor: pointer;
+}
+
+.btn, .chip {
+    background: var(--panel-2);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 0.5rem 0.85rem;
+    cursor: pointer;
+    font-size: 0.85rem;
+    transition: background .12s, border-color .12s, transform .08s;
+    user-select: none;
+}
+.btn:hover, .chip:hover {
+    background: #232333;
+    border-color: var(--accent);
+}
+.btn:active, .chip:active { transform: translateY(1px); }
+.btn.danger { color: var(--danger); border-color: #4a2222; }
+.btn.danger:hover { background: #2a1414; border-color: var(--danger); }
+
+.chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+}
+
+/* ============ MIXER ============ */
+.mixer-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+    gap: 0.75rem;
+}
+.mixer-voice {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    padding: 0.75rem;
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+}
+.mixer-voice .name {
+    font-size: 0.8rem;
+    text-align: center;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+.mixer-voice input[type="range"][orient="vertical"] {
+    writing-mode: bt-lr;
+    -webkit-appearance: slider-vertical;
+    width: 8px;
+    height: 120px;
+    margin: 0 auto;
+}
+.mixer-voice .actions {
+    display: flex;
+    gap: 0.25rem;
+    justify-content: center;
+}
+.mixer-voice .actions button {
+    flex: 1;
+    font-size: 0.7rem;
+    padding: 0.3rem;
+}
+.mixer-voice .actions button.active {
+    background: var(--accent);
+    color: white;
+    border-color: var(--accent);
+}
+.mixer-voice .actions button.solo.active { background: var(--accent-2); border-color: var(--accent-2); }
+.mixer-voice .vol-display {
+    text-align: center;
+    font-size: 0.75rem;
+    color: var(--accent);
+    font-variant-numeric: tabular-nums;
+}
+
+/* ============ STEP SEQUENCER ============ */
+.seq-grid {
+    display: grid;
+    grid-template-columns: 90px repeat(16, 1fr);
+    gap: 3px;
+    padding: 0.5rem 0;
+    overflow-x: auto;
+}
+.seq-row {
+    display: contents;
+}
+.seq-label {
+    font-size: 0.7rem;
+    color: var(--muted);
+    text-transform: uppercase;
+    align-self: center;
+    padding-right: 0.5rem;
+    text-align: right;
+}
+.seq-cell {
+    aspect-ratio: 1;
+    min-height: 28px;
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background .08s;
+}
+.seq-cell.on {
+    background: var(--accent);
+    border-color: var(--accent);
+}
+.seq-cell:hover { border-color: var(--accent-2); }
+.seq-cell:nth-child(4n+2) { border-left: 1px solid var(--accent-2); }
+
+/* ============ FX par voie ============ */
+.fx-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 0.75rem;
+}
+.fx-voice {
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 0.75rem;
+}
+.fx-voice .name {
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 0.5rem;
+    letter-spacing: 0.05em;
+}
+
+/* Chips actives */
+.chip.active {
+    background: var(--accent);
+    color: white;
+    border-color: var(--accent);
+}
