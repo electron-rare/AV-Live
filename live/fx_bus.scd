@@ -259,8 +259,10 @@ s.sync;
 };
 
 // ---------- CROSSFADE entre 2 FX -------------------------------------
+~crossfadeFxRoutine = ~crossfadeFxRoutine ?? { nil };
 ~crossfadeFx = { |fromFx, toFx, dur = 4|
-    Routine({
+    ~crossfadeFxRoutine !? { ~crossfadeFxRoutine.stop };
+    ~crossfadeFxRoutine = Routine({
         var steps = (dur * 20).asInteger;
         steps.do { |i|
             var x = (i + 1) / steps;
@@ -268,8 +270,13 @@ s.sync;
             ~send.(toFx,   0.3 * x);
             (dur / steps).wait;
         };
+        ~crossfadeFxRoutine = nil;
     }).play;
     ("crossfade " ++ fromFx ++ " -> " ++ toFx ++ " sur " ++ dur ++ "s").postln;
+};
+~crossfadeFxStop = {
+    ~crossfadeFxRoutine !? { ~crossfadeFxRoutine.stop; ~crossfadeFxRoutine = nil };
+    "crossfade stopped".postln;
 };
 
 // ---------- PRESETS FX (combos pret a l'emploi par genre) ------------

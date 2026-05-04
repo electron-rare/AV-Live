@@ -55,30 +55,38 @@
 ~ch[\world]     = {               ~seqWorldEvolve !? { ~seqWorldEvolve.() } };
 
 // --- STOP / CUSTOM --------------------------------------------------
-~ch[\stop]      = { ~seqStop !? { ~seqStop.() } };
+~chainRoutine = ~chainRoutine ?? { nil };
+~ch[\stop]      = {
+    ~chainRoutine !? { ~chainRoutine.stop; ~chainRoutine = nil };
+    ~seqStop !? { ~seqStop.() };
+};
 ~ch[\custom]    = { |actions| ~seqPlay !? { ~seqPlay.(actions) } };
 
 // --- COMBOS pre-faits (enchaines) -----------------------------------
 ~ch[\full] = ();
 
 ~ch[\full][\intro2drop] = { |introDur = 4, buildDur = 4|
-    Routine({
+    ~chainRoutine !? { ~chainRoutine.stop };
+    ~chainRoutine = Routine({
         ~seqIntro   !? { ~seqIntro.() };
         introDur.wait;
         ~seqBuildup !? { ~seqBuildup.(buildDur) };
         (buildDur * ~stepDur ? 0.25).wait;
         ~seqDrop    !? { ~seqDrop.() };
+        ~chainRoutine = nil;
     }).play(TempoClock.default);
     "[ch.full.intro2drop] intro -> buildup -> drop".postln;
 };
 
 ~ch[\full][\dropToBreak] = { |breakDur = 8|
-    Routine({
+    ~chainRoutine !? { ~chainRoutine.stop };
+    ~chainRoutine = Routine({
         ~seqDrop      !? { ~seqDrop.() };
         4.wait;
         ~seqBreakdown !? { ~seqBreakdown.() };
         breakDur.wait;
         ~seqDrop      !? { ~seqDrop.() };
+        ~chainRoutine = nil;
     }).play(TempoClock.default);
     "[ch.full.dropToBreak] drop -> break -> drop".postln;
 };
