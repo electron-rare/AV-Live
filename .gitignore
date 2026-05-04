@@ -1,0 +1,26 @@
+# Archives historiques (exclues du repo)
+_archive/
+
+# Caches
+.ruff_cache/
+.claude/cache/
+
+# Logs de tests
+tests/.logs/
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# Editeurs
+*.swp
+*.swo
+*~
+.vscode/
+.idea/
+
+# SuperCollider artefacts
+*.scsyndef
+*.scd~
