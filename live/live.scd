@@ -647,9 +647,24 @@ s.sync;
 //  4. Tricks sceniques live (combos)
 // =====================================================================
 
+// --- Tracking des Routines de tricks (anti-spam / anti-fuite RAM) ---
+~trickRoutines = ~trickRoutines ?? { () };
+~trickStop = { |key|
+    ~trickRoutines[key.asSymbol] !? {
+        ~trickRoutines[key.asSymbol].stop;
+        ~trickRoutines[key.asSymbol] = nil;
+    };
+};
+~trickStopAll = {
+    ~trickRoutines.keysValuesDo { |k, r| r !? { r.stop } };
+    ~trickRoutines = ();
+    "TRICKS STOPPED ALL".postln;
+};
+
 // Stutter master via amp gate (modulation sur kick/mel/acid/harm)
 ~stutter = { |rateHz = 8, dur = 1.0|
-    Routine({
+    ~trickStop.(\stutter);
+    ~trickRoutines[\stutter] = Routine({
         var n = (dur * rateHz).max(2).asInteger;
         var period = 1.0 / rateHz;
         var startK = ~kickAmp; var startM = ~melodyAmp;
@@ -693,7 +708,8 @@ s.sync;
     var startM = ~melodyAmp ? 0.16;
     var startA = ~acidAmp ? 0.32;
     var startH = ~harmonyAmp ? 0.14;
-    Routine({
+    ~trickStop.(\drop);
+    ~trickRoutines[\drop] = Routine({
         // 1. fade out tout sur buildDur secondes
         ~envSweep.(\kickAmp,    startK, 0, buildDur, \lin, true);
         ~envSweep.(\melodyAmp,  startM, 0, buildDur, \lin, false);
@@ -743,7 +759,8 @@ s.sync;
     var startK = ~kickAmp ? 0.5;
     var startA = ~acidAmp ? 0.32;
     var startH = (~hatAmp ? 0.18);
-    Routine({
+    ~trickStop.(\breakdown);
+    ~trickRoutines[\breakdown] = Routine({
         ~envSweep.(\kickAmp, startK, 0, dur * 0.4, \lin, true);
         ~envSweep.(\acidAmp, startA, 0, dur * 0.4, \lin, false);
         ~envSweep.(\hatAmp,  startH, 0, dur * 0.4, \lin, false);
@@ -768,7 +785,8 @@ s.sync;
 // Tape stop : ralenti progressif du tempo puis stop
 ~tapeStop = { |dur = 2|
     var startTempo = TempoClock.default.tempo;
-    Routine({
+    ~trickStop.(\tapeStop);
+    ~trickRoutines[\tapeStop] = Routine({
         var steps = (dur / 0.03).max(2).asInteger;
         steps.do { |i|
             var x = (i + 1) / steps;
@@ -793,7 +811,8 @@ s.sync;
         ~setFx.(\dly, \delayTime, 0.05);
         ~sendDelay !? { ~sendDelay.(0.4) };
     };
-    Routine({
+    ~trickStop.(\glitch);
+    ~trickRoutines[\glitch] = Routine({
         dur.wait;
         ~sendDelay !? { ~sendDelay.(0) };
     }).play;
@@ -805,7 +824,8 @@ s.sync;
     var startK = ~kickAmp ? 0.5;
     var startM = ~melodyAmp ? 0.16;
     var startA = ~acidAmp ? 0.32;
-    Routine({
+    ~trickStop.(\freeze);
+    ~trickRoutines[\freeze] = Routine({
         ~setFx !? {
             ~setFx.(\rev, \freeze, 1);
             ~sendReverb !? { ~sendReverb.(0.7) };
@@ -829,7 +849,8 @@ s.sync;
     var startM = ~melodyAmp ? 0.16;
     var startA = ~acidAmp ? 0.32;
     var startH = ~harmonyAmp ? 0.14;
-    Routine({
+    ~trickStop.(\reverbTail);
+    ~trickRoutines[\reverbTail] = Routine({
         ~sendReverb !? { ~sendReverb.(0.9) };
         ~setFx !? { ~setFx.(\rev, \room, 0.97); ~setFx.(\rev, \damp, 0.1) };
         ~kickAmp = 0; ~melodyAmp = 0; ~acidAmp = 0; ~harmonyAmp = 0;
@@ -851,7 +872,8 @@ s.sync;
         ~setFx.(\rev, \freeze, 1);
         ~sendReverb !? { ~sendReverb.(0.5) };
     };
-    Routine({
+    ~trickStop.(\tapeReverse);
+    ~trickRoutines[\tapeReverse] = Routine({
         dur.wait;
         ~setFx !? { ~setFx.(\rev, \freeze, 0) };
     }).play;
@@ -861,7 +883,8 @@ s.sync;
 // Swap : crossfade entre deux scenes (utilise scenes.scd ~scenes ou
 // simplement bascule deux preset par nom). Si ~scene helper existe.
 ~swap = { |sceneA, sceneB, dur = 4|
-    Routine({
+    ~trickStop.(\swap);
+    ~trickRoutines[\swap] = Routine({
         if (~scene.notNil) {
             // fade out current
             ~envSweep.(\melodyAmp, ~melodyAmp, 0, dur * 0.5, \lin, false);
@@ -879,7 +902,8 @@ s.sync;
 ~jumpCut = { |dur = 1|
     var startK = ~kickAmp; var startM = ~melodyAmp;
     var startA = ~acidAmp; var startH = ~harmonyAmp;
-    Routine({
+    ~trickStop.(\jumpCut);
+    ~trickRoutines[\jumpCut] = Routine({
         ~kickAmp = 0; ~melodyAmp = 0; ~acidAmp = 0; ~harmonyAmp = 0;
         ~reload !? { ~reload.value };
         dur.wait;
