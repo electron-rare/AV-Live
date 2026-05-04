@@ -8,18 +8,77 @@
 //
 //  PREREQUIS :
 //    - 01_live.scd > bloc [0] charge (engine + setupAll + wrappers)
-//    - cd web && npm install && npm start (lance le bridge sur :3000)
+//    - web/node_modules installes (npm install fait une fois)
 //
 //  USAGE :
-//    1. Lance le serveur : `cd web && npm start`
-//    2. Cmd+Entree sur le bloc ci-dessous
-//    3. Ouvre http://localhost:3000/control/ ou /hydra/
-//    4. ~webBridgeStop.value pour arreter
+//    Cmd+Entree sur le bloc ci-dessous. Le serveur Node demarre
+//    automatiquement (si pas deja actif) et les pages /control + /hydra
+//    s'ouvrent dans le navigateur par defaut.
+//      ~webBridgeStop.value     -- ferme les OSCdef SC
+//      ~webServerStop.value     -- tue le serveur Node
+//      ~webOpenPages.value      -- ouvre /control + /hydra a la main
 // =====================================================================
 (
 ~webBridgeNode = NetAddr("127.0.0.1", 57122);    // <- vers le serveur Node
 ~webBridgeIn   = 57121;                          // <- ecoute du serveur
 thisProcess.openUDPPort(~webBridgeIn);
+
+~webBase = ~base ?? { "/Users/electron/Documents/Projets_Creatifs/sound_algo/" };
+~webHttpUrl = "http://localhost:3000";
+
+// ---------- Auto-lancement serveur Node + ouverture pages -----------
+~webServerCheck = {
+    ("curl -sf " ++ ~webHttpUrl ++ "/api/health > /dev/null 2>&1").systemCmd == 0;
+};
+
+~webOpenUrl = { |url|
+    var cmd = switch (thisProcess.platform.name,
+        \osx,    "open " ++ url,
+        \linux,  "xdg-open " ++ url,
+        \windows, "start " ++ url,
+        "open " ++ url
+    );
+    cmd.unixCmd;
+};
+
+~webOpenPages = {
+    "[web_bridge] ouverture des pages...".postln;
+    ~webOpenUrl.(~webHttpUrl ++ "/control/");
+    ~webOpenUrl.(~webHttpUrl ++ "/hydra/");
+};
+
+~webServerStart = {
+    var webDir = ~webBase ++ "web";
+    if (~webServerCheck.()) {
+        "[web_bridge] serveur Node deja actif sur :3000".postln;
+        ~webOpenPages.();
+    } {
+        "[web_bridge] demarrage serveur Node en background...".postln;
+        ("cd " ++ webDir.shellQuote
+            ++ " && nohup node server.js > /tmp/sound_algo_web.log 2>&1 &"
+        ).unixCmd;
+        Routine({
+            var tries = 20, ready = false;
+            while { tries > 0 and: { ready.not } } {
+                0.5.wait;
+                ready = ~webServerCheck.();
+                tries = tries - 1;
+            };
+            if (ready) {
+                "[web_bridge] serveur Node ready".postln;
+                ~webOpenPages.();
+            } {
+                "[web_bridge] !! timeout au demarrage du serveur Node".postln;
+                "[web_bridge] !! voir /tmp/sound_algo_web.log".postln;
+            };
+        }).play(AppClock);
+    };
+};
+
+~webServerStop = {
+    "pkill -f 'node server.js' 2>/dev/null".unixCmd;
+    "[web_bridge] serveur Node stoppe (pkill node server.js)".postln;
+};
 
 // ---------- Helpers de dispatch --------------------------------------
 ~webBridgeDefs = List.new;
@@ -36,7 +95,7 @@ thisProcess.openUDPPort(~webBridgeIn);
     ~webBridgeDefs = List.new;
     ~webBeatRoutine !? { ~webBeatRoutine.stop };
     ~webAmpRoutine !? { ~webAmpRoutine.stop };
-    "[web_bridge] stopped".postln;
+    "[web_bridge] OSCdef + Routines stopped (serveur Node toujours actif, ~webServerStop pour tuer)".postln;
 };
 
 // ---------- Transport ------------------------------------------------
@@ -141,6 +200,10 @@ thisProcess.openUDPPort(~webBridgeIn);
 "=== web_bridge ready ===".postln;
 ("  Listen   : :" ++ ~webBridgeIn).postln;
 "  Send to  : 127.0.0.1:57122".postln;
-"  Stop     : ~webBridgeStop.value".postln;
+"  Stop SC  : ~webBridgeStop.value".postln;
+"  Stop web : ~webServerStop.value".postln;
 "  Webapp   : http://localhost:3000/".postln;
+
+// Auto-lancement serveur Node + ouverture pages /control + /hydra
+~webServerStart.value;
 )
