@@ -505,6 +505,7 @@
         ~loadFirstBlock.(~base ++ "live/loops.scd");
         ~loadFirstBlock.(~base ++ "palette/rhythm/fills.scd");
         ~loadAllBlocks.(~base ++ "palette/rhythm/sequences.scd");
+        ~loadAllBlocks.(~base ++ "palette/chords_progressions.scd");
         ~loadFirstBlock.(~base ++ "control/jump.scd");
 
         // 5 wrappers API live (~kk / ~mm / ~ff / ~cc / ~p) -- 1er bloc
@@ -575,6 +576,7 @@
         ~loadFirstBlock.(~base ++ "live/loops.scd");
         ~loadFirstBlock.(~base ++ "palette/rhythm/fills.scd");
         ~loadAllBlocks.(~base ++ "palette/rhythm/sequences.scd");
+        ~loadAllBlocks.(~base ++ "palette/chords_progressions.scd");
         ~loadFirstBlock.(~base ++ "control/jump.scd");
         // 5 wrappers API live (~kk / ~mm / ~ff / ~cc / ~p)
         ~loadFirstBlock.(~base ++ "live/kicks.scd");
@@ -638,6 +640,11 @@
         if (~jumpTo.isNil) {
             "ensure : jump.scd".postln;
             ~loadFirstBlock.(~base ++ "control/jump.scd");
+            loaded = loaded + 1;
+        };
+        if (~progDetroit.isNil or: { ~chordsToMelody.isNil }) {
+            "ensure : chords_progressions.scd".postln;
+            ~loadAllBlocks.(~base ++ "palette/chords_progressions.scd");
             loaded = loaded + 1;
         };
         // 5 wrappers API live (chacun expose un dict + des wrappers env)
