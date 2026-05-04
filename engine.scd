@@ -515,9 +515,9 @@ s.waitForBoot {
         Pdef(\kickSeq, Pbind(
             \instrument, \kick, \dur, 0.25,
             \amp, Pseq(~kickSteps.collect { |s| s * ~kickAmp }, inf),
-            \freq, ~kickFreq, \pitchAmt, ~kickPitchAmt,
-            \decay, ~kickDecay, \drive, ~kickDrive, \click, ~kickClick,
-            \scBus, ~scBus.index, \scShape, ~kickScShape,
+            \freq, Pfunc { ~kickFreq }, \pitchAmt, Pfunc { ~kickPitchAmt },
+            \decay, Pfunc { ~kickDecay }, \drive, Pfunc { ~kickDrive }, \click, Pfunc { ~kickClick },
+            \scBus, ~scBus.index, \scShape, Pfunc { ~kickScShape },
         ));
         Pdef(\hatSeq, Pbind(
             \instrument, \hat, \dur, 0.25,
@@ -526,7 +526,7 @@ s.waitForBoot {
         Pdef(\snareSeq, Pbind(
             \instrument, \snare, \dur, 0.25,
             \amp, Pseq(~snareSteps.collect { |s| s * ~snareAmp }, inf),
-            \freq, ~snareFreq, \noiseAmt, ~snareNoiseAmt, \decay, ~snareDecay,
+            \freq, Pfunc { ~snareFreq }, \noiseAmt, Pfunc { ~snareNoiseAmt }, \decay, Pfunc { ~snareDecay },
         ));
         Pdef(\clapSeq, Pbind(
             \instrument, \clap, \dur, 0.25,
@@ -535,7 +535,7 @@ s.waitForBoot {
         Pdef(\percSeq, Pbind(
             \instrument, ~percInst, \dur, 0.25,
             \amp, Pseq(~percSteps.collect { |s| s * ~percAmp }, inf),
-            \freq, if (~percInst == \tom) { ~tomFreq } { ~cowbellFreq },
+            \freq, Pfunc { if (~percInst == \tom) { ~tomFreq } { ~cowbellFreq } },
         ));
         Pdef(\acidSeq, PmonoArtic(\acid,
             \dur,        0.25,
@@ -543,53 +543,53 @@ s.waitForBoot {
             \midinote,   Pseq(~acidNotes, inf),
             \accent,     Pseq(~acidAccents, inf),
             \slideTime,  Pseq(~acidSlides.collect { |s| if(s == 1) {0.12} {0.005} }, inf),
-            \cutoff,     ~acidCutoff,
-            \cutoffEnv,  ~acidCutoffEnv,
-            \rq,         ~acidRq,
-            \drive,      ~acidDrive,
-            \amp,        ~acidAmp,
+            \cutoff,     Pfunc { ~acidCutoff },
+            \cutoffEnv,  Pfunc { ~acidCutoffEnv },
+            \rq,         Pfunc { ~acidRq },
+            \drive,      Pfunc { ~acidDrive },
+            \amp,        Pfunc { ~acidAmp },
             \scBus,      ~scBus.index,      // lit le sidechain
-            \scAmt,      ~acidScAmt,
+            \scAmt,      Pfunc { ~acidScAmt },
         ));
         Pdef(\melodySeq, Pbind(
             \instrument, ~melodyInst, \dur, 0.25,
             \legato,   0.9,
             \type,     Pseq(~melodyNotes.collect { |n| if(n > 0) { \note } { \rest } }, inf),
             \midinote, Pseq(~melodyNotes.collect { |n| if(n > 0) { n } { 60 } }, inf),
-            \cutoff,   ~melodyCutoff,
-            \rq,       ~melodyRq,
-            \attack,   ~melodyAttack,
-            \release,  ~melodyRelease,
-            \drive,    ~melodyDrive,
-            \sawAmt,   ~melodySawAmt,
-            \detune,      ~melodyDetune,
-            \wobbleRate,  ~melodyWobbleRate,    // pour fmBell
-            \wobbleDepth, ~melodyWobbleDepth,
-            \wobbleShape, ~melodyWobbleShape,
-            \subAmt,      ~melodySubAmt,
-            \amp,         ~melodyAmp * ~melodyBoost,
+            \cutoff,   Pfunc { ~melodyCutoff },
+            \rq,       Pfunc { ~melodyRq },
+            \attack,   Pfunc { ~melodyAttack },
+            \release,  Pfunc { ~melodyRelease },
+            \drive,    Pfunc { ~melodyDrive },
+            \sawAmt,   Pfunc { ~melodySawAmt },
+            \detune,      Pfunc { ~melodyDetune },
+            \wobbleRate,  Pfunc { ~melodyWobbleRate },    // pour fmBell
+            \wobbleDepth, Pfunc { ~melodyWobbleDepth },
+            \wobbleShape, Pfunc { ~melodyWobbleShape },
+            \subAmt,      Pfunc { ~melodySubAmt },
+            \amp,         Pfunc { ~melodyAmp * ~melodyBoost },
             \scBus,       ~scBus.index,
-            \scAmt,       ~leadScAmt,
+            \scAmt,       Pfunc { ~leadScAmt },
         ));
         // 2e voix : peut tourner en parallele avec une duree differente
         // (32th, 16th, 8th) pour creer du contrepoint / phasing
         Pdef(\harmonySeq, Pbind(
-            \instrument, ~harmonyInst, \dur, ~harmonyDur,
+            \instrument, ~harmonyInst, \dur, Pfunc { ~harmonyDur },
             \legato,   0.9,
             \type,     Pseq(~harmonyNotes.collect { |n| if(n > 0) { \note } { \rest } }, inf),
             \midinote, Pseq(~harmonyNotes.collect { |n| if(n > 0) { n } { 60 } }, inf),
-            \cutoff,   ~harmonyCutoff,
-            \rq,       ~harmonyRq,
-            \attack,   ~harmonyAttack,
-            \decay,    ~harmonyDecay,
-            \sustain,  ~harmonySustain,
-            \release,  ~harmonyRelease,
-            \drive,    ~harmonyDrive,
-            \detune,   ~harmonyDetune,
-            \sawAmt,   ~harmonySawAmt,
-            \amp,      ~harmonyAmp * ~melodyBoost,
+            \cutoff,   Pfunc { ~harmonyCutoff },
+            \rq,       Pfunc { ~harmonyRq },
+            \attack,   Pfunc { ~harmonyAttack },
+            \decay,    Pfunc { ~harmonyDecay },
+            \sustain,  Pfunc { ~harmonySustain },
+            \release,  Pfunc { ~harmonyRelease },
+            \drive,    Pfunc { ~harmonyDrive },
+            \detune,   Pfunc { ~harmonyDetune },
+            \sawAmt,   Pfunc { ~harmonySawAmt },
+            \amp,      Pfunc { ~harmonyAmp * ~melodyBoost },
             \scBus,    ~scBus.index,
-            \scAmt,    ~leadScAmt,
+            \scAmt,    Pfunc { ~leadScAmt },
         ));
     };
 

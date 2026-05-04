@@ -327,8 +327,14 @@ s.sync;
 //   doReload : si true, appelle ~reload a chaque step (utile pour les
 //              params lus dans Pdef -- pour des params pousses au Synth
 //              en live, mettre false)
+// IMPORTANT : doReload est maintenant FALSE par defaut (depuis le
+// refacto engine.scd avec Pfunc { ~xxx } sur les params scalaires).
+// Les Pdef lisent les ~xxx dynamiquement a chaque event, donc plus
+// besoin de rebuild les Pdef a chaque step LFO. Cela evitait une fuite
+// scsynth massive quand un LFO actif rebuilait Pdef(\acidSeq) =
+// PmonoArtic 20 fois/seconde.
 ~lfoTo = { |paramName, rate = 1.0, depth = 0.3, shape = \sin,
-           center = nil, doReload = true, pulseWidth = 0.5|
+           center = nil, doReload = false, pulseWidth = 0.5|
     var sym = paramName.asSymbol;
     var c = center ?? { ~getVar.(sym) ? 0 };
     var stepDur = 0.05;
