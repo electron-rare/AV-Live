@@ -27,6 +27,16 @@
 ~webBridgeIn   = 57121;                          // <- ecoute du serveur
 thisProcess.openUDPPort(~webBridgeIn);
 
+// Relais additionnels pour oscope-of (openFrameworks visualizer) sur :57123.
+// Tout /sync/* envoye au Node est aussi diffuse a ces adresses.
+~webBridgeRelays = [NetAddr("127.0.0.1", 57123)];
+
+// Wrapper d'envoi : Node + tous les relais
+~webBroadcast = { |path ...args|
+    ~webBridgeNode.sendMsg(path, *args);
+    ~webBridgeRelays.do { |addr| addr.sendMsg(path, *args) };
+};
+
 ~webBase = ~base ?? { "/Users/electron/Documents/Projets_Creatifs/sound_algo-refonte-v2/" };
 ~webHttpUrl = "http://localhost:3000";
 
@@ -97,21 +107,21 @@ thisProcess.openUDPPort(~webBridgeIn);
     var slides  = (~acidSlides  ? (0!16)).asArray.collect(_.asInteger);
     binVoices.do { |v, i|
         var arr = (currentEnvironment[binSyms[i]] ? (0!16)).asArray.collect(_.asInteger);
-        ~webBridgeNode.sendMsg(*(["/sync/steps", v.asString] ++ arr));
+        ~webBroadcast.value(*(["/sync/steps", v.asString] ++ arr));
     };
     noteVoices.do { |v, i|
         var arr = (currentEnvironment[noteSyms[i]] ? (0!16)).asArray.collect(_.asInteger);
-        ~webBridgeNode.sendMsg(*(["/sync/notes", v.asString] ++ arr));
+        ~webBroadcast.value(*(["/sync/notes", v.asString] ++ arr));
     };
     // Acid : accents + slides + params (cutoff/rq/drive/amp)
-    ~webBridgeNode.sendMsg(*(["/sync/acidAccents"] ++ accents));
-    ~webBridgeNode.sendMsg(*(["/sync/acidSlides"]  ++ slides));
-    ~webBridgeNode.sendMsg("/sync/acidParams",
+    ~webBroadcast.value(*(["/sync/acidAccents"] ++ accents));
+    ~webBroadcast.value(*(["/sync/acidSlides"]  ++ slides));
+    ~webBroadcast.value("/sync/acidParams",
         (~acidCutoff ? 800).asFloat,
         (~acidRq ? 0.15).asFloat,
         (~acidDrive ? 2.0).asFloat,
         (~acidAmp ? 0.3).asFloat);
-    ~webBridgeNode.sendMsg("/sync/harmonyAmp", (~harmonyAmp ? 0.14).asFloat);
+    ~webBroadcast.value("/sync/harmonyAmp", (~harmonyAmp ? 0.14).asFloat);
 };
 
 // ---------- Helpers de dispatch --------------------------------------
@@ -167,7 +177,7 @@ thisProcess.openUDPPort(~webBridgeIn);
     TempoClock.default.tempo = ~bpm / 60;
     // Debounce reload : evite de reload a chaque tick du slider
     ~webDebounce.(\webBpmReloadTask, 0.2, { ~reload.value });
-    ~webBridgeNode.sendMsg("/sync/bpm", ~bpm);
+    ~webBroadcast.value("/sync/bpm", ~bpm);
 });
 
 ~webBridgeAdd.("/control/masterVol", { |msg|
@@ -292,7 +302,7 @@ thisProcess.openUDPPort(~webBridgeIn);
         var letters = ~sections.keys.asArray.sort;
         letters.do { |k|
             var slugs = ~sections[k].keys.asArray.collect(_.asString);
-            ~webBridgeNode.sendMsg(*(["/sync/sections", k.asString] ++ slugs));
+            ~webBroadcast.value(*(["/sync/sections", k.asString] ++ slugs));
         };
     } {
         "[web_bridge] ~sections n/a".postln;
@@ -313,7 +323,7 @@ thisProcess.openUDPPort(~webBridgeIn);
             var trackCount = tracks.size;
             var totalSec = durations.sum.asInteger;
             var slugs = tracks.collect(_.asString);
-            ~webBridgeNode.sendMsg(*(["/sync/album", k.asString, title, trackCount, totalSec] ++ slugs));
+            ~webBroadcast.value(*(["/sync/album", k.asString, title, trackCount, totalSec] ++ slugs));
         };
     } {
         "[web_bridge] albums non charges (load tracks/_index.scd)".postln;
@@ -451,7 +461,7 @@ thisProcess.openUDPPort(~webBridgeIn);
 
 // ---------- Heartbeat ping/pong --------------------------------------
 ~webBridgeAdd.("/control/ping", {
-    ~webBridgeNode.sendMsg("/sync/pong", Main.elapsedTime);
+    ~webBroadcast.value("/sync/pong", Main.elapsedTime);
 });
 
 // ---------- Catalogue : SynthDefs et melodies -----------------------
@@ -464,7 +474,7 @@ thisProcess.openUDPPort(~webBridgeIn);
         var pn  = PathName(dir);
         var files = pn.files.select { |f| f.extension == "scd" };
         var names = files.collect { |f| f.fileNameWithoutExtension }.asArray.sort;
-        ~webBridgeNode.sendMsg(*(["/sync/synthdef", cat] ++ names));
+        ~webBroadcast.value(*(["/sync/synthdef", cat] ++ names));
     };
 });
 
@@ -474,7 +484,7 @@ thisProcess.openUDPPort(~webBridgeIn);
     if (~melodyBank.notNil) {
         ~melodyBank.keys.asArray.sort.do { |g|
             var names = ~melodyBank[g].asArray.collect(_.asString);
-            ~webBridgeNode.sendMsg(*(["/sync/melody", g.asString] ++ names));
+            ~webBroadcast.value(*(["/sync/melody", g.asString] ++ names));
         };
     } {
         "[web_bridge] ~melodyBank non charge".postln;
@@ -510,7 +520,7 @@ if (~webReloadOriginal.isNil and: { ~reload.notNil }) {
 ~webBeatRoutine !? { ~webBeatRoutine.stop };
 ~webBeatRoutine = Routine({
     inf.do {
-        ~webBridgeNode.sendMsg("/sync/beat", ~bpm ? 128);
+        ~webBroadcast.value("/sync/beat", ~bpm ? 128);
         (60 / (~bpm ? 128)).wait;
     };
 }).play(AppClock);
@@ -522,14 +532,14 @@ if (~webReloadOriginal.isNil and: { ~reload.notNil }) {
 ~webAmpRoutine !? { ~webAmpRoutine.stop };
 ~webAmpRoutine = Routine({
     inf.do {
-        ~webBridgeNode.sendMsg("/sync/amp", "kick",    ~kickAmp ? 0);
-        ~webBridgeNode.sendMsg("/sync/amp", "hat",     ~hatAmp ? 0);
-        ~webBridgeNode.sendMsg("/sync/amp", "snare",   ~snareAmp ? 0);
-        ~webBridgeNode.sendMsg("/sync/amp", "clap",    ~clapAmp ? 0);
-        ~webBridgeNode.sendMsg("/sync/amp", "perc",    ~percAmp ? 0);
-        ~webBridgeNode.sendMsg("/sync/amp", "melody",  ~melodyAmp ? 0);
-        ~webBridgeNode.sendMsg("/sync/amp", "acid",    ~acidAmp ? 0);
-        ~webBridgeNode.sendMsg("/sync/amp", "harmony", ~harmonyAmp ? 0);
+        ~webBroadcast.value("/sync/amp", "kick",    ~kickAmp ? 0);
+        ~webBroadcast.value("/sync/amp", "hat",     ~hatAmp ? 0);
+        ~webBroadcast.value("/sync/amp", "snare",   ~snareAmp ? 0);
+        ~webBroadcast.value("/sync/amp", "clap",    ~clapAmp ? 0);
+        ~webBroadcast.value("/sync/amp", "perc",    ~percAmp ? 0);
+        ~webBroadcast.value("/sync/amp", "melody",  ~melodyAmp ? 0);
+        ~webBroadcast.value("/sync/amp", "acid",    ~acidAmp ? 0);
+        ~webBroadcast.value("/sync/amp", "harmony", ~harmonyAmp ? 0);
         0.1.wait;
     };
 }).play(AppClock);
@@ -556,11 +566,11 @@ Server.default.sync;
 
 ~webRmsResp = OSCFunc({ |msg|
     // msg = ['/webRms', nodeID, replyID, amp]
-    ~webBridgeNode.sendMsg("/sync/rms", "master", msg[3].asFloat);
+    ~webBroadcast.value("/sync/rms", "master", msg[3].asFloat);
 }, '/webRms', Server.default.addr);
 
 // Annonce initiale
-~webBridgeNode.sendMsg("/sync/bpm", ~bpm ? 128);
+~webBroadcast.value("/sync/bpm", ~bpm ? 128);
 ~webBroadcastSteps.();
 
 "=== web_bridge ready ===".postln;
