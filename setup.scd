@@ -559,6 +559,11 @@
     (~base ++ "palette/harmonics/index.scd").load;
 
     // --- 2. Boot serveur (skip si deja boote) puis init modules live ---
+    // Augmente maxSynthDefs (defaut 1024) car le projet en charge >1100
+    // (1060 dans synth/ + ~40 dans fx/ + inline). A passer en option scsynth
+    // AVANT s.boot, sinon les SynthDef au-dela de 1024 echouent
+    // silencieusement avec "Could not add SynthDef X".
+    s.options.maxSynthDefs = 4096;
     if (s.serverRunning) {
         "=== ~setupAll : serveur deja boote, skip waitForBoot ===".postln;
         liveSetup.value;

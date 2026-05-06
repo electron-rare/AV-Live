@@ -58,6 +58,8 @@
 };
 
 s = Server.internal;
+// Headroom : 1099 SynthDef dans synth/ + fx/, defaut 1024
+s.options.maxSynthDefs = 4096;
 s.waitForBoot({
     Routine({
         "  [INFO] Server.internal booted".postln;
