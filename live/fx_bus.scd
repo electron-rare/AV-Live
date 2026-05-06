@@ -39,124 +39,34 @@
 );
 
 // --- REVERB (FreeVerb stereo + freeze) ---
-SynthDef(\fxReverb, {
-    arg in, out = 0, mix = 0.4, room = 0.85, damp = 0.4,
-        freeze = 0, amp = 1.0;
-    var sig = In.ar(in, 2);
-    sig = FreeVerb2.ar(sig[0], sig[1],
-        Select.kr(freeze, [mix, 1.0]),
-        Select.kr(freeze, [room, 0.999]),
-        Select.kr(freeze, [damp, 0.001]));
-    Out.ar(out, sig * amp);
-}).add;
+
 
 // --- DELAY ping-pong avec saturation tape ---
-SynthDef(\fxDelay, {
-    arg in, out = 0, delayTime = 0.375, feedback = 0.5,
-        mix = 0.5, color = 0.3, amp = 1.0;
-    var dry, wet, l, r, fb;
-    dry = In.ar(in, 2);
-    fb = LocalIn.ar(2);                  // vrai feedback stereo
-    l = DelayC.ar(fb[1] + dry[0], 2.0, delayTime) * feedback;   // ping
-    r = DelayC.ar(fb[0] + dry[1], 2.0, delayTime) * feedback;   // pong
-    // Color : LPF pour effet tape vintage
-    l = LPF.ar(l, color.linexp(0, 1, 800, 16000));
-    r = LPF.ar(r, color.linexp(0, 1, 800, 16000));
-    LocalOut.ar([l, r]);
-    wet = [l, r];
-    Out.ar(out, ((dry * (1 - mix)) + (wet * mix)) * amp);
-}).add;
+
 
 // --- CHORUS (modulation stereo) ---
-SynthDef(\fxChorus, {
-    arg in, out = 0, rate = 0.4, depth = 0.005,
-        mix = 0.5, amp = 1.0;
-    var sig = In.ar(in, 2);
-    var l = DelayC.ar(sig[0], 0.05, SinOsc.kr(rate, 0).range(0.005, 0.005 + depth));
-    var r = DelayC.ar(sig[1], 0.05, SinOsc.kr(rate, pi).range(0.005, 0.005 + depth));
-    var wet = [l, r];
-    Out.ar(out, ((sig * (1 - mix)) + (wet * mix)) * amp);
-}).add;
+
 
 // --- PHASER (4-stage allpass + LFO) ---
-SynthDef(\fxPhaser, {
-    arg in, out = 0, rate = 0.3, depth = 0.7, feedback = 0.4,
-        mix = 0.5, amp = 1.0;
-    var dry = In.ar(in, 2);
-    var lfo = SinOsc.kr(rate).range(200, 200 + (3000 * depth));
-    var sig = AllpassN.ar(dry, 0.01, lfo.reciprocal, 0.05);
-    sig = AllpassN.ar(sig, 0.01, (lfo * 1.3).reciprocal, 0.05);
-    sig = AllpassN.ar(sig, 0.01, (lfo * 1.7).reciprocal, 0.05);
-    sig = AllpassN.ar(sig + (LocalIn.ar(2) * feedback), 0.01, (lfo * 2.1).reciprocal, 0.05);
-    LocalOut.ar(sig);
-    Out.ar(out, ((dry * (1 - mix)) + (sig * mix)) * amp);
-}).add;
+
 
 // --- FLANGER (court delay + LFO + feedback) ---
-SynthDef(\fxFlanger, {
-    arg in, out = 0, rate = 0.2, depth = 0.003, feedback = 0.6,
-        mix = 0.5, amp = 1.0;
-    var dry = In.ar(in, 2);
-    var lfo = SinOsc.kr(rate).range(0.0005, 0.0005 + depth);
-    var fb = LocalIn.ar(2) * feedback;
-    var sig = DelayC.ar(dry + fb, 0.02, lfo);
-    LocalOut.ar(sig);
-    Out.ar(out, ((dry * (1 - mix)) + (sig * mix)) * amp);
-}).add;
+
 
 // --- BITCRUSHER (lo-fi sample rate + bit depth) ---
-SynthDef(\fxBitcrush, {
-    arg in, out = 0, bits = 8, sampleRate = 8000,
-        mix = 0.6, amp = 1.0;
-    var dry = In.ar(in, 2);
-    // Bit reduction native (sans Decimator de sc3-plugins)
-    var step = 2.pow(bits - 1);
-    var crushed = (dry * step).round / step;
-    var sig = Latch.ar(crushed, Impulse.ar(sampleRate));
-    Out.ar(out, ((dry * (1 - mix)) + (sig * mix)) * amp);
-}).add;
+
 
 // --- TAPE (saturation analog + wow/flutter) ---
-SynthDef(\fxTape, {
-    arg in, out = 0, drive = 1.5, wow = 0.0015, flutter = 0.0008,
-        mix = 1.0, amp = 1.0;
-    var dry = In.ar(in, 2);
-    var modL = SinOsc.kr(0.3).range(0, wow) + LFNoise2.kr(8).range(0, flutter);
-    var modR = SinOsc.kr(0.31).range(0, wow) + LFNoise2.kr(8).range(0, flutter);
-    var sig = [DelayC.ar(dry[0], 0.02, 0.005 + modL),
-               DelayC.ar(dry[1], 0.02, 0.005 + modR)];
-    sig = (sig * drive).tanh / drive.sqrt;
-    sig = LPF.ar(sig, 12000);   // EQ tape rolloff aigu
-    Out.ar(out, ((dry * (1 - mix)) + (sig * mix)) * amp);
-}).add;
+
 
 // --- SHIMMER REVERB (octave up + reverb hall) ---
-SynthDef(\fxShimmer, {
-    arg in, out = 0, mix = 0.5, room = 0.92, shimmer = 0.5, amp = 1.0;
-    var dry = In.ar(in, 2);
-    var pitched = PitchShift.ar(dry, 0.2, 2, 0.01, 0.005) * shimmer;
-    var sig = FreeVerb2.ar(dry[0] + pitched[0], dry[1] + pitched[1],
-        1.0, room, 0.3);
-    Out.ar(out, ((dry * (1 - mix)) + (sig * mix)) * amp);
-}).add;
+
 
 // --- DISTORTION (overdrive + tone) ---
-SynthDef(\fxDist, {
-    arg in, out = 0, drive = 3.0, tone = 0.5,
-        mix = 1.0, amp = 1.0;
-    var dry = In.ar(in, 2);
-    var sig = (dry * drive).tanh;
-    sig = (sig * 1.5).tanh;
-    sig = MoogFF.ar(sig, tone.linexp(0, 1, 500, 12000), 1.5);
-    Out.ar(out, ((dry * (1 - mix)) + (sig * mix)) * amp);
-}).add;
+
 
 // --- SEND (copie audio vers un FX bus, ratio reglable) ---
-SynthDef(\fxSend, {
-    arg srcBus = 0, dstBus, amount = 0.3;
-    var sig = In.ar(srcBus, 2);
-    Out.ar(dstBus, sig * amount);
-}).add;
+
 
 s.sync;
 
@@ -280,65 +190,76 @@ s.sync;
 };
 
 // ---------- PRESETS FX (combos pret a l'emploi par genre) ------------
+//
+// REVERT : ~fxPresetReset retiree car cause une fuite/crash explosive
+// sclang quand combinee avec switch+sub-calls. La cascade des sends
+// reste un probleme connu mais geree par ~ff.(\dry) explicit reset.
+~fxPresetReset = nil;
+
+// Dispatch via dictionary pour eviter le bug de switch() qui crashe sclang
+// avec 11 cases sur certaines versions SC.
+~fxPresetTable = (
+    dry: {
+        [\rev,\dly,\chr,\phs,\flg,\crsh,\tape,\shim,\dist]
+            .do { |k| ~send.(k, 0) };
+        "preset DRY".postln;
+    },
+    dub: {
+        ~sendReverb.(0.5);  ~sendDelay.(0.6); ~sendTape.(0.7);
+        ~setFx.(\dly, \delayTime, 0.5);
+        ~setFx.(\dly, \feedback, 0.7);
+        ~setFx.(\rev, \room, 0.92);
+        "preset DUB (rev hall + delay long + tape)".postln;
+    },
+    space: {
+        ~sendReverb.(0.55); ~sendShimmer.(0.4); ~sendChorus.(0.3);
+        ~setFx.(\rev, \room, 0.95);
+        "preset SPACE (shimmer + reverb + chorus)".postln;
+    },
+    trance: {
+        ~sendReverb.(0.35); ~sendDelay.(0.4); ~sendChorus.(0.5);
+        ~setFx.(\dly, \delayTime, 0.375);
+        ~setFx.(\dly, \feedback, 0.5);
+        "preset TRANCE (rev + delay 1/8 + chorus)".postln;
+    },
+    dubstep: {
+        ~sendReverb.(0.2);  ~sendDist.(0.3); ~sendBitcrush.(0.2);
+        ~setFx.(\dist, \drive, 4); ~setFx.(\dist, \tone, 0.4);
+        ~setFx.(\crsh, \bits, 6);
+        "preset DUBSTEP (dist + bitcrush + reverb)".postln;
+    },
+    retro: {
+        ~sendBitcrush.(0.4); ~sendTape.(1.0); ~sendChorus.(0.4);
+        ~setFx.(\crsh, \bits, 8); ~setFx.(\crsh, \sampleRate, 12000);
+        ~setFx.(\tape, \drive, 1.8);
+        "preset RETRO (bitcrush + tape + chorus)".postln;
+    },
+    industrial: {
+        ~sendDist.(0.6); ~sendFlanger.(0.4); ~sendBitcrush.(0.3);
+        ~setFx.(\dist, \drive, 5);
+        ~setFx.(\flg, \rate, 0.15); ~setFx.(\flg, \feedback, 0.7);
+        "preset INDUSTRIAL (dist + flanger + bitcrush)".postln;
+    },
+    dream: {
+        ~sendShimmer.(0.6); ~sendReverb.(0.5); ~sendChorus.(0.4);
+        ~setFx.(\shim, \shimmer, 0.7);
+        "preset DREAM (shimmer + reverb + chorus)".postln;
+    },
+    cosmic: {
+        ~sendPhaser.(0.5); ~sendShimmer.(0.4); ~sendReverb.(0.4);
+        ~lfo.(\phs, \rate, 0.05, 0.1, 0.8);
+        "preset COSMIC (phaser LFO + shimmer + reverb)".postln;
+    },
+    drone: {
+        ~sendReverb.(0.7); ~sendShimmer.(0.5);
+        ~setFx.(\rev, \freeze, 1); ~setFx.(\rev, \room, 0.99);
+        "preset DRONE (reverb FROZEN + shimmer)".postln;
+    }
+);
+
 ~fxPreset = { |name|
-    switch (name,
-        \dry, {
-            [\rev,\dly,\chr,\phs,\flg,\crsh,\tape,\shim,\dist]
-                .do { |k| ~send.(k, 0) };
-            "preset DRY".postln;
-        },
-        \dub, {
-            ~sendReverb.(0.5);  ~sendDelay.(0.6); ~sendTape.(0.7);
-            ~setFx.(\dly, \delayTime, 0.5);
-            ~setFx.(\dly, \feedback, 0.7);
-            ~setFx.(\rev, \room, 0.92);
-            "preset DUB (rev hall + delay long + tape)".postln;
-        },
-        \space, {
-            ~sendReverb.(0.55); ~sendShimmer.(0.4); ~sendChorus.(0.3);
-            ~setFx.(\rev, \room, 0.95);
-            "preset SPACE (shimmer + reverb + chorus)".postln;
-        },
-        \trance, {
-            ~sendReverb.(0.35); ~sendDelay.(0.4); ~sendChorus.(0.5);
-            ~setFx.(\dly, \delayTime, 0.375);
-            ~setFx.(\dly, \feedback, 0.5);
-            "preset TRANCE (rev + delay 1/8 + chorus)".postln;
-        },
-        \dubstep, {
-            ~sendReverb.(0.2);  ~sendDist.(0.3); ~sendBitcrush.(0.2);
-            ~setFx.(\dist, \drive, 4); ~setFx.(\dist, \tone, 0.4);
-            ~setFx.(\crsh, \bits, 6);
-            "preset DUBSTEP (dist + bitcrush + reverb)".postln;
-        },
-        \retro, {
-            ~sendBitcrush.(0.4); ~sendTape.(1.0); ~sendChorus.(0.4);
-            ~setFx.(\crsh, \bits, 8); ~setFx.(\crsh, \sampleRate, 12000);
-            ~setFx.(\tape, \drive, 1.8);
-            "preset RETRO (bitcrush + tape + chorus)".postln;
-        },
-        \industrial, {
-            ~sendDist.(0.6); ~sendFlanger.(0.4); ~sendBitcrush.(0.3);
-            ~setFx.(\dist, \drive, 5);
-            ~setFx.(\flg, \rate, 0.15); ~setFx.(\flg, \feedback, 0.7);
-            "preset INDUSTRIAL (dist + flanger + bitcrush)".postln;
-        },
-        \dream, {
-            ~sendShimmer.(0.6); ~sendReverb.(0.5); ~sendChorus.(0.4);
-            ~setFx.(\shim, \shimmer, 0.7);
-            "preset DREAM (shimmer + reverb + chorus)".postln;
-        },
-        \cosmic, {
-            ~sendPhaser.(0.5); ~sendShimmer.(0.4); ~sendReverb.(0.4);
-            ~lfo.(\phs, \rate, 0.05, 0.1, 0.8);
-            "preset COSMIC (phaser LFO + shimmer + reverb)".postln;
-        },
-        \drone, {
-            ~sendReverb.(0.7); ~sendShimmer.(0.5);
-            ~setFx.(\rev, \freeze, 1); ~setFx.(\rev, \room, 0.99);
-            "preset DRONE (reverb FROZEN + shimmer)".postln;
-        }
-    );
+    var fn = ~fxPresetTable[name.asSymbol];
+    if (fn.notNil) { fn.value } { ("!! preset " ++ name ++ " inconnu").postln };
 };
 
 "=== 9 FX BUSES + master limiter en queue ===".postln;

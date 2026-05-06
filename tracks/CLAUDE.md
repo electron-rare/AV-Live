@@ -1,7 +1,29 @@
-# tracks/ — Tracks autonomes A-W
+# tracks/ — Albums A-W (15 tracks par lettre)
 
-23 tracks live, une lettre par track, ~5-10 minutes chacune.
-Cmd+Entree sur le bloc `(...)` pour lancer.
+23 albums live, une lettre par album, 15 tracks par album. Chaque
+track est autonome, 4-8 minutes : Cmd+Entree sur le bloc `(...)` pour
+la lancer.
+
+## Structure album
+
+```text
+tracks/
+  <L>_<slug>/             ex: A_acid_journey/
+    _album.scd            orchestrateur (~playAlbum.(\A) / ~playTrack.(\A, n))
+    <L>01_<sub_slug>.scd  ex: A01_acid_journey.scd  (track 1)
+    <L>02_<sub_slug>.scd  ex: A02_minimal_acid.scd  (track 2)
+    ...
+    <L>15_<sub_slug>.scd  ex: A15_acid_finale.scd   (track 15)
+```
+
+Conventions album :
+
+- 15 tracks numerotees `<L>01` a `<L>15`, sub-styles varies (BPM
+  progressif, gammes differentes, instruments variant)
+- `_album.scd` declare `~albums[\<L>]` (titre, ordre, durees) et
+  expose `~playTrack.(\<L>, n)` / `~playAlbum.(\<L>)` / `~stopAlbum.()`
+- Le prefixe `_` exclut le fichier du test E2E `e2e_09_tracks`
+  (c'est un orchestrateur multi-bloc, pas une track autonome)
 
 ## Structure type
 

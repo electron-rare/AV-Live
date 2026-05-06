@@ -9,7 +9,7 @@
 
 "=== e2e_10_timestamps ===".postln;
 
-~base = "/Users/electron/Documents/Projets_Creatifs/sound_algo/";
+~base = "/Users/electron/Documents/Projets_Creatifs/sound_algo-refonte-v2/";
 ~testCount = 0;
 ~testFailed = 0;
 
@@ -41,10 +41,10 @@
 
 // Extrait les couples (timestamp_seconds, line_number) d'un fichier
 // en cherchant les "[X M:SS] ...".postln; ou .postln (parenthese).
-~extractTimestamps = { |srcLines, letter|
+~extractTimestamps = { |srcLines, tag|
     var pattern, results = List.new;
-    // pattern : [<letter> <m>:<ss>]
-    pattern = "[" ++ letter ++ " ";
+    // pattern : [<tag> <m>:<ss>]   ex: [A 0:00] ou [A02 1:30]
+    pattern = "[" ++ tag ++ " ";
     srcLines.do { |line, i|
         var startIdx, endIdx, tsStr, ts;
         startIdx = line.find(pattern);
@@ -64,13 +64,15 @@
 
 // Verifie monotonie pour une track donnee
 ~checkTrack = { |trackPath|
-    var fileName, src, lines, letter, timestamps, prevTs, allOk;
+    var fileName, src, lines, tag, timestamps, prevTs, allOk;
     fileName = PathName(trackPath).fileName;
-    // letter = premier char du nom (A_acid_journey -> A)
-    letter = fileName[0].asString;
+    // tag = portion avant le premier '_' du nom de fichier
+    //   A_acid_journey.scd       -> "A"   (legacy standalone)
+    //   A02_minimal_acid.scd     -> "A02" (album sub-track v2)
+    tag = fileName.split($_)[0];
     src = File.readAllString(trackPath);
     lines = src.split($\n);
-    timestamps = ~extractTimestamps.(lines, letter);
+    timestamps = ~extractTimestamps.(lines, tag);
 
     // Au moins 2 timestamps attendus (intro + outro minimum)
     ~assert.(fileName ++ " has timestamps",
@@ -85,7 +87,7 @@
         if (ts < prevTs) {
             allOk = false;
             ("    -> regression line " ++ lineNum
-                ++ " : [" ++ letter ++ " " ++ tsStr ++ "] vient apres "
+                ++ " : [" ++ tag ++ " " ++ tsStr ++ "] vient apres "
                 ++ prevTs).postln;
         };
         prevTs = ts;
@@ -93,11 +95,22 @@
     ~assert.(fileName ++ " timestamps monotones", allOk);
 };
 
-// Iter sur tous les tracks/*.scd
-PathName(~base ++ "tracks/").files.do { |pn|
-    if (pn.fullPath.endsWith(".scd")) {
-        ~checkTrack.(pn.fullPath);
+// Iter recursif : tracks/*.scd ET tracks/<album>/*.scd
+// Skip prefixe "_" (orchestrateurs : _index.scd, _album.scd -- ils ne
+// contiennent pas de timestamps de sections, c'est de la metadonnee).
+~scanForTs = { |dirPath|
+    PathName(dirPath).entries.do { |entry|
+        if (entry.isFolder) {
+            ~scanForTs.(entry.fullPath);
+        } {
+            if (entry.fullPath.endsWith(".scd") and: {
+                entry.fileName.beginsWith("_").not
+            }) {
+                ~checkTrack.(entry.fullPath);
+            };
+        };
     };
 };
+~scanForTs.(~base ++ "tracks/");
 
 ~report.value;

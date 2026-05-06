@@ -9,7 +9,7 @@
 
 "=== e2e_02_load ===".postln;
 
-~base = "/Users/electron/Documents/Projets_Creatifs/sound_algo/";
+~base = "/Users/electron/Documents/Projets_Creatifs/sound_algo-refonte-v2/";
 ~testCount = 0;
 ~testFailed = 0;
 
@@ -31,7 +31,7 @@
 };
 
 // Charge le PREMIER bloc top-level (...) d'un fichier multi-blocs
-// (utile pour palette/rhythm/fills.scd qui contient en fin des blocs '( ~snareFill.value; )' de demo).
+// (utilitaire generique conserve pour usage futur).
 ~loadFirstBlock = { |path|
     var src = File.readAllString(path);
     var lines, block, capturing, done, balance;
@@ -70,12 +70,11 @@ s.waitForBoot({
         2.wait;
         s.sync;
 
-        try { (~base ++ "synthdefs/asia.scd").load }      { |e| ("  [INFO] asia: "  ++ e.errorString).postln };
-        try { (~base ++ "synthdefs/extra.scd").load }     { |e| ("  [INFO] extra: " ++ e.errorString).postln };
-        try { (~base ++ "synthdefs/authentic.scd").load } { |e| ("  [INFO] authn: " ++ e.errorString).postln };
+        try { (~base ++ "synth/_index.scd").load } { |e| ("  [INFO] synth: " ++ e.errorString).postln };
+        try { (~base ++ "fx/_index.scd").load }    { |e| ("  [INFO] fx: "    ++ e.errorString).postln };
 
-        try { ~loadFirstBlock.(~base ++ "palette/rhythm/fills.scd") } { |e|
-            ("  [INFO] fills: " ++ e.errorString).postln };
+        try { (~base ++ "palette/rhythm/_index.scd").load } { |e|
+            ("  [INFO] palette/rhythm: " ++ e.errorString).postln };
         // Charge scales + harmonics (sources de ~genMelody et ~enableHarmony
         // depuis la reorganisation -- engine.scd ne les definit plus).
         try { (~base ++ "palette/scales.scd").load } { |e|

@@ -1,32 +1,26 @@
 // =====================================================================
-//  palette/melodies/index.scd  --  loader du module melodies (split)
+//  palette/melodies/index.scd  --  loader recursif (post-split v2)
 //
-//  NOTE : les scales et helpers genMelody/mutate/octavate/transpose
-//  /retrograde/densify/sparsify/jitter/genAcidNotes/genAcidAccents
-//  /genAcidSlides/genKickPattern/randomTweak ont ete deplaces dans
-//  palette/scales.scd (un cran au-dessus). 00_load.scd les charge
-//  AVANT ce module via CHARGER TOUT.
+//  Charge :
+//    helpers.scd                (helpers melodiques)
+//    short/<*.scd>              ~m1..~m78 + ~m{Genre}100..
+//    long/<*.scd>               ~ml1..~ml30 + ~ml{Genre}100..
+//    xlong/<*.scd>              ~mxl1..~mxl15 + ~mxl{Genre}100..
+//    epic/<*.scd>               ~mepic1..~mepic10 + ~mepic{Genre}100..
+//    bank.scd                   ~melodyBank + selecteurs
+//    tracks.scd                 systeme multi-pistes
 //
-//  Charge dans l'ordre :
-//    helpers.scd      stretch/chain/mirror/sequenceUp/callResponse/...
-//    short.scd        ~m1..~m78    (32 pas)
-//    long.scd         ~ml1..~ml30  (64 pas)
-//    xlong.scd        ~mxl1..~mxl15(96 pas)
-//    epic.scd         ~mepic1..~mepic10 (128 pas)
-//    bank.scd         ~melodyBank + selecteurs
-//    tracks.scd       systeme multi-pistes (charge en DERNIER)
-//
-//  Usage : (~base ++ "palette/melodies/index.scd").load;
 //  Un seul bloc top-level (compatible .load).
 // =====================================================================
 (
 var dir = thisProcess.nowExecutingPath.dirname;
 (dir +/+ "helpers.scd").load;
-(dir +/+ "short.scd").load;
-(dir +/+ "long.scd").load;
-(dir +/+ "xlong.scd").load;
-(dir +/+ "epic.scd").load;
+["short", "long", "xlong", "epic"].do { |sub|
+    PathName(dir +/+ sub).files.do { |f|
+        if (f.extension == "scd") { f.fullPath.load };
+    };
+};
 (dir +/+ "bank.scd").load;
 (dir +/+ "tracks.scd").load;
-"=== melodies module loaded ===".postln;
+"=== melodies module loaded (recursive) ===".postln;
 )

@@ -24,11 +24,10 @@
 //   + mixer + scenes + loops + fills + sequences + jump. Termine par
 //   un ~check.() qui rapporte l'etat de chaque module.
 (
-~base = "/Users/electron/Documents/Projets_Creatifs/sound_algo/";
+~base = "/Users/electron/Documents/Projets_Creatifs/sound_algo-refonte-v2/";
 (~base ++ "engine.scd").load;
-(~base ++ "synthdefs/asia.scd").load;
-(~base ++ "synthdefs/extra.scd").load;
-(~base ++ "synthdefs/authentic.scd").load;
+(~base ++ "synth/_index.scd").load;
+(~base ++ "fx/_index.scd").load;
 (~base ++ "palette/scales.scd").load;
 (~base ++ "palette/melodies/index.scd").load;
 (~base ++ "palette/harmonics/index.scd").load;

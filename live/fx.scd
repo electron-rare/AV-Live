@@ -79,6 +79,8 @@
 ~fx[\stutter]   = { |rate = 8, dur = 1| ~stutter !? { ~stutter.(rate, dur) } };
 ~fx[\freezeR]   = { |dur = 4|     ~freeze     !? { ~freeze.(dur) } };
 ~fx[\tapeStop]  = { |dur = 2|     ~tapeStop   !? { ~tapeStop.(dur) } };
+~fx[\tapeStart] = { |dur = 2, t|  ~tapeStart  !? { ~tapeStart.(dur, t) } };
+~fx[\playAll]   = {               ~playAll    !? { ~playAll.() } };
 ~fx[\tapeRev]   = { |dur = 4|     ~tapeReverse!? { ~tapeReverse.(dur) } };
 ~fx[\handsUp]   = {               ~handsUp    !? { ~handsUp.() } };
 ~fx[\jumpCut]   = { |dur = 0.5|   ~jumpCut    !? { ~jumpCut.(dur) } };
@@ -170,7 +172,11 @@
 };
 
 // --- API utilisateur : variables d'env top-level --------------------
-~fxPreset    = { |name = \dry| ~fx[\preset].(name) };
+// SUPPRIME : ~fxPreset etait redefinie ici en wrapper de ~fx[\preset],
+// mais ~fx[\preset] appelle DEJA ~fxPreset -> RECURSION INFINIE.
+// Cause de la fuite RAM 40GB+ historique. ~fxPreset reste celui de
+// fx_bus.scd (vraie implementation). ~ff l'alias court reste plus bas.
+// ~fxPreset = { |name = \dry| ~fx[\preset].(name) };  // SUPPRIME
 ~fxSnd       = { |fxName, amount = 0.3| ~fx[\snd].(fxName, amount) };
 ~fxSt        = { |fxName, param, value| ~fx[\st].(fxName, param, value) };
 ~fxTp        = { ~fx[\tp].() };
@@ -182,6 +188,8 @@
 ~fxStutter   = { |rate = 8, dur = 1| ~fx[\stutter].(rate, dur) };
 ~fxFreezeR   = { |dur = 4| ~fx[\freezeR].(dur) };
 ~fxTapeStop  = { |dur = 2| ~fx[\tapeStop].(dur) };
+~fxTapeStart = { |dur = 2, t| ~fx[\tapeStart].(dur, t) };
+~fxPlayAll   = { ~fx[\playAll].() };
 ~fxTapeRev   = { |dur = 4| ~fx[\tapeRev].(dur) };
 ~fxHandsUp   = { ~fx[\handsUp].() };
 ~fxJumpCut   = { |dur = 0.5| ~fx[\jumpCut].(dur) };

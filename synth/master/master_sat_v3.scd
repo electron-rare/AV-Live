@@ -1,0 +1,15 @@
+// synth/master/master_sat_v3.scd  --  SynthDef \master_sat_v3  // variation master stereo widener
+(
+SynthDef(\master_sat_v3, {
+    arg width = 1.2, delay = 0.005, makeup = 1.05;
+    var sig, l, r, mid, side;
+    sig = In.ar(0, 2);
+    mid = (sig[0] + sig[1]) * 0.5;
+    side = (sig[0] - sig[1]) * 0.5 * width;
+    side = DelayC.ar(side, 0.01, delay);
+    l = mid + side;
+    r = mid - side;
+    sig = [l, r] * makeup;
+    ReplaceOut.ar(0, sig);
+}).add;
+)

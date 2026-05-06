@@ -79,7 +79,13 @@ wss.on("connection", (ws) => {
         }
         // Format : { address: "/control/bpm", args: [128] }
         if (typeof msg.address === "string" && Array.isArray(msg.args)) {
-            sendToSC(msg.address, msg.args);
+            // Routage direct browser->browser pour /hydra/* (control -> hydra)
+            // pas besoin de passer par SC : on broadcast immediatement.
+            if (msg.address.startsWith("/hydra/")) {
+                broadcast({ address: msg.address, args: msg.args });
+            } else {
+                sendToSC(msg.address, msg.args);
+            }
         } else {
             console.warn("[ws] message mal forme:", msg);
         }

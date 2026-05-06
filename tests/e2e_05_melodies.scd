@@ -8,7 +8,7 @@
 
 "=== e2e_05_melodies ===".postln;
 
-~base = "/Users/electron/Documents/Projets_Creatifs/sound_algo/";
+~base = "/Users/electron/Documents/Projets_Creatifs/sound_algo-refonte-v2/";
 ~testCount = 0;
 ~testFailed = 0;
 
@@ -74,23 +74,30 @@ s.waitForBoot({
             ("scales err: " ++ e.errorString).postln };
         s.sync;
 
-        // Charge chaque sous-fichier melodies bloc par bloc
-        [
-            "palette/melodies/helpers.scd",
-            "palette/melodies/short.scd",
-            "palette/melodies/long.scd",
-            "palette/melodies/xlong.scd",
-            "palette/melodies/epic.scd",
+        // Charge melodies : helpers.scd + sous-dossiers eclates
+        // (short/long/xlong/epic = 2898 fichiers a la v2) + bank + tracks
+        // Construction dynamique de la liste (index.scd lui-meme passe par
+        // PathName.deepFiles donc on reproduit la meme strategie ici pour
+        // les tests bloc par bloc).
+        blocks = List.new;
+        ([
+            "palette/melodies/helpers.scd"
+        ] ++ (
+            ["short", "long", "xlong", "epic"].collect { |sub|
+                PathName(~base ++ "palette/melodies/" ++ sub ++ "/").files
+                    .select { |pn| pn.extension == "scd" }
+                    .collect { |pn| pn.fullPath.replace(~base, "") };
+            }.flatten
+        ) ++ [
             "palette/melodies/bank.scd",
             "palette/melodies/tracks.scd"
-        ].do { |relPath|
+        ]).do { |relPath|
             var bs = ~loadAllBlocks.(~base ++ relPath);
             bs.do { |b|
                 idx = idx + 1;
                 try { b.interpret } { |e| nFail = nFail + 1;
                     ("    !! " ++ relPath ++ " bloc#" ++ idx ++ " : " ++ e.errorString).postln };
             };
-            blocks = blocks ?? { List.new };
             bs.do { |b| blocks.add(b) };
         };
         ~assert.("melodies module : " ++ blocks.size ++ " blocs interpretes",
@@ -156,16 +163,17 @@ s.waitForBoot({
         //     finit par utiliser la nouvelle valeur (preuve que le bank ne
         //     stocke pas une copie figee de l'ancienne).
         ~m29 = [99, 99, 99];
-        // Le bank \acid contient \m29 entre autres. On boucle jusqu'a 30
-        // tentatives pour avoir une chance d'aterrir sur \m29.
+        // Le bank \acid contient \m29 parmi ~130 entrees (post-split v2).
+        // P(hit sur N essais) = 1 - (126/127)^N. Pour 99% on a besoin de
+        // N >= 580. On utilise 1000 pour avoir une marge confortable.
         lookupHits = 0;
-        50.do {
+        1000.do {
             ~melodyByGenre.(\acid);
             if (~melodyNotes == [99, 99, 99]) { lookupHits = lookupHits + 1 };
         };
         ~assert.("~melodyByGenre lookup indirect (m29 modifie pris en compte)",
             lookupHits > 0,
-            "0 hits sur 50 essais -- bank a peut-etre fige les valeurs");
+            "0 hits sur 1000 essais -- bank a peut-etre fige les valeurs");
 
         // --- ~stretchPattern.([1,2,3,4], 2) -> 8 elements ---
         ~assert.("~stretchPattern factor=2", ~stretchPattern.([1,2,3,4], 2).size == 8);

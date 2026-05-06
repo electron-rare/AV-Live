@@ -1,17 +1,27 @@
 ---
 name: adding-synthdef
-description: Use when the user asks to "add a SynthDef", "create a new instrument", "ajouter un instrument", or names a synthesis technique to package (FM, granular, Karplus-Strong, formant, etc.). Generates a SynthDef in `synthdefs/asia.scd`, `synthdefs/extra.scd`, or `synthdefs/authentic.scd` following the rigid 32-SynthDef convention of sound_algo: standard arg signature (freq/gate/ADSR/amp/pan/scBus/scAmt), `EnvGen.kr(..., doneAction: 2)`, `Pan2.ar` final, `LeakDC.ar` after feedback, `clip` on freq, `tanh` saturation pattern. Forgetting `doneAction: 2` creates Synth zombies that accumulate in RAM until the server crashes.
+description: Use when the user asks to "add a SynthDef", "create a new instrument", "ajouter un instrument", or names a synthesis technique to package (FM, granular, Karplus-Strong, formant, etc.). Generates a SynthDef under `synth/<category>/` (drums, bass, lead, pad, world, master) for instruments, or `fx/<type>/` (bus, insert, trick) for effects. The auto-loaders `synth/_index.scd` and `fx/_index.scd` discover new files recursively. Follows the rigid sound_algo convention: standard arg signature (freq/gate/ADSR/amp/pan/scBus/scAmt), `EnvGen.kr(..., doneAction: 2)`, `Pan2.ar` final, `LeakDC.ar` after feedback, `clip` on freq, `tanh` saturation pattern. Forgetting `doneAction: 2` creates Synth zombies that accumulate in RAM until the server crashes.
 ---
 
 # Adding a SynthDef
 
 ## Where to put it
 
-| File | Theme |
+Pick a directory based on the SynthDef's role. The auto-loader (`_index.scd`)
+recursively loads every `.scd` in the tree, so a new file is picked up
+automatically without editing any index.
+
+| Directory | Theme |
 | --- | --- |
-| `synthdefs/asia.scd` | World/exotic timbres (koto, erhu, gong, growl) |
-| `synthdefs/extra.scd` | Misc additions |
-| `synthdefs/authentic.scd` | Vintage/authentic emulations |
+| `synth/drums/` | Kicks, snares, claps, hats, percs, taiko, tabla |
+| `synth/bass/` | Sub bass, FM bass, reese, hooverbass |
+| `synth/lead/` | Lead synths, plucks, scratches |
+| `synth/pad/` | Warm pads, choirs, strings, drones |
+| `synth/world/` | Exotic/world instruments (koto, erhu, didgeridoo, ...) |
+| `synth/master/` | Master-bus instruments / utility synths |
+| `fx/bus/` | Send-bus FX (reverb, delay, chorus, ...) |
+| `fx/insert/` | Insert FX on a single channel |
+| `fx/trick/` | Live tricks (freeze, glitch, stutter, ...) |
 | `engine.scd` | DO NOT add here -- it's the core, kept stable |
 
 ## Standard arg signature

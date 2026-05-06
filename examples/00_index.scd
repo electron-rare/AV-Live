@@ -37,7 +37,7 @@
 
 // --- Ouvrir tous les exemples dans l'IDE -----------------------------
 (
-var root = if (thisProcess.nowExecutingPath.notNil) { thisProcess.nowExecutingPath.dirname } { "/Users/electron/Documents/Projets_Creatifs/sound_algo/examples" };
+var root = if (thisProcess.nowExecutingPath.notNil) { thisProcess.nowExecutingPath.dirname } { "/Users/electron/Documents/Projets_Creatifs/sound_algo-refonte-v2/examples" };
 [
     "01_quickstart.scd",
     "02_first_track.scd",

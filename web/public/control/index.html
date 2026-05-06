@@ -1,129 +1,499 @@
 <!doctype html>
 <html lang="fr">
 <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>sound_algo / control</title>
-    <link rel="stylesheet" href="style.css" />
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+  <title>sound_algo · live</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-    <header>
-        <h1>sound_algo / control</h1>
-        <div class="status">
-            <span id="ws-status" class="dot offline"></span>
-            <span id="ws-label">connecting…</span>
-        </div>
-    </header>
 
-    <main>
-        <!-- ============ TRANSPORT ============ -->
-        <section class="panel" id="transport">
-            <h2>Transport</h2>
-            <div class="row">
-                <label class="control">
-                    <span>BPM <output data-output="bpm">128</output></span>
-                    <input type="range" min="60" max="200" step="1" value="128"
-                           data-osc="/control/bpm" data-output="bpm"/>
-                </label>
-                <label class="control">
-                    <span>Master <output data-output="masterVol">1.00</output></span>
-                    <input type="range" min="0" max="1.5" step="0.01" value="1"
-                           data-osc="/control/masterVol" data-output="masterVol"/>
-                </label>
-                <button class="btn" data-osc="/control/masterFadeOut" data-args="8">Fade out 8s</button>
-                <button class="btn danger" data-osc="/control/teardown">Teardown</button>
-            </div>
-        </section>
+<!-- ============================== HEADER ============================== -->
+<header class="topbar">
+  <div class="brand">
+    <div class="logo"></div>
+    <h1>sound_algo <span class="sub">· live</span></h1>
+  </div>
 
-        <!-- ============ MIXER ============ -->
-        <section class="panel" id="mixer">
-            <h2>Mixer (8 voies)</h2>
-            <div class="mixer-grid"></div>
-        </section>
+  <div class="hud">
+    <div class="hud-item bpm-display">
+      <span class="hud-label">BPM</span>
+      <span class="hud-value" id="hudBpm">128</span>
+    </div>
+    <div class="hud-item beat-display" title="Beat pulse">
+      <span class="hud-label">BEAT</span>
+      <div class="beat-pulse" id="beatPulse"></div>
+    </div>
+    <div class="hud-item ws-display">
+      <span class="ws-dot offline" id="wsDot"></span>
+      <span class="ws-label" id="wsLabel">offline</span>
+    </div>
+    <button class="btn danger teardown" id="btnTeardown">TEARDOWN</button>
+  </div>
+</header>
 
-        <!-- ============ KICKS / PATTERNS ============ -->
-        <section class="panel" id="kicks">
-            <h2>Kicks (~kk)</h2>
-            <div class="chips" id="kicks-chips"></div>
-        </section>
+<!-- ============================== TABS ============================== -->
+<nav class="tabs" id="tabs">
+  <button class="tab active" data-target="tab-transport">Transport</button>
+  <button class="tab" data-target="tab-album">Album</button>
+  <button class="tab" data-target="tab-mixer">Mixer</button>
+  <button class="tab" data-target="tab-steps">Steps</button>
+  <button class="tab" data-target="tab-acid">Acid</button>
+  <button class="tab" data-target="tab-harmony">Harmony</button>
+  <button class="tab" data-target="tab-kicks">Kicks</button>
+  <button class="tab" data-target="tab-fx">FX</button>
+  <button class="tab" data-target="tab-sends">Sends</button>
+  <button class="tab" data-target="tab-lfo">LFO</button>
+  <button class="tab" data-target="tab-tricks">Tricks</button>
+  <button class="tab" data-target="tab-melodies">Mélodies</button>
+  <button class="tab" data-target="tab-synthdefs">SynthDefs</button>
+  <button class="tab" data-target="tab-jump">Jump</button>
+  <button class="tab" data-target="tab-chains">Chains</button>
+  <button class="tab" data-target="tab-scenes">Scenes</button>
+  <button class="tab" data-target="tab-hydra">Hydra</button>
+  <span class="tab-underline" id="tabUnderline"></span>
+</nav>
 
-        <section class="panel" id="patterns">
-            <h2>Patterns (~p)</h2>
-            <div class="row">
-                <div class="chips" id="pkit-chips"></div>
-            </div>
-            <div class="row">
-                <div class="chips" id="pgenre-chips"></div>
-            </div>
-        </section>
+<main>
 
-        <!-- ============ STEP SEQUENCER ============ -->
-        <section class="panel" id="seq">
-            <h2>Step sequencer (16 pas)</h2>
-            <div class="seq-grid" id="seq-grid"></div>
-            <div class="row">
-                <button class="btn" data-action="seq-clear">Clear</button>
-                <button class="btn" data-action="seq-random">Random</button>
-                <button class="btn" data-action="seq-send">Send to SC</button>
-            </div>
-        </section>
+<!-- ============================== TRANSPORT ============================== -->
+<section class="tabpane active" data-tab="tab-transport">
+  <div class="grid">
+    <div class="card">
+      <h2>Tempo</h2>
+      <label class="ctrl">
+        <span class="ctrl-row"><span>BPM</span><output class="mono" id="outBpm">128</output></span>
+        <input type="range" min="60" max="200" step="1" value="128" id="bpmSlider" />
+      </label>
+      <div class="row">
+        <button class="btn" id="btnTap">Tap</button>
+        <button class="btn ghost" id="btnPing">Ping</button>
+        <span class="mono muted" id="pingResult">—</span>
+      </div>
+    </div>
 
-        <!-- ============ FX ============ -->
-        <section class="panel" id="fx">
-            <h2>FX par voie</h2>
-            <div class="fx-grid"></div>
-            <h3>LFO</h3>
-            <div class="row">
-                <select id="lfo-target">
-                    <option value="\\melodyCutoff">melodyCutoff</option>
-                    <option value="\\acidCutoff">acidCutoff</option>
-                    <option value="\\acidAmp">acidAmp</option>
-                    <option value="\\kickAmp">kickAmp</option>
-                    <option value="\\hatAmp">hatAmp</option>
-                    <option value="\\acidDrive">acidDrive</option>
-                </select>
-                <label class="control">
-                    <span>Rate Hz <output data-output="lfoRate">0.5</output></span>
-                    <input type="range" min="0.05" max="8" step="0.05" value="0.5"
-                           data-output="lfoRate"/>
-                </label>
-                <label class="control">
-                    <span>Depth <output data-output="lfoDepth">1500</output></span>
-                    <input type="range" min="0" max="3000" step="10" value="1500"
-                           data-output="lfoDepth"/>
-                </label>
-                <button class="btn" data-action="lfo-on">LFO on</button>
-                <button class="btn" data-action="lfo-off">LFO off</button>
-                <button class="btn" data-action="lfo-stop-all">Stop all</button>
-            </div>
-        </section>
+    <div class="card">
+      <h2>Master</h2>
+      <label class="ctrl">
+        <span class="ctrl-row"><span>Volume</span><output class="mono" id="outMaster">1.00</output></span>
+        <input type="range" min="0" max="1.5" step="0.01" value="1" id="masterSlider" />
+      </label>
+      <label class="ctrl">
+        <span class="ctrl-row"><span>Fade out (s)</span><output class="mono" id="outFade">8</output></span>
+        <input type="range" min="1" max="30" step="1" value="8" id="fadeSlider" />
+      </label>
+      <button class="btn warn" id="btnFadeOut">Fade out</button>
+    </div>
 
-        <!-- ============ TRICKS ============ -->
-        <section class="panel" id="tricks">
-            <h2>Tricks scéniques</h2>
-            <div class="chips">
-                <button class="chip" data-osc="/control/drop">Drop</button>
-                <button class="chip" data-osc="/control/breakdown" data-args="8">Breakdown 8</button>
-                <button class="chip" data-osc="/control/buildup" data-args="8">Buildup 8</button>
-                <button class="chip" data-osc="/control/glitch" data-args="2">Glitch 2s</button>
-                <button class="chip" data-osc="/control/stutter" data-args="8 1">Stutter 8/1s</button>
-                <button class="chip" data-osc="/control/freeze">Freeze</button>
-                <button class="chip" data-osc="/control/tapeStop" data-args="2">Tape stop</button>
-                <button class="chip" data-osc="/control/tapeReverse" data-args="4">Tape rev</button>
-                <button class="chip" data-osc="/control/handsUp">Hands up</button>
-                <button class="chip" data-osc="/control/jumpCut" data-args="0.5">Jump cut</button>
-                <button class="chip" data-osc="/control/bitCrushNow" data-args="6 6000 1">Bit crush</button>
-            </div>
-        </section>
+    <div class="card">
+      <h2>Pdef global</h2>
+      <div class="row">
+        <button class="btn accent" id="btnPlayAll">play all</button>
+        <button class="btn" id="btnStopAll">stop all</button>
+      </div>
+      <p class="hint">play/stop des Pdef principaux</p>
+    </div>
+  </div>
+</section>
 
-        <!-- ============ FX preset ============ -->
-        <section class="panel" id="fxpreset">
-            <h2>FX preset (~ff)</h2>
-            <div class="chips" id="ff-chips"></div>
-        </section>
+<!-- ============================== ALBUM ============================== -->
+<section class="tabpane" data-tab="tab-album">
+  <div class="card album-toolbar">
+    <h2>Albums</h2>
+    <div class="row">
+      <label class="ctrl mini">
+        <span class="ctrl-row"><span>Gap (s)</span><output class="mono" id="outAlbumGap">8</output></span>
+        <input type="range" min="0" max="30" step="1" value="8" id="albumGap" />
+      </label>
+      <button class="btn danger" id="btnAlbumStop">■ Stop album</button>
+      <button class="btn ghost" id="btnAlbumRefresh">↻ Refresh</button>
+    </div>
+  </div>
+  <div class="albums-grid" id="albumsGrid">
+    <p class="muted album-placeholder" id="albumsPlaceholder">Charge tracks/_index.scd côté SuperCollider, puis click ↻ Refresh</p>
+  </div>
+</section>
 
-    </main>
+<!-- ============================== MIXER ============================== -->
+<section class="tabpane" data-tab="tab-mixer">
+  <div class="mixer-grid" id="mixerGrid"></div>
+  <div class="card master-returns-card">
+    <h2>Master returns</h2>
+    <div class="master-returns-grid" id="masterReturnsGrid"></div>
+  </div>
+</section>
 
-    <script src="app.js"></script>
+<!-- ============================== STEPS ============================== -->
+<section class="tabpane" data-tab="tab-steps">
+  <div class="seq-toolbar">
+    <button class="btn" data-seq-action="clear">Clear</button>
+    <button class="btn" data-seq-action="random">Random</button>
+    <button class="btn accent" data-seq-action="send">Send all</button>
+    <label class="toggle">
+      <input type="checkbox" id="liveEdit" /> <span>Live edit</span>
+    </label>
+    <span class="muted mono" id="stepCounter">step 1/16</span>
+  </div>
+  <div class="seq-grid" id="seqGrid"></div>
+</section>
+
+<!-- ============================== ACID ============================== -->
+<section class="tabpane" data-tab="tab-acid">
+  <div class="card">
+    <h2>Acid · notes (16)</h2>
+    <div class="acid-toolbar">
+      <button type="button" class="btn" id="btnAcidRandom">Random</button>
+      <button type="button" class="btn accent" id="btnAcidSend">Send</button>
+      <label class="toggle">
+        <input type="checkbox" id="acidLive" /> <span>Live edit</span>
+      </label>
+      <label class="ctrl mini">
+        <span>Acc prob</span>
+        <input type="range" min="0" max="1" step="0.05" value="0.4" id="acidAccProb" />
+        <output class="mono" id="outAcidAccProb">0.40</output>
+      </label>
+      <label class="ctrl mini">
+        <span>Sld prob</span>
+        <input type="range" min="0" max="1" step="0.05" value="0.3" id="acidSldProb" />
+        <output class="mono" id="outAcidSldProb">0.30</output>
+      </label>
+    </div>
+    <div class="acid-grid" id="acidNotesGrid"></div>
+    <h3>Accents</h3>
+    <div class="acid-grid" id="acidAccentsGrid"></div>
+    <h3>Slides</h3>
+    <div class="acid-grid" id="acidSlidesGrid"></div>
+  </div>
+  <div class="card">
+    <h2>Acid · params</h2>
+    <label class="ctrl">
+      <span class="ctrl-row"><span>Cutoff Hz</span><output class="mono" id="outAcidCut">1500</output></span>
+      <input type="range" min="50" max="12000" step="10" value="1500" id="acidCut" />
+    </label>
+    <label class="ctrl">
+      <span class="ctrl-row"><span>RQ</span><output class="mono" id="outAcidRq">0.25</output></span>
+      <input type="range" min="0.05" max="1.5" step="0.01" value="0.25" id="acidRq" />
+    </label>
+    <label class="ctrl">
+      <span class="ctrl-row"><span>Drive</span><output class="mono" id="outAcidDrive">2.00</output></span>
+      <input type="range" min="0.5" max="5" step="0.05" value="2" id="acidDrive" />
+    </label>
+    <label class="ctrl">
+      <span class="ctrl-row"><span>Amp</span><output class="mono" id="outAcidAmp">1.00</output></span>
+      <input type="range" min="0" max="1.5" step="0.01" value="1" id="acidAmp" />
+    </label>
+  </div>
+</section>
+
+<!-- ============================== HARMONY ============================== -->
+<section class="tabpane" data-tab="tab-harmony">
+  <div class="card">
+    <h2>Harmony · notes (32)</h2>
+    <div class="acid-toolbar">
+      <button type="button" class="btn accent" id="btnHarmonySend">Send</button>
+      <label class="toggle">
+        <input type="checkbox" id="harmonyLive" /> <span>Live edit</span>
+      </label>
+    </div>
+    <div class="harmony-grid" id="harmonyNotesGrid"></div>
+  </div>
+  <div class="card">
+    <h2>Harmony · presets</h2>
+    <div class="chips" id="harmonyPresetChips"></div>
+  </div>
+  <div class="card">
+    <h2>Harmony · params</h2>
+    <label class="ctrl">
+      <span class="ctrl-row"><span>Amp</span><output class="mono" id="outHarmonyAmp">1.00</output></span>
+      <input type="range" min="0" max="1.5" step="0.01" value="1" id="harmonyAmp" />
+    </label>
+  </div>
+</section>
+
+<!-- ============================== KICKS / PATTERNS ============================== -->
+<section class="tabpane" data-tab="tab-kicks">
+  <div class="card">
+    <h2>Kicks (~kk)</h2>
+    <div class="chips" id="kicksChips"></div>
+  </div>
+  <div class="card">
+    <h2>Pattern kits (~pKit)</h2>
+    <div class="chips" id="pkitChips"></div>
+  </div>
+  <div class="card">
+    <h2>Pattern genres (~pGenre)</h2>
+    <div class="chips" id="pgenreChips"></div>
+  </div>
+  <div class="card">
+    <h2>FX preset (~ff)</h2>
+    <div class="chips" id="ffChips"></div>
+  </div>
+</section>
+
+<!-- ============================== FX ============================== -->
+<section class="tabpane" data-tab="tab-fx">
+  <div class="card">
+    <h2>FX par voie</h2>
+    <div class="fx-grid" id="fxGrid"></div>
+  </div>
+  <div class="card">
+    <h2>VCF master</h2>
+    <div class="row">
+      <select id="vcfType"></select>
+      <select id="vcfPreset"><option value="">— preset —</option></select>
+      <button class="btn accent" id="btnVcfOn">On</button>
+      <button class="btn" id="btnVcfOff">Off</button>
+    </div>
+    <label class="ctrl">
+      <span class="ctrl-row"><span>Freq Hz</span><output class="mono" id="outVcfFreq">800</output></span>
+      <input type="range" min="40" max="12000" step="1" value="800" id="vcfFreq" />
+    </label>
+    <label class="ctrl">
+      <span class="ctrl-row"><span>Q</span><output class="mono" id="outVcfQ">0.30</output></span>
+      <input type="range" min="0.05" max="2" step="0.01" value="0.3" id="vcfQ" />
+    </label>
+    <div class="row">
+      <label class="ctrl mini">
+        <span>From</span>
+        <input type="number" id="sweepFrom" value="200" />
+      </label>
+      <label class="ctrl mini">
+        <span>To</span>
+        <input type="number" id="sweepTo" value="4000" />
+      </label>
+      <label class="ctrl mini">
+        <span>Dur</span>
+        <input type="number" id="sweepDur" value="4" step="0.1" />
+      </label>
+      <button class="btn" id="btnVcfSweep">Sweep</button>
+    </div>
+  </div>
+  <div class="card">
+    <h2>Compression / Saturation</h2>
+    <div class="row">
+      <span class="muted">Comp:</span>
+      <div class="chips" id="compChips"></div>
+    </div>
+    <div class="row">
+      <span class="muted">Sat mode:</span>
+      <select id="satMode"></select>
+      <label class="ctrl mini">
+        <span>Amount</span>
+        <input type="range" min="0" max="2" step="0.01" value="0.5" id="satAmount" />
+        <output class="mono" id="outSat">0.50</output>
+      </label>
+      <button class="btn" id="btnSat">Apply</button>
+    </div>
+  </div>
+</section>
+
+<!-- ============================== SENDS ============================== -->
+<section class="tabpane" data-tab="tab-sends">
+  <div class="card">
+    <h2>FX sends</h2>
+    <div class="sends-grid" id="sendsGrid"></div>
+  </div>
+</section>
+
+<!-- ============================== LFO ============================== -->
+<section class="tabpane" data-tab="tab-lfo">
+  <div class="card">
+    <h2>LFO modulation</h2>
+    <div class="row">
+      <label class="ctrl">
+        <span>Target (symbole)</span>
+        <input type="text" id="lfoTarget" value="\melodyCutoff" class="mono" />
+      </label>
+    </div>
+    <label class="ctrl">
+      <span class="ctrl-row"><span>Rate Hz</span><output class="mono" id="outLfoRate">0.50</output></span>
+      <input type="range" min="0.05" max="8" step="0.05" value="0.5" id="lfoRate" />
+    </label>
+    <label class="ctrl">
+      <span class="ctrl-row"><span>Depth</span><output class="mono" id="outLfoDepth">1500</output></span>
+      <input type="range" min="0" max="3000" step="10" value="1500" id="lfoDepth" />
+    </label>
+    <div class="row">
+      <button class="btn accent" id="btnLfoOn">LFO on</button>
+      <button class="btn" id="btnLfoOff">LFO off</button>
+      <button class="btn warn" id="btnLfoStopAll">Stop all</button>
+    </div>
+    <div class="chips" id="lfoPresets">
+      <button class="chip" data-lfo="\melodyCutoff">melodyCutoff</button>
+      <button class="chip" data-lfo="\acidCutoff">acidCutoff</button>
+      <button class="chip" data-lfo="\acidAmp">acidAmp</button>
+      <button class="chip" data-lfo="\kickAmp">kickAmp</button>
+      <button class="chip" data-lfo="\hatAmp">hatAmp</button>
+      <button class="chip" data-lfo="\acidDrive">acidDrive</button>
+    </div>
+  </div>
+</section>
+
+<!-- ============================== TRICKS ============================== -->
+<section class="tabpane" data-tab="tab-tricks">
+  <div class="tricks-grid" id="tricksGrid"></div>
+</section>
+
+<!-- ============================== MÉLODIES ============================== -->
+<section class="tabpane" data-tab="tab-melodies">
+  <div class="card melody-catalog">
+    <div class="cat-header">
+      <h2>Catalogue mélodies</h2>
+      <span class="cat-counter mono muted" id="melCounter">0 / 0</span>
+      <button class="btn ghost" id="btnMelRefresh">↻</button>
+    </div>
+    <div class="cat-row">
+      <span class="cat-label">Genre :</span>
+      <div class="chips cat-chips" id="melGenreChips"></div>
+    </div>
+    <div class="cat-row">
+      <span class="cat-label">Longueur :</span>
+      <div class="chips cat-len-chips" id="melLenChips">
+        <button class="chip active" data-len="all">Toutes</button>
+        <button class="chip" data-len="short">Short (32)</button>
+        <button class="chip" data-len="long">Long (64)</button>
+        <button class="chip" data-len="xlong">Xlong (96)</button>
+        <button class="chip" data-len="epic">Epic (128)</button>
+      </div>
+    </div>
+    <div class="cat-row">
+      <input type="search" id="melSearch" placeholder="rechercher (substring)…" class="cat-search mono" />
+      <span class="muted mono" id="melActive">— aucune active —</span>
+    </div>
+    <div class="cat-grid" id="melGrid"></div>
+    <div class="cat-pager">
+      <button class="btn ghost" id="melPrev">‹</button>
+      <span class="mono muted" id="melPage">1 / 1</span>
+      <button class="btn ghost" id="melNext">›</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Apply mélodie (kind × n) — rétrocompat</h2>
+    <div id="mApplyGrid" class="m-apply-grid"></div>
+  </div>
+
+  <div class="card">
+    <h2>Réglages</h2>
+    <label class="ctrl">
+      <span class="ctrl-row"><span>Amp</span><output class="mono" id="outMAmp">1.00</output></span>
+      <input type="range" min="0" max="1.5" step="0.01" value="1" id="mAmp" />
+    </label>
+    <label class="ctrl">
+      <span class="ctrl-row"><span>Cut Hz</span><output class="mono" id="outMCut">5000</output></span>
+      <input type="range" min="50" max="12000" step="10" value="5000" id="mCut" />
+    </label>
+    <label class="ctrl">
+      <span class="ctrl-row"><span>Drive</span><output class="mono" id="outMDrive">1.00</output></span>
+      <input type="range" min="0.5" max="5" step="0.05" value="1" id="mDrive" />
+    </label>
+    <div class="row">
+      <button class="btn" id="btnMPv">‹ prev</button>
+      <button class="btn accent" id="btnMNx">next ›</button>
+      <button class="btn warn" id="btnMOff">off</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Genre wrapper (~mGen) — rétrocompat</h2>
+    <div class="chips" id="mGenChips"></div>
+  </div>
+</section>
+
+<!-- ============================== SYNTHDEFS ============================== -->
+<section class="tabpane" data-tab="tab-synthdefs">
+  <div class="card synthdef-catalog">
+    <div class="cat-header">
+      <h2>Catalogue SynthDefs</h2>
+      <span class="cat-counter mono muted" id="sdCounter">0 / 0</span>
+      <button class="btn ghost" id="btnSdRefresh">↻</button>
+    </div>
+    <div class="cat-row">
+      <span class="cat-label">Catégorie :</span>
+      <div class="chips cat-cat-chips" id="sdCatChips">
+        <button class="chip active" data-cat="drums">drums</button>
+        <button class="chip" data-cat="bass">bass</button>
+        <button class="chip" data-cat="lead">lead</button>
+        <button class="chip" data-cat="pad">pad</button>
+        <button class="chip" data-cat="world">world</button>
+        <button class="chip" data-cat="master">master</button>
+      </div>
+    </div>
+    <div class="cat-row">
+      <input type="search" id="sdSearch" placeholder="rechercher (substring)…" class="cat-search mono" />
+      <span class="muted mono" id="sdActive">— aucun actif —</span>
+    </div>
+    <div class="cat-grid sd-grid" id="sdGrid"></div>
+    <div class="cat-pager">
+      <button class="btn ghost" id="sdPrev">‹</button>
+      <span class="mono muted" id="sdPage">1 / 1</span>
+      <button class="btn ghost" id="sdNext">›</button>
+    </div>
+    <p class="hint">Click = applique au lead courant via <code>~mInst</code>. Pour drums/master, c'est purement informatif (le moteur les utilise via les Pdef).</p>
+  </div>
+</section>
+
+<!-- ============================== JUMP ============================== -->
+<section class="tabpane" data-tab="tab-jump">
+  <div class="card">
+    <h2>Tracks</h2>
+    <div class="jump-letters" id="jumpLetters"></div>
+  </div>
+  <div class="card" id="jumpSectionsCard" hidden>
+    <h2>Sections de <span id="jumpLetterLabel" class="mono">—</span></h2>
+    <div class="chips" id="jumpSections"></div>
+  </div>
+</section>
+
+<!-- ============================== CHAINS ============================== -->
+<section class="tabpane" data-tab="tab-chains">
+  <div class="chains-grid" id="chainsGrid"></div>
+</section>
+
+<!-- ============================== SCENES ============================== -->
+<section class="tabpane" data-tab="tab-scenes">
+  <div class="card">
+    <h2>Save / Load</h2>
+    <div class="row">
+      <input type="text" id="sceneName" placeholder="nom de scène" />
+      <button class="btn accent" id="btnSaveScene">Save</button>
+      <button class="btn" id="btnLoadScene">Load</button>
+    </div>
+    <h3>Presets</h3>
+    <div class="chips" id="scenePresets">
+      <button class="chip" data-preset="intro">intro</button>
+      <button class="chip" data-preset="drop">drop</button>
+      <button class="chip" data-preset="breakdown">breakdown</button>
+      <button class="chip" data-preset="buildup">buildup</button>
+    </div>
+  </div>
+</section>
+
+<!-- ============================== HYDRA =============================== -->
+<section class="tabpane" data-tab="tab-hydra">
+  <div class="card">
+    <h2>Hydra visuals</h2>
+    <div class="row">
+      <a class="btn" href="/hydra/" target="_blank" rel="noopener">Open /hydra/</a>
+    </div>
+    <h3>Presets</h3>
+    <div class="chips" id="hydraPresets"></div>
+    <h3>Params</h3>
+    <div class="row" id="hydraParams"></div>
+    <h3>Custom code</h3>
+    <textarea id="hydraCode" rows="6" placeholder="// code Hydra a envoyer a /hydra/..."
+              style="width:100%; font-family:ui-monospace,monospace; font-size:0.8rem;"></textarea>
+    <div class="row">
+      <button class="btn accent" id="btnHydraSendCode">Send code</button>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<script src="app.js"></script>
 </body>
 </html>

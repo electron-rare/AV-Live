@@ -40,7 +40,7 @@
 // =====================================================================
 (
 // --- BASE PATH (auto-detection si pas deja defini) -------------------
-~base = ~base ?? { "/Users/electron/Documents/Projets_Creatifs/sound_algo/" };
+~base = ~base ?? { "/Users/electron/Documents/Projets_Creatifs/sound_algo-refonte-v2/" };
 "~base = ".post; ~base.postln;
 
 
@@ -228,7 +228,7 @@
         };
     };
 
-    // ----- synthdefs/asia.scd -----
+    // ----- synth/_index.scd : asia palette -----
     block { |b|
         var asia = [\koto, \erhu, \pipa, \gong, \growl, \reeseHard];
         var miss = missingSd.(asia);
@@ -236,7 +236,7 @@
         { line.("asia", "[!!]", "manquant : " ++ miss); };
     };
 
-    // ----- synthdefs/extra.scd -----
+    // ----- synth/_index.scd : extra palette -----
     block { |b|
         var extra = [\squareLead, \fmLead, \organLead, \hardLead, \warmPad,
                      \strings, \choir, \fmBass, \subBoom, \handpan, \flute, \drone];
@@ -245,7 +245,7 @@
         { line.("extra", "[!!]", "manquant : " ++ miss); };
     };
 
-    // ----- synthdefs/authentic.scd -----
+    // ----- synth/_index.scd : authentic palette -----
     block { |b|
         var auth = [\kickGabber, \kick808, \snareGated, \reeseDnB, \supersaw,
                     \hooverbass, \rhodes, \vocalPad, \didgeridoo, \guzheng,
@@ -424,6 +424,18 @@
         };
     };
 
+    // ----- live/memory_guard.scd -----
+    block { |b|
+        var probes = [\killAllOrphans, \memReport, \watchdogOn, \watchdogOff];
+        var miss = missingV.(probes);
+        if (miss.isEmpty) {
+            line.("guard", "[OK]", "~killAllOrphans / ~memReport / ~watchdogOn / ~watchdogOff");
+        } {
+            line.("guard", "[!!]", "manquant : " ++ miss);
+            actions.add("Lance ~setupAll.() (charge live/memory_guard.scd)");
+        };
+    };
+
     // ----- control/midi.scd (optionnel) -----
     block { |b|
         if (~midiFuncs.notNil and: { ~midiFuncs.size > 0 }) {
@@ -503,8 +515,8 @@
         ~loadFirstBlock.(~base ++ "live/mixer.scd");
         ~loadFirstBlock.(~base ++ "live/scenes.scd");
         ~loadFirstBlock.(~base ++ "live/loops.scd");
-        ~loadFirstBlock.(~base ++ "palette/rhythm/fills.scd");
-        ~loadAllBlocks.(~base ++ "palette/rhythm/sequences.scd");
+        ~loadFirstBlock.(~base ++ "live/memory_guard.scd");
+        (~base ++ "palette/rhythm/_index.scd").load;  // fills + sequences (auto-discovery)
         ~loadAllBlocks.(~base ++ "palette/chords_progressions.scd");
         ~loadFirstBlock.(~base ++ "control/jump.scd");
 
@@ -518,6 +530,11 @@
         ~loadFirstBlock.(~base ++ "live/patterns.scd");
 
         s.sync;
+
+        // Hook CmdPeriod : chaque Cmd-. declenche aussi ~killAllOrphans
+        // pour eviter l'accumulation de Routines/Bus apres un panic stop.
+        ~guardCmdPeriodOn !? { ~guardCmdPeriodOn.value };
+
         "".postln;
         "=== setupAll DONE ===".postln;
         "".postln;
@@ -525,17 +542,15 @@
     };
 
     "=== ~setupAll : start ===".postln;
-    ~base = ~base ?? { "/Users/electron/Documents/Projets_Creatifs/sound_algo/" };
+    ~base = ~base ?? { "/Users/electron/Documents/Projets_Creatifs/sound_algo-refonte-v2/" };
 
     // --- 1. Charge tous les fichiers .load-compatibles ---
     "[setupAll] engine.scd ... loading".postln;
     (~base ++ "engine.scd").load;
-    "[setupAll] synthdefs/asia.scd ... loading".postln;
-    (~base ++ "synthdefs/asia.scd").load;
-    "[setupAll] synthdefs/extra.scd ... loading".postln;
-    (~base ++ "synthdefs/extra.scd").load;
-    "[setupAll] synthdefs/authentic.scd ... loading".postln;
-    (~base ++ "synthdefs/authentic.scd").load;
+    "[setupAll] synth/_index.scd ... loading".postln;
+    (~base ++ "synth/_index.scd").load;
+    "[setupAll] fx/_index.scd ... loading".postln;
+    (~base ++ "fx/_index.scd").load;
     "[setupAll] palette/scales.scd ... loading".postln;
     (~base ++ "palette/scales.scd").load;
     "[setupAll] palette/melodies/index.scd ... loading".postln;
@@ -564,7 +579,7 @@
 //   rapide quand le serveur tourne deja avec engine charge.
 // --------------------------------------------------------------------
 ~setupLive = {
-    ~base = ~base ?? { "/Users/electron/Documents/Projets_Creatifs/sound_algo/" };
+    ~base = ~base ?? { "/Users/electron/Documents/Projets_Creatifs/sound_algo-refonte-v2/" };
     if (s.serverRunning.not) {
         "!! ~setupLive : serveur pas demarre. Lance ~setupAll a la place.".postln;
     } {
@@ -574,8 +589,8 @@
         ~loadFirstBlock.(~base ++ "live/mixer.scd");
         ~loadFirstBlock.(~base ++ "live/scenes.scd");
         ~loadFirstBlock.(~base ++ "live/loops.scd");
-        ~loadFirstBlock.(~base ++ "palette/rhythm/fills.scd");
-        ~loadAllBlocks.(~base ++ "palette/rhythm/sequences.scd");
+        ~loadFirstBlock.(~base ++ "live/memory_guard.scd");
+        (~base ++ "palette/rhythm/_index.scd").load;  // fills + sequences (auto-discovery)
         ~loadAllBlocks.(~base ++ "palette/chords_progressions.scd");
         ~loadFirstBlock.(~base ++ "control/jump.scd");
         // 5 wrappers API live (~kk / ~mm / ~ff / ~cc / ~p)
@@ -597,7 +612,7 @@
 // --------------------------------------------------------------------
 ~ensureLive = {
     var loaded = 0;
-    ~base = ~base ?? { "/Users/electron/Documents/Projets_Creatifs/sound_algo/" };
+    ~base = ~base ?? { "/Users/electron/Documents/Projets_Creatifs/sound_algo-refonte-v2/" };
     if (s.serverRunning.not) {
         "!! ~ensureLive : serveur pas demarre. Lance ~setupAll d'abord.".postln;
     } {
@@ -627,14 +642,15 @@
             ~loadFirstBlock.(~base ++ "live/loops.scd");
             loaded = loaded + 1;
         };
-        if (~snareFill.isNil or: { ~tomFill.isNil }) {
-            "ensure : fills.scd".postln;
-            ~loadFirstBlock.(~base ++ "palette/rhythm/fills.scd");
+        if (~killAllOrphans.isNil) {
+            "ensure : memory_guard.scd".postln;
+            ~loadFirstBlock.(~base ++ "live/memory_guard.scd");
             loaded = loaded + 1;
         };
-        if (~seqPlay.isNil or: { ~seqIntro.isNil }) {
-            "ensure : sequences.scd".postln;
-            ~loadAllBlocks.(~base ++ "palette/rhythm/sequences.scd");
+        if (~snareFill.isNil or: { ~tomFill.isNil }
+            or: { ~seqPlay.isNil } or: { ~seqIntro.isNil }) {
+            "ensure : palette/rhythm/_index.scd (fills + sequences)".postln;
+            (~base ++ "palette/rhythm/_index.scd").load;
             loaded = loaded + 1;
         };
         if (~jumpTo.isNil) {
@@ -692,6 +708,10 @@
 // --------------------------------------------------------------------
 ~teardown = {
     "=== ~teardown : stop tout ===".postln;
+
+    // Watchdog memory_guard et album orchestrateur
+    ~watchdogOff !? { ~watchdogOff.value };
+    ~albumRoutine !? { ~albumRoutine.stop; ~albumRoutine = nil };
 
     // Routines de track / sweep / loops engine
     ~track !? { ~track.stop; ~track = nil };

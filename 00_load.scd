@@ -7,10 +7,10 @@
 //                             (~check / ~setupAll / ~setupLive /
 //                              ~ensureLive / ~teardown)
 //    engine.scd               Moteur (SynthDef base + Pdef + sidechain bus)
-//    synthdefs/
-//      asia.scd               Koto, erhu, pipa, gong, growl, reeseHard
-//      extra.scd              Lead/pad/bass/world (12 synths)
-//      authentic.scd          14 instruments authentiques (gabber, reese, supersaw...)
+//    synth/                   SynthDef instruments (auto-loader _index.scd)
+//                             drums/, bass/, lead/, pad/, world/, master/
+//    fx/                      SynthDef effets (auto-loader _index.scd)
+//                             bus/, insert/, trick/
 //    palette/
 //      scales.scd             Scales (mineur/dorian/.../hijaz/vietnam) +
 //                             helpers genMelody/mutate/octavate/transpose/
@@ -29,12 +29,13 @@
 //        helpers.scd            genThirdHarmony / genFifthHarmony / genCounter / ...
 //        presets.scd            ~enableHarmony.(\preset) -- 10 presets (SOURCE UNIQUE)
 //      rhythm/                MODULE rythmes / kicks / percussions
-//        kicks.scd              25 patterns + 12 timbres kick (~kK1..~kK25)
-//        percussions.scd        ~25 patterns clap/perc + selecteur ~percInst
-//        drum_kits.scd          21 kits complets
-//        patterns_genre.scd     40 patterns rythmiques signature par genre
-//        sequences.scd          Macros de sequences (~seqIntro/Buildup/Drop...)
-//        fills.scd              Snare fill / tom fill
+//        _index.scd             Auto-loader (charge fills/ + sequences/)
+//        kicks/                 25 patterns + 12 timbres kick (1 fichier/preset)
+//        percussions/           ~25 patterns clap/perc (1 fichier/preset)
+//        drum_kits/             21 kits complets (1 fichier/kit)
+//        patterns_genre/        40 patterns signature par genre (1 fichier/preset)
+//        sequences/             Macros de sequences (~seqIntro/Buildup/Drop...)
+//        fills/                 Snare fill / tom fill
 //      timbres.scd            26 timbres melodie (L1-L26)
 //      styles.scd             5 styles complets (Acid Rave, Dub, Hard...)
 //      chords_progressions.scd ~35 progressions d'accords (auto + ~progXxx)
@@ -87,7 +88,7 @@
 //   Utile si tu veux juste set le chemin avant de Cmd+Entree sur un
 //   autre bloc. CHARGER TOUT et CHARGER MINIMAL le font deja.
 (
-~base = "/Users/electron/Documents/Projets_Creatifs/sound_algo/";
+~base = "/Users/electron/Documents/Projets_Creatifs/sound_algo-refonte-v2/";
 "~base = ".post; ~base.postln;
 )
 
@@ -99,17 +100,20 @@
 //
 //   Ce bloc est AUTONOME : pas besoin d'evaluer BASE PATH avant.
 (
-~base = "/Users/electron/Documents/Projets_Creatifs/sound_algo/";
+~base = "/Users/electron/Documents/Projets_Creatifs/sound_algo-refonte-v2/";
 (~base ++ "engine.scd").load;
-(~base ++ "synthdefs/asia.scd").load;
-(~base ++ "synthdefs/extra.scd").load;
-(~base ++ "synthdefs/authentic.scd").load;
+(~base ++ "synth/_index.scd").load;
+(~base ++ "fx/_index.scd").load;
 (~base ++ "palette/scales.scd").load;
 (~base ++ "palette/melodies/index.scd").load;
 (~base ++ "palette/harmonics/index.scd").load;
 (~base ++ "setup.scd").load;       // ~check / ~setupAll / ~setupLive / ~teardown
-~setupAll.();                       // boot serveur + tous les SETUP modules + ~check
-(~base ++ "live/_load.scd").load;   // wrappers API live : ~kk / ~mm / ~ff / ~cc / ~p
+// NOTE : ~setupAll.() est appele par live/_load.scd ci-dessous (qui gere
+// l'idempotence via ~setupAll_done). L'appeler ici en plus declenchait
+// un DOUBLE BOOT : 1er ~setupAll lance s.waitForBoot async, puis le
+// .load de live/_load.scd voit ~setupAll_done = nil et relance ~setupAll
+// -> "address in use" + zombie scsynth. Fix : un seul appel via _load.
+(~base ++ "live/_load.scd").load;   // boot + tous modules + wrappers API live
 )
 
 
@@ -117,11 +121,10 @@
 //   Pour debugger ou demarrer sans live/mixer/fx. Pas de boot serveur
 //   automatique, pas de helpers ~check / ~setupAll.
 (
-~base = "/Users/electron/Documents/Projets_Creatifs/sound_algo/";
+~base = "/Users/electron/Documents/Projets_Creatifs/sound_algo-refonte-v2/";
 (~base ++ "engine.scd").load;
-(~base ++ "synthdefs/asia.scd").load;
-(~base ++ "synthdefs/extra.scd").load;
-(~base ++ "synthdefs/authentic.scd").load;
+(~base ++ "synth/_index.scd").load;
+(~base ++ "fx/_index.scd").load;
 (~base ++ "palette/scales.scd").load;
 )
 
@@ -132,21 +135,15 @@
 )
 
 
-// --- CHARGER PALETTE ASIA (koto/erhu/pipa/gong/growl/reeseHard) -----
+// --- CHARGER SYNTH (tous les SynthDef instruments) -------------------
 (
-(~base ++ "synthdefs/asia.scd").load;
+(~base ++ "synth/_index.scd").load;
 )
 
 
-// --- CHARGER PALETTE EXTRA (12 leads/pads/bass/world) ----------------
+// --- CHARGER FX (tous les SynthDef effets) ---------------------------
 (
-(~base ++ "synthdefs/extra.scd").load;
-)
-
-
-// --- CHARGER PALETTE AUTHENTIC (14 instruments authentiques) ---------
-(
-(~base ++ "synthdefs/authentic.scd").load;
+(~base ++ "fx/_index.scd").load;
 )
 
 
@@ -166,7 +163,7 @@ var root = if (thisProcess.nowExecutingPath.notNil) { thisProcess.nowExecutingPa
     "live/live_fx_panel.scd",          // PANNEAU FX tout-en-un
     "live/mixer.scd",                  // faders / mute / solo / master
     "live/scenes.scd",                 // save / recall snapshots
-    "palette/rhythm/fills.scd",        // ~snareFill / ~tomFill
+    "palette/rhythm/_index.scd",       // ~snareFill / ~tomFill / ~seqPlay (auto)
     "control/jump.scd",                // sauter dans une section
     "examples/00_index.scd",           // catalogue tutoriels
 ].do { |p| Document.open(root +/+ p) };
@@ -195,11 +192,10 @@ var root = if (thisProcess.nowExecutingPath.notNil) { thisProcess.nowExecutingPa
     "palette/chords_progressions.scd",
     "palette/fx_genre.scd",
     "palette/tweaks_template.scd",
-    "palette/rhythm/kicks.scd",
-    "palette/rhythm/percussions.scd",
-    "palette/rhythm/drum_kits.scd",
-    "palette/rhythm/patterns_genre.scd",
-    "palette/rhythm/sequences.scd",
+    "palette/rhythm/_index.scd",       // loader recursif fills+sequences
+    // NB : les presets rythmiques sont eclates en sous-dossiers
+    //   palette/rhythm/{drum_kits,patterns_genre,kicks,percussions,sequences,fills}/
+    //   1 fichier = 1 preset Cmd+Entree. Ouvre-les a la demande dans l'IDE.
 ].do { |p| Document.open(root +/+ p) };
 )
 
@@ -230,14 +226,14 @@ PathName(root +/+ "examples").files
 var root = if (thisProcess.nowExecutingPath.notNil) { thisProcess.nowExecutingPath.dirname } { "/Users/electron/Documents/Projets_Creatifs/sound_algo" };
 [
     "engine.scd",
-    "synthdefs/asia.scd", "synthdefs/extra.scd", "synthdefs/authentic.scd",
+    "synth/_index.scd", "fx/_index.scd",
     "palette/scales.scd",
     "palette/melodies/helpers.scd", "palette/melodies/short.scd",
     "palette/melodies/long.scd",    "palette/melodies/xlong.scd",
     "palette/melodies/epic.scd",    "palette/melodies/bank.scd",
     "palette/melodies/tracks.scd",
     "palette/harmonics/helpers.scd","palette/harmonics/presets.scd",
-    "palette/rhythm/fills.scd",     "palette/fx.scd",
+    "palette/rhythm/_index.scd",    "palette/fx.scd",
 ].do { |p| Document.open(root +/+ p) };
 )
 

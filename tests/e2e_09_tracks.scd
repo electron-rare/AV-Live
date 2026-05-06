@@ -6,7 +6,8 @@
 
 "=== e2e_09_tracks ===".postln;
 
-~base = "/Users/electron/Documents/Projets_Creatifs/sound_algo/";
+// ~base auto-derive depuis l'emplacement du test (portable entre worktrees).
+~base = PathName(thisProcess.nowExecutingPath).pathOnly ++ "../";
 ~testCount = 0;
 ~testFailed = 0;
 
@@ -25,14 +26,26 @@
     if (~testFailed > 0) { 1.exit } { 0.exit };
 };
 
-PathName(~base ++ "tracks/").files.do { |pn|
-    if (pn.fullPath.endsWith(".scd")) {
-        var src = File.readAllString(pn.fullPath);
-        var compiled = src.compile;
-        ~assert.("compile track " ++ pn.fileName,
-            compiled.isKindOf(Function),
-            "got class " ++ compiled.class);
+// Scan recursif : tracks/*.scd ET tracks/<album>/*.scd (sous-dossiers
+// d'album generes par la convention "<L>_<slug>/<L>NN_<sub>.scd").
+// Skip _album.scd : c'est un orchestrateur multi-bloc, pas une track.
+~scanTracks = { |dirPath|
+    PathName(dirPath).entries.do { |entry|
+        if (entry.isFolder) {
+            ~scanTracks.(entry.fullPath);
+        } {
+            if (entry.fullPath.endsWith(".scd") and: {
+                entry.fileName.beginsWith("_").not
+            }) {
+                var src = File.readAllString(entry.fullPath);
+                var compiled = src.compile;
+                ~assert.("compile " ++ entry.fileName,
+                    compiled.isKindOf(Function),
+                    "got class " ++ compiled.class);
+            };
+        };
     };
 };
+~scanTracks.(~base ++ "tracks/");
 
 ~report.value;

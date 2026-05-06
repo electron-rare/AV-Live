@@ -34,7 +34,7 @@
 ~base = if (thisProcess.nowExecutingPath.notNil) {
     thisProcess.nowExecutingPath.dirname ++ "/"
 } {
-    "/Users/electron/Documents/Projets_Creatifs/sound_algo/"
+    "/Users/electron/Documents/Projets_Creatifs/sound_algo-refonte-v2/"
 };
 (~base ++ "live/_load.scd").load;
 )
@@ -90,7 +90,7 @@
 ( ~mRndXlong.(); )
 
 // epic (128 steps, 10 dispos)
-( ~mEpic.(1); )
+( ~mEpic.(2); )
 ( ~mRndEpic.(); )
 
 // par genre
@@ -170,20 +170,23 @@
 ( ~fxFreeze.(0); )
 
 // tricks scéniques
-( ~fxDrop.(); )
-( ~fxBreakdown.(8); )
-( ~fxBuildup.(8); )
-( ~fxGlitch.(2); )
-( ~fxStutter.(8, 1); )
-( ~fxFreezeR.(4); )
-( ~fxTapeStop.(2); )
-( ~fxTapeRev.(4); )
-( ~fxHandsUp.(); )
-( ~fxJumpCut.(0.5); )
-( ~fxBitCrush.(6, 6000, 1); )
-( ~fxRing.(200, 1); )
-( ~fxShift.(100, 1); )
-( ~fxGran.(2); )
+( ~fxDrop.(); )                       // build silence -> snareFill -> blast
+( ~fxBreakdown.(8); )                 // kill rythmique progressif sur dur s
+( ~fxBuildup.(8); )                   // crescendo (riser + fade in + sweep up)
+( ~fxGlitch.(2); )                    // bitcrush + stutter + delay courte
+( ~fxStutter.(8, 1); )                // gate amp à rateHz pendant dur s
+( ~fxFreezeR.(4); )                   // reverb freeze + cut sec, retour apres dur
+( ~fxTapeStop.(2); )                  // ralenti tempo expo -> stop Pdef (dur s)
+( ~fxTapeStart.(2); )                 // RELANCE apres tapeStop : tempo 0.01 -> courant
+( ~fxTapeStart.(2, 2.8); )            // idem mais cible 150 BPM (TempoClock = BPM/60)
+( ~fxPlayAll.(); )                    // relance instantanee de tous les Pdef sequenceurs
+( ~fxTapeRev.(4); )                   // riser inverse + filter sweep + freeze rev
+( ~fxHandsUp.(); )                    // mute kick + boost lead + delay courte + clap
+( ~fxJumpCut.(0.5); )                 // silence sec dur s puis reprend tout
+( ~fxBitCrush.(6, 6000, 1); )         // bitcrush master (bits, sr, dur)
+( ~fxRing.(200, 1); )                 // ring modulator master (freq, dur)
+( ~fxShift.(100, 1); )                // freq shifter master (hz, dur)
+( ~fxGran.(2); )                      // freeze granulaire master pendant dur s
 
 // VCF master
 ( ~fxVcfOn.(\moog, 800, 0.5); )

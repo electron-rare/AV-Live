@@ -16,7 +16,8 @@ Generative techno/electronic live performance engine.
 |---|---|
 | `00_load.scd` | Loader + index (entry point) |
 | `engine.scd` | Core SynthDefs + Pdef sequencer + ~reload |
-| `synthdefs/` | Additional instruments (asia/extra/authentic) |
+| `synth/` | SynthDef instruments (drums/bass/lead/pad/world/master), auto-loaded via `_index.scd` |
+| `fx/` | SynthDef effets (bus/insert/trick), auto-loaded via `_index.scd` |
 | `palette/scales.scd` | Scales + melody generation helpers |
 | `palette/melodies/` | 130+ melody presets + multi-track |
 | `palette/harmonics/` | Harmony generators + ~enableHarmony |
@@ -32,7 +33,7 @@ Generative techno/electronic live performance engine.
 
 CHARGER TOUT charge automatiquement dans l'ordre :
 1. engine.scd
-2. synthdefs/*.scd (asia, extra, authentic)
+2. synth/_index.scd + fx/_index.scd (auto-loaders recursifs)
 3. palette/scales.scd (scales + helpers melodiques)
 4. palette/melodies/index.scd (130+ melodies + multi-track)
 5. palette/harmonics/index.scd (~enableHarmony + helpers)

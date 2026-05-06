@@ -32,274 +32,88 @@
 // =====================================================================
 
 // --- VCF Moog (filtre 4-pole, MoogFF) ---------------------------------
-SynthDef(\vcfMoog, {
-    arg busIn = 0, freq = 1500, gain = 2.0, mix = 1.0, drive = 1.0;
-    var sig = In.ar(busIn, 2);
-    var wet = MoogFF.ar(sig * drive, freq.clip(40, 18000), gain.clip(0, 4));
-    ReplaceOut.ar(busIn, (sig * (1 - mix)) + (wet * mix));
-}).add;
+
 
 // --- VCF MS20 (Sallen-Key style, agressif) ----------------------------
-SynthDef(\vcfMs20, {
-    arg busIn = 0, freq = 1500, q = 1.5, mix = 1.0, drive = 1.2;
-    var sig = In.ar(busIn, 2);
-    var wet = (sig * drive).tanh;
-    wet = RLPF.ar(wet, freq.clip(40, 18000), q.reciprocal.clip(0.05, 1.5));
-    wet = (wet * 1.3).tanh;
-    ReplaceOut.ar(busIn, (sig * (1 - mix)) + (wet * mix));
-}).add;
+
 
 // --- VCF Ladder (24 dB/oct vintage) -----------------------------------
-SynthDef(\vcfLadder, {
-    arg busIn = 0, freq = 1500, q = 1.0, mix = 1.0, drive = 1.0;
-    var sig = In.ar(busIn, 2);
-    var wet = LPF.ar(LPF.ar(sig * drive, freq), freq);
-    wet = wet + (RHPF.ar(wet, freq, q.reciprocal.clip(0.1, 2)) * (q * 0.3));
-    ReplaceOut.ar(busIn, (sig * (1 - mix)) + (wet * mix));
-}).add;
+
 
 // --- VCF Formant (voyelles a/e/i/o/u) ---------------------------------
 // vowel : 0=a 1=e 2=i 3=o 4=u, mix entre crossfade
-SynthDef(\vcfFormant, {
-    arg busIn = 0, vowel = 0, q = 0.15, mix = 1.0;
-    var sig = In.ar(busIn, 2);
-    var f1 = Select.kr(vowel, [800, 400, 350, 450, 325]);
-    var f2 = Select.kr(vowel, [1150, 1700, 1900, 800, 700]);
-    var f3 = Select.kr(vowel, [2900, 2600, 2500, 2830, 2530]);
-    var wet = BPF.ar(sig, f1, q) * 1.0
-            + BPF.ar(sig, f2, q) * 0.7
-            + BPF.ar(sig, f3, q) * 0.4;
-    wet = wet * 1.5;
-    ReplaceOut.ar(busIn, (sig * (1 - mix)) + (wet * mix));
-}).add;
+
 
 // --- VCF Comb (resonator) ---------------------------------------------
-SynthDef(\vcfComb, {
-    arg busIn = 0, freq = 220, decay = 1.0, mix = 0.6;
-    var sig = In.ar(busIn, 2);
-    var wet = CombC.ar(sig, 0.05, freq.reciprocal.clip(0.0001, 0.05), decay);
-    ReplaceOut.ar(busIn, (sig * (1 - mix)) + (wet * mix));
-}).add;
+
 
 // --- VCF HPF resonant -------------------------------------------------
-SynthDef(\vcfHpf, {
-    arg busIn = 0, freq = 200, q = 0.5, mix = 1.0;
-    var sig = In.ar(busIn, 2);
-    var wet = RHPF.ar(sig, freq.clip(20, 18000), q.clip(0.05, 2));
-    ReplaceOut.ar(busIn, (sig * (1 - mix)) + (wet * mix));
-}).add;
+
 
 // --- VCF BPF resonant -------------------------------------------------
-SynthDef(\vcfBpf, {
-    arg busIn = 0, freq = 1000, q = 0.3, mix = 1.0;
-    var sig = In.ar(busIn, 2);
-    var wet = BPF.ar(sig, freq.clip(40, 18000), q.clip(0.05, 2)) * 1.5;
-    ReplaceOut.ar(busIn, (sig * (1 - mix)) + (wet * mix));
-}).add;
+
 
 // --- VCF Notch (sweepable, supprime une bande) ------------------------
-SynthDef(\vcfNotch, {
-    arg busIn = 0, freq = 1000, q = 0.3, mix = 1.0;
-    var sig = In.ar(busIn, 2);
-    var wet = BRF.ar(sig, freq.clip(40, 18000), q.clip(0.05, 2));
-    ReplaceOut.ar(busIn, (sig * (1 - mix)) + (wet * mix));
-}).add;
+
 
 // --- FX additionnels (lus depuis fxBuses[\xxx], compatibles fx_bus.scd) ---
 
 // Ring modulator avec freq mod
-SynthDef(\fxRingMod, {
-    arg in, out = 0, freq = 200, modAmt = 1.0, mix = 0.5, amp = 1.0;
-    var dry = In.ar(in, 2);
-    var wet = dry * SinOsc.ar(freq) * modAmt;
-    Out.ar(out, ((dry * (1 - mix)) + (wet * mix)) * amp);
-}).add;
+
 
 // Frequency shifter
-SynthDef(\fxFreqShift, {
-    arg in, out = 0, shift = 100, mix = 0.5, amp = 1.0;
-    var dry = In.ar(in, 2);
-    var wet = FreqShift.ar(dry, shift);
-    Out.ar(out, ((dry * (1 - mix)) + (wet * mix)) * amp);
-}).add;
+
 
 // Granular freeze (simule un "grain hold" via PitchShift en boucle)
-SynthDef(\fxGran, {
-    arg in, out = 0, grainDur = 0.1, density = 30, pitch = 1.0,
-        mix = 0.5, amp = 1.0;
-    var dry = In.ar(in, 2);
-    var wet = PitchShift.ar(dry, grainDur, pitch, 0.05, 0.05);
-    Out.ar(out, ((dry * (1 - mix)) + (wet * mix)) * amp);
-}).add;
+
 
 // Comb filter resonator
-SynthDef(\fxComb, {
-    arg in, out = 0, freq = 220, decay = 1.0, mix = 0.5, amp = 1.0;
-    var dry = In.ar(in, 2);
-    var wet = CombC.ar(dry, 0.05, freq.reciprocal.clip(0.0001, 0.05), decay);
-    Out.ar(out, ((dry * (1 - mix)) + (wet * mix)) * amp);
-}).add;
+
 
 // Formant filter (Klank) - voyelle parametrable
-SynthDef(\fxFormant, {
-    arg in, out = 0, vowel = 0, q = 0.15, mix = 0.5, amp = 1.0;
-    var dry = In.ar(in, 2);
-    var f1 = Select.kr(vowel, [800, 400, 350, 450, 325]);
-    var f2 = Select.kr(vowel, [1150, 1700, 1900, 800, 700]);
-    var f3 = Select.kr(vowel, [2900, 2600, 2500, 2830, 2530]);
-    var wet = BPF.ar(dry, f1, q)
-            + BPF.ar(dry, f2, q) * 0.7
-            + BPF.ar(dry, f3, q) * 0.4;
-    wet = wet * 1.5;
-    Out.ar(out, ((dry * (1 - mix)) + (wet * mix)) * amp);
-}).add;
+
 
 // Auto-filter LFO sur cutoff
-SynthDef(\fxAutoFilter, {
-    arg in, out = 0, rate = 0.5, lo = 200, hi = 4000, q = 0.4,
-        mix = 0.7, amp = 1.0;
-    var dry = In.ar(in, 2);
-    var lfo = SinOsc.kr(rate).range(lo, hi);
-    var wet = RLPF.ar(dry, lfo, q.clip(0.05, 1.5));
-    Out.ar(out, ((dry * (1 - mix)) + (wet * mix)) * amp);
-}).add;
+
 
 // Tremolo (amp LFO)
-SynthDef(\fxTremolo, {
-    arg in, out = 0, rate = 5, depth = 0.7, mix = 1.0, amp = 1.0;
-    var dry = In.ar(in, 2);
-    var lfo = SinOsc.kr(rate).range(1 - depth, 1);
-    var wet = dry * lfo;
-    Out.ar(out, ((dry * (1 - mix)) + (wet * mix)) * amp);
-}).add;
+
 
 // Auto-pan
-SynthDef(\fxAutopan, {
-    arg in, out = 0, rate = 0.3, depth = 1.0, mix = 1.0, amp = 1.0;
-    var dry = In.ar(in, 2);
-    var p = SinOsc.kr(rate) * depth;
-    var wet = Balance2.ar(dry[0], dry[1], p);
-    Out.ar(out, ((dry * (1 - mix)) + (wet * mix)) * amp);
-}).add;
+
 
 // Stutter rythmique (gate carre)
-SynthDef(\fxStutter, {
-    arg in, out = 0, rate = 8, dutyCycle = 0.5, mix = 1.0, amp = 1.0;
-    var dry = In.ar(in, 2);
-    var gate = LFPulse.kr(rate, 0, dutyCycle);
-    var wet = dry * gate;
-    Out.ar(out, ((dry * (1 - mix)) + (wet * mix)) * amp);
-}).add;
+
 
 // Resonator Klank (pitched ringing)
-SynthDef(\fxResonator, {
-    arg in, out = 0, freq = 220, decay = 2.0, mix = 0.4, amp = 1.0;
-    var dry = In.ar(in, 2);
-    var ratios = [1, 1.5, 2.01, 2.5, 3.01];
-    var amps = [1, 0.6, 0.4, 0.3, 0.2];
-    var ringL = Klank.ar(`[ratios * freq, amps, ratios.collect { decay }],
-                        dry[0] * 0.1);
-    var ringR = Klank.ar(`[ratios * freq, amps, ratios.collect { decay }],
-                        dry[1] * 0.1);
-    var wet = [ringL, ringR];
-    Out.ar(out, ((dry * (1 - mix)) + (wet * mix)) * amp);
-}).add;
+
 
 // Reverb a ressort (allpass nested + filtre tonal)
-SynthDef(\fxSpringRev, {
-    arg in, out = 0, decay = 1.5, mix = 0.4, amp = 1.0;
-    var dry = In.ar(in, 2);
-    var wet = dry;
-    // chaine d'allpass typique d'un spring tank
-    [0.013, 0.029, 0.041, 0.067, 0.089].do { |t|
-        wet = AllpassN.ar(wet, 0.1, t, decay);
-    };
-    wet = HPF.ar(wet, 200);    // pas de basses dans un spring
-    wet = LPF.ar(wet, 4500);
-    Out.ar(out, ((dry * (1 - mix)) + (wet * mix)) * amp);
-}).add;
+
 
 // Plate reverb (court + brillant + dense)
-SynthDef(\fxPlate, {
-    arg in, out = 0, decay = 2.5, damp = 0.3, mix = 0.4, amp = 1.0;
-    var dry = In.ar(in, 2);
-    var wet = FreeVerb2.ar(dry[0], dry[1], 1.0,
-        decay.linlin(0.5, 5.0, 0.7, 0.95), damp);
-    wet = HPF.ar(wet, 80);
-    Out.ar(out, ((dry * (1 - mix)) + (wet * mix)) * amp);
-}).add;
+
 
 // --- Master compresseur (insert avant masterLim) ----------------------
 // Compander : threshold, slopeBelow=1 (no expand), slopeAbove<1 (compress)
-SynthDef(\masterComp, {
-    arg threshold = 0.4, ratio = 0.5, attack = 0.01, release = 0.1,
-        makeup = 1.4;
-    var sig = In.ar(0, 2);
-    sig = Compander.ar(sig, sig, threshold, 1.0, ratio, attack, release);
-    sig = sig * makeup;
-    ReplaceOut.ar(0, sig);
-}).add;
+
 
 // --- Master saturation (tanh / softclip / fold) -----------------------
 // mode : 0=tanh, 1=softclip, 2=fold
-SynthDef(\masterSat, {
-    arg amount = 1.5, mode = 0, mix = 1.0;
-    var sig = In.ar(0, 2);
-    var wet = Select.ar(mode.clip(0, 2), [
-        (sig * amount).tanh / amount.sqrt,
-        (sig * amount).softclip,
-        (sig * amount).fold(-0.95, 0.95)
-    ]);
-    ReplaceOut.ar(0, (sig * (1 - mix)) + (wet * mix));
-}).add;
+
 
 // --- Bus master temporaire pour effets globaux serie -------------------
 // utilise par ~slipTime, ~ringMod momentanes : un Synth applique l'effet
 // inline dans une chaine ReplaceOut sur le bus 0.
-SynthDef(\fxMasterPitch, {
-    arg dur = 2, pitch = 1.0, releaseTime = 0.05;
-    var sig = In.ar(0, 2);
-    var wet = PitchShift.ar(sig, 0.2, pitch, 0.01, 0.005);
-    var env = EnvGen.kr(Env.linen(0.01, dur, releaseTime), doneAction: 2);
-    ReplaceOut.ar(0, XFade2.ar(sig, wet, env.linlin(0, 1, -1, 1)));
-}).add;
 
-SynthDef(\fxMasterRing, {
-    arg dur = 1, freq = 200, mix = 0.7;
-    var sig = In.ar(0, 2);
-    var wet = sig * SinOsc.ar(freq);
-    var env = EnvGen.kr(Env.linen(0.01, dur, 0.05), doneAction: 2);
-    ReplaceOut.ar(0, ((sig * (1 - mix)) + (wet * mix)) * env
-                     + (sig * (1 - env)));
-}).add;
 
-SynthDef(\fxMasterFreqShift, {
-    arg dur = 1, shift = 100;
-    var sig = In.ar(0, 2);
-    var wet = FreqShift.ar(sig, shift);
-    var env = EnvGen.kr(Env.linen(0.01, dur, 0.05), doneAction: 2);
-    ReplaceOut.ar(0, XFade2.ar(sig, wet, env.linlin(0, 1, -1, 1)));
-}).add;
 
-SynthDef(\fxMasterBitcrush, {
-    arg dur = 1, bits = 6, sr = 6000, mix = 0.7;
-    var sig = In.ar(0, 2);
-    // Bit + SR reduction native (sans Decimator de sc3-plugins)
-    var step = 2.pow(bits - 1);
-    var crushed = (sig * step).round / step;
-    var wet = Latch.ar(crushed, Impulse.ar(sr));
-    var env = EnvGen.kr(Env.linen(0.01, dur, 0.05), doneAction: 2);
-    ReplaceOut.ar(0, ((sig * (1 - mix)) + (wet * mix)) * env
-                     + (sig * (1 - env)));
-}).add;
 
-SynthDef(\fxMasterGran, {
-    arg dur = 2, grainDur = 0.1, pitch = 1.0;
-    var sig = In.ar(0, 2);
-    var wet = PitchShift.ar(sig, grainDur, pitch, 0.05, 0.05);
-    var env = EnvGen.kr(Env.linen(0.01, dur, 0.05), doneAction: 2);
-    ReplaceOut.ar(0, XFade2.ar(sig, wet, env.linlin(0, 1, -1, 1)));
-}).add;
+
+
+
+
+
 
 s.sync;
 
@@ -383,8 +197,12 @@ s.sync;
 
 // LFO sync au tempo : beatsDiv = nombre de beats par cycle complet
 //   ex: 4 = un cycle sur 4 beats (ralenti), 0.25 = 4 cycles par beat
+// FIX FUITE RAM : doReload defaut a false (etait true). Avec true, chaque
+// tick LFO appelait ~reload.value qui recompile les 8 Pdef -> 5-40
+// recompilations/sec selon BPM, fuite client + server. Pfunc dans engine.scd
+// lit deja les variables dynamiquement, doReload n'est plus necessaire.
 ~lfoSync = { |paramName, beatsDiv = 4, depth = 0.3, shape = \sin,
-              center = nil, doReload = true|
+              center = nil, doReload = false|
     var bps = TempoClock.default.tempo;
     var rate = bps / beatsDiv;
     ~lfoTo.(paramName, rate, depth, shape, center, doReload);
@@ -606,9 +424,14 @@ s.sync;
     ~vcfActive !? { ~vcfActive.set(param.asSymbol, value) };
 };
 
-// Sweep automatique du cutoff (ne touche pas le SynthDef, set en live)
+// Sweep automatique du cutoff (ne touche pas le SynthDef, set en live).
+// FIX FUITE RAM : Routine maintenant trackee dans ~vcfSweepRoutine (avant
+// elle etait orpheline ; si l'utilisateur cancelait mid-sweep ou
+// enchainait deux ~vcfSweep d'affilee, les anciennes Routines continuaient
+// silencieusement). ~vcfOff et ~killAllOrphans la stoppent.
 ~vcfSweep = { |fromHz = 200, toHz = 5000, dur = 4, curve = \exp|
-    Routine({
+    ~vcfSweepRoutine !? { try { ~vcfSweepRoutine.stop } };
+    ~vcfSweepRoutine = Routine({
         var steps = (dur / 0.03).max(2).asInteger;
         steps.do { |i|
             var x = (i + 1) / steps;
@@ -621,11 +444,13 @@ s.sync;
             ~vcfSet.(\freq, f);
             0.03.wait;
         };
+        ~vcfSweepRoutine = nil;
     }).play;
     ("VCF SWEEP " ++ fromHz ++ " -> " ++ toHz ++ "Hz sur " ++ dur ++ "s").postln;
 };
 
 ~vcfOff = {
+    ~vcfSweepRoutine !? { try { ~vcfSweepRoutine.stop }; ~vcfSweepRoutine = nil };
     ~vcfActive !? { ~vcfActive.free; ~vcfActive = nil; ~vcfActiveType = nil };
     "VCF OFF".postln;
 };
@@ -654,7 +479,13 @@ s.sync;
 // =====================================================================
 
 // --- Tracking des Routines de tricks (anti-spam / anti-fuite RAM) ---
-~trickRoutines = ~trickRoutines ?? { () };
+// Au reload du fichier : stoppe et libere les anciennes Routines avant
+// de re-creer le dict (sinon les anciennes continuent a tourner et
+// accumulent des Synths cote scsynth).
+~trickRoutines !? {
+    ~trickRoutines.keysValuesDo { |k, r| r !? { try { r.stop } } };
+};
+~trickRoutines = ();
 ~trickStop = { |key|
     ~trickRoutines[key.asSymbol] !? {
         ~trickRoutines[key.asSymbol].stop;
@@ -687,6 +518,7 @@ s.sync;
         ~kickAmp = startK; ~melodyAmp = startM;
         ~acidAmp = startA; ~harmonyAmp = startH;
         ~reload !? { ~reload.value };
+        ~trickRoutines[\stutter] = nil;
     }).play;
     ("STUTTER " ++ rateHz ++ "Hz " ++ dur ++ "s").postln;
 };
@@ -743,6 +575,7 @@ s.sync;
         // unfreeze apres 1s
         1.0.wait;
         ~setFx !? { ~setFx.(\rev, \freeze, 0) };
+        ~trickRoutines[\drop] = nil;
     }).play;
     ("DROP build=" ++ buildDur ++ "s").postln;
 };
@@ -773,6 +606,7 @@ s.sync;
         ~sendShimmer !? { ~sendShimmer.(0.5) };
         ~sendReverb !? { ~sendReverb.(0.5) };
         dur.wait;
+        ~trickRoutines[\breakdown] = nil;
     }).play;
     ("BREAKDOWN " ++ dur ++ "s").postln;
 };
@@ -786,6 +620,162 @@ s.sync;
     ~envSweep.(\acidAmp,   ~acidAmp ? 0,   endA, dur, \lin, false);
     ~filterSweepUp.(dur);
     ("BUILDUP " ++ dur ++ "s").postln;
+};
+
+// Liste centralisee des Pdef sequenceurs (utilise par tapeStop / tapeStart
+// / playAll). Si tu ajoutes une voix, mets a jour ici.
+~allSeqs = [
+    \kickSeq, \hatSeq, \snareSeq, \clapSeq, \percSeq,
+    \acidSeq, \melodySeq, \harmonySeq
+];
+
+// FIX FUITE RAM CLIENT : ~reload debounce.
+//
+// Probleme : les tracks appellent ~reload.value 5-10x par section (dans
+// les `if (X.coin) { ...; ~reload.value }` loops). Chaque reload recompile
+// 8 Pdef Pbind avec ~50 Pfunc closures qui retiennent currentEnvironment
+// = ~10 KB sclang par reload. Sur une track de 5 min : ~250 reloads =
+// 2.5 MB client memory pile. Sur un album : 50 MB. Sclang grossit jusqu'au
+// crash.
+//
+// Solution : 1er appel fire IMMEDIAT + arme une fenetre 100 ms. Les appels
+// pendant la fenetre sont coalesces en UN SEUL trailing call. Les variables
+// ~xxx etant lues a l'execution du Pdef, le trailing call recupere
+// automatiquement la valeur la plus recente.
+//
+// DEBOUNCING ~reload : 4-10 ~reload rapides -> 2 executions reelles.
+// Reduit la pression sur le GC sclang (Pfunc closures).
+//
+// IMPORTANT : guard idempotent contre reload multiple de live.scd.
+if (~reloadImmediate.isNil) { ~reloadImmediate = ~reload };
+~reloadPending = false;
+~reloadDebouncer = nil;
+~reloadWindow = 0.1;  // 100 ms
+
+~reload = {
+    if (~reloadDebouncer.isNil) {
+        // Hors fenetre : execute tout de suite + ouvre fenetre
+        ~reloadImmediate.value;
+        ~reloadDebouncer = Routine({
+            ~reloadWindow.wait;
+            if (~reloadPending) {
+                ~reloadImmediate.value;
+                ~reloadPending = false;
+            };
+            ~reloadDebouncer = nil;
+        }).play;
+    } {
+        // Dans la fenetre : marque pending, le trailing call l'executera
+        ~reloadPending = true;
+    };
+};
+
+~reloadNow = { ~reloadImmediate.value };
+
+// FIX FUITE RAM SCSYNTH : ~playActive ne lance QUE les Pdef dont l'amp > 0.
+//
+// Probleme : la pluspart des tracks font
+//   [\kickSeq, \hatSeq, \snareSeq, \clapSeq, \percSeq, \acidSeq, \melodySeq, \harmonySeq].do { |k| Pdef(k).play };
+// meme quand snare/clap/perc/harmony ont amp=0. Resultat : 3-4 Pdef
+// fantomes qui spawnent des Synths silencieux a 9/sec chacun = 30+
+// Synths/sec inutiles cote scsynth. Sur une track de 5 min = 9000+
+// Synth instantiations gachees + UGens correspondants alloues puis
+// liberes (churn massif).
+//
+// Solution : verifier l'amp avant chaque .play. Les Pdef sans amp restent
+// .stop. L'utilisateur peut les ramener vivant en setant ~xxxAmp > 0
+// puis appelant ~playActive.value de nouveau.
+~allSeqsAmpKey = (
+    kickSeq: \kickAmp, hatSeq: \hatAmp, snareSeq: \snareAmp,
+    clapSeq: \clapAmp, percSeq: \percAmp, acidSeq: \acidAmp,
+    melodySeq: \melodyAmp, harmonySeq: \harmonyAmp
+);
+
+~playActive = {
+    var played = List.new, skipped = List.new;
+    ~allSeqsAmpKey.keysValuesDo { |seqKey, ampKey|
+        var amp = currentEnvironment[ampKey] ? 0;
+        if (amp > 0) {
+            Pdef(seqKey).play;
+            played.add(seqKey);
+        } {
+            Pdef(seqKey).stop;
+            skipped.add(seqKey);
+        };
+    };
+    ("[playActive] play=" ++ played.asArray
+     ++ "  skip=" ++ skipped.asArray).postln;
+};
+
+// FIX FUITE RAM TRACK : helper a appeler en debut de chaque ~track Routine
+// pour eviter que la track precedente survive en pieces detachees.
+//
+// Probleme : `~track !? { ~track.stop }` arretait la Routine principale
+// MAIS pas les Pdef qu'elle avait .play() (kickSeq/melodySeq/etc.) ni les
+// ~trickRoutines (stutter, drop), ~lfos, ~envs, ~fxLfos qu'elle avait
+// declenches. Resultat : enchainer 3 tracks empilait 3 jeux complets ->
+// 3x les Synths, 3x les Routines, fuite explosive.
+//
+// ~trackBegin fait le meme cleanup que ~killAllOrphans mais SANS stopper
+// ~track lui-meme (sinon il s'auto-tuerait).
+~trackBegin = {
+    // 1. Stop tous les Pdef sequenceurs
+    ~allSeqs.do { |k| Pdef(k).stop };
+    // 2. Stop ~trickRoutines (stutter, drop, glitch, freeze, ...)
+    ~trickStopAll !? { ~trickStopAll.value };
+    // 3. Stop ~lfos (params live)
+    ~lfos !? {
+        ~lfos.keysValuesDo { |k, v| try { v.stop } };
+        ~lfos.clear;
+    };
+    // 4. Stop ~envs (envelopes ponctuelles)
+    ~envs !? {
+        ~envs.keysValuesDo { |k, v| try { v.stop } };
+        ~envs.clear;
+    };
+    // 5. Stop ~fxLfos (LFO sur sends FX)
+    ~fxLfos !? {
+        ~fxLfos.keysValuesDo { |k, v| try { v.stop } };
+        ~fxLfos.clear;
+    };
+    // 6. Stop VCF sweep en cours
+    ~vcfSweepRoutine !? { try { ~vcfSweepRoutine.stop }; ~vcfSweepRoutine = nil };
+    // 7. Stop auto-fx (panning/tremolo) sur les voix principales
+    ~stopAutoFx !? {
+        [\kick, \hat, \snare, \clap, \perc, \acid, \melody, \harmony]
+            .do { |v| try { ~stopAutoFx.(v) } };
+    };
+    "[trackBegin] cleanup OK".postln;
+};
+
+// Play All : relance instantanement tous les Pdef sequenceurs (pendant
+// direct de ~tapeStop). N'altere ni tempo ni amp -- juste .play().
+~playAll = {
+    ~allSeqs.do { |k| Pdef(k).play };
+    "PLAY ALL".postln;
+};
+
+// Tape start : symetrique de ~tapeStop. Relance les Pdef puis accelere
+// le tempo de 0.01 jusqu'a startTempo (passe en argument ou actuel).
+~tapeStart = { |dur = 2, targetTempo|
+    var endTempo = targetTempo ? TempoClock.default.tempo;
+    ~trickStop.(\tapeStart);
+    ~trickRoutines[\tapeStart] = Routine({
+        var steps = (dur / 0.03).max(2).asInteger;
+        // relance les Pdef AU PLUS BAS tempo (ou ils repartent au ralenti)
+        TempoClock.default.tempo = 0.01;
+        ~allSeqs.do { |k| Pdef(k).play };
+        steps.do { |i|
+            var x = (i + 1) / steps;
+            // courbe expo inverse (monte vite puis lentement)
+            var t = endTempo * x.sqrt;
+            TempoClock.default.tempo = t.max(0.01);
+            0.03.wait;
+        };
+        TempoClock.default.tempo = endTempo;
+        ~trickRoutines[\tapeStart] = nil;
+    }).play;
+    ("TAPE START " ++ dur ++ "s -> " ++ endTempo).postln;
 };
 
 // Tape stop : ralenti progressif du tempo puis stop
@@ -802,9 +792,9 @@ s.sync;
             0.03.wait;
         };
         // stop
-        [\kickSeq, \hatSeq, \snareSeq, \clapSeq, \percSeq,
-         \acidSeq, \melodySeq, \harmonySeq].do { |k| Pdef(k).stop };
+        ~allSeqs.do { |k| Pdef(k).stop };
         TempoClock.default.tempo = startTempo;
+        ~trickRoutines[\tapeStop] = nil;
     }).play;
     ("TAPE STOP " ++ dur ++ "s").postln;
 };
@@ -821,6 +811,7 @@ s.sync;
     ~trickRoutines[\glitch] = Routine({
         dur.wait;
         ~sendDelay !? { ~sendDelay.(0) };
+        ~trickRoutines[\glitch] = nil;
     }).play;
     ("GLITCH " ++ dur ++ "s").postln;
 };
@@ -845,6 +836,7 @@ s.sync;
         };
         ~kickAmp = startK; ~melodyAmp = startM; ~acidAmp = startA;
         ~reload !? { ~reload.value };
+        ~trickRoutines[\freeze] = nil;
     }).play;
     ("FREEZE " ++ dur ++ "s").postln;
 };
@@ -866,6 +858,7 @@ s.sync;
         ~acidAmp = startA; ~harmonyAmp = startH;
         ~reload !? { ~reload.value };
         ~sendReverb !? { ~sendReverb.(0.3) };
+        ~trickRoutines[\reverbTail] = nil;
     }).play;
     ("REVERB TAIL " ++ dur ++ "s").postln;
 };
@@ -882,6 +875,7 @@ s.sync;
     ~trickRoutines[\tapeReverse] = Routine({
         dur.wait;
         ~setFx !? { ~setFx.(\rev, \freeze, 0) };
+        ~trickRoutines[\tapeReverse] = nil;
     }).play;
     ("TAPE REVERSE " ++ dur ++ "s").postln;
 };
@@ -901,6 +895,7 @@ s.sync;
             ("swap : pas de helper ~scene -- swap " ++ sceneA
                 ++ " <-> " ++ sceneB ++ " (no-op)").postln;
         };
+        ~trickRoutines[\swap] = nil;
     }).play;
 };
 
@@ -916,6 +911,7 @@ s.sync;
         ~kickAmp = startK; ~melodyAmp = startM;
         ~acidAmp = startA; ~harmonyAmp = startH;
         ~reload !? { ~reload.value };
+        ~trickRoutines[\jumpCut] = nil;
     }).play;
     ("JUMP CUT " ++ dur ++ "s").postln;
 };
@@ -1000,7 +996,7 @@ s.sync;
     ("GRAN FREEZE " ++ dur ++ "s").postln;
 };
 
-// Utilise le SynthDef \scratch existant (synthdefs/authentic.scd)
+// Utilise le SynthDef \scratch existant (synth/_index.scd)
 ~scratch = { |dir = 1, dur = 0.3|
     Synth(\scratch, [\dur, dur, \freq, rrand(400, 1500),
                      \sweepDir, dir, \amp, 0.4]);
@@ -1025,11 +1021,15 @@ s.sync;
 // variables ~xxxAmp / ~xxxPan via les LFO existants.
 ~autoFx = ();   // dictionnaire d'auto-fx par cible
 
+// FIX FUITE RAM : doReload force a false (etait true en 6e arg de ~lfoTo).
+// A 5Hz un tremolo declenchait 100 recompils Pdef/sec -> Synths fuiteurs
+// massifs. Pfunc { ~xxxAmp } dans engine.scd suffit a propager la valeur
+// en live sans recompil.
 ~autoPan = { |target = \melody, rate = 0.5, depth = 0.8|
     // on vise la variable ~xxxPan -- si elle n'existe pas, on la cree
     var sym = (target.asString ++ "Pan").asSymbol;
     ~setVar.(sym, 0);
-    ~lfoTo.(sym, rate, depth, \sin, 0, true);
+    ~lfoTo.(sym, rate, depth, \sin, 0, false);
     ~autoFx[target.asSymbol] = sym;
     ("AUTOPAN " ++ target ++ " rate=" ++ rate
         ++ " depth=" ++ depth ++ " (sur ~" ++ sym ++ ")").postln;
@@ -1038,7 +1038,7 @@ s.sync;
 ~tremolo = { |target = \melody, rate = 5, depth = 0.5|
     var sym = (target.asString ++ "Amp").asSymbol;
     var center = ~getVar.(sym) ? 0.16;
-    ~lfoTo.(sym, rate, center * depth, \sin, center, true);
+    ~lfoTo.(sym, rate, center * depth, \sin, center, false);
     ~autoFx[target.asSymbol] = sym;
     ("TREMOLO " ++ target ++ " rate=" ++ rate ++ "Hz depth=" ++ depth).postln;
 };
@@ -1077,9 +1077,14 @@ s.sync;
         \fxRingMod
     );
     ~fxBuses !? {
-        // si le bus n'existe pas, on l'alloue
+        // si le bus n'existe pas, on l'alloue (et on track pour cleanup
+        // ulterieur via ~freeDynFxBuses : les bus statiques de fx_bus.scd
+        // sont free par leur propre guard, mais ceux ajoutes a chaud par
+        // ~addFx etaient orphelins jusqu'ici -> fuite RAM serveur).
         if (~fxBuses[key].isNil) {
             ~fxBuses[key] = Bus.audio(s, 2);
+            ~fxBusesDyn = ~fxBusesDyn ?? { () };
+            ~fxBusesDyn[key] = ~fxBuses[key];
         };
         ~fxFx[key] !? { ~fxFx[key].free };
         if (~masterLim.notNil) {

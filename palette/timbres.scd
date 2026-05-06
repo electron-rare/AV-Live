@@ -153,7 +153,7 @@
 
 
 // =====================================================================
-//  TIMBRES AUTHENTIQUES (L19-L28) -- necessite synthdefs/authentic.scd
+//  TIMBRES AUTHENTIQUES (L19-L28) -- necessite synth/_index.scd
 // =====================================================================
 
 // --- L19 : SUPERSAW (trance JP-8000 7-voice) -----------------------

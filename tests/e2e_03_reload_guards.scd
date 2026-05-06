@@ -7,7 +7,7 @@
 
 "=== e2e_03_reload_guards ===".postln;
 
-~base = "/Users/electron/Documents/Projets_Creatifs/sound_algo/";
+~base = "/Users/electron/Documents/Projets_Creatifs/sound_algo-refonte-v2/";
 ~testCount = 0;
 ~testFailed = 0;
 

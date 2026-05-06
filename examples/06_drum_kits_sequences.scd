@@ -7,21 +7,22 @@
 //  PREREQUIS   : CHARGER TOUT (00_load.scd)
 //
 //  BUT
-//    palette/rhythm/drum_kits.scd  : 21 kits complets (Techno, DnB, Phonk, ...)
-//      -- chaque kit est un bloc qui set ~kickSteps + ~hatSteps + ...
+//    palette/rhythm/drum_kits/   : 21 kits complets (Techno, DnB, Phonk, ...)
+//      -- chaque kit est un fichier qui set ~kickSteps + ~hatSteps + ...
 //         et appelle ~reload.value
-//    palette/rhythm/sequences.scd  : macros de sequences pretes a l'emploi
+//    palette/rhythm/sequences/   : macros de sequences pretes a l'emploi
 //      -- chaque seq est une Routine qui orchestre transitions + tempo
 //
-//  Avant de pouvoir utiliser les ~seqXxx, il faut charger sequences.scd.
+//  Le _index.scd charge fills + sequences. Les drum_kits restent
+//  evalues a la demande (Cmd+Entree sur le fichier d'un kit).
 // =====================================================================
 
 
-// --- [etape 1] Charger drum_kits + sequences -----------------------
+// --- [etape 1] Charger sequences + un kit au choix -----------------
 (
-(~base ++ "palette/rhythm/drum_kits.scd").load;
-(~base ++ "palette/rhythm/sequences.scd").load;
-"drum_kits + sequences charges".postln;
+(~base ++ "palette/rhythm/_index.scd").load;     // fills + sequences
+(~base ++ "palette/rhythm/drum_kits/kit_techno.scd").load;  // exemple kit
+"sequences + kit techno charges".postln;
 )
 
 

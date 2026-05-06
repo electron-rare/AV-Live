@@ -32,3 +32,9 @@ tests/.logs/
 # SuperCollider artefacts
 *.scsyndef
 *.scd~
+
+# Debug probes (temporaires, snapshots OSC)
+_debug/
+
+# Settings Claude Code locaux
+.claude/settings.json

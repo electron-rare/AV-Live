@@ -4,14 +4,14 @@
 //  TITRE       : Construire un morceau ethnique
 //  DUREE       : ~6 minutes
 //  NIVEAU      : intermediaire
-//  PREREQUIS   : CHARGER TOUT (00_load.scd) charge synthdefs/asia.scd
-//                + synthdefs/authentic.scd (taiko, didgeridoo, guzheng,
-//                shakuhachi, tabla)
+//  PREREQUIS   : CHARGER TOUT (00_load.scd) charge synth/_index.scd
+//                qui inclut taiko, didgeridoo, guzheng, shakuhachi, tabla
+//                ainsi que toute la palette asia (koto, erhu, pipa, ...)
 //                + palette/chords_progressions.scd pour ~progHijaz +
 //                ~progVietnam (a charger separement) :
 (
 (~base ++ "palette/chords_progressions.scd").load;
-(~base ++ "palette/rhythm/sequences.scd").load;
+(~base ++ "palette/rhythm/_index.scd").load;
 )
 //
 //  PALETTE

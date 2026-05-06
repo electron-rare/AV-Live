@@ -10,7 +10,7 @@
 
 "=== e2e_01_syntax ===".postln;
 
-~base = "/Users/electron/Documents/Projets_Creatifs/sound_algo/";
+~base = "/Users/electron/Documents/Projets_Creatifs/sound_algo-refonte-v2/";
 ~testCount = 0;
 ~testFailed = 0;
 
@@ -129,17 +129,15 @@
     "live/loops.scd", "live/scenes.scd", "live/tweaks.scd",
     "live/live_fx_panel.scd",
     "control/midi.scd", "control/playlist.scd", "control/jump.scd",
-    "synthdefs/asia.scd", "synthdefs/extra.scd", "synthdefs/authentic.scd",
+    "synth/_index.scd", "fx/_index.scd",
     "palette/scales.scd",
     "palette/styles.scd", "palette/timbres.scd",
-    "palette/melodies/helpers.scd", "palette/melodies/short.scd",
-    "palette/melodies/long.scd", "palette/melodies/xlong.scd",
-    "palette/melodies/epic.scd", "palette/melodies/bank.scd",
+    "palette/melodies/helpers.scd",
+    "palette/melodies/index.scd",
+    "palette/melodies/bank.scd",
     "palette/melodies/tracks.scd",
     "palette/harmonics/helpers.scd", "palette/harmonics/presets.scd",
-    "palette/rhythm/kicks.scd", "palette/rhythm/percussions.scd",
-    "palette/rhythm/drum_kits.scd", "palette/rhythm/patterns_genre.scd",
-    "palette/rhythm/sequences.scd", "palette/rhythm/fills.scd",
+    "palette/rhythm/_index.scd",
     "palette/chords_progressions.scd",
     "palette/fx.scd", "palette/fx_genre.scd",
     "palette/tweaks_template.scd",
@@ -154,10 +152,40 @@
     };
 };
 
-PathName(~base ++ "tracks/").files.do { |pn|
-    if (pn.fullPath.endsWith(".scd")) {
-        ~assert.("syntax: tracks/" ++ pn.fileName, ~compileFileSyntax.(pn.fullPath),
-            "parse FAIL");
+// Tracks : scan recursif tracks/*.scd ET tracks/<album>/*.scd
+// Skip les fichiers prefixes par "_" (orchestrateurs multi-bloc :
+// _index.scd, _album.scd) -- la convention sound_algo les exclut.
+~scanTracksSyntax = { |dirPath|
+    PathName(dirPath).entries.do { |entry|
+        if (entry.isFolder) {
+            ~scanTracksSyntax.(entry.fullPath);
+        } {
+            if (entry.fullPath.endsWith(".scd") and: {
+                entry.fileName.beginsWith("_").not
+            }) {
+                ~assert.("syntax: " ++ entry.fullPath.replace(~base, ""),
+                    ~compileFileSyntax.(entry.fullPath), "parse FAIL");
+            };
+        };
+    };
+};
+~scanTracksSyntax.(~base ++ "tracks/");
+
+// Sous-dossiers eclates de palette/rhythm (presets interactifs)
+PathName(~base ++ "palette/rhythm/").deepFiles.do { |pn|
+    if (pn.extension == "scd" and: { pn.fileName != "_index.scd" }) {
+        ~assert.("syntax: " ++ pn.fullPath.replace(~base, ""),
+            ~compileFileSyntax.(pn.fullPath), "parse FAIL");
+    };
+};
+
+// Sous-dossiers eclates de palette/melodies (short/long/xlong/epic)
+["short", "long", "xlong", "epic"].do { |sub|
+    PathName(~base ++ "palette/melodies/" ++ sub ++ "/").files.do { |pn|
+        if (pn.extension == "scd") {
+            ~assert.("syntax: " ++ pn.fullPath.replace(~base, ""),
+                ~compileFileSyntax.(pn.fullPath), "parse FAIL");
+        };
     };
 };
 

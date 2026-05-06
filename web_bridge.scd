@@ -11,19 +11,23 @@
 //    - web/node_modules installes (npm install fait une fois)
 //
 //  USAGE :
-//    Cmd+Entree sur le bloc ci-dessous. Le serveur Node demarre
-//    automatiquement (si pas deja actif) et les pages /control + /hydra
-//    s'ouvrent dans le navigateur par defaut.
+//    Cmd+Entree sur le bloc ci-dessous : enregistre les OSCdef.
+//    Le serveur Node n'est PAS demarre automatiquement (relire le
+//    fichier ne relance pas Node a chaque fois).
+//      ~webStart.value          -- demarre Node + ouvre /control + /hydra
 //      ~webBridgeStop.value     -- ferme les OSCdef SC
 //      ~webServerStop.value     -- tue le serveur Node
 //      ~webOpenPages.value      -- ouvre /control + /hydra a la main
 // =====================================================================
 (
+// Idempotence : si on relit le fichier, on ferme l'ancien etat OSC
+~webBridgeStop !? { ~webBridgeStop.value };
+
 ~webBridgeNode = NetAddr("127.0.0.1", 57122);    // <- vers le serveur Node
 ~webBridgeIn   = 57121;                          // <- ecoute du serveur
 thisProcess.openUDPPort(~webBridgeIn);
 
-~webBase = ~base ?? { "/Users/electron/Documents/Projets_Creatifs/sound_algo/" };
+~webBase = ~base ?? { "/Users/electron/Documents/Projets_Creatifs/sound_algo-refonte-v2/" };
 ~webHttpUrl = "http://localhost:3000";
 
 // ---------- Auto-lancement serveur Node + ouverture pages -----------
@@ -80,12 +84,50 @@ thisProcess.openUDPPort(~webBridgeIn);
     "[web_bridge] serveur Node stoppe (pkill node server.js)".postln;
 };
 
+// Helper unique pour lancer Node + ouvrir les pages
+~webStart = { ~webServerStart.value; };
+
+// ---------- Broadcast steps/notes vers le browser -------------------
+~webBroadcastSteps = {
+    var binVoices = [\kick, \hat, \snare, \clap, \perc];
+    var binSyms   = [\kickSteps, \hatSteps, \snareSteps, \clapSteps, \percSteps];
+    var noteVoices = [\acid, \melody, \harmony];
+    var noteSyms   = [\acidNotes, \melodyNotes, \harmonyNotes];
+    var accents = (~acidAccents ? (0!16)).asArray.collect(_.asInteger);
+    var slides  = (~acidSlides  ? (0!16)).asArray.collect(_.asInteger);
+    binVoices.do { |v, i|
+        var arr = (currentEnvironment[binSyms[i]] ? (0!16)).asArray.collect(_.asInteger);
+        ~webBridgeNode.sendMsg(*(["/sync/steps", v.asString] ++ arr));
+    };
+    noteVoices.do { |v, i|
+        var arr = (currentEnvironment[noteSyms[i]] ? (0!16)).asArray.collect(_.asInteger);
+        ~webBridgeNode.sendMsg(*(["/sync/notes", v.asString] ++ arr));
+    };
+    // Acid : accents + slides + params (cutoff/rq/drive/amp)
+    ~webBridgeNode.sendMsg(*(["/sync/acidAccents"] ++ accents));
+    ~webBridgeNode.sendMsg(*(["/sync/acidSlides"]  ++ slides));
+    ~webBridgeNode.sendMsg("/sync/acidParams",
+        (~acidCutoff ? 800).asFloat,
+        (~acidRq ? 0.15).asFloat,
+        (~acidDrive ? 2.0).asFloat,
+        (~acidAmp ? 0.3).asFloat);
+    ~webBridgeNode.sendMsg("/sync/harmonyAmp", (~harmonyAmp ? 0.14).asFloat);
+};
+
 // ---------- Helpers de dispatch --------------------------------------
 ~webBridgeDefs = List.new;
 
+// Wrapper protege : toute exception dans une action ne tue pas l'OSCdef
 ~webBridgeAdd = { |path, action|
     var key = ("web_" ++ path.replace("/", "_")).asSymbol;
-    var def = OSCdef(key, action, path, recvPort: ~webBridgeIn);
+    var safe = { |msg, time, addr, recvPort|
+        try {
+            action.value(msg, time, addr, recvPort);
+        } { |err|
+            ("[web_bridge] " ++ path ++ " err: " ++ err.errorString).postln;
+        };
+    };
+    var def = OSCdef(key, safe, path, recvPort: ~webBridgeIn);
     ~webBridgeDefs.add(def);
     def;
 };
@@ -93,16 +135,38 @@ thisProcess.openUDPPort(~webBridgeIn);
 ~webBridgeStop = {
     ~webBridgeDefs.do(_.free);
     ~webBridgeDefs = List.new;
-    ~webBeatRoutine !? { ~webBeatRoutine.stop };
-    ~webAmpRoutine !? { ~webAmpRoutine.stop };
+    ~webBeatRoutine !? { ~webBeatRoutine.stop; ~webBeatRoutine = nil };
+    ~webAmpRoutine  !? { ~webAmpRoutine.stop;  ~webAmpRoutine  = nil };
+    ~webBpmReloadTask !? { ~webBpmReloadTask.stop; ~webBpmReloadTask = nil };
+    ~webStepReloadTask !? { ~webStepReloadTask.stop; ~webStepReloadTask = nil };
+    // Restaure ~reload si wrappe par ce module
+    ~webReloadOriginal !? {
+        ~reload = ~webReloadOriginal;
+        ~webReloadOriginal = nil;
+    };
     "[web_bridge] OSCdef + Routines stopped (serveur Node toujours actif, ~webServerStop pour tuer)".postln;
+};
+
+// ---------- Debounce helper (200ms) ---------------------------------
+// Utilise une Task qu'on reschedule -- le compteur est l'identite de
+// la Task : seule la derniere lancee survit jusqu'a l'execution.
+~webDebounce = { |slot, delay, action|
+    currentEnvironment[slot] !? { currentEnvironment[slot].stop };
+    currentEnvironment[slot] = Task({
+        delay.wait;
+        try { action.value } { |err|
+            ("[web_bridge] debounce " ++ slot ++ " err: " ++ err.errorString).postln;
+        };
+        currentEnvironment[slot] = nil;
+    }).play(AppClock);
 };
 
 // ---------- Transport ------------------------------------------------
 ~webBridgeAdd.("/control/bpm", { |msg|
     ~bpm = msg[1];
     TempoClock.default.tempo = ~bpm / 60;
-    ~reload.value;
+    // Debounce reload : evite de reload a chaque tick du slider
+    ~webDebounce.(\webBpmReloadTask, 0.2, { ~reload.value });
     ~webBridgeNode.sendMsg("/sync/bpm", ~bpm);
 });
 
@@ -132,14 +196,61 @@ thisProcess.openUDPPort(~webBridgeIn);
 ~webBridgeAdd.("/control/pGenre", { |msg| ~pGenre.(msg[1].asString.asSymbol) });
 ~webBridgeAdd.("/control/ff",     { |msg| ~ff.(msg[1].asString.asSymbol) });
 
-// ---------- Step sequencer (5 voies x 16 pas) -----------------------
-[\kickSteps, \hatSteps, \snareSteps, \clapSteps, \percSteps].do { |sym|
+// ---------- Step sequencer (8 voies x 16 pas) -----------------------
+// Voies drums + 3 voies melodiques (acid/melody/harmony)
+[\kickSteps, \hatSteps, \snareSteps, \clapSteps, \percSteps,
+ \melodySteps, \harmonySteps, \acidSteps].do { |sym|
     ~webBridgeAdd.("/control/" ++ sym.asString, { |msg|
         var steps = msg[1..].asArray.collect(_.asInteger);
         currentEnvironment.put(sym, steps);
-        ~reload.value;
+        // Debounce reload : si l'UI envoie plusieurs voies a la suite
+        ~webDebounce.(\webStepReloadTask, 0.2, { ~reload.value });
     });
 };
+
+// ---------- Acid / Harmony -------------------------------------------
+// Acid : notes + accents + slides + cutoff/rq/drive/amp + random
+~webBridgeAdd.("/control/acidNotes", { |msg|
+    var arr = msg[1..].asArray.collect(_.asInteger);
+    ~acidNotes = arr;
+    ~reload.value;
+});
+~webBridgeAdd.("/control/acidAccents", { |msg|
+    var arr = msg[1..].asArray.collect(_.asInteger);
+    ~acidAccents = arr;
+    ~reload.value;
+});
+~webBridgeAdd.("/control/acidSlides", { |msg|
+    var arr = msg[1..].asArray.collect(_.asInteger);
+    ~acidSlides = arr;
+    ~reload.value;
+});
+~webBridgeAdd.("/control/acidCutoff", { |msg| ~acidCutoff = msg[1].asFloat; ~reload.value });
+~webBridgeAdd.("/control/acidRq",     { |msg| ~acidRq     = msg[1].asFloat; ~reload.value });
+~webBridgeAdd.("/control/acidDrive",  { |msg| ~acidDrive  = msg[1].asFloat; ~reload.value });
+~webBridgeAdd.("/control/acidAmp",    { |msg| ~acidAmp    = msg[1].asFloat; ~reload.value });
+~webBridgeAdd.("/control/acidRandom", { |msg|
+    // msg[1]/msg[2] optionnels : seuils 0..1 pour densite accents/slides
+    var accProb = (msg[1] ? 0.4).asFloat;
+    var slidProb = (msg[2] ? 0.3).asFloat;
+    if (~genAcidNotes.notNil) { ~acidNotes = ~genAcidNotes.value };
+    if (~genAcidAccents.notNil) { ~acidAccents = ~genAcidAccents.(accProb) };
+    if (~genAcidSlides.notNil) { ~acidSlides = ~genAcidSlides.(slidProb) };
+    ~reload.value;
+});
+
+// Harmony : notes + amp + preset (off/third/fifth/octave/power/shell/sus2/sus4)
+~webBridgeAdd.("/control/harmonyNotes", { |msg|
+    var arr = msg[1..].asArray.collect(_.asInteger);
+    ~harmonyNotes = arr;
+    ~reload.value;
+});
+~webBridgeAdd.("/control/harmonyAmp", { |msg| ~harmonyAmp = msg[1].asFloat; ~reload.value });
+~webBridgeAdd.("/control/harmonyPreset", { |msg|
+    var preset = msg[1].asString.asSymbol;
+    currentEnvironment[\enableHarmony] !? { ~enableHarmony.(preset) }
+        ?? { ("[web_bridge] ~enableHarmony absent (preset=" ++ preset ++ ")").postln };
+});
 
 // ---------- FX par voie ----------------------------------------------
 ~webBridgeAdd.("/control/fxCut",   { |msg| ~fxCut.(msg[1].asString.asSymbol, msg[2]) });
@@ -153,7 +264,7 @@ thisProcess.openUDPPort(~webBridgeIn);
 ~webBridgeAdd.("/control/lfoStop",    { |msg| ~lfoStopVar.(msg[1].asString.asSymbol) });
 ~webBridgeAdd.("/control/lfoStopAll", { ~lfoStopAllVars.() });
 
-// ---------- Tricks scéniques -----------------------------------------
+// ---------- Tricks sceniques -----------------------------------------
 ~webBridgeAdd.("/control/drop",        { ~drop.() });
 ~webBridgeAdd.("/control/breakdown",   { |msg| ~breakdown.(msg[1] ? 8) });
 ~webBridgeAdd.("/control/buildup",     { |msg| ~buildup.(msg[1] ? 8) });
@@ -168,42 +279,299 @@ thisProcess.openUDPPort(~webBridgeIn);
     ~bitCrushNow.(msg[1] ? 6, msg[2] ? 6000, msg[3] ? 1);
 });
 
+// ---------- Navigation sections (jump.scd) ---------------------------
+~webBridgeAdd.("/control/jumpTo", { |msg|
+    var letter = msg[1].asString.asSymbol;
+    var slug   = msg[2].asString.asSymbol;
+    ~jumpTo.(letter, slug);
+});
+
+// Liste les sections disponibles : envoie /sync/sections (letter, slug1, slug2, ...) par lettre
+~webBridgeAdd.("/control/listSections", {
+    if (~sections.notNil) {
+        var letters = ~sections.keys.asArray.sort;
+        letters.do { |k|
+            var slugs = ~sections[k].keys.asArray.collect(_.asString);
+            ~webBridgeNode.sendMsg(*(["/sync/sections", k.asString] ++ slugs));
+        };
+    } {
+        "[web_bridge] ~sections n/a".postln;
+    };
+});
+
+// ---------- Albums (tracks/_index.scd) -------------------------------
+// Liste les albums disponibles : envoie /sync/album par lettre triee
+// Format : letter, title, trackCount, totalSec, slug1, slug2, ...
+~webBridgeAdd.("/control/listAlbums", {
+    if (~albums.notNil) {
+        var letters = ~albums.keys.asArray.sort;
+        letters.do { |k|
+            var alb = ~albums[k];
+            var title = (alb[\title] ? "").asString;
+            var tracks = (alb[\tracks] ? []).asArray;
+            var durations = (alb[\durations] ? []).asArray;
+            var trackCount = tracks.size;
+            var totalSec = durations.sum.asInteger;
+            var slugs = tracks.collect(_.asString);
+            ~webBridgeNode.sendMsg(*(["/sync/album", k.asString, title, trackCount, totalSec] ++ slugs));
+        };
+    } {
+        "[web_bridge] albums non charges (load tracks/_index.scd)".postln;
+    };
+});
+
+// Sync immediate des steps/notes (appele a la connexion WS du client)
+~webBridgeAdd.("/control/getSteps", { ~webBroadcastSteps.() });
+
+~webBridgeAdd.("/control/playTrack", { |msg|
+    var letter = msg[1].asString.asSymbol;
+    var n = msg[2].asInteger;
+    currentEnvironment[\playTrack] !? { ~playTrack.(letter, n) }
+        ?? { "[web_bridge] ~playTrack n/a".postln };
+});
+
+~webBridgeAdd.("/control/playAlbum", { |msg|
+    var letter = msg[1].asString.asSymbol;
+    var gap = msg[2] ? 8;
+    currentEnvironment[\playAlbum] !? { ~playAlbum.(letter, gap) }
+        ?? { "[web_bridge] ~playAlbum n/a".postln };
+});
+
+~webBridgeAdd.("/control/stopAlbum", {
+    currentEnvironment[\stopAlbum] !? { ~stopAlbum.() }
+        ?? { "[web_bridge] ~stopAlbum n/a".postln };
+});
+
+// ---------- Chains scenes (control/chain.scd) ------------------------
+~webBridgeAdd.("/control/chain", { |msg|
+    var name = msg[1].asString.asSymbol;
+    var opt  = msg[2];
+    switch (name,
+        \intro,     { ~chIntro.() },
+        \drop,      { ~chDrop.() },
+        \breakdown, { ~chBreakdown.() },
+        \buildup,   { ~chBuildup.(opt ? 8) },
+        \techno,    { ~chTechno.(opt ? 4) },
+        \dnb,       { ~chDnb.(opt ? 4) },
+        \outroFade, { ~chOutroFade.(opt ? 16) },
+        \stop,      { ~chStop.() },
+        { ("[web_bridge] chain inconnue: " ++ name).postln }
+    );
+});
+
+// ---------- Pdef control --------------------------------------------
+~webBridgeAdd.("/control/playPdef", { |msg|
+    Pdef(msg[1].asString.asSymbol).play(TempoClock.default, quant: 4);
+});
+~webBridgeAdd.("/control/stopPdef", { |msg|
+    Pdef(msg[1].asString.asSymbol).stop;
+});
+~webBridgeAdd.("/control/playAll", {
+    [\kickSeq, \hatSeq, \snareSeq, \clapSeq, \percSeq,
+     \acidSeq, \melodySeq, \harmonySeq].do { |n|
+        Pdef(n).play(TempoClock.default, quant: 4);
+    };
+});
+~webBridgeAdd.("/control/stopAll", {
+    [\kickSeq, \hatSeq, \snareSeq, \clapSeq, \percSeq,
+     \acidSeq, \melodySeq, \harmonySeq].do { |n| Pdef(n).stop };
+});
+
+// ---------- Melodies API (~m / ~mInst / ...) -------------------------
+~webBridgeAdd.("/control/mApply", { |msg|
+    var kind = msg[1].asString.asSymbol;
+    var n    = msg[2].asInteger;
+    ~m[\apply].(kind, n);
+});
+~webBridgeAdd.("/control/mInst",  { |msg| ~mInst.(msg[1].asString.asSymbol) });
+~webBridgeAdd.("/control/mAmp",   { |msg| ~mAmp.(msg[1]) });
+~webBridgeAdd.("/control/mCut",   { |msg| ~mCut.(msg[1]) });
+~webBridgeAdd.("/control/mDrive", { |msg| ~mDrive.(msg[1]) });
+~webBridgeAdd.("/control/mOff",   { ~mOff.() });
+~webBridgeAdd.("/control/mGen",   { |msg| ~mGen.(msg[1].asString.asSymbol) });
+~webBridgeAdd.("/control/mNx",    { ~mNx.() });
+~webBridgeAdd.("/control/mPv",    { ~mPv.() });
+
+// ---------- Sends FX bus (rev/dly/chr/phs/flg/crsh/tape/shim/dist) ----
+~webBridgeAdd.("/control/sendFx", { |msg|
+    var bus = msg[1].asString.asSymbol;
+    var amt = msg[2] ? 0.3;
+    switch (bus,
+        \rev,  { ~sendReverb.(amt) },
+        \dly,  { ~sendDelay.(amt) },
+        \chr,  { ~sendChorus.(amt) },
+        \phs,  { ~sendPhaser.(amt) },
+        \flg,  { ~sendFlanger.(amt) },
+        \crsh, { ~sendBitcrush.(amt) },
+        \tape, { ~sendTape.(amt) },
+        \shim, { ~sendShimmer.(amt) },
+        \dist, { ~sendDist.(amt) },
+        { ("[web_bridge] sendFx bus inconnu: " ++ bus).postln }
+    );
+});
+
+// ---------- VCF master (live/fx.scd) --------------------------------
+~webBridgeAdd.("/control/vcfOn", { |msg|
+    ~fxVcfOn.(msg[1].asString.asSymbol, msg[2] ? 1500, msg[3] ? 0.5);
+});
+~webBridgeAdd.("/control/vcfOff",    { ~fxVcfOff.() });
+~webBridgeAdd.("/control/vcfFreq",   { |msg| ~fxVcfFreq.(msg[1] ? 1500) });
+~webBridgeAdd.("/control/vcfQ",      { |msg| ~fxVcfQ.(msg[1] ? 0.5) });
+~webBridgeAdd.("/control/vcfSweep",  { |msg|
+    ~fxVcfSweep.(msg[1] ? 200, msg[2] ? 5000, msg[3] ? 4);
+});
+~webBridgeAdd.("/control/vcfPreset", { |msg| ~fxVcfPreset.(msg[1].asString.asSymbol) });
+
+// ---------- Comp / Sat master ---------------------------------------
+~webBridgeAdd.("/control/fxComp", { |msg|
+    var preset = msg[1] !? { msg[1].asString.asSymbol } ?? \glue;
+    ~fxComp.(preset);
+});
+~webBridgeAdd.("/control/fxSat", { |msg|
+    var mode = msg[1].asString.asSymbol;
+    var amt  = msg[2] ? 1.5;
+    ~fxSat.(mode, amt);
+});
+
+// ---------- Scenes (live/scenes.scd) --------------------------------
+~webBridgeAdd.("/control/saveScene", { |msg|
+    currentEnvironment[\saveScene] !? { ~saveScene.(msg[1].asString.asSymbol) }
+        ?? { "[web_bridge] ~saveScene n/a".postln };
+});
+~webBridgeAdd.("/control/loadScene", { |msg|
+    currentEnvironment[\loadScene] !? { ~loadScene.(msg[1].asString.asSymbol) }
+        ?? { "[web_bridge] ~loadScene n/a".postln };
+});
+
+// ---------- Tap tempo (optionnel) -----------------------------------
+~webBridgeAdd.("/control/tap", {
+    currentEnvironment[\tap] !? { ~tap.() }
+        ?? { "[web_bridge] ~tap n/a".postln };
+});
+
+// ---------- Heartbeat ping/pong --------------------------------------
+~webBridgeAdd.("/control/ping", {
+    ~webBridgeNode.sendMsg("/sync/pong", Main.elapsedTime);
+});
+
+// ---------- Catalogue : SynthDefs et melodies -----------------------
+// /control/listSynthdefs : pour chaque categorie, envoie un message
+//   /sync/synthdef <category> <name1> <name2> ... (tries alpha).
+~webBridgeAdd.("/control/listSynthdefs", {
+    var cats = ["drums", "bass", "lead", "pad", "world", "master"];
+    cats.do { |cat|
+        var dir = ~webBase ++ "synth/" ++ cat;
+        var pn  = PathName(dir);
+        var files = pn.files.select { |f| f.extension == "scd" };
+        var names = files.collect { |f| f.fileNameWithoutExtension }.asArray.sort;
+        ~webBridgeNode.sendMsg(*(["/sync/synthdef", cat] ++ names));
+    };
+});
+
+// /control/listMelodies : pour chaque genre du ~melodyBank, envoie
+//   /sync/melody <genre> <name1> <name2> ...
+~webBridgeAdd.("/control/listMelodies", {
+    if (~melodyBank.notNil) {
+        ~melodyBank.keys.asArray.sort.do { |g|
+            var names = ~melodyBank[g].asArray.collect(_.asString);
+            ~webBridgeNode.sendMsg(*(["/sync/melody", g.asString] ++ names));
+        };
+    } {
+        "[web_bridge] ~melodyBank non charge".postln;
+    };
+});
+
+// /control/setMelody [name:str] : applique une melodie nommee a
+//   ~melodyNotes. Utilise ~useMelody si dispo, sinon assigne direct.
+~webBridgeAdd.("/control/setMelody", { |msg|
+    var name = msg[1].asString.asSymbol;
+    currentEnvironment[\useMelody] !? { ~useMelody.(name) } ?? {
+        currentEnvironment[name] !? {
+            ~melodyNotes = currentEnvironment[name].asArray;
+            ~reload.value;
+        } ?? { ("[web_bridge] melodie inconnue: " ++ name).postln };
+    };
+});
+
+// ---------- Hook ~reload : broadcast auto des steps apres reload ----
+// Wraper idempotent : si deja installe, on ne wrap pas a nouveau.
+if (~webReloadOriginal.isNil and: { ~reload.notNil }) {
+    ~webReloadOriginal = ~reload;
+    ~reload = {
+        ~webReloadOriginal.value;
+        // Diffuse 250ms apres pour laisser les mutations se stabiliser
+        // (le debounce interne de ~reload tourne sur ~200ms).
+        AppClock.sched(0.25, { ~webBroadcastSteps.(); nil });
+    };
+};
+
 // ---------- SC -> web : envoi du beat (sync visuel) ------------------
+// AppClock + (60/bpm).wait : intervalle en secondes, previsible.
 ~webBeatRoutine !? { ~webBeatRoutine.stop };
 ~webBeatRoutine = Routine({
     inf.do {
         ~webBridgeNode.sendMsg("/sync/beat", ~bpm ? 128);
         (60 / (~bpm ? 128)).wait;
     };
-}).play(TempoClock.default);
+}).play(AppClock);
 
-// ---------- SC -> web : amplitude RMS par voie -----------------------
-//   Approximation simple : utilise les ~xxxAmp variables du moteur.
-//   Pour un vrai RMS, il faudrait Bus.audio + SendReply, mais c'est
-//   plus lourd. Cette version envoie les amp parameters statiques
-//   chaque 10 Hz, suffisant pour l'animation Hydra.
+// ---------- SC -> web : amplitude par voie (parametres statiques) ----
+//   Les ~xxxAmp sont les volumes du mixer (parametres, pas du signal).
+//   Hydra peut les utiliser pour pondérer la réactivité par voie.
+//   8 voies envoyees (kick, hat, snare, clap, perc, melody, acid, harmony).
 ~webAmpRoutine !? { ~webAmpRoutine.stop };
 ~webAmpRoutine = Routine({
     inf.do {
-        ~webBridgeNode.sendMsg("/sync/amp", "kick",   ~kickAmp ? 0);
-        ~webBridgeNode.sendMsg("/sync/amp", "hat",    ~hatAmp ? 0);
-        ~webBridgeNode.sendMsg("/sync/amp", "snare",  ~snareAmp ? 0);
-        ~webBridgeNode.sendMsg("/sync/amp", "melody", ~melodyAmp ? 0);
-        ~webBridgeNode.sendMsg("/sync/amp", "acid",   ~acidAmp ? 0);
+        ~webBridgeNode.sendMsg("/sync/amp", "kick",    ~kickAmp ? 0);
+        ~webBridgeNode.sendMsg("/sync/amp", "hat",     ~hatAmp ? 0);
+        ~webBridgeNode.sendMsg("/sync/amp", "snare",   ~snareAmp ? 0);
+        ~webBridgeNode.sendMsg("/sync/amp", "clap",    ~clapAmp ? 0);
+        ~webBridgeNode.sendMsg("/sync/amp", "perc",    ~percAmp ? 0);
+        ~webBridgeNode.sendMsg("/sync/amp", "melody",  ~melodyAmp ? 0);
+        ~webBridgeNode.sendMsg("/sync/amp", "acid",    ~acidAmp ? 0);
+        ~webBridgeNode.sendMsg("/sync/amp", "harmony", ~harmonyAmp ? 0);
         0.1.wait;
     };
-}).play(TempoClock.default);
+}).play(AppClock);
+
+// ---------- SC -> web : VRAI RMS audio sur master (bus 0) ------------
+//   Architecture actuelle : tous les Pdef sortent vers le bus 0 (pas de
+//   bus dedie par voie). Donc on capture un RMS GLOBAL sur master via
+//   SynthDef + SendReply.kr a 20 Hz. Hydra peut combiner ce RMS reel
+//   avec les ~xxxAmp parametres pour decoupler par voie.
+//
+//   Message OSC : /sync/rms  master <valeur 0..1>
+SynthDef(\webRmsProbe, { |inBus = 0, rate = 20|
+    var sig = Mix.ar(In.ar(inBus, 2)) * 0.5;
+    var amp = Amplitude.kr(sig, 0.01, 0.2);
+    SendReply.kr(Impulse.kr(rate), '/webRms', [amp]);
+}).add;
+
+~webRmsResp !? { ~webRmsResp.free };
+~webRmsSynth !? { ~webRmsSynth.free };
+
+// On attend que le SynthDef soit envoye au serveur avant de creer le Synth
+Server.default.sync;
+~webRmsSynth = Synth.tail(nil, \webRmsProbe, [\inBus, 0, \rate, 20]);
+
+~webRmsResp = OSCFunc({ |msg|
+    // msg = ['/webRms', nodeID, replyID, amp]
+    ~webBridgeNode.sendMsg("/sync/rms", "master", msg[3].asFloat);
+}, '/webRms', Server.default.addr);
 
 // Annonce initiale
 ~webBridgeNode.sendMsg("/sync/bpm", ~bpm ? 128);
+~webBroadcastSteps.();
 
 "=== web_bridge ready ===".postln;
 ("  Listen   : :" ++ ~webBridgeIn).postln;
 "  Send to  : 127.0.0.1:57122".postln;
+"  Start web: ~webStart.value".postln;
 "  Stop SC  : ~webBridgeStop.value".postln;
 "  Stop web : ~webServerStop.value".postln;
 "  Webapp   : http://localhost:3000/".postln;
 
-// Auto-lancement serveur Node + ouverture pages /control + /hydra
-~webServerStart.value;
+// Le serveur Node n'est PAS lance automatiquement -- decommenter si besoin
+// ou appeler ~webStart.value depuis l'IDE.
+// ~webServerStart.value;
 )

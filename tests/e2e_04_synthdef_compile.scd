@@ -8,7 +8,7 @@
 
 "=== e2e_04_synthdef_compile ===".postln;
 
-~base = "/Users/electron/Documents/Projets_Creatifs/sound_algo/";
+~base = "/Users/electron/Documents/Projets_Creatifs/sound_algo-refonte-v2/";
 ~testCount = 0;
 ~testFailed = 0;
 
@@ -71,9 +71,8 @@ s.waitForBoot({
         try { (~base ++ "engine.scd").load } { |e| ("engine err: " ++ e.errorString).postln };
         2.wait;
         s.sync;
-        try { (~base ++ "synthdefs/asia.scd").load }      { |e| ("asia err: "  ++ e.errorString).postln };
-        try { (~base ++ "synthdefs/extra.scd").load }     { |e| ("extra err: " ++ e.errorString).postln };
-        try { (~base ++ "synthdefs/authentic.scd").load } { |e| ("authn err: " ++ e.errorString).postln };
+        try { (~base ++ "synth/_index.scd").load } { |e| ("synth err: " ++ e.errorString).postln };
+        try { (~base ++ "fx/_index.scd").load }    { |e| ("fx err: "    ++ e.errorString).postln };
         // Multi-blocs : charge bloc par bloc
         ~loadAllBlocks.(~base ++ "live/fx_bus.scd");
         ~loadAllBlocks.(~base ++ "live/live.scd");

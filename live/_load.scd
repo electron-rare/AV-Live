@@ -18,10 +18,10 @@
 //  Utilisation :
 //    (~base ++ "live/_load.scd").load;
 //      OU
-//    "/Users/electron/Documents/Projets_Creatifs/sound_algo/live/_load.scd".load;
+//    "/Users/electron/Documents/Projets_Creatifs/sound_algo-refonte-v2/live/_load.scd".load;
 // =====================================================================
 (
-~base = ~base ?? { "/Users/electron/Documents/Projets_Creatifs/sound_algo/" };
+~base = ~base ?? { "/Users/electron/Documents/Projets_Creatifs/sound_algo-refonte-v2/" };
 
 Routine({
     var maxWait = 30, waited = 0;
@@ -32,9 +32,8 @@ Routine({
         // --- 1. Modules .load-compatibles -------------------------------
         "[live/_load] engine + synthdefs + palette ...".postln;
         (~base ++ "engine.scd").load;
-        (~base ++ "synthdefs/asia.scd").load;
-        (~base ++ "synthdefs/extra.scd").load;
-        (~base ++ "synthdefs/authentic.scd").load;
+        (~base ++ "synth/_index.scd").load;
+        (~base ++ "fx/_index.scd").load;
         (~base ++ "palette/scales.scd").load;
         (~base ++ "palette/melodies/index.scd").load;
         (~base ++ "palette/harmonics/index.scd").load;
@@ -66,6 +65,50 @@ Routine({
 
     if (s.serverRunning) { s.sync };
 
+    // --- 4a. Albums (catalogue 23 albums × 15 tracks) -------------------
+    "[live/_load] tracks/_index.scd ...".postln;
+    {
+        var path = ~base ++ "tracks/_index.scd";
+        if (File.exists(path)) {
+            try { path.load } { |err|
+                ("[live/_load] !! erreur load tracks/_index: " ++ err.errorString).postln;
+            };
+        } { ("[live/_load] !! manquant : " ++ path).postln };
+    }.value;
+
+    // --- 4b. Pont web (OSC bridge + serveur Node + UI control/hydra) ----
+    "[live/_load] web_bridge ...".postln;
+    {
+        var path = ~base ++ "web_bridge.scd";
+        if (File.exists(path)) {
+            try { path.load } { |err|
+                ("[live/_load] !! erreur load web_bridge: " ++ err.errorString).postln;
+            };
+            // ~webStart est expose par web_bridge.scd : lance Node + ouvre les pages
+            currentEnvironment[\webStart] !? { ~webStart.value } ?? {
+                "[live/_load] !! ~webStart absent (web_bridge mal charge)".postln;
+            };
+        } { ("[live/_load] !! manquant : " ++ path).postln };
+    }.value;
+
+    // --- 4c. Auto-PLAY : demarre les sequenceurs immediatement ---------
+    "[live/_load] auto-play sequenceurs ...".postln;
+    {
+        // Defaults pour les patterns si non definis (kicks 4/4 minimum)
+        ~kickSteps    = ~kickSteps    ? (1!16);
+        ~hatSteps     = ~hatSteps     ? (0!16);
+        ~snareSteps   = ~snareSteps   ? (0!16);
+        ~clapSteps    = ~clapSteps    ? (0!16);
+        ~percSteps    = ~percSteps    ? (0!16);
+        ~acidNotes    = ~acidNotes    ? (0!16);
+        ~melodyNotes  = ~melodyNotes  ? (0!32);
+        ~harmonyNotes = ~harmonyNotes ? (0!32);
+        TempoClock.default.tempo = (~bpm ? 128) / 60;
+        currentEnvironment[\reload] !? { ~reload.value };
+        [\kickSeq, \hatSeq, \snareSeq, \clapSeq, \percSeq,
+         \acidSeq, \melodySeq, \harmonySeq].do { |k| Pdef(k).play(quant: 4) };
+    }.value;
+
     // --- 5. Ouvrir les fichiers essentiels dans l'editeur SC ------------
     //   Document.open est IDE-only (ScIDE classique). En sclang CLI ou
     //   dans certaines extensions VSCode, la classe Document n'existe
@@ -89,7 +132,7 @@ Routine({
                 "live/scenes.scd",              // ~saveScene / ~loadScene
                 "live/tweaks.scd",              // tweaks Cmd+Entree par bloc
                 "control/jump.scd",             // ~jumpTo
-                "palette/rhythm/fills.scd",     // ~snareFill / ~tomFill
+                "palette/rhythm/_index.scd",    // ~snareFill / ~tomFill / ~seqPlay / ...
             ].do { |path|
                 var full = ~base ++ path;
                 if (File.exists(full)) {
@@ -108,10 +151,12 @@ Routine({
     "  Wrappers : ~kk(kicks) ~mm(melodies) ~ff(fx) ~cc(chains) ~p(patterns)".postln;
     "  Mixer    : ~setVol ~mute ~solo ~mixPreset ~masterVol".postln;
     "  Live     : ~lfoTo ~vcfOn ~drop ~breakdown ~buildup".postln;
+    "  Guard    : ~killAllOrphans ~memReport ~watchdogOn ~watchdogOff".postln;
     "  Scenes   : ~saveScene ~loadScene ~listScenes".postln;
     "  Jump     : ~jumpTo.(\\X, \\section_slug)".postln;
     "  Status   : ~check.()".postln;
     "  Stop     : ~teardown.()".postln;
+    "  Web      : http://localhost:3000/control/  (UI live)".postln;
     "  -> ouvre 01_live.scd pour les blocs Cmd+Entree prets a l'emploi".postln;
 }).play(AppClock);
 )
