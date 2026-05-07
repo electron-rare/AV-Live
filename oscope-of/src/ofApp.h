@@ -48,6 +48,8 @@ private:
     void drawHud();
     void drawMode(Mode m, int x, int y, int w, int h);
     void drawHybrid(int W, int H);
+    void drawScope4(int W, int H);
+    void drawPanelLabel(int x, int y, const char* title, const std::string& metric);
     void applyOscFx();
 
     oscope::HantekDevice scope_;

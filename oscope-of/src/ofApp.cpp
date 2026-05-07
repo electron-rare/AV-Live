@@ -273,15 +273,7 @@ void ofApp::drawMode(Mode m, int x, int y, int w, int h) {
         case Mode::Kaleido:     kaleido_->draw(x, y, w, h);     break;
         case Mode::Tunnel:      tunnel_->draw(x, y, w, h);      break;
         case Mode::Mesh:        mesh_->draw(x, y, w, h);        break;
-        case Mode::Scope4: {
-            const int hw = w / 2;
-            const int hh = h / 2;
-            waveform_->draw (x,        y,         hw, hh);
-            spectro_->draw  (x + hw,   y,         hw, hh);
-            polar_->draw    (x,        y + hh,    hw, hh);
-            lissajous_->draw(x + hw,   y + hh,    hw, hh);
-            break;
-        }
+        case Mode::Scope4:      drawScope4(w, h);               break;
         case Mode::Hybrid:      drawHybrid(w, h);               break;
     }
 }
@@ -306,6 +298,57 @@ void ofApp::drawHybrid(int W, int H) {
     // Spectrogram strip across the bottom
     const int sh = H / 6;
     spectro_->draw(0, H - sh, W, sh);
+}
+
+void ofApp::drawPanelLabel(int x, int y, const char* title,
+                           const std::string& metric) {
+    ofPushStyle();
+    ofSetColor(0, 0, 0, 140);
+    const int textW = 6 * (static_cast<int>(metric.size()) + 16);
+    ofDrawRectangle(x, y, textW + 14, 22);
+    ofSetColor(0, 255, 140, 220);
+    ofDrawBitmapString(title, x + 8, y + 14);
+    ofSetColor(180, 230, 200, 220);
+    ofDrawBitmapString(metric, x + 8 + 6 * 8, y + 14);
+    ofPopStyle();
+}
+
+void ofApp::drawScope4(int W, int H) {
+    // Lissajous fullscreen en fond — additif pour ne pas masquer.
+    ofEnableBlendMode(OF_BLENDMODE_ADD);
+    ofPushStyle();
+    ofSetColor(255, 255, 255, 110);
+    lissajous_->draw(0, 0, W, H);
+    ofPopStyle();
+    ofDisableBlendMode();
+
+    // Bandeau haut : Waveform à gauche, Spectrogramme à droite (1/3 hauteur)
+    const int topH = H / 3;
+    const int hw   = W / 2;
+    waveform_->draw(0,  0, hw, topH);
+    spectro_->draw (hw, 0, hw, topH);
+
+    // Polar central, grand — couvre les 2/3 inférieurs centrés.
+    const int polarW = static_cast<int>(W * 0.62f);
+    const int polarH = static_cast<int>((H - topH) * 0.95f);
+    const int polarX = (W - polarW) / 2;
+    const int polarY = topH + ((H - topH) - polarH) / 2;
+    polar_->draw(polarX, polarY, polarW, polarH);
+
+    // Labels live par panneau (coin haut-gauche de chaque zone).
+    const float bpm  = osc_.bpm();
+    const float kick = osc_.amp("kick");
+    const float lead = osc_.amp("lead");
+    const float bass = osc_.amp("bass");
+    drawPanelLabel(8, 6, "WAVE   ",
+        ofToString(timeMsPerDiv_, 2) + " ms/div  " +
+        ofToString(lastSampleRateApplied_ * 1e-6f, 1) + " MS/s");
+    drawPanelLabel(hw + 8, 6, "SPECTRO",
+        "lead " + ofToString(lead, 2) + "  bass " + ofToString(bass, 2));
+    drawPanelLabel(polarX + 8, polarY + 6, "POLAR  ",
+        ofToString(bpm, 1) + " bpm  kick " + ofToString(kick, 2));
+    drawPanelLabel(8, H - 28, "LISSA  ",
+        "trail blend ADD");
 }
 
 void ofApp::draw() {
