@@ -495,9 +495,14 @@ void ofApp::enterScene(int idx) {
     if (s.albumLetter) {
         osc_.sendControl("/control/playAlbum", std::string(s.albumLetter));
     }
+    // Transition punchy : flash blanc + glitch postfx 0.5s.
+    transitionFlash_ = 1.0f;
+    postfx_.triggerGlitch(0.7f, 0.45f);
 }
 
 void ofApp::updateNarrative(float dt) {
+    if (transitionFlash_ > 0.0f) transitionFlash_ -= dt / 0.45f;
+    if (transitionFlash_ < 0.0f) transitionFlash_ = 0.0f;
     if (!narrativeMode_) return;
     auto& scenes = demos_[currentDemo_].scenes;
     if (narrativeIdx_ >= (int)scenes.size()) return;
@@ -773,7 +778,17 @@ void ofApp::drawScope4(int W, int H) {
     // 6) Sine scroller — toggle 3 (synchronisé avec demo_.scrollerEnabled).
     demo_.drawScroller(W, H);
 
-    // 7) Overlay narratif (titre acte + barre progression) si actif.
+    // 7) Flash de transition entre scènes (cosine ease-out 0.45s).
+    if (transitionFlash_ > 0.0f) {
+        ofPushStyle();
+        const float t = std::max(0.0f, std::min(1.0f, transitionFlash_));
+        const int alpha = static_cast<int>(180 * t * t);  // ease square
+        ofSetColor(255, 240, 220, alpha);
+        ofDrawRectangle(0, 0, W, H);
+        ofPopStyle();
+    }
+
+    // 8) Overlay narratif (titre acte + barre progression) si actif.
     drawNarrativeOverlay(W, H);
 }
 

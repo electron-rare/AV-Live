@@ -106,6 +106,7 @@ private:
     int   narrativeIdx_  = 0;
     float narrativeT_    = 0.0f;
     bool  narrativeMode_ = false;
+    float transitionFlash_ = 0.0f;   // 1.0 au début d'une scène, decay vers 0
     void initDemos();
     void launchDemo(int demoIdx);
     void enterScene(int sceneIdx);
