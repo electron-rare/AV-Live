@@ -674,19 +674,25 @@ void ofApp::initDemos() {
     // ─── 6 · GLITCH WORLD ────────────────────────────────────
     demos_[5] = {"GLITCH WORLD", {
         {"PROBE",     15.0f, stars(),  SS::Neon,
-         "    SCANNING ANOMALY    REALITY UNSTABLE    ", "V", BgKind::Voronoi},
-        {"HOPF LINK", 25.0f, polSpe(), SS::Glitch,
+         "    SCANNING ANOMALY    REALITY UNSTABLE    "
+         "    SIGNAL FROM AN UNKNOWN DIMENSION    ", "V", BgKind::Voronoi},
+        {"HOPF LINK", 22.0f, polSpe(), SS::Glitch,
          "    TWO RINGS LINKED IMPOSSIBLY    "
          "    TOPOLOGY CORRUPT    ", "V", BgKind::HopfLink},
-        {"CORRUPT",   30.0f, all(),    SS::Glitch,
+        {"DATA",      22.0f, all(),    SS::Glitch,
          "    BUFFER OVERFLOW    SIGNAL CORRUPTED    "
-         "    THE GHOSTS IN THE WIRES ARE WAKING UP    ", "V", BgKind::Voronoi},
-        {"GLITCH FX", 25.0f, all(),    SS::Glitch,
+         "    THE GHOSTS IN THE WIRES ARE WAKING UP    ", "D",
+         BgKind::DotTunnel},
+        {"FRACTALS",  22.0f, all(),    SS::Glitch,
          "    EVERY PIXEL CONTAINS AN ERROR    "
-         "    ERROR IS THE NEW NORMAL    ", "V", BgKind::TunnelCubes},
+         "    ERROR IS THE NEW NORMAL    "
+         "    GREETINGS TO HACKERS EVERYWHERE    ", "V", BgKind::TunnelCubes},
         {"CRASH",     20.0f, all(),    SS::Glitch,
-         "    KERNEL PANIC    BUT THE BEAT GOES ON    "
-         "    GREETINGS TO HACKERS EVERYWHERE    ", "Q", BgKind::Voronoi},
+         "    KERNEL PANIC    BUT THE BEAT GOES ON    ", "Q",
+         BgKind::PlasmaC64},
+        {"REBOOT",    18.0f, polSpe(), SS::Cascade,
+         "    SYSTEM REINITIALIZING    NEW REALITY LOADING    ", "Q",
+         BgKind::Vortex},
     }};
 
     // ─── 7 · AMBIENT VOID ────────────────────────────────────
@@ -831,36 +837,50 @@ void ofApp::initDemos() {
          BgKind::Starfield},
     }};
 
-    // ─── 12 · INFERNO (Fire) ────────────────────────────────
+    // ─── 12 · INFERNO ────────────────────────────────────────
     demos_[11] = {"INFERNO", {
-        {"SPARK",     15.0f, stars(),   SS::Glitch,
-         "    *** INFERNO ***    A SPARK IGNITES    ", "E", BgKind::Fire},
-        {"FLAME",     45.0f, all(),     SS::Glitch,
-         "    THE FLAMES RISE    EVERY KICK FUELS THE BLAZE    "
-         "    GREETINGS TO HARDCODE AND TITAN    ", "T", BgKind::Fire},
-        {"BURNOUT",   35.0f, all(),     SS::Rainbow,
-         "    EVERYTHING IS BURNING    NOTHING REMAINS    "
-         "    KICK BIAS IS THE FUEL    ", "P", BgKind::Fire},
-        {"ASHES",     25.0f, polSpe(),  SS::Mirror,
+        {"SPARK",      15.0f, stars(),   SS::Glitch,
+         "    *** INFERNO ***    A SPARK IGNITES IN THE DARK    "
+         "    THE FIRST PHOTON HITS YOUR EYE    ", "E", BgKind::Fire},
+        {"WILDFIRE",   25.0f, all(),     SS::Glitch,
+         "    FLAMES RISE FAST    EVERY KICK FUELS THE BLAZE    "
+         "    GREETINGS TO HARDCODE AND TITAN    ", "T", BgKind::Vortex},
+        {"FORGE",      25.0f, polSpe(),  SS::Cascade,
+         "    THE METAL MELTS    GEAR TURNS IN MOLTEN STEEL    "
+         "    HEPHAESTUS WORKS THE ANVIL    ", "P", BgKind::Gear},
+        {"PHOENIX",    25.0f, all(),     SS::Rainbow,
+         "    BIRD OF FIRE    REBORN FROM ASHES    "
+         "    KICK BIAS IS THE FUEL    ", "T", BgKind::Caustics},
+        {"BURNOUT",    20.0f, all(),     SS::Glitch,
+         "    EVERYTHING IS BURNING    NOTHING REMAINS    ",
+         "T", BgKind::Fire},
+        {"ASHES",      20.0f, polSpe(),  SS::Mirror,
          "    THE EMBERS COOL    BUT THEY DO NOT DIE    ", "S",
          BgKind::PlasmaFbm},
     }};
 
-    // ─── 13 · OUTRUN (Grid persp) ────────────────────────────
+    // ─── 13 · OUTRUN ─────────────────────────────────────────
     demos_[12] = {"OUTRUN", {
         {"DRIVE OFF",   18.0f, all(),    SS::Neon,
-         "    *** OUTRUN ***    SUNSET IGNITES THE HORIZON    ", "R",
+         "    *** OUTRUN ***    SUNSET IGNITES THE HORIZON    "
+         "    KEY IN THE IGNITION    GREETINGS TO STILL AND RGBA    ", "R",
          BgKind::GridPersp},
-        {"NEON HIGHWAY",45.0f, all(),    SS::Mirror,
+        {"NEON HIGHWAY",30.0f, all(),    SS::Mirror,
          "    PINK NEON ON CHROME ROAD    "
-         "    1985 STILL SPEEDING    "
-         "    GREETINGS TO STILL AND RGBA    ", "R",
-         BgKind::GridPersp},
-        {"OVERDRIVE",   35.0f, all(),    SS::Rainbow,
-         "    KICKDOWN    THE VECTOR SUN BENDS    ", "T",
-         BgKind::GridPersp},
-        {"HORIZON",     25.0f, starsWave(), SS::Mirror,
-         "    AND THE ENGINE FADES INTO THE NIGHT    ", "U",
+         "    1985 STILL SPEEDING    ", "R", BgKind::Mode7},
+        {"DASHBOARD",   25.0f, polSpe(), SS::Chrome,
+         "    SPEEDOMETER NEEDLE LOCKED IN ULTRA    "
+         "    CHROME REFLECTIONS EVERYWHERE    ", "R",
+         BgKind::Octahedron},
+        {"OVERDRIVE",   30.0f, all(),    SS::Rainbow,
+         "    KICKDOWN    THE VECTOR SUN BENDS    "
+         "    EVERY MILE A NEW HUE    ", "T", BgKind::Rotozoom},
+        {"VAPOR ROAD",  25.0f, all(),    SS::Mirror,
+         "    THE ROAD BECOMES MEMORY    "
+         "    GHOSTS OF FUTURES PAST    ", "R", BgKind::PlasmaFbm},
+        {"HORIZON",     20.0f, starsWave(), SS::Mirror,
+         "    AND THE ENGINE FADES INTO THE NIGHT    "
+         "    UNTIL TOMORROW WE RIDE AGAIN    ", "U",
          BgKind::Starfield},
     }};
 
