@@ -88,7 +88,12 @@
 //   Utile si tu veux juste set le chemin avant de Cmd+Entree sur un
 //   autre bloc. CHARGER TOUT et CHARGER MINIMAL le font deja.
 (
-~base = "/Users/electron/Documents/Projets_Creatifs/sound_algo-refonte-v2/";
+// Auto-detect ~base from this file's location so the project is portable
+// across machines (GrosMac dev path vs MBP /Users/electron/AV-Live/sound_algo/
+// vs anywhere else). Falls back to the legacy hard-coded path only if the
+// file isn't being executed from disk (rare — Cmd+Enter on a buffer).
+~base = (thisProcess.nowExecutingPath !? { |p| p.dirname ++ "/" })
+        ?? "/Users/electron/Documents/Projets_Creatifs/sound_algo-refonte-v2/";
 "~base = ".post; ~base.postln;
 )
 
@@ -100,7 +105,12 @@
 //
 //   Ce bloc est AUTONOME : pas besoin d'evaluer BASE PATH avant.
 (
-~base = "/Users/electron/Documents/Projets_Creatifs/sound_algo-refonte-v2/";
+// Auto-detect ~base from this file's location so the project is portable
+// across machines (GrosMac dev path vs MBP /Users/electron/AV-Live/sound_algo/
+// vs anywhere else). Falls back to the legacy hard-coded path only if the
+// file isn't being executed from disk (rare — Cmd+Enter on a buffer).
+~base = (thisProcess.nowExecutingPath !? { |p| p.dirname ++ "/" })
+        ?? "/Users/electron/Documents/Projets_Creatifs/sound_algo-refonte-v2/";
 (~base ++ "engine.scd").load;
 (~base ++ "synth/_index.scd").load;
 (~base ++ "fx/_index.scd").load;
@@ -121,7 +131,12 @@
 //   Pour debugger ou demarrer sans live/mixer/fx. Pas de boot serveur
 //   automatique, pas de helpers ~check / ~setupAll.
 (
-~base = "/Users/electron/Documents/Projets_Creatifs/sound_algo-refonte-v2/";
+// Auto-detect ~base from this file's location so the project is portable
+// across machines (GrosMac dev path vs MBP /Users/electron/AV-Live/sound_algo/
+// vs anywhere else). Falls back to the legacy hard-coded path only if the
+// file isn't being executed from disk (rare — Cmd+Enter on a buffer).
+~base = (thisProcess.nowExecutingPath !? { |p| p.dirname ++ "/" })
+        ?? "/Users/electron/Documents/Projets_Creatifs/sound_algo-refonte-v2/";
 (~base ++ "engine.scd").load;
 (~base ++ "synth/_index.scd").load;
 (~base ++ "fx/_index.scd").load;
