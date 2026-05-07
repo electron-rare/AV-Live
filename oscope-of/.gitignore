@@ -1,0 +1,30 @@
+# openFrameworks build artifacts
+obj/
+bin/oscope-of
+bin/oscope-of_debug
+bin/oscope-of.app/
+bin/oscope-of.app
+bin/libs/
+*.o
+*.d
+
+# Xcode
+*.xcuserdata/
+*.xcuserstate
+xcuserdata/
+*.xcodeproj/project.xcworkspace/xcuserdata/
+DerivedData/
+
+# macOS
+.DS_Store
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*~
+
+# Generated project files (keep handwritten config.make/addons.make)
+oscope-of.xcodeproj/
+Makefile.bak
+openFrameworks-Info.plist
