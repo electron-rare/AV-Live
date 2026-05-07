@@ -97,11 +97,12 @@ void SphereWaveVis::draw(int x, int y, int w, int h) {
     ofEnableDepthTest();
     ofEnableLighting();
 
-    // Camera orbite
-    const float orbitR = 7.0f;
-    const float orbitA = t_ * 0.25f;
+    // Camera orbite plus dramatique : varie le rayon avec kick, hauteur
+    // suit treble, angle accéléré par bpm.
+    const float orbitR = 7.0f - kick_ * 2.0f;
+    const float orbitA = t_ * (0.35f + bpm_ * 0.0008f);
     camera_.setPosition(std::cos(orbitA) * orbitR,
-                        std::sin(t_ * 0.18f) * 2.0f,
+                        std::sin(t_ * 0.27f) * (2.0f + treble_ * 2.0f),
                         std::sin(orbitA) * orbitR);
     camera_.lookAt(ofVec3f(0, 0, 0));
     light_.setPosition(std::sin(t_ * 0.7f) * 5.0f,
@@ -110,7 +111,7 @@ void SphereWaveVis::draw(int x, int y, int w, int h) {
     light_.enable();
     camera_.begin(ofRectangle(0, 0, w, h));
 
-    // Couleur cycle hue + audio
+    // Sphère solide centrale — couleur cycle hue + audio
     ofColor col;
     col.setHsb(static_cast<int>(std::fmod(t_ * 25.0f, 255.0f)),
                180,
@@ -118,16 +119,43 @@ void SphereWaveVis::draw(int x, int y, int w, int h) {
     material_.setDiffuseColor(col);
     material_.setSpecularColor(ofFloatColor(1.0f, 0.9f, 0.8f));
     material_.setShininess(48.0f);
-
-    // Solid pass
     ofSetColor(col);
     material_.begin();
     sphere_.drawFaces();
     material_.end();
 
-    // Wireframe par-dessus
-    ofSetColor(255, 240, 200, 140);
+    // Wireframe par-dessus (intérieur)
+    ofSetColor(255, 240, 200, 180);
     sphere_.drawWireframe();
+
+    // Sphère wireframe EXTÉRIEURE concentrique — scaled 1.4x avec rotation
+    // inversée pour un effet de coque tournante
+    ofPushMatrix();
+    ofRotateRad(-t_ * 0.4f, 0, 1, 0);
+    ofRotateRad(t_ * 0.25f, 1, 0, 0);
+    ofScale(1.4f + bass_ * 0.2f);
+    ofSetColor(120, 220, 255, 80);
+    sphere_.drawWireframe();
+    ofPopMatrix();
+
+    // Sphère wireframe INTÉRIEURE — scaled 0.6x pulsée par kick
+    ofPushMatrix();
+    ofRotateRad(t_ * 0.6f, 0, 1, 0);
+    ofRotateRad(-t_ * 0.4f, 1, 0, 0);
+    ofScale(0.6f + kick_ * 0.3f);
+    ofSetColor(255, 100, 200, 200);
+    sphere_.drawWireframe();
+    ofPopMatrix();
+
+    // Pôles : 2 sphères wireframe small en haut/bas pour repère
+    for (float py : {-3.5f, 3.5f}) {
+        ofPushMatrix();
+        ofTranslate(0, py, 0);
+        ofScale(0.3f + treble_ * 0.2f);
+        ofSetColor(255, 220, 100, 140);
+        sphere_.drawWireframe();
+        ofPopMatrix();
+    }
 
     camera_.end();
     light_.disable();

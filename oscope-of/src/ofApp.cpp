@@ -674,7 +674,11 @@ void ofApp::initDemos() {
         {"ROSACE",     20.0f, polSpe(),  SS::Wavy3D,
          "    K=5 PETALS POLAR ROSE    EACH PETAL A KICK    ", "H",
          BgKind::Rose3d},
-        {"COMEDOWN",   25.0f, starsWave(), SS::Mirror,
+        {"ATARI",      18.0f, polSpe(),    SS::Rainbow,
+         "    *** ATARI 2600 ***    PRINT FROM 1977    "
+         "    THE FIRST PIXEL TRIPS WERE HERE    ", "A",
+         BgKind::ImgAtari},
+        {"COMEDOWN",   22.0f, starsWave(), SS::Mirror,
          "    AND SOFTLY BACK TO EARTH    "
          "    THE 303 SLEEPS IN ITS CIRCUIT    ", "J", BgKind::Caustics},
     }};
@@ -694,7 +698,10 @@ void ofApp::initDemos() {
          "    A NEVER ENDING TORUS    "
          "    GREETINGS TO ANDROMEDA AND CONSPIRACY    ", "E",
          BgKind::TorusMesh},
-        {"OPENING",  30.0f, all(),     SS::Rainbow,
+        {"NEXT CUBE",30.0f, polSpe(), SS::Chrome,
+         "    THE NEXT CUBE APPEARS    OBJC SMALLTALK 1989    "
+         "    THE OS THAT BIRTHED OS X    ", "F", BgKind::ImgNeXT},
+        {"OPENING",  25.0f, all(),     SS::Rainbow,
          "    THE TUNNEL OPENS UP    EVERYTHING APPEARS    "
          "    PURE LIGHT BEYOND THE WALLS    ", "F", BgKind::Tunnel},
     }};
@@ -718,7 +725,14 @@ void ofApp::initDemos() {
         {"HOPF",        25.0f, polSpe(), SS::Wavy3D,
          "    HOPF FIBRATION    SPHERES INSIDE SPHERES    "
          "    HARMONIC DECOMPOSITION VISUAL    ", "B", BgKind::Hopf},
-        {"FULL",        25.0f, all(),    SS::Rainbow,
+        {"LOTUS",       22.0f, polSpe(), SS::Cascade,
+         "    LOTUS 1-2-3    THE FIRST KILLER APP    "
+         "    SPREADSHEET MEETS SPECTRUM    ", "Q", BgKind::ImgLotus},
+        {"SPHERE",      25.0f, polSpe(), SS::Wavy3D,
+         "    THE SPECTRUM AS A SPHERE    "
+         "    EACH LONGITUDE A FREQUENCY    EACH LATITUDE A TIME    ", "Q",
+         BgKind::SphereWave},
+        {"FULL",        22.0f, all(),    SS::Rainbow,
          "    EVERY BAND ALIVE NOW    THE SPECTRUM IS COMPLETE    "
          "    FROM SUBSONIC TO ULTRASONIC    ", "Q", BgKind::Voronoi},
     }};
@@ -742,6 +756,9 @@ void ofApp::initDemos() {
         {"CRASH",     20.0f, all(),    SS::Glitch,
          "    KERNEL PANIC    BUT THE BEAT GOES ON    ", "Q",
          BgKind::PlasmaC64},
+        {"OS/2 WARP",  20.0f, polSpe(), SS::Glitch,
+         "    OS/2 WARP    THE BLUE SCREEN OF DESPAIR    "
+         "    BUT THE WARP CONTINUES    ", "Q", BgKind::ImgOS2},
         {"REBOOT",    18.0f, polSpe(), SS::Cascade,
          "    SYSTEM REINITIALIZING    NEW REALITY LOADING    ", "Q",
          BgKind::Vortex},
@@ -764,7 +781,10 @@ void ofApp::initDemos() {
         {"ENNEPER",    25.0f, polSpe(),    SS::Mirror,
          "    A MINIMAL SURFACE    LEAST AREA POSSIBLE    "
          "    GREETINGS TO ASD AND CONSPIRACY    ", "S", BgKind::Enneper},
-        {"RETURN",     25.0f, starsWave(), SS::Mirror,
+        {"APPLE",      18.0f, polSpe(),    SS::Mirror,
+         "    THE APPLE RAINBOW    1977 - 1998    "
+         "    SIX BANDS OF GENTLE NOSTALGIA    ", "J", BgKind::ImgApple},
+        {"RETURN",     22.0f, starsWave(), SS::Mirror,
          "    AND BACK TO THE STARS    REMEMBER THIS QUIET    "
          "    YOU WERE HERE    YOU LISTENED    ", "J", BgKind::Starfield},
     }};
@@ -789,7 +809,10 @@ void ofApp::initDemos() {
          "    BURN THIS PLACE DOWN    180 BPM ETERNAL FLAME    "
          "    GREETINGS TO HARDCODE TITAN ANARCHY    ", "T",
          BgKind::Fire},
-        {"AFTER",      25.0f, polSpe(), SS::Mirror,
+        {"WIN95",      18.0f, all(),    SS::Glitch,
+         "    WINDOWS 95 START.WAV    BRIAN ENO 6 SECONDS    "
+         "    PLUG AND PRAY    ", "Q", BgKind::ImgWin95},
+        {"AFTER",      20.0f, polSpe(), SS::Mirror,
          "    THE BEAT IS GONE    THE WALLS STILL SHAKE    "
          "    YOUR HEART STILL THINKS IT IS RAVING    ", "Q",
          BgKind::PlasmaFbm},
@@ -910,7 +933,10 @@ void ofApp::initDemos() {
          "    THE FRACTAL HAS NO END    "
          "    GREETINGS TO INIGO QUILEZ AND KNIGHTY    ", "L",
          BgKind::Kifs},
-        {"COLLAPSE",    20.0f, polSpe(), SS::Mirror,
+        {"WIN 1.0",     18.0f, polSpe(), SS::Bouncy,
+         "    WINDOWS 1.0 1985    LEAKED PIXELS BLOCK BY BLOCK    "
+         "    GEOMETRY BEFORE GUI    ", "O", BgKind::ImgWin1},
+        {"COLLAPSE",    18.0f, polSpe(), SS::Mirror,
          "    AND THE FUNCTION RESETS    BACK TO X = 0 Y = 0    ", "J",
          BgKind::Starfield},
     }};
@@ -960,7 +986,10 @@ void ofApp::initDemos() {
         {"VAPOR ROAD",  25.0f, all(),    SS::Mirror,
          "    THE ROAD BECOMES MEMORY    "
          "    GHOSTS OF FUTURES PAST    ", "R", BgKind::PlasmaFbm},
-        {"HORIZON",     20.0f, starsWave(), SS::Mirror,
+        {"WIN 3.11",    18.0f, all(),    SS::Glitch,
+         "    WINDOWS 3.11 NT    THE PRE-START-MENU AGE    "
+         "    PROGRAM MANAGER RULES    ", "R", BgKind::ImgWin311},
+        {"HORIZON",     18.0f, starsWave(), SS::Mirror,
          "    AND THE ENGINE FADES INTO THE NIGHT    "
          "    UNTIL TOMORROW WE RIDE AGAIN    ", "U",
          BgKind::Starfield},
@@ -985,7 +1014,13 @@ void ofApp::initDemos() {
         {"CASCADE",   25.0f, all(),      SS::Wavy3D,
          "    EUCLIDEAN SPACE COLLAPSES    THE CUBES SCATTER    ", "Q",
          BgKind::TunnelCubes},
-        {"ZERO",      20.0f, polSpe(),   SS::Mirror,
+        {"ZX",        20.0f, polSpe(),   SS::Rainbow,
+         "    SINCLAIR ZX SPECTRUM    7 ATTRIBUTES OF GLORY    "
+         "    UK SCENE FOREVER    ", "Q", BgKind::ImgZX},
+        {"IRIX",      20.0f, polSpe(),   SS::Chrome,
+         "    SGI IRIX WORKSTATION    9 SQUARES OF POWER    "
+         "    JURASSIC PARK MAGIC    ", "V", BgKind::ImgIrix},
+        {"ZERO",      18.0f, polSpe(),   SS::Mirror,
          "    BACK TO ORIGIN    DIMENSION COLLAPSED    ", "J",
          BgKind::Starfield},
     }};
