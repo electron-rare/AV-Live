@@ -82,6 +82,12 @@ private struct SettingsView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
+            Toggle("Auto-start everything when the app launches",
+                   isOn: Binding(
+                    get: { processManager.autoStart },
+                    set: { processManager.autoStart = $0 }
+                   ))
+            Divider()
             Text("Paths").font(.headline)
             PathField(
                 label: "sclang binary",

@@ -46,6 +46,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 openLogs: { [weak self] in self?.showLogs() }
             )
         )
+
+        // Auto-start everything if enabled (default true). Slight delay so
+        // the menubar UI has time to appear before any subprocess output
+        // floods the log buffer.
+        if processManager.autoStart {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
+                self?.processManager.startAll()
+            }
+        }
     }
 
     func applicationWillTerminate(_ notification: Notification) {

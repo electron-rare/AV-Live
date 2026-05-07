@@ -18,6 +18,7 @@ final class ProcessManager: ObservableObject {
     @Published var sclangPath: String { didSet { defaults.set(sclangPath, forKey: "sclangPath") } }
     @Published var soundAlgoLoadFile: String { didSet { defaults.set(soundAlgoLoadFile, forKey: "soundAlgoLoadFile") } }
     @Published var oscopePath: String { didSet { defaults.set(oscopePath, forKey: "oscopePath") } }
+    @Published var autoStart: Bool { didSet { defaults.set(autoStart, forKey: "autoStart") } }
 
     private let defaults = UserDefaults.standard
     private var sclangProc: Process?
@@ -26,24 +27,64 @@ final class ProcessManager: ObservableObject {
     private let maxLogLines = 2000
 
     init() {
-        let home = FileManager.default.homeDirectoryForCurrentUser.path
+        let fm = FileManager.default
+        let home = fm.homeDirectoryForCurrentUser.path
+
+        // Discover the AV-Live tree by trying a list of likely locations.
+        // First match wins. Includes the path derived from the .app bundle
+        // when the launcher is installed inside an AV-Live checkout.
+        let avLiveCandidates: [String] = {
+            var c: [String] = []
+            // Walk up from the bundle: <root>/launcher/build/AVLiveLauncher.app
+            let bundleParents = (0..<5).reduce(into: [URL]()) { acc, _ in
+                let last = acc.last ?? Bundle.main.bundleURL
+                acc.append(last.deletingLastPathComponent())
+            }
+            for url in bundleParents {
+                let candidate = url.path
+                if fm.fileExists(atPath: candidate + "/sound_algo/00_load.scd") {
+                    c.append(candidate)
+                }
+            }
+            // Plus the well-known paths
+            c.append("\(home)/AV-Live")
+            c.append("\(home)/Documents/Projets/AV-Live")
+            return c
+        }()
+        let avLive = avLiveCandidates.first(where: {
+            fm.fileExists(atPath: $0 + "/sound_algo/00_load.scd")
+        }) ?? "\(home)/AV-Live"
+
         sclangPath = defaults.string(forKey: "sclangPath")
             ?? "/Applications/SuperCollider.app/Contents/MacOS/sclang"
         soundAlgoLoadFile = defaults.string(forKey: "soundAlgoLoadFile")
-            ?? "\(home)/Documents/Projets/AV-Live/sound_algo/00_load.scd"
+            ?? "\(avLive)/sound_algo/00_load.scd"
+
         // openFrameworks Release produces a .app bundle in bin/. Default to the
         // executable inside the bundle, with fallback to the bare binary if
         // the user built with a custom Makefile target.
-        let avLive = "\(home)/Documents/Projets/AV-Live/oscope-of"
-        let bundled = "\(avLive)/bin/oscope-of.app/Contents/MacOS/oscope-of"
-        let bare = "\(avLive)/bin/oscope-of"
+        let bundled = "\(avLive)/oscope-of/bin/oscope-of.app/Contents/MacOS/oscope-of"
+        let bare    = "\(avLive)/oscope-of/bin/oscope-of"
         let stored = defaults.string(forKey: "oscopePath")
         if let s = stored, !s.isEmpty {
             oscopePath = s
-        } else if FileManager.default.fileExists(atPath: bundled) {
+        } else if fm.fileExists(atPath: bundled) {
             oscopePath = bundled
         } else {
             oscopePath = bare
+        }
+        autoStart = (defaults.object(forKey: "autoStart") as? Bool) ?? true
+    }
+
+    /// Start everything that's currently stopped. Used by AppDelegate on
+    /// launch when autoStart is enabled.
+    func startAll() {
+        if !sclangRunning { startSclang() }
+        // Stagger so sclang has a head start booting scsynth before
+        // oscope-of opens its OSC listener
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { [weak self] in
+            guard let self = self else { return }
+            if !self.oscopeRunning { self.startOscope() }
         }
     }
 
