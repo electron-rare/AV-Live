@@ -40,6 +40,7 @@ Routine({
         // Helpers humanity : humanize est dans engine, rotation + layer ici.
         (~base ++ "palette/synth_rotation.scd").load;
         (~base ++ "palette/auto_layer.scd").load;
+        (~base ++ "palette/album_signatures.scd").load;
 
         // --- 2. setup.scd : definit ~check / ~setupAll / ~teardown -----
         "[live/_load] setup.scd ...".postln;

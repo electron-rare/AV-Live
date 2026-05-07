@@ -413,6 +413,54 @@ thisProcess.openUDPPort(~webBridgeIn);
         ?? { "[web_bridge] ~stopAlbum n/a".postln };
 });
 
+// === Humanity controls : humanize / rotation / auto-layer ===
+// Toggles via 1.0/0.0 ; quand toggle change, on rappelle ~reload pour
+// que le moteur applique les nouveaux Pfunc factories.
+~webBridgeAdd.("/control/setHumanize", { |msg|
+    var on = (msg[1] ? 1).asFloat > 0.5;
+    ~humanizeOn = on;
+    ("[web_bridge] humanize " ++ if(on) {"ON"} {"OFF"}).postln;
+    ~reload !? { ~reload.value };
+});
+~webBridgeAdd.("/control/setRotation", { |msg|
+    var on = (msg[1] ? 1).asFloat > 0.5;
+    ~setRotationOn !? { ~setRotationOn.(on) }
+        ?? { "[web_bridge] ~setRotationOn n/a".postln };
+});
+~webBridgeAdd.("/control/setLayer", { |msg|
+    var on = (msg[1] ? 1).asFloat > 0.5;
+    ~setAutoLayer !? { ~setAutoLayer.(on) }
+        ?? { "[web_bridge] ~setAutoLayer n/a".postln };
+});
+// Tunables fins (en flottants 0..1)
+~webBridgeAdd.("/control/humanizeTiming", { |msg|
+    ~humanizeTiming = (msg[1] ? 0.0035).asFloat.clip(0.0, 0.05);
+    ~reload !? { ~reload.value };
+});
+~webBridgeAdd.("/control/humanizeVelocity", { |msg|
+    ~humanizeVelocity = (msg[1] ? 0.10).asFloat.clip(0.0, 0.5);
+    ~reload !? { ~reload.value };
+});
+~webBridgeAdd.("/control/humanizeDetune", { |msg|
+    ~humanizeDetune = (msg[1] ? 0.03).asFloat.clip(0.0, 0.5);
+    ~reload !? { ~reload.value };
+});
+// Layer config par-album (signature)
+~webBridgeAdd.("/control/layerSet", { |msg|
+    // /control/layerSet <melodyInst> <melodyAmp> <melodyOctave>
+    //                   <harmonyInst> <harmonyAmp>
+    //                   <acidInst> <acidAmp> <acidOctave>
+    msg[1] !? { ~layerMelodyInst   = msg[1].asString.asSymbol };
+    msg[2] !? { ~layerMelodyAmp    = msg[2].asFloat };
+    msg[3] !? { ~layerMelodyOctave = msg[3].asInteger };
+    msg[4] !? { ~layerHarmonyInst  = msg[4].asString.asSymbol };
+    msg[5] !? { ~layerHarmonyAmp   = msg[5].asFloat };
+    msg[6] !? { ~layerAcidInst     = msg[6].asString.asSymbol };
+    msg[7] !? { ~layerAcidAmp      = msg[7].asFloat };
+    msg[8] !? { ~layerAcidOctave   = msg[8].asInteger };
+    "[web_bridge] layer config updated".postln;
+});
+
 // ---------- Chains scenes (control/chain.scd) ------------------------
 ~webBridgeAdd.("/control/chain", { |msg|
     var name = msg[1].asString.asSymbol;
