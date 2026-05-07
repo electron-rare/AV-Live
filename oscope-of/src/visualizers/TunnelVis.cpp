@@ -22,18 +22,21 @@ void TunnelVis::update(const VisFrame& frame) {
     const float dirTarget = (lead_ - bass_) > 0.05f ? 1.0f
                           : (bass_ - lead_) > 0.05f ? -1.0f
                           : direction_;
-    direction_ += (dirTarget - direction_) * 0.04f;
+    direction_ += (dirTarget - direction_) * 0.04f * mults_.dirLerp;
 
-    // Vitesse : base BPM + boost sur kick, signée par direction_.
-    const float speed = (0.6f + bpm_ * 0.012f + kick_ * 1.5f) * direction_;
+    // Vitesse : base BPM /10 (flow lent) + bias kick violent (kick frappe
+    // brutal sur cette base lente). Signée par direction_.
+    const float baseSpeed = 0.06f + bpm_ * 0.0012f;            // /10 vs avant
+    const float kickPunch = kick_ * 4.0f * mults_.kickBoost;   // violent
+    const float speed = (baseSpeed + kickPunch) * direction_ * mults_.speed;
     travel_ += static_cast<float>(ofGetLastFrameTime()) * speed;
 
     // 3D — Banking (roll) : la nef s'incline. Composante kinétique de base
     // (oscillation sinusoïdale toujours présente) + composante audio.
     const float t = ofGetElapsedTimef();
-    const float rollTarget = std::sin(t * 0.5f) * 0.35f
+    const float rollTarget = (std::sin(t * 0.5f) * 0.35f
         + (lead_ - bass_) * 1.2f
-        + std::sin(t * 1.7f) * 0.25f * (kick_ + 0.15f);
+        + std::sin(t * 1.7f) * 0.6f * (kick_ + 0.15f)) * mults_.rollAmp;
     roll_ += (rollTarget - roll_) * 0.08f;
 
     // 3D — Pan : le vanishing point se déplace vraiment, en figure de
@@ -43,12 +46,12 @@ void TunnelVis::update(const VisFrame& frame) {
                       + std::sin(t * 0.83f) * 0.12f;
     const float baseY = std::cos(t * 0.42f) * 0.25f
                       + std::cos(t * 1.13f) * 0.10f;
-    const float panTargetX = baseX
+    const float panTargetX = (baseX
         + (snare_ - 0.4f) * 0.8f * snare_
-        + (lead_ - bass_) * 0.4f;
-    const float panTargetY = baseY
-        - kick_ * 0.6f
-        - bass_ * 0.3f;
+        + (lead_ - bass_) * 0.4f) * mults_.panAmp;
+    const float panTargetY = (baseY
+        - kick_ * 1.4f * mults_.kickBoost
+        - bass_ * 0.3f) * mults_.panAmp;
     panX_ += (panTargetX - panX_) * 0.12f;
     panY_ += (panTargetY - panY_) * 0.12f;
 
@@ -58,10 +61,10 @@ void TunnelVis::update(const VisFrame& frame) {
     // qui garantit qu'il y a toujours un léger virage.
     const float dt = static_cast<float>(ofGetLastFrameTime());
     curvePhase_ += dt * (1.2f + bpm_ * 0.005f) * direction_;
-    const float curveTarget = 0.04f
+    const float curveTarget = (0.04f
         + std::abs(lead_ - bass_) * 0.10f
         + bass_ * 0.12f
-        + std::sin(t * 0.21f) * 0.03f;
+        + std::sin(t * 0.21f) * 0.03f) * mults_.curveAmp;
     curveAmp_ += (curveTarget - curveAmp_) * 0.05f;
 }
 
@@ -87,8 +90,8 @@ void TunnelVis::draw(int x, int y, int w, int h) {
     // Taille de tile pilotée par les fréquences :
     // - axe Z (profondeur) : bass loud → grosses tuiles (uTileZ bas)
     // - axe angulaire        : lead loud → tuiles fines    (uTileX haut)
-    const float tileZ = ofLerp(3.0f, 0.5f, std::min(1.0f, bass_));
-    const float tileX = ofLerp(8.0f, 32.0f, std::min(1.0f, lead_));
+    const float tileZ = ofLerp(3.0f, 0.5f, std::min(1.0f, bass_)) * mults_.tileZ;
+    const float tileX = ofLerp(8.0f, 32.0f, std::min(1.0f, lead_)) * mults_.tileX;
     shader_.setUniform1f("uTileZ", tileZ);
     shader_.setUniform1f("uTileX", tileX);
     shader_.setUniform1f("uDirection", direction_);

@@ -549,6 +549,47 @@ void ofApp::keyPressed(int key) {
             postfx_.reloadShader();
             ofLogNotice("ofApp") << "Shaders rechargés";
             break;
+
+        // FX live — multiplicateurs tunnel par paires (down/up). Chaque
+        // pression scale ×0.83 (down) ou ×1.20 (up). Clamp 0.05..12.
+        // 'w' = reset all to 1.0 (n'écrase pas qwerty mode_ déjà mappés).
+        case 'a': case 'z': case 's': case 'x':
+        case 'd': case 'c': case 'e': case 'v':
+        case 't': case 'n': case 'u': case 'm':
+        case 'i': case 'l': case 'o': case 'h':
+        case 'j': case 'y':
+        case 'w': {
+            auto m = tunnel_->mults();
+            auto bump = [](float v, bool up) {
+                v *= up ? 1.20f : 0.83f;
+                return std::max(0.05f, std::min(12.0f, v));
+            };
+            switch (key) {
+                case 'a': m.speed     = bump(m.speed,     false); break;
+                case 'z': m.speed     = bump(m.speed,     true);  break;
+                case 's': m.kickBoost = bump(m.kickBoost, false); break;
+                case 'x': m.kickBoost = bump(m.kickBoost, true);  break;
+                case 'd': m.rollAmp   = bump(m.rollAmp,   false); break;
+                case 'c': m.rollAmp   = bump(m.rollAmp,   true);  break;
+                case 'e': m.panAmp    = bump(m.panAmp,    false); break;
+                case 'v': m.panAmp    = bump(m.panAmp,    true);  break;
+                case 't': m.curveAmp  = bump(m.curveAmp,  false); break;
+                case 'n': m.curveAmp  = bump(m.curveAmp,  true);  break;
+                case 'u': m.tileX     = bump(m.tileX,     false); break;
+                case 'm': m.tileX     = bump(m.tileX,     true);  break;
+                case 'i': m.tileZ     = bump(m.tileZ,     false); break;
+                case 'l': m.tileZ     = bump(m.tileZ,     true);  break;
+                case 'o': m.dirLerp   = bump(m.dirLerp,   false); break;
+                case 'h': m.dirLerp   = bump(m.dirLerp,   true);  break;
+                case 'j': m.speed     = bump(m.speed,     false);
+                          m.kickBoost = bump(m.kickBoost, false); break;
+                case 'y': m.speed     = bump(m.speed,     true);
+                          m.kickBoost = bump(m.kickBoost, true);  break;
+                case 'w': m = oscope::TunnelVis::Mults{};         break;
+            }
+            tunnel_->setMults(m);
+            break;
+        }
         default: break;
     }
 }
