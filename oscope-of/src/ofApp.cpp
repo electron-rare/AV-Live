@@ -378,7 +378,9 @@ void ofApp::update() {
     }
     prevKick_ = kNow;
 
-    oscope::VisFrame frame{ch1_, ch2_, osc_, audio_.bands()};
+    oscope::VisFrame frame{ch1_, ch2_, osc_, audio_.bands(),
+                           &audio_.monoDown(), &audio_.magDown(),
+                           audio_.monoHead()};
     lissajous_->update(frame);
     spectro_->update(frame);
     reactive_->update(frame);
@@ -781,6 +783,10 @@ void ofApp::initDemos() {
         {"ENNEPER",    25.0f, polSpe(),    SS::Mirror,
          "    A MINIMAL SURFACE    LEAST AREA POSSIBLE    "
          "    GREETINGS TO ASD AND CONSPIRACY    ", "S", BgKind::Enneper},
+        {"SPHERE",     22.0f, polSpe(),    SS::Mirror,
+         "    THE SPECTRUM AS A LIVING SPHERE    "
+         "    EVERY HZ A LATITUDE    EVERY KICK A PULSE    ", "S",
+         BgKind::SphereWave},
         {"APPLE",      18.0f, polSpe(),    SS::Mirror,
          "    THE APPLE RAINBOW    1977 - 1998    "
          "    SIX BANDS OF GENTLE NOSTALGIA    ", "J", BgKind::ImgApple},
@@ -1045,7 +1051,10 @@ void ofApp::initDemos() {
         {"CUBES",      18.0f, all(),      SS::Wavy3D,
          "    CUBE STORM    GEOMETRY ATTACK    ", "Q",
          BgKind::TunnelCubes},
-        {"FAREWELL",   30.0f, all(),      SS::Rainbow,
+        {"SPHERE",     20.0f, polSpe(),   SS::Wavy3D,
+         "    SPECTRUM SPHERE    THE FREQUENCIES BECOME GEOMETRY    ", "U",
+         BgKind::SphereWave},
+        {"FAREWELL",   25.0f, all(),      SS::Rainbow,
          "    THIS IS THE GRAND FINAL    "
          "    GREETINGS TO EVERYBODY OUT THERE    "
          "    THE SCENE IS YOUR FAMILY    THE PHOSPHOR YOUR HOME    "

@@ -56,19 +56,29 @@ void SphereWaveVis::update(const VisFrame& frame) {
     kick_   = frame.bands.kick;
     bpm_    = frame.osc.bpm();
 
-    // FFT depuis mono Hantek
-    const auto& ch1 = frame.ch1;
-    const auto& ch2 = frame.ch2;
-    const std::size_t n = std::min({ch1.size(), ch2.size(), kFftSize});
-    if (n > 16 && fft_) {
-        std::fill(mono_.begin(), mono_.end(), 0.0f);
-        for (std::size_t i = 0; i < n; ++i)
-            mono_[i] = 0.5f * (ch1[i] + ch2[i]);
-        fft_->magnitude(mono_, mag_);
+    // Préfère le mono downsamplé (48 kHz) + magnitudes pré-calculées de
+    // l'AudioAnalyzer global — bin width ~47 Hz au lieu de 7800 Hz brut.
+    const std::vector<float>* useMag = nullptr;
+    const std::vector<float>* useMono = nullptr;
+    if (frame.magDown && !frame.magDown->empty()) {
+        useMag  = frame.magDown;
+        useMono = frame.monoDown;
+    } else {
+        // Fallback : FFT raw Hantek si les downsamples ne sont pas dispos
+        const auto& ch1 = frame.ch1;
+        const auto& ch2 = frame.ch2;
+        const std::size_t n = std::min({ch1.size(), ch2.size(), kFftSize});
+        if (n > 16 && fft_) {
+            std::fill(mono_.begin(), mono_.end(), 0.0f);
+            for (std::size_t i = 0; i < n; ++i)
+                mono_[i] = 0.5f * (ch1[i] + ch2[i]);
+            fft_->magnitude(mono_, mag_);
+            useMag = &mag_;
+            useMono = &mono_;
+        }
     }
-
-    // Mise à jour des vertex de la sphère : rayon = base + FFT_à_cet_angle
-    if (mag_.empty()) return;
+    if (!useMag || useMag->empty()) return;
+    const auto& magRef = *useMag;
     auto& verts = sphere_.getVertices();
     for (int u = 0; u < kNU; ++u) {
         for (int v = 0; v < kNV; ++v) {
@@ -76,12 +86,15 @@ void SphereWaveVis::update(const VisFrame& frame) {
             // Map (u,v) → bin FFT (log scale) ; chaque longitude couvre une plage
             const float t = static_cast<float>(u) / kNU;
             const std::size_t bin = static_cast<std::size_t>(
-                std::pow(t, 2.0f) * (mag_.size() - 1));
-            const float magdb = 20.0f * std::log10(std::max(mag_[bin], 1e-6f)) + 60.0f;
+                std::pow(t, 2.0f) * (magRef.size() - 1));
+            const float magdb = 20.0f * std::log10(std::max(magRef[bin], 1e-6f)) + 60.0f;
             const float fftAmp = std::max(0.0f, std::min(1.0f, magdb / 60.0f));
-            // + waveform oscillation par latitude
-            const std::size_t wIdx = (v * 4 + u) % std::min(n, kFftSize);
-            const float wave = (n > 16) ? mono_[wIdx] * 0.3f : 0.0f;
+            // + waveform oscillation par latitude (depuis monoDown si dispo)
+            float wave = 0.0f;
+            if (useMono && !useMono->empty()) {
+                const std::size_t wIdx = (v * 4 + u) % useMono->size();
+                wave = (*useMono)[wIdx] * 0.3f;
+            }
 
             const float r = baseR_[idx] + fftAmp * 1.2f + wave;
             const ofVec3f n_ = sphere_.getNormal(idx);

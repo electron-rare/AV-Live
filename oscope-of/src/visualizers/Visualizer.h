@@ -15,6 +15,9 @@ struct VisFrame {
     const std::vector<float>& ch2;
     OscClient& osc;
     const AudioBands& bands;   // FFT-derived bands depuis le signal Hantek
+    const std::vector<float>* monoDown = nullptr;  // mono ring 48 kHz, optional
+    const std::vector<float>* magDown  = nullptr;  // FFT mag sur monoDown
+    std::size_t monoHead = 0;
 };
 
 class Visualizer {

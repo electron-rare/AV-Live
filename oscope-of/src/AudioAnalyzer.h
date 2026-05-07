@@ -30,6 +30,12 @@ public:
                 const std::vector<float>& ch2,
                 float scopeSampleRateHz);
     const AudioBands& bands() const { return bands_; }
+    /// Buffer mono downsamplé vers ~48 kHz (avant FFT). Ring de kFftSize.
+    const std::vector<float>& monoDown() const { return mono_; }
+    /// Magnitudes FFT sur monoDown (taille = kFftSize/2). Bin width ≈ 47 Hz.
+    const std::vector<float>& magDown()  const { return mag_; }
+    std::size_t monoHead() const { return head_; }
+    static constexpr float audioSr() { return kAudioSr; }
 
 private:
     static constexpr std::size_t kFftSize  = 1024;
