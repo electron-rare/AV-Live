@@ -319,41 +319,46 @@ void ofApp::drawPanelLabel(int x, int y, const char* title,
 }
 
 void ofApp::drawScope4(int W, int H) {
-    // 1) Tunnel fullscreen en fond — fréquences pilotent tile size / dir.
+    // 1) Tunnel fullscreen en fond — fréquences pilotent tile size / dir
+    //    + curve. Le centre du tunnel reste pile au milieu de l'écran ;
+    //    les uniformes uPan / uCurve modulent l'intérieur sans bouger le
+    //    cadre, donc le polar central reste aligné avec la nef.
     tunnel_->draw(0, 0, W, H);
 
     const float cx = W * 0.5f;
     const float cy = H * 0.5f;
     const float minSide = static_cast<float>(std::min(W, H));
 
-    // 2) Polar VRAIMENT central, focal — taille = 70% du min(W,H), centré
-    //    pile sur (cx, cy). Couleurs des pétales pilotées par les bands.
-    const int   polarS = static_cast<int>(minSide * 0.70f);
+    // 2) WAVEFORM circulaire FULLSCREEN — les CH1/CH2/slow sont des anneaux
+    //    concentriques qui font le tour complet (timeline → angle 0..2π).
+    //    Mode circular activé, le draw remplit tout l'écran derrière le
+    //    polar et le spectro ring.
+    waveform_->setCircular(true);
+    waveform_->draw(0, 0, W, H);
+
+    // 3) Polar central, focal, centré PILE sur le tunnel (cx, cy).
+    //    Couleurs des pétales par bands (bass→bleu, lead→rouge).
+    const int polarS = static_cast<int>(minSide * 0.55f);
     polar_->draw(static_cast<int>(cx) - polarS / 2,
                  static_cast<int>(cy) - polarS / 2,
                  polarS, polarS);
 
-    // 3) Spectrogramme circulaire en anneau juste à l'extérieur du Polar
-    //    (PolarVis::draw utilise radius = polarS*0.4 pour ses pétales,
-    //    soit 0.28 de minSide depuis le centre — l'anneau commence après).
-    const float ringInner = minSide * 0.32f;
-    const float ringOuter = minSide * 0.44f;
+    // 4) Spectrogramme circulaire en anneau autour du polar.
+    const float ringInner = minSide * 0.27f;
+    const float ringOuter = minSide * 0.36f;
     spectro_->drawCircular(cx, cy, ringInner, ringOuter);
 
-    // 4) Deux satellites (Waveform + Lissajous) en orbite à 180°, situés
-    //    AU-DELÀ de l'anneau spectro pour ne pas le couper.
-    const float bpm   = osc_.bpm();
-    const float orbit = ofGetElapsedTimef() * (0.04f + bpm * 0.0003f);
-    const float orbitR = minSide * 0.54f;
-    const int satW = static_cast<int>(minSide * 0.18f);
-    const int satH = static_cast<int>(minSide * 0.14f);
-    oscope::Visualizer* sats[2] = { waveform_.get(), lissajous_.get() };
-    for (int i = 0; i < 2; ++i) {
-        const float a = orbit + i * PI;
-        const int sx = static_cast<int>(cx + std::cos(a) * orbitR - satW * 0.5f);
-        const int sy = static_cast<int>(cy + std::sin(a) * orbitR - satH * 0.5f);
-        sats[i]->draw(sx, sy, satW, satH);
-    }
+    // 5) Lissajous en arrière-plan additif fullscreen pour le glow.
+    ofEnableBlendMode(OF_BLENDMODE_ADD);
+    ofPushStyle();
+    ofSetColor(255, 255, 255, 90);
+    lissajous_->draw(0, 0, W, H);
+    ofPopStyle();
+    ofDisableBlendMode();
+
+    // Reset le flag circular pour que le mode Waveform standard (touche 5)
+    // garde son rendu CRT rectangulaire.
+    waveform_->setCircular(false);
 }
 
 void ofApp::draw() {

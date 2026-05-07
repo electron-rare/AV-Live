@@ -125,7 +125,63 @@ void WaveformVis::update(const VisFrame& frame) {
     }
 }
 
+void WaveformVis::drawCircular(int cx, int cy, float baseR, float maxR) {
+    ofPushStyle();
+    ofPushMatrix();
+    ofTranslate(cx, cy);
+
+    // Cercle de référence (timeline) — discret, pour donner une sensation
+    // d'horloge.
+    ofNoFill();
+    ofSetColor(0, 80, 50, 80);
+    ofSetLineWidth(1);
+    ofDrawCircle(0, 0, baseR);
+
+    auto plotRing = [&](const std::vector<float>& trace, ofColor base,
+                        float radius, float ampScale) {
+        const int n = static_cast<int>(trace.size());
+        if (n < 2) return;
+        // Glow phosphor 3 passes
+        for (int pass = 3; pass >= 1; --pass) {
+            ofColor c = base;
+            c.a = static_cast<unsigned char>(40 * pass);
+            ofSetColor(c);
+            ofSetLineWidth(2.0f * (4 - pass));
+            ofBeginShape();
+            for (int i = 0; i < n; ++i) {
+                const float t = static_cast<float>(i) / (n - 1);
+                const float a = t * TWO_PI - HALF_PI;
+                const float r = radius + trace[i] * ampScale;
+                ofVertex(std::cos(a) * r, std::sin(a) * r);
+            }
+            ofEndShape(true);  // closed loop
+        }
+    };
+
+    const float band = (maxR - baseR);
+    // Ordre : slow trace en arrière-plan, puis CH1 puis CH2 par-dessus.
+    if (showSlowOverlay_ && !slowTrace_.empty()) {
+        plotRing(slowTrace_, ofColor(80, 160, 200), baseR + band * 0.05f,
+                 band * 0.45f);
+    }
+    plotRing(trace1_, ofColor(0,   255, 140), baseR + band * 0.30f,
+             band * 0.20f);
+    plotRing(trace2_, ofColor(255, 200,  60), baseR + band * 0.65f,
+             band * 0.20f);
+
+    ofPopMatrix();
+    ofPopStyle();
+}
+
 void WaveformVis::draw(int x, int y, int w, int h) {
+    if (circular_) {
+        const float cx = x + w * 0.5f;
+        const float cy = y + h * 0.5f;
+        const float maxR = 0.46f * std::min(w, h);
+        const float baseR = maxR * 0.50f;
+        drawCircular(static_cast<int>(cx), static_cast<int>(cy), baseR, maxR);
+        return;
+    }
     ofPushStyle();
     ofPushMatrix();
 

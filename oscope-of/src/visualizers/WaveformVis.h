@@ -24,6 +24,10 @@ public:
     void setShowSlowOverlay(bool b)   { showSlowOverlay_ = b; }
     void setScrollSpeed(float v)      { scrollSpeed_  = std::max(0.0f, std::min(1.0f, v)); }
     void setSampleRate(float hz)      { if (hz > 1.0f) sampleRateHz_ = hz; }
+    void setCircular(bool b)          { circular_ = b; }
+    /// Render circulaire fullscreen — timeline mappée à l'angle (0..2π),
+    /// CH1/CH2/slow chacun sur un anneau concentrique. Pour Scope4.
+    void drawCircular(int cx, int cy, float baseR, float maxR);
 
 private:
     int   w_ = 0, h_ = 0;
@@ -49,6 +53,7 @@ private:
     // mais avec une fenêtre bien plus longue, superposé au trace audio.
     float slowMsPerDiv_     = 50.0f;
     bool  showSlowOverlay_  = true;
+    bool  circular_         = false;
     // 0 = freeze (capture par trame), 1 = scroll continu (oscilloscope rolling).
     // Défaut = 1 pour que le trace soit live tant que le user ne touche à rien.
     float scrollSpeed_  = 1.0f;
