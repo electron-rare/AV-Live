@@ -1,8 +1,10 @@
-#version 120
+#version 150
 
 // Cylindrical pseudo-3D tunnel. Closed-form mapping from screen UV to
 // (angle, depth) — no real raymarching needed for an infinite straight
 // tunnel. Twist is added per-depth slice based on lead amplitude.
+
+out vec4 fragColor;
 
 uniform vec2  uRes;
 uniform float uTime;
@@ -61,5 +63,5 @@ void main() {
     // Outer ring vignette
     col *= smoothstep(2.0, 0.4, length(p));
 
-    gl_FragColor = vec4(col, 1.0);
+    fragColor = vec4(col, 1.0);
 }

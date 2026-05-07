@@ -1,5 +1,7 @@
-#version 120
+#version 150
+
 uniform mat4 modelViewProjectionMatrix;
+in vec4 position;
 void main() {
-    gl_Position = modelViewProjectionMatrix * gl_Vertex;
+    gl_Position = modelViewProjectionMatrix * position;
 }

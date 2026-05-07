@@ -1,4 +1,6 @@
-#version 120
+#version 150
+
+out vec4 fragColor;
 
 uniform vec2  uRes;
 uniform float uTime;
@@ -45,5 +47,5 @@ void main() {
     // Soft radial vignette
     col *= smoothstep(1.5, 0.2, r);
 
-    gl_FragColor = vec4(col, 1.0);
+    fragColor = vec4(col, 1.0);
 }
