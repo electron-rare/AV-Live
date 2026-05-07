@@ -24,6 +24,7 @@
 #include "visualizers/KaleidoVis.h"
 #include "visualizers/TunnelVis.h"
 #include "visualizers/MeshVis.h"
+#include "visualizers/ShaderVis.h"
 
 #include <memory>
 
@@ -89,6 +90,7 @@ private:
     // 10 démoparties narratives multi-actes (touches 1..9 + 0).
     // Chaque démo = liste de scènes qui défilent dans le temps avec
     // narration scénarisée + track SC + transitions.
+    enum class BgKind { Tunnel, Starfield, Metaballs, Voronoi, Twister };
     struct DemoScene {
         const char*           name;
         float                 durSec;
@@ -96,6 +98,7 @@ private:
         oscope::ScrollerStyle scroller;
         const char*           narration;
         const char*           albumLetter;
+        BgKind                background = BgKind::Tunnel;
     };
     struct Demo {
         const char*            name;
@@ -123,6 +126,10 @@ private:
     std::unique_ptr<oscope::KaleidoVis>     kaleido_;
     std::unique_ptr<oscope::TunnelVis>      tunnel_;
     std::unique_ptr<oscope::MeshVis>        mesh_;
+    // Demoscene fullscreen FX (shader-based, frag-only).
+    std::unique_ptr<oscope::ShaderVis>      metaballs_;
+    std::unique_ptr<oscope::ShaderVis>      voronoi_;
+    std::unique_ptr<oscope::ShaderVis>      twister_;
 
     std::vector<float> ch1_, ch2_;
     Mode mode_ = Mode::Scope4;

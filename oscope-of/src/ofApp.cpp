@@ -80,6 +80,9 @@ void ofApp::setup() {
     kaleido_   = std::make_unique<oscope::KaleidoVis>();
     tunnel_    = std::make_unique<oscope::TunnelVis>();
     mesh_      = std::make_unique<oscope::MeshVis>();
+    metaballs_ = std::make_unique<oscope::ShaderVis>("shaders/metaballs");
+    voronoi_   = std::make_unique<oscope::ShaderVis>("shaders/voronoi");
+    twister_   = std::make_unique<oscope::ShaderVis>("shaders/twister");
     lissajous_->setup(W, H);
     spectro_->setup(W, H / 4);
     reactive_->setup(W, H);
@@ -90,6 +93,9 @@ void ofApp::setup() {
     kaleido_->setup(W, H);
     tunnel_->setup(W, H);
     mesh_->setup(W, H);
+    metaballs_->setup(W, H);
+    voronoi_->setup(W, H);
+    twister_->setup(W, H);
 
     postfx_.setup(W, H);
 
@@ -238,6 +244,9 @@ void ofApp::update() {
     kaleido_->update(frame);
     tunnel_->update(frame);
     mesh_->update(frame);
+    metaballs_->update(frame);
+    voronoi_->update(frame);
+    twister_->update(frame);
 
     applyOscFx();
 
@@ -354,12 +363,14 @@ void ofApp::initDemos() {
     demos_[0] = {"AMIGA TRIBUTE", {
         {"INSERT DISK",  18.0f, stars(),     SS::Neon,
          "    *** AMIGA 500 RELOADED ***    KICKSTART 1.3    "
-         "    INSERT WORKBENCH DISK ", "M"},
+         "    INSERT WORKBENCH DISK ", "M", BgKind::Starfield},
         {"SCROLLZ",      35.0f, all(),       SS::Classic,
          "    GREETINGS FROM 1989    COPPER BARS AND BOBS FOREVER    "
-         "    AMIGA NEVER DIES    HELLO TO ALL DEMOSCENE VETERANS    ", "M"},
+         "    AMIGA NEVER DIES    HELLO TO ALL DEMOSCENE VETERANS    ", "M",
+         BgKind::Twister},
         {"COPPER STORM", 30.0f, all(),       SS::Rainbow,
-         "    COPPER LIST IS POETRY    EVERY SCANLINE A NEW COLOR    ", "G"},
+         "    COPPER LIST IS POETRY    EVERY SCANLINE A NEW COLOR    ", "G",
+         BgKind::Twister},
     }};
 
     // ─── 2 · C64 LOWLIFE ─────────────────────────────────────
@@ -413,12 +424,12 @@ void ofApp::initDemos() {
     // ─── 6 · GLITCH WORLD ────────────────────────────────────
     demos_[5] = {"GLITCH WORLD", {
         {"PROBE",     15.0f, stars(),  SS::Neon,
-         "    SCANNING ANOMALY    REALITY UNSTABLE    ", "V"},
+         "    SCANNING ANOMALY    REALITY UNSTABLE    ", "V", BgKind::Voronoi},
         {"CORRUPT",   40.0f, all(),    SS::Glitch,
          "    BUFFER OVERFLOW    SIGNAL CORRUPTED    "
-         "    THE GHOSTS IN THE WIRES ARE WAKING UP    ", "V"},
+         "    THE GHOSTS IN THE WIRES ARE WAKING UP    ", "V", BgKind::Voronoi},
         {"CRASH",     30.0f, all(),    SS::Glitch,
-         "    KERNEL PANIC    BUT THE BEAT GOES ON    ", "Q"},
+         "    KERNEL PANIC    BUT THE BEAT GOES ON    ", "Q", BgKind::Voronoi},
     }};
 
     // ─── 7 · AMBIENT VOID ────────────────────────────────────
@@ -660,14 +671,26 @@ void ofApp::drawScope4(int W, int H) {
     demo_.bobsEnabled()      = scope4_.bobs;
     demo_.starfieldEnabled() = scope4_.starfield;
 
-    // 1) Fond : starfield remplace le tunnel si toggle actif, sinon tunnel.
-    if (scope4_.starfield) {
-        ofBackground(0);
-        demo_.drawStarfield(W, H);
-    } else if (scope4_.tunnel) {
-        tunnel_->draw(0, 0, W, H);
-    } else {
-        ofBackground(0);
+    // 1) Fond : selon scène narrative active (BgKind), sinon tunnel/starfield
+    //    classique en mode live.
+    BgKind bg = BgKind::Tunnel;
+    if (narrativeMode_ && currentDemo_ < (int)demos_.size() &&
+        narrativeIdx_ < (int)demos_[currentDemo_].scenes.size()) {
+        bg = demos_[currentDemo_].scenes[narrativeIdx_].background;
+    } else if (scope4_.starfield) {
+        bg = BgKind::Starfield;
+    } else if (!scope4_.tunnel) {
+        bg = BgKind::Tunnel; // pas de fond -> tunnel skip below
+    }
+    switch (bg) {
+        case BgKind::Tunnel:
+            if (scope4_.tunnel) tunnel_->draw(0, 0, W, H);
+            else                ofBackground(0);
+            break;
+        case BgKind::Starfield: ofBackground(0); demo_.drawStarfield(W, H); break;
+        case BgKind::Metaballs: metaballs_->draw(0, 0, W, H); break;
+        case BgKind::Voronoi:   voronoi_->draw(0, 0, W, H);   break;
+        case BgKind::Twister:   twister_->draw(0, 0, W, H);   break;
     }
 
     // 1bis) HUD pseudo-aléatoire de valeurs sub-10 Hz.

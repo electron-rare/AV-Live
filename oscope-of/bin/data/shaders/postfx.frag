@@ -156,11 +156,14 @@ void main() {
         col *= mix(1.0, v, uVignette);
     }
 
-    // Final tone-map / clamp — without this, bloom + grain + feedback
-    // saturate to pure white very quickly on bright visualizers.
-    // Reinhard avec exposition : col = (col*e) / (1 + col*e), e=0.6 → la
-    // valeur d'entrée 1.0 mappe à ~0.375, 5.0 à ~0.75, jamais à 1.0.
-    col = (col * 0.6) / (1.0 + col * 0.6);
-    col = clamp(col, 0.0, 1.0);
+    // Tone-map ACES filmic (Narkowicz approximation) — courbe S filmique
+    // bien meilleure que Reinhard pour le contraste et la saturation des
+    // hautes lumières. Empêche le clip + garde du peps dans les blacks.
+    //   y = (x*(a*x+b)) / (x*(c*x+d)+e)
+    {
+        const float a = 2.51, b = 0.03, c = 2.43, d = 0.59, e = 0.14;
+        col = clamp((col * (a * col + b)) / (col * (c * col + d) + e),
+                    0.0, 1.0);
+    }
     fragColor = vec4(col, 1.0);
 }
