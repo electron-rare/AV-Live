@@ -167,8 +167,9 @@ void WaveformVis::drawCircular(int cx, int cy, float baseR, float maxR) {
     ofDrawCircle(0, 0, baseR);
 
     // Plot ring : 5 passes glow (phosphor persistance) + trait fin central.
+    // phaseOffset = rotation propre du ring (CH1 +φ, CH2 -φ → contre-rotation)
     auto plotRing = [&](const std::vector<float>& trace, ofColor base,
-                        float radius, float ampScale) {
+                        float radius, float ampScale, float phaseOffset) {
         const int n = static_cast<int>(trace.size());
         if (n < 2) return;
         for (int pass = 5; pass >= 1; --pass) {
@@ -179,7 +180,7 @@ void WaveformVis::drawCircular(int cx, int cy, float baseR, float maxR) {
             ofBeginShape();
             for (int i = 0; i < n; ++i) {
                 const float t = static_cast<float>(i) / (n - 1);
-                const float a = t * TWO_PI - HALF_PI;
+                const float a = t * TWO_PI - HALF_PI + phaseOffset;
                 const float r = radius + trace[i] * ampScale;
                 ofVertex(std::cos(a) * r, std::sin(a) * r);
             }
@@ -193,7 +194,7 @@ void WaveformVis::drawCircular(int cx, int cy, float baseR, float maxR) {
         ofBeginShape();
         for (int i = 0; i < n; ++i) {
             const float t = static_cast<float>(i) / (n - 1);
-            const float a = t * TWO_PI - HALF_PI;
+            const float a = t * TWO_PI - HALF_PI + phaseOffset;
             const float r = radius + trace[i] * ampScale;
             ofVertex(std::cos(a) * r, std::sin(a) * r);
         }
@@ -201,15 +202,19 @@ void WaveformVis::drawCircular(int cx, int cy, float baseR, float maxR) {
     };
 
     const float band = (maxR - baseR);
-    // Ordre : slow ring en arrière, CH1/CH2 par-dessus.
+    // CH1 tourne dans un sens, CH2 dans l'autre. Vitesse modulée par les
+    // amps des bandes — la rotation accélère sur les transitoires.
+    const float now = ofGetElapsedTimef();
+    const float phase = now * 0.30f;
+    // Ordre : slow ring statique en arrière, CH1 + phase, CH2 - phase.
     if (showSlowOverlay_ && !slowTrace_.empty()) {
         plotRing(slowTrace_, ofColor(80, 160, 200), baseR + band * 0.05f,
-                 band * 0.40f);
+                 band * 0.40f, 0.0f);
     }
     plotRing(trace1_, ofColor(80,  255, 160), baseR + band * 0.32f,
-             band * 0.22f);
+             band * 0.22f, +phase);
     plotRing(trace2_, ofColor(255, 210,  80), baseR + band * 0.68f,
-             band * 0.22f);
+             band * 0.22f, -phase);
 
     ofDisableBlendMode();
     ofPopMatrix();
