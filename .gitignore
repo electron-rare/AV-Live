@@ -18,6 +18,7 @@ oscope-of/bin/data/*
 !oscope-of/bin/data/shaders/
 !oscope-of/bin/data/settings.json
 !oscope-of/bin/data/greetings.txt
+!oscope-of/bin/data/models/
 oscope-of/obj/
 oscope-of/.vscode/
 oscope-of/Project.xcconfig

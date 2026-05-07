@@ -25,6 +25,8 @@
 #include "visualizers/TunnelVis.h"
 #include "visualizers/MeshVis.h"
 #include "visualizers/ShaderVis.h"
+#include "visualizers/VectorCubesVis.h"
+#include "visualizers/ModelVis.h"
 
 #include <memory>
 
@@ -93,7 +95,10 @@ private:
     enum class BgKind { Tunnel, Starfield, Metaballs, Voronoi, Twister,
                         PlasmaFbm, Rotozoom, Truchet, SdfTunnel,
                         Kifs, Fire, GridPersp, TunnelCubes,
-                        Caustics, Vortex, Octahedron };
+                        Caustics, Vortex, Octahedron, VectorCubes,
+                        Mobius, Klein, TrefoilTube, TwistedTorus, Lucy,
+                        Helix, Catenoid, Hyperboloid, Boys, Lemniscate,
+                        Penrose, Sphere3D, IcoMesh, DodMesh, TorusMesh };
     struct DemoScene {
         const char*           name;
         float                 durSec;
@@ -164,6 +169,23 @@ private:
     std::unique_ptr<oscope::ShaderVis>      caustics_;
     std::unique_ptr<oscope::ShaderVis>      vortex_;
     std::unique_ptr<oscope::ShaderVis>      octahedron_;
+    std::unique_ptr<oscope::VectorCubesVis> vectorCubes_;
+    // 3D models (.ply) — formes paramétriques type Escher / Möbius / Klein
+    std::unique_ptr<oscope::ModelVis> modelMobius_;
+    std::unique_ptr<oscope::ModelVis> modelKlein_;
+    std::unique_ptr<oscope::ModelVis> modelTrefoil_;
+    std::unique_ptr<oscope::ModelVis> modelTwistedTorus_;
+    std::unique_ptr<oscope::ModelVis> modelLucy_;
+    std::unique_ptr<oscope::ModelVis> modelHelix_;
+    std::unique_ptr<oscope::ModelVis> modelCatenoid_;
+    std::unique_ptr<oscope::ModelVis> modelHyperboloid_;
+    std::unique_ptr<oscope::ModelVis> modelBoys_;
+    std::unique_ptr<oscope::ModelVis> modelLemniscate_;
+    std::unique_ptr<oscope::ModelVis> modelPenrose_;
+    std::unique_ptr<oscope::ModelVis> modelSphere_;
+    std::unique_ptr<oscope::ModelVis> modelIco_;
+    std::unique_ptr<oscope::ModelVis> modelDod_;
+    std::unique_ptr<oscope::ModelVis> modelTorus_;
 
     std::vector<float> ch1_, ch2_;
     Mode mode_ = Mode::Scope4;

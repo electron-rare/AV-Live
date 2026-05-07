@@ -94,6 +94,26 @@ void ofApp::setup() {
     caustics_   = std::make_unique<oscope::ShaderVis>("shaders/caustics");
     vortex_     = std::make_unique<oscope::ShaderVis>("shaders/vortex");
     octahedron_ = std::make_unique<oscope::ShaderVis>("shaders/octahedron");
+    vectorCubes_= std::make_unique<oscope::VectorCubesVis>();
+    auto mp = [](const char* n){
+        return std::make_unique<oscope::ModelVis>(
+            ofToDataPath(std::string("models/") + n, true));
+    };
+    modelMobius_       = mp("mobius.ply");
+    modelKlein_        = mp("klein.ply");
+    modelTrefoil_      = mp("trefoil_tube.ply");
+    modelTwistedTorus_ = mp("twisted_torus.ply");
+    modelLucy_         = mp("lucy.ply");
+    modelHelix_        = mp("helix.ply");
+    modelCatenoid_     = mp("catenoid.ply");
+    modelHyperboloid_  = mp("hyperboloid.ply");
+    modelBoys_         = mp("boys.ply");
+    modelLemniscate_   = mp("lemniscate.ply");
+    modelPenrose_      = mp("penrose.ply");
+    modelSphere_       = mp("sphere.ply");
+    modelIco_          = mp("icosahedron.ply");
+    modelDod_          = mp("dodecahedron.ply");
+    modelTorus_        = mp("torus.ply");
     lissajous_->setup(W, H);
     spectro_->setup(W, H / 4);
     reactive_->setup(W, H);
@@ -118,6 +138,22 @@ void ofApp::setup() {
     caustics_->setup(W, H);
     vortex_->setup(W, H);
     octahedron_->setup(W, H);
+    vectorCubes_->setup(W, H);
+    modelMobius_->setup(W, H);
+    modelKlein_->setup(W, H);
+    modelTrefoil_->setup(W, H);
+    modelTwistedTorus_->setup(W, H);
+    modelLucy_->setup(W, H);
+    modelHelix_->setup(W, H);
+    modelCatenoid_->setup(W, H);
+    modelHyperboloid_->setup(W, H);
+    modelBoys_->setup(W, H);
+    modelLemniscate_->setup(W, H);
+    modelPenrose_->setup(W, H);
+    modelSphere_->setup(W, H);
+    modelIco_->setup(W, H);
+    modelDod_->setup(W, H);
+    modelTorus_->setup(W, H);
 
     postfx_.setup(W, H);
 
@@ -301,6 +337,22 @@ void ofApp::update() {
     caustics_->update(frame);
     vortex_->update(frame);
     octahedron_->update(frame);
+    vectorCubes_->update(frame);
+    modelMobius_->update(frame);
+    modelKlein_->update(frame);
+    modelTrefoil_->update(frame);
+    modelTwistedTorus_->update(frame);
+    modelLucy_->update(frame);
+    modelHelix_->update(frame);
+    modelCatenoid_->update(frame);
+    modelHyperboloid_->update(frame);
+    modelBoys_->update(frame);
+    modelLemniscate_->update(frame);
+    modelPenrose_->update(frame);
+    modelSphere_->update(frame);
+    modelIco_->update(frame);
+    modelDod_->update(frame);
+    modelTorus_->update(frame);
 
     applyOscFx();
 
@@ -511,15 +563,15 @@ void ofApp::initDemos() {
          "    INTO THE DARK    DEEPER WE GO    "
          "    NO STARS NO POLAR ONLY THE TUNNEL    "
          "    HOLD YOUR BREATH    ", "P", BgKind::SdfTunnel},
-        {"WALLS",    40.0f, tunOnly(), SS::Wavy3D,
-         "    THE WALLS BREATHE    FREQUENCIES SHAPE THE TILES    "
-         "    BASS WIDENS LEAD NARROWS    "
-         "    THE TURN BEGINS    A SLOW CURVE    ", "P", BgKind::SdfTunnel},
-        {"BENDING",  35.0f, tunOnly(), SS::Wavy3D,
+        {"TREFOIL",  35.0f, tunOnly(), SS::Wavy3D,
+         "    THE PATH KNOTS ITSELF    A REAL TREFOIL KNOT    "
+         "    NO ENDS NO BEGINNINGS    PURE TOPOLOGY    ", "P",
+         BgKind::TrefoilTube},
+        {"TORUS",    35.0f, tunOnly(), SS::Wavy3D,
          "    REALITY BENDS AROUND THE PATH    "
          "    A NEVER ENDING TORUS    "
          "    GREETINGS TO ANDROMEDA AND CONSPIRACY    ", "P",
-         BgKind::SdfTunnel},
+         BgKind::TorusMesh},
         {"OPENING",  30.0f, all(),     SS::Rainbow,
          "    THE TUNNEL OPENS UP    EVERYTHING APPEARS    "
          "    PURE LIGHT BEYOND THE WALLS    ", "F", BgKind::Tunnel},
@@ -595,14 +647,22 @@ void ofApp::initDemos() {
         {"REWIND",    20.0f, starsWave(), SS::Mirror,
          "    *** AESTHETIC MODE ***    SLOWING DOWN    "
          "    LET THE TAPE WHIRR    ", "U", BgKind::Rotozoom},
-        {"VAPOR",     50.0f, all(),       SS::Mirror,
+        {"STATUE",    30.0f, polSpe(),    SS::Chrome,
+         "    AN ANGEL FROM THE STANFORD ARCHIVE    "
+         "    LUCY 50K POINTS MARBLE FROZEN IN TIME    ", "R",
+         BgKind::Lucy},
+        {"VAPOR",     35.0f, all(),       SS::Mirror,
          "    PINK NEON ON CHROME    LOST PALACES OF THE 90S    "
          "    THIS IS HOW WE REMEMBER YOU    "
          "    GREETINGS TO TPOLM AND PLASTIC    ", "R", BgKind::Rotozoom},
-        {"DREAM POOL",30.0f, all(),       SS::Mirror,
-         "    POOL TILES ECHO    UNDERWATER COPPER    "
-         "    SOMETHING WAITS BENEATH    ", "R", BgKind::Truchet},
-        {"FOG",       30.0f, polSpe(),    SS::Mirror,
+        {"HELIX",     25.0f, polSpe(),    SS::Cascade,
+         "    DNA OF MEMORY    SPIRAL OF LOST AFTERNOONS    ", "R",
+         BgKind::Helix},
+        {"CATENOID",  25.0f, polSpe(),    SS::Mirror,
+         "    THE SHAPE OF A SOAP FILM    "
+         "    MINIMAL SURFACE OF WHAT REMAINS    ", "U",
+         BgKind::Catenoid},
+        {"FOG",       25.0f, polSpe(),    SS::Mirror,
          "    THE MEMORY FADES    BUT NEVER DISAPPEARS    "
          "    UNTIL THE NEXT REWIND    ", "U", BgKind::PlasmaFbm},
     }};
@@ -630,19 +690,31 @@ void ofApp::initDemos() {
          BgKind::Starfield},
     }};
 
-    // ─── 11 · FRACTAL DREAMS (KIFS) ─────────────────────────
-    demos_[10] = {"FRACTAL DREAMS", {
-        {"GENESIS",   18.0f, polSpe(),  SS::Neon,
-         "    *** FRACTAL DREAMS ***    BEGIN ITERATION 0    ", "J",
-         BgKind::Kifs},
-        {"FOLD",      35.0f, polSpe(),  SS::Wavy3D,
-         "    REFLECTION OF REFLECTION OF REFLECTION    "
-         "    AT EVERY SCALE THE SAME PATTERN    ", "S", BgKind::Kifs},
-        {"INFINITE",  40.0f, all(),     SS::Rainbow,
+    // ─── 11 · ESCHER DREAMS (formes impossibles + KIFS) ──────
+    demos_[10] = {"ESCHER DREAMS", {
+        {"GENESIS",     18.0f, polSpe(), SS::Neon,
+         "    *** ESCHER DREAMS ***    "
+         "    IMPOSSIBLE GEOMETRY AWAKENS    ", "J", BgKind::Kifs},
+        {"MOBIUS",      30.0f, polSpe(), SS::Wavy3D,
+         "    A MOBIUS STRIP    ONE SIDE ONE EDGE    "
+         "    WALK FOREVER YOU WILL NEVER LEAVE    ", "S",
+         BgKind::Mobius},
+        {"KLEIN",       30.0f, polSpe(), SS::Wavy3D,
+         "    A KLEIN BOTTLE    INSIDE IS OUTSIDE    "
+         "    THE FOURTH DIMENSION SHOWS ITS HAND    ", "S",
+         BgKind::Klein},
+        {"PENROSE",     25.0f, polSpe(), SS::Mirror,
+         "    THE PENROSE TRIANGLE    THREE BARS THREE LIES    "
+         "    GREETINGS TO M.C.ESCHER AND ROGER PENROSE    ", "L",
+         BgKind::Penrose},
+        {"BOYS",        25.0f, polSpe(), SS::Wavy3D,
+         "    BOYS SURFACE    NON ORIENTABLE    "
+         "    YOUR INTUITION FAILS HERE    ", "L", BgKind::Boys},
+        {"INFINITE",    25.0f, all(),    SS::Rainbow,
          "    THE FRACTAL HAS NO END    "
          "    GREETINGS TO INIGO QUILEZ AND KNIGHTY    ", "L",
          BgKind::Kifs},
-        {"COLLAPSE",  25.0f, polSpe(),  SS::Mirror,
+        {"COLLAPSE",    20.0f, polSpe(), SS::Mirror,
          "    AND THE FUNCTION RESETS    BACK TO X = 0 Y = 0    ", "J",
          BgKind::Starfield},
     }};
@@ -680,18 +752,24 @@ void ofApp::initDemos() {
          BgKind::Starfield},
     }};
 
-    // ─── 14 · CUBE STORM (tunnel cubes) ──────────────────────
+    // ─── 14 · CUBE STORM (geometry attack 3D) ────────────────
     demos_[13] = {"CUBE STORM", {
         {"INCOMING",  18.0f, polSpe(),   SS::Neon,
          "    *** CUBE STORM ***    SOMETHING APPROACHES    ", "Q",
          BgKind::TunnelCubes},
-        {"CASCADE",   45.0f, all(),      SS::Wavy3D,
-         "    THOUSANDS OF CUBES    EACH ONE A NOTE    "
-         "    THEY FALL THEY FLY THEY FALL AGAIN    ", "Q",
-         BgKind::TunnelCubes},
-        {"GEOMETRY",  35.0f, all(),      SS::Glitch,
-         "    EUCLIDEAN SPACE COLLAPSES    "
+        {"VECTOR",    25.0f, all(),      SS::Wavy3D,
+         "    VECTOR CUBES    REAL 3D MESH    "
+         "    EACH CUBE A SEPARATE EXISTENCE    ", "Q",
+         BgKind::VectorCubes},
+        {"ICOSAHEDRON",25.0f, polSpe(),  SS::Glitch,
+         "    PLATONIC SOLIDS RETURN    20 FACES OF GREEK GEOMETRY    ", "V",
+         BgKind::IcoMesh},
+        {"DODEC",     25.0f, polSpe(),   SS::Glitch,
+         "    THE DODECAHEDRON    12 PENTAGONS PERFECT    "
          "    GREETINGS TO FARBRAUSCH AND ANDROMEDA    ", "V",
+         BgKind::DodMesh},
+        {"CASCADE",   25.0f, all(),      SS::Wavy3D,
+         "    EUCLIDEAN SPACE COLLAPSES    THE CUBES SCATTER    ", "Q",
          BgKind::TunnelCubes},
         {"ZERO",      20.0f, polSpe(),   SS::Mirror,
          "    BACK TO ORIGIN    DIMENSION COLLAPSED    ", "J",
@@ -960,6 +1038,22 @@ void ofApp::drawScope4(int W, int H) {
         case BgKind::Caustics:    caustics_->draw(0, 0, W, H);    break;
         case BgKind::Vortex:      vortex_->draw(0, 0, W, H);      break;
         case BgKind::Octahedron:  octahedron_->draw(0, 0, W, H);  break;
+        case BgKind::VectorCubes: vectorCubes_->draw(0, 0, W, H); break;
+        case BgKind::Mobius:       modelMobius_->draw(0, 0, W, H);       break;
+        case BgKind::Klein:        modelKlein_->draw(0, 0, W, H);        break;
+        case BgKind::TrefoilTube:  modelTrefoil_->draw(0, 0, W, H);      break;
+        case BgKind::TwistedTorus: modelTwistedTorus_->draw(0, 0, W, H); break;
+        case BgKind::Lucy:         modelLucy_->draw(0, 0, W, H);         break;
+        case BgKind::Helix:        modelHelix_->draw(0, 0, W, H);        break;
+        case BgKind::Catenoid:     modelCatenoid_->draw(0, 0, W, H);     break;
+        case BgKind::Hyperboloid:  modelHyperboloid_->draw(0, 0, W, H);  break;
+        case BgKind::Boys:         modelBoys_->draw(0, 0, W, H);         break;
+        case BgKind::Lemniscate:   modelLemniscate_->draw(0, 0, W, H);   break;
+        case BgKind::Penrose:      modelPenrose_->draw(0, 0, W, H);      break;
+        case BgKind::Sphere3D:     modelSphere_->draw(0, 0, W, H);       break;
+        case BgKind::IcoMesh:      modelIco_->draw(0, 0, W, H);          break;
+        case BgKind::DodMesh:      modelDod_->draw(0, 0, W, H);          break;
+        case BgKind::TorusMesh:    modelTorus_->draw(0, 0, W, H);        break;
     }
 
     // 1bis) HUD pseudo-aléatoire de valeurs sub-10 Hz.
