@@ -103,8 +103,12 @@ void ofApp::setup() {
     gui_.add(sampleRateHz_.setup("Sample rate", 8000000, 1000000, 48000000));
     gui_.add(timeMsPerDiv_.setup("Time ms/div", 5.0f, 0.05f, 200.0f));
     gui_.add(scrollSpeed_.setup("Scroll", 1.0f, 0.0f, 1.0f));
+    // start() a déjà appelé configureDevice() avec sampleRateHz_=8e6 (valeur
+    // par défaut côté HantekDevice). On NE rappelle PAS setSampleRate ici :
+    // ça enverrait un control transfer 0xE2 pendant la première bulk transfer
+    // et désynchroniserait le FX2 (pixels 0/255 entrelacés -> écran "blanc").
     lastSampleRateApplied_ = sampleRateHz_;
-    scope_.setSampleRate(static_cast<uint32_t>(lastSampleRateApplied_));
+    pendingSampleRate_     = sampleRateHz_;
 
     // PostFx panel — placed to the right of the main GUI
     fxGui_.setup("post-fx", "fx-settings.xml", 230, 10);
@@ -190,9 +194,17 @@ void ofApp::applyOscFx() {
 
 void ofApp::update() {
     osc_.update();
-    // Re-apply sample rate to the scope when the slider changes.
-    if (sampleRateHz_ != lastSampleRateApplied_) {
-        lastSampleRateApplied_ = sampleRateHz_;
+    // Re-apply sample rate when the slider changes — debounce 250ms pour
+    // ne pas spammer le FX2 avec des control transfers pendant que l'user
+    // fait glisser le slider (chaque transfer désynchronise le bulk stream).
+    const int curSr = sampleRateHz_;
+    if (curSr != pendingSampleRate_) {
+        pendingSampleRate_   = curSr;
+        pendingSampleRateAt_ = ofGetElapsedTimef();
+    }
+    if (pendingSampleRate_ != lastSampleRateApplied_ &&
+        ofGetElapsedTimef() - pendingSampleRateAt_ > 0.25f) {
+        lastSampleRateApplied_ = pendingSampleRate_;
         scope_.setSampleRate(static_cast<uint32_t>(lastSampleRateApplied_));
     }
     // Push live timebase + scroll into WaveformVis.

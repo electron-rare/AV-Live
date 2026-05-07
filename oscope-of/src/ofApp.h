@@ -79,7 +79,9 @@ private:
     ofxIntSlider sampleRateHz_;
     ofxFloatSlider timeMsPerDiv_;
     ofxFloatSlider scrollSpeed_;
-    int lastSampleRateApplied_ = 0;
+    int   lastSampleRateApplied_ = 0;
+    int   pendingSampleRate_     = 0;
+    float pendingSampleRateAt_   = 0.0f;
     ofxLabel scopeStatusLabel_;
     ofxLabel oscStatusLabel_;
     ofxLabel modeLabel_;
