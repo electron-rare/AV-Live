@@ -579,7 +579,7 @@ void ofApp::initDemos() {
         {"BOOT",      15.0f, stars(),    SS::Glitch,
          "    **** COMMODORE 64 BASIC V2 ****    "
          "    64K RAM SYSTEM 38911 BASIC BYTES FREE    "
-         "    READY.    LOAD \"DEMO\",8,1    SEARCHING FOR DEMO    ", "M",
+         "    READY.    LOAD \"DEMO\",8,1    SEARCHING FOR DEMO    ", "N",
          BgKind::Starfield},
         {"PLASMA",    25.0f, all(),      SS::Wavy3D,
          "    *** PLASMA EFFECT ***    SID CHIP 6581 SCREAMING    "
@@ -766,7 +766,7 @@ void ofApp::initDemos() {
     demos_[9] = {"GREETINGS", {
         {"OPENING",    15.0f, stars(),  SS::Neon,
          "    *** GREETINGS FROM SAILLANS 2026 ***    "
-         "    *** AV-LIVE / L-ELECTRON RARE ***    ", "J",
+         "    *** AV-LIVE / L-ELECTRON RARE ***    ", "W",
          BgKind::Starfield},
         {"BOING BALL", 18.0f, all(),    SS::Bouncy,
          "    AMIGA SECTION    1984 BOING BALL    "
@@ -806,7 +806,7 @@ void ofApp::initDemos() {
     demos_[10] = {"ESCHER DREAMS", {
         {"GENESIS",     18.0f, polSpe(), SS::Neon,
          "    *** ESCHER DREAMS ***    "
-         "    IMPOSSIBLE GEOMETRY AWAKENS    ", "J", BgKind::Kifs},
+         "    IMPOSSIBLE GEOMETRY AWAKENS    ", "O", BgKind::Kifs},
         {"MOBIUS",      30.0f, polSpe(), SS::Wavy3D,
          "    A MOBIUS STRIP    ONE SIDE ONE EDGE    "
          "    WALK FOREVER YOU WILL NEVER LEAVE    ", "S",
@@ -834,7 +834,7 @@ void ofApp::initDemos() {
     // ─── 12 · INFERNO (Fire) ────────────────────────────────
     demos_[11] = {"INFERNO", {
         {"SPARK",     15.0f, stars(),   SS::Glitch,
-         "    *** INFERNO ***    A SPARK IGNITES    ", "T", BgKind::Fire},
+         "    *** INFERNO ***    A SPARK IGNITES    ", "E", BgKind::Fire},
         {"FLAME",     45.0f, all(),     SS::Glitch,
          "    THE FLAMES RISE    EVERY KICK FUELS THE BLAZE    "
          "    GREETINGS TO HARDCODE AND TITAN    ", "T", BgKind::Fire},
@@ -1008,17 +1008,20 @@ void ofApp::drawNarrativeOverlay(int W, int H) {
     ofDrawBitmapString(title, 0, 0);
     ofPopMatrix();
 
-    // Barre de progression
+    // Barre de progression — y=92 pour être sous le titre 2.5× (qui
+    // s'étend jusqu'à y≈80) sans chevauchement.
     const float barW = W - 200;
     ofSetColor(60, 130, 80, 140);
-    ofDrawRectangle(100, 70, barW, 3);
+    ofDrawRectangle(100, 92, barW, 3);
     ofSetColor(100, 220, 140, 220);
-    ofDrawRectangle(100, 70, barW * prog, 3);
+    ofDrawRectangle(100, 92, barW * prog, 3);
 
-    // Hint clavier
+    // Hint clavier — placé à H-78 pour ne pas chevaucher le hint FX
+    // (à H-50) ni l'overlay slots (H-22 à H-4).
     ofSetColor(200, 220, 220, 180);
-    ofDrawBitmapString("[1-9 0] demo   [enter] next act   [esc] live mode",
-                       100, H - 48);
+    ofDrawBitmapString("[1-9 0 ! @ # $ %] demo   [enter] next act   "
+                       "[esc / q] live mode",
+                       100, H - 78);
 
     ofDisableBlendMode();
     ofPopStyle();
