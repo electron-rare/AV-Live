@@ -7,12 +7,15 @@ void TunnelVis::setup(int w, int h) { w_ = w; h_ = h; reloadShaders(); }
 void TunnelVis::reloadShaders() { shader_.load("shaders/tunnel"); }
 
 void TunnelVis::update(const VisFrame& frame) {
+    // Fréquences extraites du signal Hantek (FFT du ring downsamplé).
+    // bpm/pad restent OSC car ce sont des métadonnées de timing/pad pas
+    // déductibles d'une FFT brute.
     bpm_   = frame.osc.bpm();
-    kick_  = frame.osc.amp("kick");
-    bass_  = frame.osc.amp("bass");
-    lead_  = frame.osc.amp("lead");
     pad_   = frame.osc.amp("pad");
-    snare_ = frame.osc.amp("snare");
+    kick_  = frame.bands.kick;
+    bass_  = frame.bands.bass;
+    lead_  = frame.bands.mid + frame.bands.treble * 0.5f;
+    snare_ = frame.bands.snare;
 
     // Direction : lerp lente vers +1 si la balance HF (lead) > LF (bass),
     // -1 sinon. Le signe contrôle le sens de défilement et le sens du twist.

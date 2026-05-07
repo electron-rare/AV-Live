@@ -217,7 +217,12 @@ void ofApp::update() {
     waveform_->setSampleRate(static_cast<float>(lastSampleRateApplied_));
     scope_.ring().readLatest(ch1_, ch2_, static_cast<std::size_t>(bufferSize_));
 
-    oscope::VisFrame frame{ch1_, ch2_, osc_};
+    // FFT audio depuis le ring Hantek (downsampled vers 48 kHz) pour les
+    // bandes bass/lowMid/mid/treble + transitoires kick/snare. Pilote
+    // les visualizers (Tunnel, Polar) sans dépendre de l'OSC.
+    audio_.update(ch1_, ch2_, static_cast<float>(lastSampleRateApplied_));
+
+    oscope::VisFrame frame{ch1_, ch2_, osc_, audio_.bands()};
     lissajous_->update(frame);
     spectro_->update(frame);
     reactive_->update(frame);

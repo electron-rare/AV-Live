@@ -11,9 +11,9 @@ void PolarVis::setup(int w, int h) {
 
 void PolarVis::update(const VisFrame& frame) {
     bpm_  = frame.osc.bpm();
-    kick_ = frame.osc.amp("kick");
-    bass_ = frame.osc.amp("bass");
-    lead_ = frame.osc.amp("lead");
+    kick_ = frame.bands.kick;
+    bass_ = frame.bands.bass;
+    lead_ = frame.bands.mid + frame.bands.treble * 0.5f;
 
     // Roll the trace forward, push new samples
     const std::size_t step = std::max<std::size_t>(1, trace1_.size() / 90);

@@ -55,6 +55,7 @@ private:
     oscope::HantekDevice scope_;
     oscope::OscClient osc_;
     oscope::PostFx postfx_;
+    oscope::AudioAnalyzer audio_;
 
     std::unique_ptr<oscope::LissajousVis>   lissajous_;
     std::unique_ptr<oscope::SpectrogramVis> spectro_;

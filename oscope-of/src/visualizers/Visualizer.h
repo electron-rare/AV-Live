@@ -2,6 +2,7 @@
 
 // Interface abstraite pour les 3 modes de visualisation.
 
+#include "../AudioAnalyzer.h"
 #include "../OscClient.h"
 #include "../ScopeData.h"
 
@@ -13,6 +14,7 @@ struct VisFrame {
     const std::vector<float>& ch1;
     const std::vector<float>& ch2;
     OscClient& osc;
+    const AudioBands& bands;   // FFT-derived bands depuis le signal Hantek
 };
 
 class Visualizer {
