@@ -1,9 +1,9 @@
-#version 120
-#extension GL_ARB_texture_rectangle : enable
+#version 150
 
 // Composite post-processing pass. Each effect is gated by an intensity
 // uniform — set to 0 to skip its branch. Order matters: spatial /
 // kaleido first (work in UV), then color / chromatic / glitch.
+// macOS GL 3.2 core : sampler2DRect + texture() (sans 2DRect).
 
 uniform sampler2DRect uScene;
 uniform sampler2DRect uPrev;
@@ -25,7 +25,8 @@ uniform float uFbRot;
 uniform float uGlitch;
 uniform float uGlitchProb;
 
-varying vec2 vTex;
+in  vec2 vTex;
+out vec4 fragColor;
 
 const float TAU = 6.2831853;
 
@@ -89,9 +90,9 @@ void main() {
     // 4. Chromatic aberration : RGB channels sampled at radial offsets
     vec2 dir = c * uChroma * 14.0;
     vec3 col;
-    col.r = texture2DRect(uScene, clamp(glUv + dir, vec2(0.0), uRes - 1.0)).r;
-    col.g = texture2DRect(uScene, glUv).g;
-    col.b = texture2DRect(uScene, clamp(glUv - dir, vec2(0.0), uRes - 1.0)).b;
+    col.r = texture(uScene, clamp(glUv + dir, vec2(0.0), uRes - 1.0)).r;
+    col.g = texture(uScene, glUv).g;
+    col.b = texture(uScene, clamp(glUv - dir, vec2(0.0), uRes - 1.0)).b;
 
     // 5. Glitch channel swap
     if (uGlitch > 0.55) {
@@ -105,7 +106,7 @@ void main() {
         float w = 4.0 + uBloom * 12.0;
         for (int i = -2; i <= 2; i++) {
             for (int j = -2; j <= 2; j++) {
-                vec3 s = texture2DRect(uScene,
+                vec3 s = texture(uScene,
                     clamp(uv + vec2(i, j) * w, vec2(0.0), uRes - 1.0)).rgb;
                 float lum = max(max(s.r, s.g), s.b);
                 bl += s * smoothstep(0.45, 1.0, lum);
@@ -133,7 +134,7 @@ void main() {
         fc = rot2(fc, uFbRot);
         fc += uRes * 0.5;
         fc = clamp(fc, vec2(0.0), uRes - 1.0);
-        vec3 prev = texture2DRect(uPrev, fc).rgb * 0.96;
+        vec3 prev = texture(uPrev, fc).rgb * 0.96;
         col = max(col, prev * uFeedback * 1.5);
     }
 
@@ -161,5 +162,5 @@ void main() {
     // valeur d'entrée 1.0 mappe à ~0.375, 5.0 à ~0.75, jamais à 1.0.
     col = (col * 0.6) / (1.0 + col * 0.6);
     col = clamp(col, 0.0, 1.0);
-    gl_FragColor = vec4(col, 1.0);
+    fragColor = vec4(col, 1.0);
 }

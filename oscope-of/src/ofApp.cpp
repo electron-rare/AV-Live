@@ -116,7 +116,7 @@ void ofApp::setup() {
     fxGui_.setup("post-fx", "fx-settings.xml", 230, 10);
     fxGui_.add(fxEnableToggle_.setup("enabled", true));
     fxGui_.add(fxChroma_.setup("chroma",     0.0f, 0.0f, 1.0f));
-    fxGui_.add(fxBloom_.setup("bloom",       0.4f, 0.0f, 1.0f));
+    fxGui_.add(fxBloom_.setup("bloom",       0.15f, 0.0f, 1.0f));
     fxGui_.add(fxRgbShift_.setup("hue rot",  0.0f, 0.0f, 1.0f));
     fxGui_.add(fxSat_.setup("saturation",    1.0f, 0.0f, 2.0f));
     fxGui_.add(fxScan_.setup("scanlines",    0.3f, 0.0f, 1.0f));

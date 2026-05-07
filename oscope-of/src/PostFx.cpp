@@ -34,7 +34,14 @@ void PostFx::resize(int w, int h) {
 }
 
 void PostFx::reloadShader() {
-    shader_.load("shaders/postfx");
+    const bool ok = shader_.load("shaders/postfx");
+    if (!ok || !shader_.isLoaded()) {
+        ofLogError("PostFx") << "shader postfx FAILED to load/compile — "
+                                "le tone-map ne s'appliquera pas, fallback "
+                                "= scène brute (peut paraître blanche).";
+    } else {
+        ofLogNotice("PostFx") << "shader postfx loaded OK";
+    }
 }
 
 void PostFx::beginScene() {

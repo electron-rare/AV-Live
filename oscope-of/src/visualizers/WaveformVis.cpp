@@ -163,27 +163,26 @@ void WaveformVis::draw(int x, int y, int w, int h) {
         ofEndShape(false);
     };
 
-    // Glow phosphor : 3 passes décalées en alpha
-    for (int pass = 3; pass >= 1; --pass) {
-        const float a = 30.0f * pass;
-        plot(trace1_, ofColor(0, 255, 140, static_cast<int>(a)), h * 0.30f);
-        plot(trace2_, ofColor(255, 200, 60, static_cast<int>(a)), h * 0.70f);
-    }
-
-    // Overlay trace lent — vue enveloppe / drift, traversant tout l'écran.
-    // Cyan épais semi-transparent, dessiné par-dessus les traces audio.
+    // Trace lent en arrière-plan (sous les traces audio) — vue enveloppe /
+    // drift, traversant tout l'écran. Cyan épais semi-transparent.
     if (showSlowOverlay_ && !slowTrace_.empty()) {
-        ofSetColor(120, 220, 255, 180);
-        ofSetLineWidth(3);
+        ofSetColor(80, 160, 200, 110);
+        ofSetLineWidth(4);
         ofBeginShape();
         const int n = static_cast<int>(slowTrace_.size());
         for (int i = 0; i < n; ++i) {
             const float px = x + (static_cast<float>(i) / (n - 1)) * w;
-            // l'overlay occupe 80% de la hauteur, centré
             const float py = y + h * 0.5f - slowTrace_[i] * (h * 0.40f);
             ofVertex(px, py);
         }
         ofEndShape(false);
+    }
+
+    // Glow phosphor : 3 passes décalées en alpha (au-dessus du slow trace)
+    for (int pass = 3; pass >= 1; --pass) {
+        const float a = 30.0f * pass;
+        plot(trace1_, ofColor(0, 255, 140, static_cast<int>(a)), h * 0.30f);
+        plot(trace2_, ofColor(255, 200, 60, static_cast<int>(a)), h * 0.70f);
     }
 
     // HUD
