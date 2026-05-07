@@ -38,7 +38,11 @@ struct MenuBarContent: View {
 
             HStack {
                 Button(action: processManager.openBrowser) {
-                    Label("Open in browser", systemImage: "safari")
+                    Label("Control", systemImage: "slider.horizontal.3")
+                }
+                .disabled(!processManager.webRunning)
+                Button(action: processManager.openHydra) {
+                    Label("Hydra", systemImage: "waveform")
                 }
                 .disabled(!processManager.webRunning)
                 Spacer()

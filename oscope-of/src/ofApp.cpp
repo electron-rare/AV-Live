@@ -291,12 +291,55 @@ void ofApp::draw() {
 
 void ofApp::drawHud() {
     ofPushStyle();
+
+    // Bottom-left : FPS + mode
     ofSetColor(180, 220, 200, 220);
     ofDrawBitmapString("FPS: " + ofToString(ofGetFrameRate(), 1),
                        12, ofGetHeight() - 28);
     ofDrawBitmapString(std::string("Mode: ") + modeName(mode_) +
         (postFxEnabled_ ? "  [fx ON]" : "  [fx OFF]"),
         12, ofGetHeight() - 12);
+
+    // Top-left : sound_algo state from /sync/* (album, melody, synthdef,
+    // bpm, beat). Boxed background so it stays readable over any visual.
+    const std::string& album = osc_.album();
+    const std::string& melody = osc_.melody();
+    const std::string& synthdef = osc_.synthdef();
+    const float bpm = osc_.bpm();
+    const int beat = osc_.beat();
+    const float kick = osc_.amp("kick");
+
+    std::vector<std::string> lines;
+    if (!album.empty())    lines.push_back("ALBUM   " + album);
+    if (!melody.empty())   lines.push_back("MELODY  " + melody);
+    if (!synthdef.empty()) lines.push_back("SYNTH   " + synthdef);
+    lines.push_back("BPM     " + ofToString(bpm, 1) +
+                    "   BEAT " + ofToString(beat));
+
+    if (!lines.empty()) {
+        const int padding = 8;
+        const int lineH = 14;
+        const int boxW = 280;
+        const int boxH = static_cast<int>(lines.size()) * lineH + padding * 2;
+        ofSetColor(0, 0, 0, 150);
+        ofDrawRectangle(12, 12, boxW, boxH);
+        ofSetColor(140, 200, 255, 60);
+        ofNoFill();
+        ofDrawRectangle(12, 12, boxW, boxH);
+        ofFill();
+        for (std::size_t i = 0; i < lines.size(); ++i) {
+            ofSetColor(220, 230, 240, 230);
+            ofDrawBitmapString(lines[i],
+                               12 + padding,
+                               12 + padding + 11 + static_cast<int>(i) * lineH);
+        }
+        // Beat indicator dot pulses on each beat (uses kick amp as proxy)
+        const float pulse = std::min(1.0f, kick * 2.0f);
+        ofSetColor(255, 180, 80, static_cast<int>(120 + pulse * 135.0f));
+        ofDrawCircle(12 + boxW - padding - 6, 12 + padding + 6,
+                     3.0f + pulse * 4.0f);
+    }
+
     ofPopStyle();
 }
 

@@ -114,7 +114,7 @@ final class ProcessManager: ObservableObject {
         if autoOpenBrowser {
             DispatchQueue.main.asyncAfter(deadline: .now() + 3.5) { [weak self] in
                 guard let self = self else { return }
-                if let url = URL(string: "http://localhost:\(self.webPort)/") {
+                if let url = URL(string: "http://localhost:\(self.webPort)/control/") {
                     NSWorkspace.shared.open(url)
                 }
             }
@@ -167,7 +167,13 @@ final class ProcessManager: ObservableObject {
     }
 
     func openBrowser() {
-        if let url = URL(string: "http://localhost:\(webPort)/") {
+        if let url = URL(string: "http://localhost:\(webPort)/control/") {
+            NSWorkspace.shared.open(url)
+        }
+    }
+
+    func openHydra() {
+        if let url = URL(string: "http://localhost:\(webPort)/hydra/") {
             NSWorkspace.shared.open(url)
         }
     }
