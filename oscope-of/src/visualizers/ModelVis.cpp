@@ -6,7 +6,8 @@ namespace oscope {
 
 void ModelVis::setup(int w, int h) {
     w_ = w; h_ = h;
-    if (!mesh_.load(plyPath_)) {
+    mesh_.load(plyPath_);
+    if (mesh_.getNumVertices() == 0) {
         ofLogError("ModelVis") << "load failed : " << plyPath_;
         return;
     }
