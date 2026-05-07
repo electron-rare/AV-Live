@@ -1415,8 +1415,10 @@ void ofApp::drawScope4(int W, int H) {
         }
         // Hints clavier
         ofSetColor(140, 220, 220, 180);
-        ofDrawBitmapString("[a z e r t y u i o p] = scenes   "
-                           "[s d f g h j k l m  w x c v b n , ;] = params   "
+        ofDrawBitmapString("[1-0 / & e \" ' ( s e ! c a] demos 0-9   "
+                           "[F6-F10] demos 10-14   "
+                           "[a z e r t y u i o p] scenes   "
+                           "[s d f g h j k l m / w x c v b n , ;] params   "
                            "[UP DOWN] adjust   [:] reset",
                            padX, rowY - 28);
         if (narrativeMode_ && currentDemo_ < (int)demos_.size()) {
@@ -1550,25 +1552,29 @@ void ofApp::keyPressed(int key) {
     // Touches 1..9 + 0 — lance une démoparty narrative complète.
     // 'q' reste libre pour le mode live (pas de scénario auto).
     switch (key) {
-        case '1': launchDemo(0); break;  // AMIGA TRIBUTE
-        case '2': launchDemo(1); break;  // C64 LOWLIFE
-        case '3': launchDemo(2); break;  // ACID JOURNEY
-        case '4': launchDemo(3); break;  // TUNNEL VISION
-        case '5': launchDemo(4); break;  // FREQUENCIES
-        case '6': launchDemo(5); break;  // GLITCH WORLD
-        case '7': launchDemo(6); break;  // AMBIENT VOID
-        case '8': launchDemo(7); break;  // RAVE
-        case '9': launchDemo(8); break;  // MEMORY LANE
-        case '0': launchDemo(9); break;  // GREETINGS
-        // Demos 11..15 — symboles. Shift+1..5 sur US (! @ # $ %),
-        // ou les chars correspondants sur AZERTY FR.
-        case '!': launchDemo(10); break;  // FRACTAL DREAMS
-        case '@': launchDemo(11); break;  // INFERNO
-        case '#': launchDemo(12); break;  // OUTRUN
-        case '$': launchDemo(13); break;  // CUBE STORM
-        case '%': launchDemo(14); break;  // GRAND FINAL
-        // Beat-sync toggle : quand actif, les démos lancent au prochain kick
-        case '*':
+        // Démos 0-9 : digits (avec shift sur Mac AZERTY FR) + chars
+        // AZERTY FR direct (sans shift) en alias.
+        case '1': case '&': launchDemo(0); break;  // AMIGA TRIBUTE
+        case '2': case 0xe9: launchDemo(1); break; // C64 (é)
+        case '3': case '"': launchDemo(2); break;  // ACID
+        case '4': case '\'':launchDemo(3); break;  // TUNNEL
+        case '5': case '(': launchDemo(4); break;  // FREQ
+        case '6': case 0xa7: launchDemo(5); break; // GLITCH (§)
+        case '7': case 0xe8: launchDemo(6); break; // AMBIENT (è)
+        // 8 sans shift = '!' sur AZERTY FR Mac → conflit ancien demo 10
+        case '8': launchDemo(7); break;            // RAVE
+        case '9': case 0xe7: launchDemo(8); break; // MEMORY (ç)
+        case '0': case 0xe0: launchDemo(9); break; // GREETINGS (à)
+        // Démos 10-14 : F6-F10 (universels, indépendants du layout).
+        case OF_KEY_F6:  launchDemo(10); break;    // FRACTAL DREAMS
+        case OF_KEY_F7:  launchDemo(11); break;    // INFERNO
+        case OF_KEY_F8:  launchDemo(12); break;    // OUTRUN
+        case OF_KEY_F9:  launchDemo(13); break;    // CUBE STORM
+        case OF_KEY_F10: launchDemo(14); break;    // GRAND FINAL
+        // '!' aussi pour AZERTY FR Mac (8 sans shift) -> demo 7 RAVE.
+        case '!': launchDemo(7); break;
+        // Beat-sync toggle. '*' (US) ou '\' (universel).
+        case '*': case '\\':
             beatSyncEnabled_ = !beatSyncEnabled_;
             if (!beatSyncEnabled_) pendingDemoIdx_ = -1;
             ofLogNotice("ofApp") << "beatSync " << (beatSyncEnabled_ ? "ON" : "OFF");
