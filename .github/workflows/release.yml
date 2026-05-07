@@ -25,9 +25,33 @@ jobs:
         with:
           xcode-version: latest-stable
 
-      - name: Install dependencies (libusb)
+      - name: Install build dependencies (libusb + create-dmg)
         run: |
           brew install libusb create-dmg
+
+      - name: Download SuperCollider 3.14
+        run: |
+          mkdir -p ~/sc-dl
+          curl -sL --max-time 300 -o ~/sc-dl/sc.dmg \
+            https://github.com/supercollider/supercollider/releases/download/Version-3.14.0/SuperCollider-3.14.0-macOS-universal.dmg
+          ls -lh ~/sc-dl/sc.dmg
+          hdiutil attach -nobrowse -quiet ~/sc-dl/sc.dmg
+          ls /Volumes/ | head -5
+          # Le volume s'appelle "SuperCollider 3.14.0" ou similaire
+          SC_VOL=$(ls /Volumes | grep -i SuperCollider | head -1)
+          mkdir -p ~/sc-extracted
+          cp -R "/Volumes/$SC_VOL/SuperCollider.app" ~/sc-extracted/
+          hdiutil detach "/Volumes/$SC_VOL" -quiet
+          ls -lh ~/sc-extracted/SuperCollider.app/Contents/MacOS/
+
+      - name: Download Node.js 20
+        run: |
+          mkdir -p ~/node-dl
+          curl -sL --max-time 120 -o ~/node-dl/node.tar.gz \
+            https://nodejs.org/dist/v20.18.0/node-v20.18.0-darwin-arm64.tar.gz
+          cd ~/node-dl
+          tar xzf node.tar.gz
+          ls -la node-v20.18.0-darwin-arm64/bin/node
 
       - name: Cache openFrameworks
         id: cache-of
@@ -72,13 +96,26 @@ jobs:
           ls -la "$GITHUB_WORKSPACE/oscope-of/bin/oscope-of.app/Contents/MacOS/" || true
           file "$GITHUB_WORKSPACE/oscope-of/bin/oscope-of.app/Contents/MacOS/oscope-of" || true
 
-      - name: Package data into .app bundle
+      - name: Bundle libusb into oscope-of.app + data/
         run: |
           cd "$GITHUB_WORKSPACE/oscope-of/bin"
-          # Copie le data/ à l'intérieur du bundle pour qu'il soit
-          # autonome (les shaders/models/sprites/greetings.txt soient
-          # accessibles depuis n'importe où).
-          cp -r data oscope-of.app/Contents/Resources/data || mkdir -p oscope-of.app/Contents/Resources/ && cp -r data oscope-of.app/Contents/Resources/
+          mkdir -p oscope-of.app/Contents/Frameworks oscope-of.app/Contents/Resources
+          # Copie data/ dans Resources
+          cp -r data oscope-of.app/Contents/Resources/
+          # Embarque libusb dans Frameworks et réécrit le rpath
+          BIN=oscope-of.app/Contents/MacOS/oscope-of
+          # Trouve le chemin du libusb actuellement linké
+          OLD_LIB=$(otool -L "$BIN" | awk '/libusb/{print $1; exit}')
+          if [ -n "$OLD_LIB" ] && [ -f "$OLD_LIB" ]; then
+            cp -L "$OLD_LIB" oscope-of.app/Contents/Frameworks/libusb-1.0.0.dylib
+            install_name_tool -change "$OLD_LIB" \
+              "@executable_path/../Frameworks/libusb-1.0.0.dylib" "$BIN"
+            echo "libusb bundled : $OLD_LIB → @executable_path/.."
+            otool -L "$BIN" | head -10
+          else
+            echo "warning: libusb not found in linker output"
+            otool -L "$BIN" | head -10
+          fi
 
       - name: Stage DMG payload
         run: |
@@ -94,38 +131,46 @@ jobs:
           fi
           # 3. sound_algo source (pour sclang)
           cp -R sound_algo payload/
-          # 4. INSTALL.txt avec prérequis et marche à suivre
+          # 4. SuperCollider.app bundled
+          cp -R ~/sc-extracted/SuperCollider.app payload/
+          # 5. node binary standalone (~70 MB)
+          mkdir -p payload/runtime
+          cp ~/node-dl/node-v20.18.0-darwin-arm64/bin/node payload/runtime/node
+          chmod +x payload/runtime/node
+          # 6. INSTALL.txt avec prérequis et marche à suivre
           cat > payload/INSTALL.txt <<'EOF'
-          AV-Live ${{ github.ref_name }}
-          ==============================
+          AV-Live ${{ github.ref_name }} — DMG TOUT-INCLUS
+          ================================================
 
-          Ce paquet contient :
-            - oscope-of.app          : visualizer 41 backgrounds + 15 demoparties
-            - AVLiveLauncher.app     : menubar coordinateur (si build OK)
-            - sound_algo/            : moteur SuperCollider (1099 SynthDef, 345 tracks)
-            - INSTALL.txt            : ce fichier
-
-          PREREQUIS (à installer manuellement, non bundlés ici) :
-            1. SuperCollider 3.14+
-                 brew install --cask supercollider
-                 OU télécharger : https://supercollider.github.io/downloads
-            2. Node.js (pour l'UI web :3000)
-                 brew install node
-            3. libusb (pour Hantek 6022BL, optionnel)
-                 brew install libusb
+          Ce paquet contient TOUT le nécessaire (rien à installer en plus) :
+            - oscope-of.app           visualizer (libusb bundled)
+            - AVLiveLauncher.app      menubar coordinateur
+            - SuperCollider.app       moteur audio 3.14 universel
+            - sound_algo/             1099 SynthDef + 345 tracks
+            - runtime/node            Node.js 20 standalone pour web UI
+            - INSTALL.txt             ce fichier
 
           INSTALLATION :
-            1. Copiez oscope-of.app et AVLiveLauncher.app dans /Applications
-            2. Copiez sound_algo/ dans ~/AV-Live/ (ou autre chemin de votre choix)
-            3. Au premier lancement, clic-droit > Ouvrir (Gatekeeper unsigned)
-            4. Le launcher autostart sclang + oscope-of + node web
+            1. Glissez le contenu du DMG dans un dossier (ex: ~/AV-Live/)
+               ou directement dans /Applications pour les .app
+            2. Premier lancement : clic-droit sur l'app > Ouvrir
+               (Gatekeeper unsigned, normal pour binaire open-source)
+            3. AVLiveLauncher démarre tout automatiquement :
+                 sclang (moteur audio) + oscope-of (visu) + node (web :3000)
 
-          DEMOPARTIES :
-            Touches 1-9, 0     -> 10 demos principales
-            Touches F6-F10     -> 5 demos additionnelles
-            Touche q / Esc     -> mode live (sphere wave 3D + override clavier)
+          UTILISATION :
+            Touches 1-9, 0     -> 10 demoparties principales
+            Touches F6-F10     -> 5 demoparties additionnelles
+            Touche q / Esc     -> mode live (sphere wave 3D)
+            Touches azertyuiop -> 10 backgrounds scènes
+            Touches s d f g h... -> 17 paramètres FX live
+            Flèches haut/bas   -> ajuste valeur paramètre sélectionné
 
-          Documentation complète : https://github.com/electron-rare/AV-Live
+          Hantek 6022BL (oscilloscope USB) supporté en option pour piloter
+          la visualisation depuis l'audio physique. Sans le scope, oscope-of
+          tourne quand même avec le signal OSC depuis sclang.
+
+          Documentation : https://github.com/electron-rare/AV-Live
           EOF
 
           create-dmg \
@@ -160,32 +205,27 @@ jobs:
           files: dist/*
           generate_release_notes: true
           body: |
-            # AV-Live ${{ github.ref_name }}
+            # AV-Live ${{ github.ref_name }} — DMG tout-inclus
 
-            Build automatique pour macOS (Apple Silicon).
+            Build automatique macOS (Apple Silicon). **Aucune dépendance à
+            installer**, tout est bundlé dans le DMG.
 
-            ## Contenu du DMG
+            ## Contenu
 
-            - `oscope-of.app` — visualizer (41 backgrounds, 15 demoparties, 35 modèles 3D)
+            - `oscope-of.app` — visualizer (41 bg, 15 demoparties, 35 modèles 3D, libusb bundled)
             - `AVLiveLauncher.app` — menubar coordinateur
-            - `sound_algo/` — moteur SuperCollider (1099 SynthDef, 345 tracks)
-            - `INSTALL.txt` — instructions complètes
-
-            ## Prérequis externes (à installer)
-
-            ```bash
-            brew install --cask supercollider     # moteur audio
-            brew install node libusb              # web UI + Hantek
-            ```
+            - `SuperCollider.app` — moteur audio 3.14 universel
+            - `sound_algo/` — 1099 SynthDef + 345 tracks SC
+            - `runtime/node` — Node.js 20 standalone
+            - `INSTALL.txt`
 
             ## Installation
 
             1. Téléchargez `AV-Live-${{ github.ref_name }}.dmg`
-            2. Glissez `oscope-of.app` + `AVLiveLauncher.app` dans `/Applications`
-            3. Copiez `sound_algo/` dans `~/AV-Live/sound_algo/`
-            4. **Premier lancement** : clic-droit sur l'app > Ouvrir (Gatekeeper non signé)
-            5. AVLiveLauncher démarre automatiquement sclang + oscope-of + node web
+            2. Glissez le contenu dans `~/AV-Live/` ou `/Applications`
+            3. **Premier lancement** : clic-droit sur l'app > Ouvrir (Gatekeeper non signé)
+            4. AVLiveLauncher démarre tout automatiquement
 
-            **Note** : binaire non signé Apple Developer. Avertissement Gatekeeper attendu au premier lancement.
+            **Note** : binaires non signés Apple Developer. Avertissement Gatekeeper attendu, c'est normal.
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
