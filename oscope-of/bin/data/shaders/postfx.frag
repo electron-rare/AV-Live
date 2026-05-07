@@ -157,7 +157,9 @@ void main() {
 
     // Final tone-map / clamp — without this, bloom + grain + feedback
     // saturate to pure white very quickly on bright visualizers.
-    col = col / (col + vec3(0.6));    // Reinhard-ish soft knee
+    // Reinhard avec exposition : col = (col*e) / (1 + col*e), e=0.6 → la
+    // valeur d'entrée 1.0 mappe à ~0.375, 5.0 à ~0.75, jamais à 1.0.
+    col = (col * 0.6) / (1.0 + col * 0.6);
     col = clamp(col, 0.0, 1.0);
     gl_FragColor = vec4(col, 1.0);
 }

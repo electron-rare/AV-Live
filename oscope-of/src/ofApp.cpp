@@ -102,7 +102,7 @@ void ofApp::setup() {
     gui_.add(trailFade_.setup("Trail fade", 0.07f, 0.0f, 1.0f));
     gui_.add(sampleRateHz_.setup("Sample rate", 8000000, 1000000, 48000000));
     gui_.add(timeMsPerDiv_.setup("Time ms/div", 5.0f, 0.05f, 200.0f));
-    gui_.add(scrollSpeed_.setup("Scroll", 0.0f, 0.0f, 1.0f));
+    gui_.add(scrollSpeed_.setup("Scroll", 1.0f, 0.0f, 1.0f));
     lastSampleRateApplied_ = sampleRateHz_;
     scope_.setSampleRate(static_cast<uint32_t>(lastSampleRateApplied_));
 

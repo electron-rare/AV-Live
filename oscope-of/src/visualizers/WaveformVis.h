@@ -42,7 +42,8 @@ private:
     // Time base — combien de millisecondes représente une division horizontale.
     float timeMsPerDiv_ = 5.0f;
     // 0 = freeze (capture par trame), 1 = scroll continu (oscilloscope rolling).
-    float scrollSpeed_  = 0.0f;
+    // Défaut = 1 pour que le trace soit live tant que le user ne touche à rien.
+    float scrollSpeed_  = 1.0f;
     // Hz — utilisé pour convertir ms/div en samples/div.
     float sampleRateHz_ = 8'000'000.0f;
 };
