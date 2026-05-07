@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="fr">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>sound_algo / web bridge</title>
+    <style>
+        :root { color-scheme: dark; }
+        body {
+            margin: 0;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            font-family: ui-sans-serif, system-ui, -apple-system, sans-serif;
+            background: #0b0b0f;
+            color: #e8e8e8;
+            text-align: center;
+            padding: 1.5rem;
+        }
+        h1 {
+            font-size: clamp(1.6rem, 4vw, 2.4rem);
+            margin: 0 0 0.4rem;
+            letter-spacing: -0.01em;
+        }
+        p { color: #9c9ca6; margin: 0 0 2rem; max-width: 520px; }
+        .links { display: flex; gap: 1rem; flex-wrap: wrap; justify-content: center; }
+        a.card {
+            display: block;
+            padding: 1.6rem 2rem;
+            border-radius: 12px;
+            border: 1px solid #2c2c36;
+            background: #14141c;
+            color: inherit;
+            text-decoration: none;
+            min-width: 220px;
+            transition: border-color .15s, transform .15s, background .15s;
+        }
+        a.card:hover {
+            border-color: #5b5bff;
+            background: #1b1b27;
+            transform: translateY(-2px);
+        }
+        a.card h2 { margin: 0 0 .25rem; font-size: 1.15rem; }
+        a.card span { color: #9c9ca6; font-size: .9rem; }
+        footer {
+            position: fixed;
+            bottom: 1rem;
+            color: #4d4d55;
+            font-size: .8rem;
+        }
+        code { background: #1b1b27; padding: .15em .4em; border-radius: 4px; font-size: .85em; }
+    </style>
+</head>
+<body>
+    <h1>sound_algo</h1>
+    <p>Pont web entre le navigateur et SuperCollider.<br/>
+    Lance <code>(~base ++ "web_bridge.scd").load</code> dans SC pour activer.</p>
+    <div class="links">
+        <a class="card" href="/control/">
+            <h2>Control surface</h2>
+            <span>Mixer · BPM · FX · tricks · step seq</span>
+        </a>
+        <a class="card" href="/hydra/">
+            <h2>Hydra visuals</h2>
+            <span>Live coding visuel synchronise audio</span>
+        </a>
+    </div>
+    <footer>Status : <span id="status">…</span></footer>
+    <script>
+        fetch("/api/health").then(r => r.json()).then(d => {
+            document.getElementById("status").textContent =
+                `bridge OK · SC ${d.sc.host}:${d.sc.portOut} · ${d.clients} client(s)`;
+        }).catch(() => {
+            document.getElementById("status").textContent = "bridge KO";
+        });
+    </script>
+</body>
+</html>

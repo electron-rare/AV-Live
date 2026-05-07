@@ -1,0 +1,68 @@
+// =====================================================================
+//  J12_ritual_bells.scd  --  Album J, track 12/15
+// =====================================================================
+
+// --- TRACK J12 : "RITUAL BELLS" 5 minutes ----------------------------
+//   0:00 drone gong -> 1:30 fmBell -> 3:00 handpan -> 4:00 outro
+(
+~track !? { ~track.stop };
+~track = Routine({
+    ~trackBegin !? { ~trackBegin.value };
+    "[J12 0:00] drone + gong rituel...".postln;
+    ~bpm = 70;
+    ~melodyInst = \drone; ~melodyAttack = 1.5; ~melodyRelease = 3.0;
+    ~melodyCutoff = 1500; ~melodyAmp = 0.20;
+    ~melodyNotes = [48,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0,
+                    48,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0];
+    ~kickSteps=(0!16); ~hatSteps=(0!16); ~snareSteps=(0!16);
+    ~clapSteps=(0!16); ~percSteps=(0!16); ~acidAmp=0;
+    TempoClock.default.tempo = ~bpm/60;
+    ~fxPreset !? { ~fxPreset.(\space) };
+    ~reload.value;
+    ~playActive !? { ~playActive.value } ?? { ~allSeqs.do { |k| Pdef(k).play } };
+    ~enableHarmony.(\cinematic);
+    Synth(\gong, [\freq, 60, \decay, 10, \amp, 0.5]);
+    45.wait;
+    Synth(\gong, [\freq, 50, \decay, 10, \amp, 0.5]);
+    45.wait;
+
+    "[J12 1:30] fmBell ceremonie...".postln;
+    ~melodyInst = \fmBell;
+    ~melodyAttack = 0.005; ~melodyRelease = 1.5; ~melodyCutoff = 5500;
+    ~melodyAmp = 0.20;
+    ~melodyNotes = [72,0,0,0, 75,0,0,0, 79,0,0,0, 72,0,0,0,
+                    77,0,0,0, 75,0,0,0, 72,0,0,0, 70,0,0,0];
+    ~reload.value;
+    90.wait;
+
+    "[J12 3:00] handpan rituel...".postln;
+    ~melodyInst = \handpan;
+    ~melodyAttack = 0.001; ~melodyRelease = 1.8; ~melodyCutoff = 5000;
+    ~melodyAmp = 0.22;
+    ~melodyNotes = [60,0,67,0, 70,0,72,0, 75,0,72,70, 67,0,63,60,
+                    63,0,67,0, 70,0,75,0, 79,0,75,72, 70,0,65,60];
+    ~reload.value;
+    12.do { |k|
+        if (0.20.coin) {
+            ~melodyNotes = ~mutate.(~melodyNotes, 0.2, ~scaleMinorPent);
+            ~reload.value;
+        };
+        5.wait;
+    };
+
+    "[J12 4:00] outro -- gong final...".postln;
+    Synth(\gong, [\freq, 40, \decay, 15, \amp, 0.6]);
+    ~melodyInst = \drone;
+    ~melodyAttack = 1.5; ~melodyRelease = 3.0;
+    ~reload.value;
+    20.do { |k|
+        var x = 1 - ((k + 1) / 20);
+        ~melodyAmp = x * 0.22; ~melodyCutoff = 200 + (x * 1000);
+        ~reload.value; 1.5.wait;
+    };
+    [\kickSeq, \hatSeq, \snareSeq, \clapSeq, \percSeq, \acidSeq, \melodySeq, \harmonySeq].do { |k| Pdef(k).stop };
+    ~fxPreset !? { ~fxPreset.(\dry) };
+    "[J12 5:00] === fin RITUAL BELLS ===".postln;
+}).play;
+"=== TRACK J12 : RITUAL BELLS 5 min lancee ===".postln;
+)

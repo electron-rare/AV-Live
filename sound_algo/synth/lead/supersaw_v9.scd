@@ -1,0 +1,25 @@
+// synth/lead/supersaw_v9.scd  --  SynthDef \supersaw_v9  // variation supersaw supersaw
+(
+SynthDef(\supersaw_v9, {
+    arg freq = 220, gate = 1, detune = 0.016, mix = 0.6,
+        cutoff = 5000, rq = 0.4,
+        attack = 0.02, decay = 0.2, sustain = 0.7, release = 0.5,
+        drive = 1.0, amp = 0.16, pan = 0,
+        scBus = 0, scAmt = 0.4;
+    var sig, env, duck, voices, center, sides;
+    voices = ((-4..4)).collect { |i|
+        Saw.ar(freq * (1 + (i * detune)))
+    };
+    center = voices[4];
+    sides = voices.removeAt(4);
+    sig = (center * (1 - mix)) + (Mix(voices) * mix * 0.18);
+    sig = LPF.ar(sig, cutoff);
+    sig = [DelayC.ar(sig, 0.03, SinOsc.kr(0.4, 0).range(0.005, 0.018)),
+           DelayC.ar(sig, 0.03, SinOsc.kr(0.5, pi).range(0.005, 0.018))];
+    env = EnvGen.kr(Env.adsr(attack, decay, sustain, release), gate, doneAction: 2);
+    sig = [(sig[0] * drive).tanh / drive.sqrt, (sig[1] * drive).tanh / drive.sqrt];
+    duck = 1 - (In.kr(scBus, 1) * scAmt);
+    sig = Balance2.ar(sig[0], sig[1], pan);
+    Out.ar(0, sig * env * amp * duck);
+}).add;
+)

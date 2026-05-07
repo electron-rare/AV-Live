@@ -1,0 +1,40 @@
+# Archives historiques (exclues du repo)
+_archive/
+
+# Caches
+.ruff_cache/
+.claude/cache/
+
+# Node.js
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.env
+.env.local
+
+# Logs de tests
+tests/.logs/
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# Editeurs
+*.swp
+*.swo
+*~
+.vscode/
+.idea/
+
+# SuperCollider artefacts
+*.scsyndef
+*.scd~
+
+# Debug probes (temporaires, snapshots OSC)
+_debug/
+
+# Settings Claude Code locaux
+.claude/settings.json
