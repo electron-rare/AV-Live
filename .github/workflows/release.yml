@@ -6,9 +6,12 @@ on:
       - 'v*'
   workflow_dispatch:    # bouton manuel dans l'UI GitHub
 
+permissions:
+  contents: write       # nécessaire pour créer/upload les releases
+
 jobs:
   build-mac:
-    runs-on: macos-14   # Apple Silicon (arm64), de_with optional fat build
+    runs-on: macos-14   # Apple Silicon (arm64)
     timeout-minutes: 60
 
     steps:
