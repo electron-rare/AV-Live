@@ -64,8 +64,12 @@ final class ProcessManager: ObservableObject {
 
         sclangPath = defaults.string(forKey: "sclangPath")
             ?? "/Applications/SuperCollider.app/Contents/MacOS/sclang"
+        // Prefer boot.scd (single-block, auto-executable by sclang CLI) over
+        // 00_load.scd which is split into ~32 IDE-only Cmd+Enter blocks.
+        let bootCandidate    = "\(avLive)/sound_algo/boot.scd"
+        let legacyCandidate  = "\(avLive)/sound_algo/00_load.scd"
         soundAlgoLoadFile = defaults.string(forKey: "soundAlgoLoadFile")
-            ?? "\(avLive)/sound_algo/00_load.scd"
+            ?? (fm.fileExists(atPath: bootCandidate) ? bootCandidate : legacyCandidate)
 
         // openFrameworks Release produces a .app bundle in bin/. Default to the
         // executable inside the bundle, with fallback to the bare binary if
@@ -215,6 +219,12 @@ final class ProcessManager: ObservableObject {
 
     func stopSclang() {
         sclangProc?.terminate()
+        // sclang's terminate doesn't always tear scsynth down cleanly —
+        // run a belt-and-braces pkill so the next boot can grab :57110.
+        let kill = Process()
+        kill.executableURL = URL(fileURLWithPath: "/usr/bin/pkill")
+        kill.arguments = ["-f", "scsynth"]
+        try? kill.run()
     }
 
     // MARK: - oscope-of

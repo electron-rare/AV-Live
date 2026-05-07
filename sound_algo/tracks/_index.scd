@@ -98,9 +98,13 @@
 
 
 // =====================================================================
-//  RACCOURCIS LIVE -- Cmd+Entree sur la ligne souhaitee
+//  RACCOURCIS LIVE -- Cmd+Entree sur la ligne souhaitee dans l'IDE.
+//  Commentes pour permettre `.load` de ce fichier sans erreur de parse :
+//  sclang refuse plusieurs blocs `(...)` top-level dans un meme load.
+//  Decommenter au besoin dans l'IDE.
 // =====================================================================
 
+/*
 ( ~listAlbums.(); )                      // liste les 23 albums
 ( ~listTracks.(\A); )                    // liste les 15 tracks de A
 ( ~listTracks.(\Q); )                    // liste les 15 tracks de Q
@@ -112,3 +116,4 @@
 ( ~playAlbum.(\A); )                     // album A en entier
 ( ~playAlbum.(\J); )                     // album J ambient
 ( ~stopAlbum.(); )                       // stop immediat
+*/
