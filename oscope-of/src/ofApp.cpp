@@ -326,25 +326,27 @@ void ofApp::drawScope4(int W, int H) {
     const float cy = H * 0.5f;
     const float minSide = static_cast<float>(std::min(W, H));
 
-    // 2) Polar central, focal — couleurs des pétales pilotées par les
-    //    fréquences (lead → hue rouge, bass → hue bleu profond).
-    const int   polarS = static_cast<int>(minSide * 0.55f);
+    // 2) Polar VRAIMENT central, focal — taille = 70% du min(W,H), centré
+    //    pile sur (cx, cy). Couleurs des pétales pilotées par les bands.
+    const int   polarS = static_cast<int>(minSide * 0.70f);
     polar_->draw(static_cast<int>(cx) - polarS / 2,
                  static_cast<int>(cy) - polarS / 2,
                  polarS, polarS);
 
-    // 3) Spectrogramme circulaire colorisé en anneau autour du Polar.
-    //    Pas de fond noir — alpha-blend par-dessus le Polar et le Tunnel.
-    const float ringInner = minSide * 0.30f;
-    const float ringOuter = minSide * 0.42f;
+    // 3) Spectrogramme circulaire en anneau juste à l'extérieur du Polar
+    //    (PolarVis::draw utilise radius = polarS*0.4 pour ses pétales,
+    //    soit 0.28 de minSide depuis le centre — l'anneau commence après).
+    const float ringInner = minSide * 0.32f;
+    const float ringOuter = minSide * 0.44f;
     spectro_->drawCircular(cx, cy, ringInner, ringOuter);
 
-    // 4) Deux satellites (Waveform + Lissajous) en orbite, BPM-driven.
+    // 4) Deux satellites (Waveform + Lissajous) en orbite à 180°, situés
+    //    AU-DELÀ de l'anneau spectro pour ne pas le couper.
     const float bpm   = osc_.bpm();
     const float orbit = ofGetElapsedTimef() * (0.04f + bpm * 0.0003f);
-    const float orbitR = minSide * 0.46f;
-    const int satW = static_cast<int>(W * 0.22f);
-    const int satH = static_cast<int>(H * 0.18f);
+    const float orbitR = minSide * 0.54f;
+    const int satW = static_cast<int>(minSide * 0.18f);
+    const int satH = static_cast<int>(minSide * 0.14f);
     oscope::Visualizer* sats[2] = { waveform_.get(), lissajous_.get() };
     for (int i = 0; i < 2; ++i) {
         const float a = orbit + i * PI;

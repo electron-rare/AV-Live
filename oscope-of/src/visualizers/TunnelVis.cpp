@@ -28,22 +28,29 @@ void TunnelVis::update(const VisFrame& frame) {
     const float speed = (0.6f + bpm_ * 0.012f + kick_ * 1.5f) * direction_;
     travel_ += static_cast<float>(ofGetLastFrameTime()) * speed;
 
-    // 3D — Banking (roll) : la nef s'incline en suivant la balance LF/HF
-    // signée, oscillation lente sinusoïdale + composante directe.
-    const float rollTarget = (lead_ - bass_) * 0.6f
-        + std::sin(ofGetElapsedTimef() * 0.7f) * 0.15f * (kick_ + 0.3f);
-    roll_ += (rollTarget - roll_) * 0.06f;
+    // 3D — Banking (roll) : la nef s'incline. Composante kinétique de base
+    // (oscillation sinusoïdale toujours présente) + composante audio.
+    const float t = ofGetElapsedTimef();
+    const float rollTarget = std::sin(t * 0.5f) * 0.35f
+        + (lead_ - bass_) * 1.2f
+        + std::sin(t * 1.7f) * 0.25f * (kick_ + 0.15f);
+    roll_ += (rollTarget - roll_) * 0.08f;
 
-    // 3D — Pan : kick déplace momentanément le point de fuite (impact),
-    // snare donne un offset latéral, pad un drift vertical lent.
-    const float panTargetX =
-        std::sin(ofGetElapsedTimef() * 0.4f) * 0.15f * pad_
-        + (snare_ - 0.5f) * 0.4f * snare_;
-    const float panTargetY =
-        std::cos(ofGetElapsedTimef() * 0.55f) * 0.10f * pad_
-        - kick_ * 0.25f;
-    panX_ += (panTargetX - panX_) * 0.10f;
-    panY_ += (panTargetY - panY_) * 0.10f;
+    // 3D — Pan : le vanishing point se déplace vraiment, en figure de
+    // Lissajous lente toujours active + impulsions sur kick/snare/bass.
+    // Amplitudes max ~0.55 (vs 0.15 avant) → mouvement franc.
+    const float baseX = std::sin(t * 0.31f) * 0.30f
+                      + std::sin(t * 0.83f) * 0.12f;
+    const float baseY = std::cos(t * 0.42f) * 0.25f
+                      + std::cos(t * 1.13f) * 0.10f;
+    const float panTargetX = baseX
+        + (snare_ - 0.4f) * 0.8f * snare_
+        + (lead_ - bass_) * 0.4f;
+    const float panTargetY = baseY
+        - kick_ * 0.6f
+        - bass_ * 0.3f;
+    panX_ += (panTargetX - panX_) * 0.12f;
+    panY_ += (panTargetY - panY_) * 0.12f;
 }
 
 void TunnelVis::draw(int x, int y, int w, int h) {
