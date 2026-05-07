@@ -329,35 +329,30 @@ void ofApp::drawScope4(int W, int H) {
     const float cy = H * 0.5f;
     const float minSide = static_cast<float>(std::min(W, H));
 
-    // 2) WAVEFORM circulaire FULLSCREEN — les CH1/CH2/slow sont des anneaux
-    //    concentriques qui font le tour complet (timeline → angle 0..2π).
-    //    Mode circular activé, le draw remplit tout l'écran derrière le
-    //    polar et le spectro ring.
-    waveform_->setCircular(true);
-    waveform_->draw(0, 0, W, H);
-
-    // 3) Polar central, focal, centré PILE sur le tunnel (cx, cy).
-    //    Couleurs des pétales par bands (bass→bleu, lead→rouge).
+    // 2) Polar central, focal, centré PILE sur le tunnel (cx, cy).
     const int polarS = static_cast<int>(minSide * 0.55f);
     polar_->draw(static_cast<int>(cx) - polarS / 2,
                  static_cast<int>(cy) - polarS / 2,
                  polarS, polarS);
 
-    // 4) Spectrogramme circulaire en anneau autour du polar.
+    // 3) Spectrogramme circulaire en anneau autour du polar.
     const float ringInner = minSide * 0.27f;
     const float ringOuter = minSide * 0.36f;
     spectro_->drawCircular(cx, cy, ringInner, ringOuter);
 
-    // 5) Lissajous en arrière-plan additif fullscreen pour le glow.
+    // 4) Lissajous additif fullscreen pour le glow ambiant (sous le scope).
     ofEnableBlendMode(OF_BLENDMODE_ADD);
     ofPushStyle();
-    ofSetColor(255, 255, 255, 90);
+    ofSetColor(255, 255, 255, 70);
     lissajous_->draw(0, 0, W, H);
     ofPopStyle();
     ofDisableBlendMode();
 
-    // Reset le flag circular pour que le mode Waveform standard (touche 5)
-    // garde son rendu CRT rectangulaire.
+    // 5) WAVEFORM circulaire FULLSCREEN, en PREMIER PLAN — look CRT rétro
+    //    avec phosphor additif, ticks de timeline, vignette interne. Les
+    //    rings CH1/CH2/slow font le tour complet (timeline → angle 0..2π).
+    waveform_->setCircular(true);
+    waveform_->draw(0, 0, W, H);
     waveform_->setCircular(false);
 }
 

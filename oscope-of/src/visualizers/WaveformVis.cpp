@@ -130,23 +130,52 @@ void WaveformVis::drawCircular(int cx, int cy, float baseR, float maxR) {
     ofPushMatrix();
     ofTranslate(cx, cy);
 
-    // Cercle de référence (timeline) — discret, pour donner une sensation
-    // d'horloge.
+    // Look CRT rétro : tout en blend additif pour que les traces se
+    // somment en luminance, comme un faisceau de phosphor.
+    ofEnableBlendMode(OF_BLENDMODE_ADD);
+
+    // Vignette interne CRT — très léger halo vert phosphor sur tout l'anneau.
     ofNoFill();
-    ofSetColor(0, 80, 50, 80);
+    ofSetLineWidth(1);
+    for (int g = 0; g < 8; ++g) {
+        const float t = g / 7.0f;
+        ofSetColor(0,
+                   static_cast<int>(60 + 50 * (1.0f - t)),
+                   static_cast<int>(40 + 30 * (1.0f - t)),
+                   static_cast<int>(8 + 12 * (1.0f - t)));
+        ofDrawCircle(0, 0, baseR + (maxR - baseR) * t);
+    }
+
+    // Timeline ticks — graduations toutes les 30° (12 ticks principaux,
+    // sous-ticks de 6° pour le reste). Donne l'impression d'un cadran d'osc.
+    ofSetColor(0, 130, 80, 90);
+    for (int i = 0; i < 60; ++i) {
+        const float a = static_cast<float>(i) / 60.0f * TWO_PI - HALF_PI;
+        const bool major = (i % 5 == 0);
+        const float r0 = maxR * (major ? 0.96f : 0.985f);
+        const float r1 = maxR;
+        ofSetLineWidth(major ? 2.0f : 1.0f);
+        ofSetColor(0, major ? 200 : 110, major ? 130 : 70,
+                   major ? 160 : 80);
+        ofDrawLine(std::cos(a) * r0, std::sin(a) * r0,
+                   std::cos(a) * r1, std::sin(a) * r1);
+    }
+
+    // Cercle de référence (la base de chaque trace) en vert phosphor sombre.
+    ofSetColor(0, 100, 60, 130);
     ofSetLineWidth(1);
     ofDrawCircle(0, 0, baseR);
 
+    // Plot ring : 5 passes glow (phosphor persistance) + trait fin central.
     auto plotRing = [&](const std::vector<float>& trace, ofColor base,
                         float radius, float ampScale) {
         const int n = static_cast<int>(trace.size());
         if (n < 2) return;
-        // Glow phosphor 3 passes
-        for (int pass = 3; pass >= 1; --pass) {
+        for (int pass = 5; pass >= 1; --pass) {
             ofColor c = base;
-            c.a = static_cast<unsigned char>(40 * pass);
+            c.a = static_cast<unsigned char>(28 * pass);
             ofSetColor(c);
-            ofSetLineWidth(2.0f * (4 - pass));
+            ofSetLineWidth(1.0f + 1.6f * (6 - pass));
             ofBeginShape();
             for (int i = 0; i < n; ++i) {
                 const float t = static_cast<float>(i) / (n - 1);
@@ -154,21 +183,35 @@ void WaveformVis::drawCircular(int cx, int cy, float baseR, float maxR) {
                 const float r = radius + trace[i] * ampScale;
                 ofVertex(std::cos(a) * r, std::sin(a) * r);
             }
-            ofEndShape(true);  // closed loop
+            ofEndShape(true);
         }
+        // Trait fin "beam" central, surluminescent
+        ofColor bright = base;
+        bright.a = 240;
+        ofSetColor(bright);
+        ofSetLineWidth(1);
+        ofBeginShape();
+        for (int i = 0; i < n; ++i) {
+            const float t = static_cast<float>(i) / (n - 1);
+            const float a = t * TWO_PI - HALF_PI;
+            const float r = radius + trace[i] * ampScale;
+            ofVertex(std::cos(a) * r, std::sin(a) * r);
+        }
+        ofEndShape(true);
     };
 
     const float band = (maxR - baseR);
-    // Ordre : slow trace en arrière-plan, puis CH1 puis CH2 par-dessus.
+    // Ordre : slow ring en arrière, CH1/CH2 par-dessus.
     if (showSlowOverlay_ && !slowTrace_.empty()) {
         plotRing(slowTrace_, ofColor(80, 160, 200), baseR + band * 0.05f,
-                 band * 0.45f);
+                 band * 0.40f);
     }
-    plotRing(trace1_, ofColor(0,   255, 140), baseR + band * 0.30f,
-             band * 0.20f);
-    plotRing(trace2_, ofColor(255, 200,  60), baseR + band * 0.65f,
-             band * 0.20f);
+    plotRing(trace1_, ofColor(80,  255, 160), baseR + band * 0.32f,
+             band * 0.22f);
+    plotRing(trace2_, ofColor(255, 210,  80), baseR + band * 0.68f,
+             band * 0.22f);
 
+    ofDisableBlendMode();
     ofPopMatrix();
     ofPopStyle();
 }
