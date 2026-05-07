@@ -31,8 +31,20 @@ final class ProcessManager: ObservableObject {
             ?? "/Applications/SuperCollider.app/Contents/MacOS/sclang"
         soundAlgoLoadFile = defaults.string(forKey: "soundAlgoLoadFile")
             ?? "\(home)/Documents/Projets/AV-Live/sound_algo/00_load.scd"
-        oscopePath = defaults.string(forKey: "oscopePath")
-            ?? "\(home)/Documents/Projets/AV-Live/oscope-of/bin/oscope-of"
+        // openFrameworks Release produces a .app bundle in bin/. Default to the
+        // executable inside the bundle, with fallback to the bare binary if
+        // the user built with a custom Makefile target.
+        let avLive = "\(home)/Documents/Projets/AV-Live/oscope-of"
+        let bundled = "\(avLive)/bin/oscope-of.app/Contents/MacOS/oscope-of"
+        let bare = "\(avLive)/bin/oscope-of"
+        let stored = defaults.string(forKey: "oscopePath")
+        if let s = stored, !s.isEmpty {
+            oscopePath = s
+        } else if FileManager.default.fileExists(atPath: bundled) {
+            oscopePath = bundled
+        } else {
+            oscopePath = bare
+        }
     }
 
     // MARK: - sclang
@@ -84,9 +96,7 @@ final class ProcessManager: ObservableObject {
         }
         let p = Process()
         p.executableURL = URL(fileURLWithPath: oscopePath)
-        p.currentDirectoryURL = URL(fileURLWithPath: oscopePath)
-            .deletingLastPathComponent()
-            .deletingLastPathComponent()
+        p.currentDirectoryURL = oscopeProjectRoot(from: oscopePath)
         attach(process: p, label: "oscope")
         do {
             try p.run()
@@ -107,6 +117,22 @@ final class ProcessManager: ObservableObject {
 
     func stopOscope() {
         oscopeProc?.terminate()
+    }
+
+    /// openFrameworks expects the working dir to be the project root (the
+    /// directory containing `bin/`) so it can find `bin/data/`. The binary
+    /// path can be either `<root>/bin/oscope-of` (bare) or
+    /// `<root>/bin/oscope-of.app/Contents/MacOS/oscope-of` (release bundle) —
+    /// walk up to the parent of `bin/` either way.
+    private func oscopeProjectRoot(from binaryPath: String) -> URL {
+        var url = URL(fileURLWithPath: binaryPath).deletingLastPathComponent()
+        while url.path != "/" {
+            if url.lastPathComponent == "bin" {
+                return url.deletingLastPathComponent()
+            }
+            url.deleteLastPathComponent()
+        }
+        return URL(fileURLWithPath: binaryPath).deletingLastPathComponent()
     }
 
     // MARK: - utilities

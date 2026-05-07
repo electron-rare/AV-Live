@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="35%" r="65%">
+      <stop offset="0" stop-color="#3b1e8c"/>
+      <stop offset="0.6" stop-color="#1a0b3d"/>
+      <stop offset="1" stop-color="#05021a"/>
+    </radialGradient>
+    <radialGradient id="electron" cx="50%" cy="40%" r="55%">
+      <stop offset="0"   stop-color="#fffae0"/>
+      <stop offset="0.45" stop-color="#ffd000"/>
+      <stop offset="1"   stop-color="#ff5500"/>
+    </radialGradient>
+    <radialGradient id="glow" cx="50%" cy="50%" r="50%">
+      <stop offset="0"   stop-color="#ffea00" stop-opacity="0.55"/>
+      <stop offset="1"   stop-color="#ffea00" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="blur" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="14"/>
+    </filter>
+  </defs>
+
+  <!-- macOS Big Sur rounded rect base -->
+  <rect x="64" y="64" width="896" height="896" rx="220" fill="url(#bg)"/>
+
+  <!-- Chaotic orbital ellipses (not concentric, "fou") -->
+  <g transform="translate(512 512)" stroke-width="7" fill="none" opacity="0.9">
+    <ellipse cx="0"   cy="-30" rx="400" ry="130" transform="rotate(18)"  stroke="#5cd0ff"/>
+    <ellipse cx="20"  cy="10"  rx="340" ry="220" transform="rotate(-37)" stroke="#a76dff"/>
+    <ellipse cx="-15" cy="40"  rx="395" ry="90"  transform="rotate(78)"  stroke="#ff5577"/>
+  </g>
+
+  <!-- Lightning bolts radiating outward -->
+  <g fill="none" stroke="#ffea00" stroke-width="16" stroke-linejoin="round" stroke-linecap="round">
+    <polyline points="220,200 330,310 270,330 410,470"/>
+    <polyline points="800,200 700,310 760,340 660,460"/>
+    <polyline points="200,810 300,720 260,690 380,590"/>
+    <polyline points="820,810 720,720 770,690 660,580"/>
+    <polyline points="500,140 540,260 500,260 540,360"/>
+    <polyline points="500,860 540,750 500,750 540,650"/>
+  </g>
+
+  <!-- Outer halo glow -->
+  <circle cx="512" cy="512" r="280" fill="url(#glow)" filter="url(#blur)"/>
+
+  <!-- Electron body -->
+  <circle cx="512" cy="512" r="170" fill="url(#electron)" stroke="#ff8800" stroke-width="5"/>
+
+  <!-- Crazy eyes: asymmetric pupils, looking different directions -->
+  <g>
+    <ellipse cx="448" cy="488" rx="44" ry="56" fill="#fff" stroke="#000" stroke-width="4"/>
+    <ellipse cx="576" cy="488" rx="44" ry="56" fill="#fff" stroke="#000" stroke-width="4"/>
+    <circle cx="430" cy="468" r="18" fill="#000"/>
+    <circle cx="592" cy="510" r="20" fill="#000"/>
+    <!-- highlight glints -->
+    <circle cx="425" cy="463" r="6" fill="#fff"/>
+    <circle cx="587" cy="505" r="6" fill="#fff"/>
+  </g>
+
+  <!-- Crazy tongue sticking out -->
+  <path d="M 470 575
+           Q 488 605 504 595
+           L 504 640
+           Q 504 660 522 660
+           Q 540 660 540 640
+           L 540 595
+           Q 555 605 572 575
+           Q 555 590 540 590
+           Q 525 590 512 588
+           Q 499 590 484 590
+           Q 469 590 470 575 Z"
+        fill="#ff4477" stroke="#000" stroke-width="4"/>
+  <line x1="522" y1="595" x2="522" y2="650" stroke="#000" stroke-width="3" opacity="0.4"/>
+
+  <!-- Scattered spark dots -->
+  <g fill="#ffea00">
+    <circle cx="280" cy="490" r="11"/>
+    <circle cx="745" cy="540" r="13"/>
+    <circle cx="430" cy="270" r="9"/>
+    <circle cx="610" cy="780" r="11"/>
+    <circle cx="180" cy="610" r="7"/>
+    <circle cx="860" cy="420" r="7"/>
+    <circle cx="350" cy="780" r="8"/>
+    <circle cx="700" cy="240" r="9"/>
+  </g>
+</svg>

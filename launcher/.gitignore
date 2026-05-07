@@ -3,3 +3,5 @@ build/
 .swiftpm/
 Package.resolved
 DerivedData/
+Resources/AppIcon.iconset/
+Resources/AppIcon.icns
