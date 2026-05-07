@@ -139,7 +139,9 @@ private:
 
     // Live FX selector : une lettre sélectionne un paramètre, flèches
     // haut/bas pour ajuster la valeur du paramètre sélectionné.
-    int  selectedFx_ = 0;   // 0..7, index dans l'array fxNames_
+    int  selectedFx_ = 0;   // 0..16, index du paramètre FX live actif
+    BgKind liveBg_ = BgKind::Tunnel;     // override du fond en mode live
+    bool   liveBgOverride_ = false;      // true = utiliser liveBg_
 
     void   initTransitions();
     void   beginTransition();

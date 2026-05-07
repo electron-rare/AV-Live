@@ -1119,16 +1119,20 @@ void ofApp::drawScope4(int W, int H) {
     demo_.bobsEnabled()      = scope4_.bobs;
     demo_.starfieldEnabled() = scope4_.starfield;
 
-    // 1) Fond : selon scène narrative active (BgKind), sinon tunnel/starfield
-    //    classique en mode live.
+    // 1) Fond : 3 sources priorité haute-bas :
+    //    1. mode narratif → scène active dicte le bg
+    //    2. liveBgOverride_ → bg sélectionné par l'utilisateur via touche
+    //    3. fallback toggles starfield/tunnel
     BgKind bg = BgKind::Tunnel;
     if (narrativeMode_ && currentDemo_ < (int)demos_.size() &&
         narrativeIdx_ < (int)demos_[currentDemo_].scenes.size()) {
         bg = demos_[currentDemo_].scenes[narrativeIdx_].background;
+    } else if (liveBgOverride_) {
+        bg = liveBg_;
     } else if (scope4_.starfield) {
         bg = BgKind::Starfield;
     } else if (!scope4_.tunnel) {
-        bg = BgKind::Tunnel; // pas de fond -> tunnel skip below
+        bg = BgKind::Tunnel;
     }
     switch (bg) {
         case BgKind::Tunnel:
@@ -1226,16 +1230,26 @@ void ofApp::drawScope4(int W, int H) {
         const int rowY = H - 22;
         const int padX = 14;
         ofSetColor(0, 0, 0, 0); // pure additif, pas de fond
+        const auto& pp = postfx_.params;
         struct Slot { const char* label; const char* key; float val; };
         Slot slots[] = {
             {"SPD",  "s", m.speed},
-            {"KCK",  "c", m.kickBoost},
-            {"ROLL", "l", m.rollAmp},
-            {"PAN",  "d", m.panAmp},
-            {"CRV",  "v", m.curveAmp},
-            {"TLX",  "x", m.tileX},
-            {"TLZ",  "z", m.tileZ},
-            {"DIR",  "n", m.dirLerp},
+            {"KCK",  "d", m.kickBoost},
+            {"ROL",  "f", m.rollAmp},
+            {"PAN",  "g", m.panAmp},
+            {"CRV",  "h", m.curveAmp},
+            {"TLX",  "j", m.tileX},
+            {"TLZ",  "k", m.tileZ},
+            {"DIR",  "l", m.dirLerp},
+            {"BLM",  "m", pp.bloom},
+            {"CHR",  "w", pp.chroma},
+            {"KAL",  "x", pp.kaleido},
+            {"SCN",  "c", pp.scanlines},
+            {"PIX",  "v", pp.pixelate},
+            {"HUE",  "b", pp.rgbShift},
+            {"GRN",  "n", pp.filmGrain},
+            {"VIG",  ",", pp.vignette},
+            {"SAT",  ";", pp.saturation},
         };
         const int nSlots = static_cast<int>(sizeof(slots) / sizeof(Slot));
         const int slotW = (W - padX * 2) / nSlots;
@@ -1274,10 +1288,11 @@ void ofApp::drawScope4(int W, int H) {
             ofSetColor(120, 200, 100, 130);
             ofDrawRectangle(sx + barW * 0.5f - 0.5f, rowY + 14, 1, 6);
         }
-        // Hints clavier centre haut + reset à droite
+        // Hints clavier
         ofSetColor(140, 220, 220, 180);
-        ofDrawBitmapString("[s c l d v x z n] select   "
-                           "[UP DOWN] adjust   [w] reset all",
+        ofDrawBitmapString("[a z e r t y u i o p] = scenes   "
+                           "[s d f g h j k l m  w x c v b n , ;] = params   "
+                           "[UP DOWN] adjust   [:] reset",
                            padX, rowY - 28);
         if (narrativeMode_ && currentDemo_ < (int)demos_.size()) {
             ofSetColor(255, 100, 200, 200);
@@ -1438,72 +1453,116 @@ void ofApp::keyPressed(int key) {
         case OF_KEY_RETURN:
             if (narrativeMode_) enterScene(narrativeIdx_ + 1);
             break;
-        // Sortir du mode narratif (mode live).
+        // === Layout AZERTY ===
+        // Top row AZERTYUIOP = 10 backgrounds live (override scope4 bg)
+        // Middle/bottom rows = paramètres FX (sélection + flèches up/down)
+        // System keys deplacés sur F-keys car letters reservées :
+        case OF_KEY_F1:
+            fullscreen_ = !fullscreen_; ofSetFullscreen(fullscreen_); break;
+        case OF_KEY_F2: showGui_ = !showGui_; break;
+        case OF_KEY_F3: fxEnableToggle_ = !fxEnableToggle_; break;
+        case OF_KEY_F4: autoGlitchOnKick_ = !autoGlitchOnKick_; break;
+        case OF_KEY_F5:
+            lissajous_->reloadShaders(); reactive_->reloadShaders();
+            plasma_->reloadShaders(); tunnel_->reloadShaders();
+            postfx_.reloadShader();
+            ofLogNotice("ofApp") << "Shaders rechargés"; break;
+        case ' ': postfx_.triggerGlitch(0.8f); break;
         case 'q':
         case OF_KEY_ESC:
             narrativeMode_ = false;
+            liveBgOverride_ = false;
             demo_.setText("");
             break;
-        case 'f':
-            fullscreen_ = !fullscreen_;
-            ofSetFullscreen(fullscreen_);
-            break;
-        case 'g': showGui_ = !showGui_; break;
-        case 'p': fxEnableToggle_ = !fxEnableToggle_; break;
-        case 'k': autoGlitchOnKick_ = !autoGlitchOnKick_; break;
-        case ' ': postfx_.triggerGlitch(0.8f); break;
 
-        case 'r':
-            lissajous_->reloadShaders();
-            reactive_->reloadShaders();
-            plasma_->reloadShaders();
-            tunnel_->reloadShaders();
-            postfx_.reloadShader();
-            ofLogNotice("ofApp") << "Shaders rechargés";
-            break;
+        // --- 10 backgrounds AZERTYUIOP ---
+        case 'a': liveBg_ = BgKind::BoingBall;   liveBgOverride_=true; break;
+        case 'z': liveBg_ = BgKind::Tunnel;      liveBgOverride_=true; break;
+        case 'e': liveBg_ = BgKind::Metaballs;   liveBgOverride_=true; break;
+        case 'r': liveBg_ = BgKind::Voronoi;     liveBgOverride_=true; break;
+        case 't': liveBg_ = BgKind::Twister;     liveBgOverride_=true; break;
+        case 'y': liveBg_ = BgKind::Kifs;        liveBgOverride_=true; break;
+        case 'u': liveBg_ = BgKind::Fire;        liveBgOverride_=true; break;
+        case 'i': liveBg_ = BgKind::Mode7;       liveBgOverride_=true; break;
+        case 'o': liveBg_ = BgKind::Octahedron;  liveBgOverride_=true; break;
+        case 'p': liveBg_ = BgKind::PlasmaC64;   liveBgOverride_=true; break;
 
-        // FX live — sélecteur 1 lettre = 1 paramètre, flèches haut/bas
-        // pour ajuster la valeur du paramètre sélectionné.
-        // Lettres mnémoniques (évite f g p k r b déjà bindés ailleurs) :
-        //   s = Speed (tunnel)
-        //   c = Crushing kick boost
-        //   l = roLL amplitude
-        //   d = pan amplitude (Drift)
-        //   v = curVe amplitude
-        //   x = tile X (angulaire)
-        //   z = tile Z (profondeur)
-        //   n = directioN lerp
-        case 's': selectedFx_ = 0; break;
-        case 'c': selectedFx_ = 1; break;
-        case 'l': selectedFx_ = 2; break;
-        case 'd': selectedFx_ = 3; break;
-        case 'v': selectedFx_ = 4; break;
-        case 'x': selectedFx_ = 5; break;
-        case 'z': selectedFx_ = 6; break;
-        case 'n': selectedFx_ = 7; break;
-        case 'w': {
+        // --- 17 paramètres FX (middle + bottom row) ---
+        // Tunnel mults (multiplicatifs ×0.83/×1.20, clamp 0.05..12)
+        case 's': selectedFx_ = 0;  break;  // Speed tunnel
+        case 'd': selectedFx_ = 1;  break;  // kick boost (D=Drum)
+        case 'f': selectedFx_ = 2;  break;  // roll amp (F=Flip)
+        case 'g': selectedFx_ = 3;  break;  // pan amp (G=Glide)
+        case 'h': selectedFx_ = 4;  break;  // curve amp (H=Hyperbolic)
+        case 'j': selectedFx_ = 5;  break;  // tileX (J)
+        case 'k': selectedFx_ = 6;  break;  // tileZ (K)
+        case 'l': selectedFx_ = 7;  break;  // dirLerp (L)
+        case 'm': selectedFx_ = 8;  break;  // bloom (M)
+        // PostFx params (additifs ±0.05, clamp 0..1)
+        case 'w': selectedFx_ = 9;  break;  // chroma (W)
+        case 'x': selectedFx_ = 10; break;  // kaleido (X)
+        case 'c': selectedFx_ = 11; break;  // scanlines (C=CRT)
+        case 'v': selectedFx_ = 12; break;  // pixelate (V)
+        case 'b': selectedFx_ = 13; break;  // hue rotation (B)
+        case 'n': selectedFx_ = 14; break;  // grain (N=Noise)
+        case ',': selectedFx_ = 15; break;  // vignette
+        case ';': selectedFx_ = 16; break;  // saturation
+        case ':': {
+            // Reset all FX (touche : = shift+. sur AZERTY)
             tunnel_->setMults(oscope::TunnelVis::Mults{});
+            postfx_.params.bloom    = 0.15f;
+            postfx_.params.chroma   = 0.0f;
+            postfx_.params.kaleido  = 0.0f;
+            postfx_.params.scanlines= 0.3f;
+            postfx_.params.pixelate = 0.0f;
+            postfx_.params.rgbShift = 0.0f;
+            postfx_.params.filmGrain= 0.15f;
+            postfx_.params.vignette = 0.5f;
+            postfx_.params.saturation = 1.0f;
             break;
         }
         case OF_KEY_UP:
         case OF_KEY_DOWN: {
-            auto m = tunnel_->mults();
             const bool up = (key == OF_KEY_UP);
-            auto bump = [&](float v) {
+            auto bumpMul = [&](float v) {
                 v *= up ? 1.20f : 0.83f;
                 return std::max(0.05f, std::min(12.0f, v));
             };
+            auto bumpAdd = [&](float v, float lo=0.0f, float hi=1.0f) {
+                v += up ? 0.05f : -0.05f;
+                return std::max(lo, std::min(hi, v));
+            };
+            auto m = tunnel_->mults();
+            auto& p = postfx_.params;
             switch (selectedFx_) {
-                case 0: m.speed     = bump(m.speed);     break;
-                case 1: m.kickBoost = bump(m.kickBoost); break;
-                case 2: m.rollAmp   = bump(m.rollAmp);   break;
-                case 3: m.panAmp    = bump(m.panAmp);    break;
-                case 4: m.curveAmp  = bump(m.curveAmp);  break;
-                case 5: m.tileX     = bump(m.tileX);     break;
-                case 6: m.tileZ     = bump(m.tileZ);     break;
-                case 7: m.dirLerp   = bump(m.dirLerp);   break;
+                case 0:  m.speed     = bumpMul(m.speed);     break;  // s
+                case 1:  m.kickBoost = bumpMul(m.kickBoost); break;  // d
+                case 2:  m.rollAmp   = bumpMul(m.rollAmp);   break;  // f
+                case 3:  m.panAmp    = bumpMul(m.panAmp);    break;  // g
+                case 4:  m.curveAmp  = bumpMul(m.curveAmp);  break;  // h
+                case 5:  m.tileX     = bumpMul(m.tileX);     break;  // j
+                case 6:  m.tileZ     = bumpMul(m.tileZ);     break;  // k
+                case 7:  m.dirLerp   = bumpMul(m.dirLerp);   break;  // l
+                case 8:  p.bloom     = bumpAdd(p.bloom);     break;  // m
+                case 9:  p.chroma    = bumpAdd(p.chroma);    break;  // w
+                case 10: p.kaleido   = bumpAdd(p.kaleido);   break;  // x
+                case 11: p.scanlines = bumpAdd(p.scanlines); break;  // c
+                case 12: p.pixelate  = bumpAdd(p.pixelate);  break;  // v
+                case 13: p.rgbShift  = bumpAdd(p.rgbShift);  break;  // b
+                case 14: p.filmGrain = bumpAdd(p.filmGrain); break;  // n
+                case 15: p.vignette  = bumpAdd(p.vignette);  break;  // ,
+                case 16: p.saturation= bumpAdd(p.saturation, 0.0f, 2.0f); break; // ;
             }
             tunnel_->setMults(m);
+            fxBloom_     = p.bloom;
+            fxChroma_    = p.chroma;
+            fxKaleido_   = p.kaleido;
+            fxScan_      = p.scanlines;
+            fxPixelate_  = p.pixelate;
+            fxRgbShift_  = p.rgbShift;
+            fxGrain_     = p.filmGrain;
+            fxVignette_  = p.vignette;
+            fxSat_       = p.saturation;
             break;
         }
         default: break;
