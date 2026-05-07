@@ -73,18 +73,31 @@ private:
     oscope::AudioAnalyzer audio_;
     oscope::DemoFx demo_;
 
-    // Toggles Scope4 — touches 1-9 + 0 reset.
+    // Toggles Scope4 — modulés par les presets demoparty 0-9.
     struct ScopeToggles {
-        bool tunnel       = true;   // 1 — tunnel 3D background
-        bool starfield    = false;  // 2 — starfield (remplace le tunnel)
-        bool scroller     = true;   // 3 — sine scroller greetings.txt
-        bool copperBars   = true;   // 4 — copper bars haut
-        bool bobs         = true;   // 5 — logo bobs
-        bool tunnelHud    = true;   // 6 — HUD aléatoire sub-10Hz
-        bool spectroRing  = true;   // 7 — spectro circular ring
-        bool polar        = true;   // 8 — polar central
-        bool waveform     = true;   // 9 — waveform circular CRT
+        bool tunnel       = true;
+        bool starfield    = false;
+        bool scroller     = true;
+        bool copperBars   = true;
+        bool bobs         = true;
+        bool tunnelHud    = true;
+        bool spectroRing  = true;
+        bool polar        = true;
+        bool waveform     = true;
     } scope4_;
+
+    // 10 demoparty presets — appliqués via touches 1..9 + 0.
+    // Chaque preset = nom + état toggles + style scroller + lettre album SC.
+    struct DemoPreset {
+        const char*           name;
+        ScopeToggles          toggles;
+        oscope::ScrollerStyle scroller;
+        const char*           albumLetter;  // A..W ou nullptr
+    };
+    DemoPreset presets_[10];
+    int presetIdx_ = 0;
+    void initPresets();
+    void applyPreset(int idx);
 
     std::unique_ptr<oscope::LissajousVis>   lissajous_;
     std::unique_ptr<oscope::SpectrogramVis> spectro_;

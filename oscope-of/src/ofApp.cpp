@@ -94,6 +94,7 @@ void ofApp::setup() {
     postfx_.setup(W, H);
 
     demo_.setup(ofToDataPath("greetings.txt", true));
+    initPresets();
 
     gui_.setup("oscope-of");
     gui_.add(modeLabel_.setup("Mode", modeName(mode_)));
@@ -308,6 +309,59 @@ void ofApp::drawHybrid(int W, int H) {
     spectro_->draw(0, H - sh, W, sh);
 }
 
+void ofApp::initPresets() {
+    using SS = oscope::ScrollerStyle;
+    auto allOn = []{ return ScopeToggles{}; };
+    auto onlyTunnel = []{
+        ScopeToggles s{};
+        s.starfield = false; s.spectroRing = false; s.polar = false;
+        s.waveform = false; s.bobs = false; s.copperBars = false;
+        return s;
+    };
+    auto cleanScope = []{
+        ScopeToggles s{};
+        s.tunnel = false; s.starfield = false; s.copperBars = false;
+        s.bobs = false; s.tunnelHud = false;
+        return s;
+    };
+    auto starOnly = []{
+        ScopeToggles s{};
+        s.tunnel = false; s.starfield = true; s.copperBars = false;
+        s.bobs = false; s.tunnelHud = false; s.polar = false;
+        s.spectroRing = false; s.waveform = true;
+        return s;
+    };
+
+    // 10 presets demoparty — chacun avec son ambiance + track SC associée.
+    presets_[0] = {"AMIGA",       allOn(),       SS::Classic,  "A"};  // acid
+    presets_[1] = {"C64",         allOn(),       SS::Wavy3D,   "M"};  // chiptune
+    presets_[2] = {"OLDSKOOL",    allOn(),       SS::Mirror,   "G"};  // detroit
+    presets_[3] = {"NEWSKOOL",    allOn(),       SS::Rainbow,  "L"};  // future garage
+    presets_[4] = {"TUNNEL",      onlyTunnel(),  SS::Classic,  "P"};  // industrial
+    presets_[5] = {"STARFIELD",   starOnly(),    SS::Neon,     "J"};  // ambient
+    presets_[6] = {"SCOPE",       cleanScope(),  SS::Classic,  "I"};  // dnb liquide
+    presets_[7] = {"CYBER",       allOn(),       SS::Glitch,   "V"};  // glitch idm
+    presets_[8] = {"VAPOR",       allOn(),       SS::Mirror,   "U"};  // vocal trance
+    presets_[9] = {"RAVE",        allOn(),       SS::Rainbow,  "T"};  // hardcore gabber
+
+    // Defaults : appliquer preset 0 au boot.
+    applyPreset(0);
+}
+
+void ofApp::applyPreset(int idx) {
+    if (idx < 0 || idx >= 10) return;
+    presetIdx_ = idx;
+    const auto& p = presets_[idx];
+    scope4_ = p.toggles;
+    demo_.setScrollerStyle(p.scroller);
+    if (p.albumLetter) {
+        osc_.sendControl("/control/playAlbum",
+                         std::string(p.albumLetter));
+    }
+    ofLogNotice("ofApp") << "preset " << idx << " : " << p.name
+                         << " -> album " << (p.albumLetter ?: "none");
+}
+
 void ofApp::drawTunnelHud(int W, int H) {
     const float now = ofGetElapsedTimef();
     const float dt  = ofGetLastFrameTime();
@@ -498,9 +552,13 @@ void ofApp::drawScope4(int W, int H) {
             ofSetColor(120, 200, 100, 130);
             ofDrawRectangle(sx + barW * 0.5f - 0.5f, rowY + 14, 1, 6);
         }
-        // Hint reset à droite
+        // Hint reset à droite + nom du preset courant en gros
         ofSetColor(140, 200, 200, 180);
-        ofDrawBitmapString("[w] reset", W - 90, rowY);
+        ofDrawBitmapString("[w] reset", W - 100, rowY);
+        ofSetColor(255, 100, 200, 200);
+        ofDrawBitmapString(std::string("[") +
+            ofToString(presetIdx_ < 9 ? presetIdx_ + 1 : 0) + "] " +
+            presets_[presetIdx_].name, W - 220, rowY - 18);
         ofDisableBlendMode();
         ofPopStyle();
     }
@@ -601,19 +659,19 @@ void ofApp::windowResized(int w, int h) {
 }
 
 void ofApp::keyPressed(int key) {
-    // Toggles Scope4 — touches 1..9 chacune un effet demoscene, 0 = reset.
-    auto resetToggles = [&]() { scope4_ = ScopeToggles{}; };
+    // Touches 1..9 + 0 — lance un preset demoparty (visuel + track SC).
+    // 'q' reste libre pour le mode live (pas de preset, contrôle manuel).
     switch (key) {
-        case '1': scope4_.tunnel       = !scope4_.tunnel;      break;
-        case '2': scope4_.starfield    = !scope4_.starfield;   break;
-        case '3': scope4_.scroller     = !scope4_.scroller;    break;
-        case '4': scope4_.copperBars   = !scope4_.copperBars;  break;
-        case '5': scope4_.bobs         = !scope4_.bobs;        break;
-        case '6': scope4_.tunnelHud    = !scope4_.tunnelHud;   break;
-        case '7': scope4_.spectroRing  = !scope4_.spectroRing; break;
-        case '8': scope4_.polar        = !scope4_.polar;       break;
-        case '9': scope4_.waveform     = !scope4_.waveform;    break;
-        case '0': resetToggles();                              break;
+        case '1': applyPreset(0); break;  // AMIGA + acid
+        case '2': applyPreset(1); break;  // C64 + chiptune
+        case '3': applyPreset(2); break;  // OLDSKOOL + detroit
+        case '4': applyPreset(3); break;  // NEWSKOOL + future garage
+        case '5': applyPreset(4); break;  // TUNNEL + industrial
+        case '6': applyPreset(5); break;  // STARFIELD + ambient
+        case '7': applyPreset(6); break;  // SCOPE + dnb liquide
+        case '8': applyPreset(7); break;  // CYBER + glitch idm
+        case '9': applyPreset(8); break;  // VAPOR + vocal trance
+        case '0': applyPreset(9); break;  // RAVE + hardcore gabber
         case 'f':
             fullscreen_ = !fullscreen_;
             ofSetFullscreen(fullscreen_);

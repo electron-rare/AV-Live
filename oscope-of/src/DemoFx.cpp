@@ -58,31 +58,88 @@ void DemoFx::drawScroller(int W, int H) {
     ofPushStyle();
     ofEnableBlendMode(OF_BLENDMODE_ADD);
 
-    // 4x scale via push matrix per char ; chaque char a un offset Y sin.
     const float scale  = 3.0f;
-    const float charW  = 8.0f * scale;   // bitmap 8px wide
+    const float charW  = 8.0f * scale;
     const float baseY  = H - 60.0f;
     const float amp    = 14.0f;
 
-    // Wrap : quand tout le texte est sorti à gauche, on remet à droite.
     const float fullW = charW * static_cast<float>(text_.size());
     if (scrollX_ < -fullW) scrollX_ = static_cast<float>(W);
+
+    auto drawChar = [&](char ch, float x, float y, float sx, float sy,
+                        float rot, ofColor col) {
+        ofSetColor(col);
+        ofPushMatrix();
+        ofTranslate(x, y);
+        if (rot != 0.0f) ofRotateRad(rot);
+        ofScale(sx, sy, 1.0f);
+        const char buf[2] = { ch, 0 };
+        ofDrawBitmapString(buf, 0, 0);
+        ofPopMatrix();
+    };
 
     for (std::size_t i = 0; i < text_.size(); ++i) {
         const float cx = scrollX_ + i * charW;
         if (cx < -charW || cx > W + charW) continue;
         const float wob = std::sin(t_ * 2.5f + i * 0.28f) * amp;
-        // Couleur cycle phosphor → ambre par index
-        const float hue = std::fmod(i * 4.0f + t_ * 25.0f, 60.0f) + 80.0f;
-        ofColor c;
-        c.setHsb(hue, 200.0f, 255.0f);
-        ofSetColor(c, 230);
-        ofPushMatrix();
-        ofTranslate(cx, baseY + wob);
-        ofScale(scale, scale, 1.0f);
-        const char buf[2] = { text_[i], 0 };
-        ofDrawBitmapString(buf, 0, 0);
-        ofPopMatrix();
+
+        switch (scrollerStyle_) {
+        case ScrollerStyle::Classic: {
+            const float hue = std::fmod(i * 4.0f + t_ * 25.0f, 60.0f) + 80.0f;
+            ofColor c; c.setHsb(hue, 200.0f, 255.0f); c.a = 230;
+            drawChar(text_[i], cx, baseY + wob, scale, scale, 0.0f, c);
+            break;
+        }
+        case ScrollerStyle::Wavy3D: {
+            const float pulse = 0.5f + 0.5f * std::sin(t_ * 3.0f + i * 0.45f);
+            const float sxv = scale * (0.6f + pulse * 0.9f);
+            const float syv = scale * (1.0f - pulse * 0.3f);
+            ofColor c; c.setHsb(140.0f + pulse * 60.0f, 200.0f, 255.0f); c.a = 220;
+            drawChar(text_[i], cx, baseY + wob, sxv, syv, 0.0f, c);
+            break;
+        }
+        case ScrollerStyle::Rainbow: {
+            const float hue = std::fmod(i * 12.0f + t_ * 60.0f, 255.0f);
+            ofColor c; c.setHsb(hue, 230.0f, 255.0f); c.a = 240;
+            drawChar(text_[i], cx, baseY + wob, scale, scale, 0.0f, c);
+            break;
+        }
+        case ScrollerStyle::Mirror: {
+            const float hue = std::fmod(i * 4.0f + t_ * 25.0f, 60.0f) + 80.0f;
+            ofColor c; c.setHsb(hue, 200.0f, 255.0f);
+            ofColor cTop = c; cTop.a = 230;
+            ofColor cBot = c; cBot.a = 90;
+            drawChar(text_[i], cx, baseY + wob, scale, scale, 0.0f, cTop);
+            // Reflet : translate Y de 2× scale + flip Y
+            drawChar(text_[i], cx, baseY + wob + 14.0f * scale,
+                     scale, -scale * 0.7f, 0.0f, cBot);
+            break;
+        }
+        case ScrollerStyle::Glitch: {
+            const float jx = std::sin(t_ * 60.0f + i * 1.7f) * 6.0f;
+            const float jy = std::cos(t_ * 73.0f + i * 2.1f) * 4.0f;
+            const bool corrupt = (std::sin(t_ * 11.0f + i * 0.6f) > 0.85f);
+            ofColor c;
+            c.setHsb(corrupt ? 0.0f : 180.0f, 230.0f,
+                     200.0f + 55.0f * (corrupt ? 1.0f : 0.0f));
+            c.a = 230;
+            drawChar(text_[i], cx + jx, baseY + wob + jy, scale, scale, 0.0f, c);
+            break;
+        }
+        case ScrollerStyle::Neon: {
+            // Outline cyan large + cœur magenta fin
+            ofColor outline(80, 220, 255, 110);
+            for (int dx = -1; dx <= 1; ++dx)
+                for (int dy = -1; dy <= 1; ++dy) {
+                    if (dx == 0 && dy == 0) continue;
+                    drawChar(text_[i], cx + dx * 2.0f, baseY + wob + dy * 2.0f,
+                             scale, scale, 0.0f, outline);
+                }
+            ofColor core(255, 100, 200, 240);
+            drawChar(text_[i], cx, baseY + wob, scale, scale, 0.0f, core);
+            break;
+        }
+        }
     }
     ofDisableBlendMode();
     ofPopStyle();

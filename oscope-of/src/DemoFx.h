@@ -15,6 +15,15 @@
 
 namespace oscope {
 
+enum class ScrollerStyle {
+    Classic,    // sine wave wobble (par défaut)
+    Wavy3D,     // sine + scale per char, effet de respiration 3D
+    Rainbow,    // hue cycle large par char (cycle complet sur le texte)
+    Mirror,     // classic + reflet vertical en bas avec gradient alpha
+    Glitch,     // jitter horizontal aléatoire + couleurs cassées
+    Neon        // double passe : outline cyan + cœur magenta
+};
+
 class DemoFx {
 public:
     void setup(const std::string& greetingsPath);
@@ -22,6 +31,8 @@ public:
 
     /// Scroller bas d'écran. Lit text_, défile, sine wave par char.
     void drawScroller(int W, int H);
+    void setScrollerStyle(ScrollerStyle s) { scrollerStyle_ = s; }
+    ScrollerStyle scrollerStyle() const { return scrollerStyle_; }
 
     /// Starfield 3D fullscreen (peut être utilisé en place du tunnel).
     void drawStarfield(int W, int H);
@@ -42,6 +53,7 @@ private:
     std::string text_;
     float       scrollX_ = 0.0f;
     bool        scrollerOn_ = true;
+    ScrollerStyle scrollerStyle_ = ScrollerStyle::Classic;
 
     // Starfield
     struct Star { float x, y, z; };
