@@ -19,18 +19,22 @@ public:
     void draw(int x, int y, int w, int h) override;
 
     // Live tweaks (driven by GUI sliders / OSC).
-    void setTimeMsPerDiv(float v) { timeMsPerDiv_ = std::max(0.05f, v); }
-    void setScrollSpeed(float v)  { scrollSpeed_  = std::max(0.0f, std::min(1.0f, v)); }
-    void setSampleRate(float hz)  { if (hz > 1.0f) sampleRateHz_ = hz; }
+    void setTimeMsPerDiv(float v)     { timeMsPerDiv_ = std::max(0.05f, v); }
+    void setSlowMsPerDiv(float v)     { slowMsPerDiv_ = std::max(1.0f, v); }
+    void setShowSlowOverlay(bool b)   { showSlowOverlay_ = b; }
+    void setScrollSpeed(float v)      { scrollSpeed_  = std::max(0.0f, std::min(1.0f, v)); }
+    void setSampleRate(float hz)      { if (hz > 1.0f) sampleRateHz_ = hz; }
 
 private:
     int   w_ = 0, h_ = 0;
     float phase_ = 0.0f;
     float beatPhase_ = 0.0f;
     int   prevBeat_ = 0;
-    // trace1_/trace2_ : fenêtre actuelle affichée (taille fixe)
+    // trace1_/trace2_ : fenêtre "audio" (timeMsPerDiv_), taille fixe
     std::vector<float> trace1_;
     std::vector<float> trace2_;
+    // slowTrace_ : même données mais fenêtre longue (slowMsPerDiv_), mono
+    std::vector<float> slowTrace_;
     // Ring d'historique pour le scrolling (plus long, on lit la queue)
     std::vector<float> ring1_;
     std::vector<float> ring2_;
@@ -40,7 +44,11 @@ private:
     float divY_ = 8.0f;
 
     // Time base — combien de millisecondes représente une division horizontale.
-    float timeMsPerDiv_ = 5.0f;
+    float timeMsPerDiv_     = 5.0f;
+    // Time base lent (overlay) — vue enveloppe / drift, lit le même ring
+    // mais avec une fenêtre bien plus longue, superposé au trace audio.
+    float slowMsPerDiv_     = 50.0f;
+    bool  showSlowOverlay_  = true;
     // 0 = freeze (capture par trame), 1 = scroll continu (oscilloscope rolling).
     // Défaut = 1 pour que le trace soit live tant que le user ne touche à rien.
     float scrollSpeed_  = 1.0f;

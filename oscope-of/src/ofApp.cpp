@@ -102,6 +102,8 @@ void ofApp::setup() {
     gui_.add(trailFade_.setup("Trail fade", 0.07f, 0.0f, 1.0f));
     gui_.add(sampleRateHz_.setup("Sample rate", 8000000, 1000000, 48000000));
     gui_.add(timeMsPerDiv_.setup("Time ms/div", 5.0f, 0.05f, 200.0f));
+    gui_.add(slowMsPerDiv_.setup("Slow ms/div", 50.0f, 5.0f, 500.0f));
+    gui_.add(slowOverlayEnabled_.setup("Slow overlay", true));
     gui_.add(scrollSpeed_.setup("Scroll", 1.0f, 0.0f, 1.0f));
     // start() a déjà appelé configureDevice() avec sampleRateHz_=8e6 (valeur
     // par défaut côté HantekDevice). On NE rappelle PAS setSampleRate ici :
@@ -209,6 +211,8 @@ void ofApp::update() {
     }
     // Push live timebase + scroll into WaveformVis.
     waveform_->setTimeMsPerDiv(timeMsPerDiv_);
+    waveform_->setSlowMsPerDiv(slowMsPerDiv_);
+    waveform_->setShowSlowOverlay(slowOverlayEnabled_);
     waveform_->setScrollSpeed(scrollSpeed_);
     waveform_->setSampleRate(static_cast<float>(lastSampleRateApplied_));
     scope_.ring().readLatest(ch1_, ch2_, static_cast<std::size_t>(bufferSize_));

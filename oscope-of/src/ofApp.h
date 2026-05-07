@@ -78,6 +78,8 @@ private:
     ofxFloatSlider trailFade_;
     ofxIntSlider sampleRateHz_;
     ofxFloatSlider timeMsPerDiv_;
+    ofxFloatSlider slowMsPerDiv_;
+    ofxToggle      slowOverlayEnabled_;
     ofxFloatSlider scrollSpeed_;
     int   lastSampleRateApplied_ = 0;
     int   pendingSampleRate_     = 0;

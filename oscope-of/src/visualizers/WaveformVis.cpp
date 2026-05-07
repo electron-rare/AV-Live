@@ -9,6 +9,7 @@ void WaveformVis::setup(int w, int h) {
     h_ = h;
     trace1_.assign(syntheticSize_, 0.0f);
     trace2_.assign(syntheticSize_, 0.0f);
+    slowTrace_.assign(syntheticSize_, 0.0f);
     // Ring d'historique : assez grand pour que le timebase puisse aller
     // jusqu'à ~125 ms à 8 MS/s (ou 1 s à 1 MS/s). 1 M floats ≈ 4 Mo par
     // canal, soit 8 Mo total — acceptable pour une vue scope live.
@@ -61,6 +62,31 @@ void WaveformVis::update(const VisFrame& frame) {
             const std::size_t idx = (off + k) % cap;
             trace1_[i] = ring1_[idx];
             trace2_[i] = ring2_[idx];
+        }
+
+        // Trace lente superposée — même ring, fenêtre slowMsPerDiv_×8 div.
+        // Pour ne pas afficher uniquement des pics, on prend le max-abs de
+        // chaque sous-tranche : envelope-style.
+        if (showSlowOverlay_) {
+            const float slowSec = (slowMsPerDiv_ * 0.001f) * divX_;
+            std::size_t slowWin = static_cast<std::size_t>(
+                std::max(static_cast<float>(winSamples + 1),
+                         std::min(static_cast<float>(cap),
+                                  slowSec * sampleRateHz_)));
+            const std::size_t soff = (cap + ringHead_ - slowWin) % cap;
+            const std::size_t bucket = std::max<std::size_t>(
+                1, slowWin / slowTrace_.size());
+            for (std::size_t i = 0; i < slowTrace_.size(); ++i) {
+                const std::size_t k0 = i * bucket;
+                float peak = 0.0f;
+                for (std::size_t j = 0; j < bucket; ++j) {
+                    const std::size_t idx = (soff + k0 + j) % cap;
+                    const float v = 0.5f * (ring1_[idx] + ring2_[idx]);
+                    const float av = v < 0.0f ? -v : v;
+                    if (av > peak) peak = (v < 0.0f) ? -av : av;
+                }
+                slowTrace_[i] = peak;
+            }
         }
         return;
     }
@@ -144,6 +170,22 @@ void WaveformVis::draw(int x, int y, int w, int h) {
         plot(trace2_, ofColor(255, 200, 60, static_cast<int>(a)), h * 0.70f);
     }
 
+    // Overlay trace lent — vue enveloppe / drift, traversant tout l'écran.
+    // Cyan épais semi-transparent, dessiné par-dessus les traces audio.
+    if (showSlowOverlay_ && !slowTrace_.empty()) {
+        ofSetColor(120, 220, 255, 180);
+        ofSetLineWidth(3);
+        ofBeginShape();
+        const int n = static_cast<int>(slowTrace_.size());
+        for (int i = 0; i < n; ++i) {
+            const float px = x + (static_cast<float>(i) / (n - 1)) * w;
+            // l'overlay occupe 80% de la hauteur, centré
+            const float py = y + h * 0.5f - slowTrace_[i] * (h * 0.40f);
+            ofVertex(px, py);
+        }
+        ofEndShape(false);
+    }
+
     // HUD
     ofSetColor(160, 220, 180);
     const float vdiv1 = 0.5f;
@@ -156,6 +198,11 @@ void WaveformVis::draw(int x, int y, int w, int h) {
                        x + 10, y + 64);
     ofDrawBitmapString("Sr   " + ofToString(sampleRateHz_ * 1e-6f, 1) + " MS/s",
                        x + 10, y + 80);
+    if (showSlowOverlay_) {
+        ofSetColor(120, 220, 255);
+        ofDrawBitmapString("Slow " + ofToString(slowMsPerDiv_, 1) + " ms/div",
+                           x + 10, y + 96);
+    }
 
     ofPopMatrix();
     ofPopStyle();
