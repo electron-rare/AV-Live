@@ -427,6 +427,64 @@ void ofApp::drawScope4(int W, int H) {
     ofPopStyle();
     ofDisableBlendMode();
 
+    // 4bis) Overlay des multiplicateurs FX (a→z) en bas d'écran, toujours
+    //       visible — phosphor vert, en blend additif pour s'intégrer.
+    {
+        const auto& m = tunnel_->mults();
+        ofPushStyle();
+        ofEnableBlendMode(OF_BLENDMODE_ADD);
+        const int rowY = H - 22;
+        const int padX = 14;
+        ofSetColor(0, 0, 0, 0); // pure additif, pas de fond
+        struct Slot { const char* label; const char* keys; float val; };
+        Slot slots[] = {
+            {"SPD", "a/z", m.speed},
+            {"KCK", "s/x", m.kickBoost},
+            {"ROLL","d/c", m.rollAmp},
+            {"PAN", "e/v", m.panAmp},
+            {"CRV", "t/n", m.curveAmp},
+            {"TLX", "u/m", m.tileX},
+            {"TLZ", "i/l", m.tileZ},
+            {"DIR", "o/h", m.dirLerp},
+        };
+        const int nSlots = static_cast<int>(sizeof(slots) / sizeof(Slot));
+        const int slotW = (W - padX * 2) / nSlots;
+        for (int i = 0; i < nSlots; ++i) {
+            const int sx = padX + i * slotW;
+            // Color glow par valeur : 1.0 = vert calme, > 1.0 vire ambre,
+            // < 1.0 vire bleu.
+            const float v = slots[i].val;
+            int rC = static_cast<int>(80 + std::max(0.0f, v - 1.0f) * 120);
+            int gC = 230;
+            int bC = static_cast<int>(80 + std::max(0.0f, 1.0f - v) * 120);
+            rC = std::min(255, rC);
+            bC = std::min(255, bC);
+            ofSetColor(rC, gC, bC, 200);
+            ofDrawBitmapString(slots[i].label, sx, rowY);
+            ofSetColor(rC, gC, bC, 140);
+            ofDrawBitmapString(slots[i].keys, sx, rowY + 12);
+            // Valeur en chiffre
+            ofSetColor(180, 255, 180, 230);
+            ofDrawBitmapString(ofToString(v, 2) + "x", sx + 28, rowY);
+            // Petite barre horizontale ; centre = 1.0, extrémités 0.05 / 12
+            const float barW = static_cast<float>(slotW - 12);
+            const float t = std::min(1.0f, std::max(0.0f,
+                std::log(v) / std::log(12.0f) * 0.5f + 0.5f));
+            ofSetColor(60, 130, 80, 90);
+            ofDrawRectangle(sx, rowY + 16, barW, 2);
+            ofSetColor(80, 220, 140, 200);
+            ofDrawRectangle(sx, rowY + 16, barW * t, 2);
+            // Marqueur central (= 1.0)
+            ofSetColor(120, 200, 100, 130);
+            ofDrawRectangle(sx + barW * 0.5f - 0.5f, rowY + 14, 1, 6);
+        }
+        // Hint reset à droite
+        ofSetColor(140, 200, 200, 180);
+        ofDrawBitmapString("[w] reset", W - 90, rowY);
+        ofDisableBlendMode();
+        ofPopStyle();
+    }
+
     // 5) WAVEFORM circulaire FULLSCREEN, en PREMIER PLAN — look CRT rétro
     //    avec phosphor additif, ticks de timeline, vignette interne. Les
     //    rings CH1/CH2/slow font le tour complet (timeline → angle 0..2π).
