@@ -531,10 +531,15 @@ void ofApp::initDemos() {
 
     // ─── 1 · AMIGA TRIBUTE ───────────────────────────────────
     demos_[0] = {"AMIGA TRIBUTE", {
-        {"INSERT DISK",  15.0f, stars(),     SS::Neon,
+        {"BOING BALL",   30.0f, all(),       SS::Bouncy,
+         "    *** BOING BALL ***    JULY 1984 RJ MICAL DALE LUCK    "
+         "    THE FIRST AMIGA DEMO    8 MERIDIANS RED AND WHITE    "
+         "    GREETINGS TO COMMODORE-AMIGA INC    ", "M",
+         BgKind::BoingBall},
+        {"INSERT DISK",  10.0f, stars(),     SS::Neon,
          "    *** AMIGA 500 RELOADED ***    KICKSTART 1.3    "
          "    INSERT WORKBENCH DISK ", "M", BgKind::Starfield},
-        {"BOING BALL",   30.0f, all(),       SS::Bouncy,
+        {"BOING BALL 2", 25.0f, all(),       SS::Bouncy,
          "    *** BOING BALL ***    JULY 1984 RJ MICAL DALE LUCK    "
          "    THE FIRST AMIGA DEMO    8 MERIDIANS RED AND WHITE    "
          "    GREETINGS TO COMMODORE-AMIGA INC    ", "M",

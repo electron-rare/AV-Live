@@ -9,7 +9,8 @@ uniform float uT;
 out vec4 fragColor;
 
 void main() {
-    vec2 px = gl_FragCoord.xy;
+    // Y-flip : gl_FragCoord est bottom-left, FBO content est top-left.
+    vec2 px = vec2(gl_FragCoord.x, uRes.y - gl_FragCoord.y);
     vec2 uv = px / uRes;
     // Wipe radial depuis le centre. À uT=0 : tout uPrev. À uT=1 : tout uCur.
     float d = length(uv - 0.5) * 1.5;     // 0 au centre, ~1 au coin
