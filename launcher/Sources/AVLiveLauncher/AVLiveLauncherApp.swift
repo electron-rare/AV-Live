@@ -55,6 +55,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 self?.processManager.startAll()
             }
         }
+
+        // Watch the sentinel file written by the web bridge's
+        // /control/rebootSclang handler — restarts sclang when touched.
+        processManager.startSentinelWatcher()
     }
 
     func applicationWillTerminate(_ notification: Notification) {

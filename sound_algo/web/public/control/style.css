@@ -1380,3 +1380,9 @@ kbd {
                 0 0 24px rgba(255, 194, 74, 0.55) !important;
     animation: armed-pulse 0.5s ease-in-out infinite alternate;
 }
+
+/* Smaller variant of warn button (scsynth reboot) */
+.btn.warn.small {
+    padding: 4px 8px;
+    font-size: 0.78rem;
+}

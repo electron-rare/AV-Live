@@ -190,9 +190,9 @@ thisProcess.openUDPPort(~webBridgeIn);
 
 ~webBridgeAdd.("/control/teardown", { ~teardown.() });
 
-// Reboot scsynth + replay setupAll (recharge engine + wrappers + tracks
-// + web_bridge). Conserve l'etat sclang (catalogues, dicts, OSCdef).
-// Le client web doit re-emettre listAlbums/Sections apres ~5s.
+// Reboot juste scsynth (audio engine). Conserve l'etat sclang
+// (catalogues, dicts, OSCdef). Le client web doit re-emettre
+// listAlbums/Sections apres ~5s via le retry persistant.
 ~webBridgeAdd.("/control/rebootServer", {
     "[web_bridge] /control/rebootServer reçu — quit puis ~setupAll".postln;
     Routine({
@@ -201,6 +201,20 @@ thisProcess.openUDPPort(~webBridgeIn);
         ~setupAll_done = nil;
         ~setupAll.();
     }).play(AppClock);
+});
+
+// Reboot complet sclang : suicide via pkill, le launcher detecte
+// l'exit et relance sclang via terminationHandler + wantsAutoRestart.
+~webBridgeAdd.("/control/rebootSclang", {
+    "[web_bridge] /control/rebootSclang reçu — sclang suicide en 0.5s...".postln;
+    AppClock.sched(0.5, {
+        // Touche un fichier sentinel que le launcher surveille
+        var sentinel = Platform.userHomeDir ++ "/.av-live-restart-sclang";
+        File.use(sentinel, "w") { |f| f.write("1") };
+        // Puis suicide
+        "pkill -TERM -f 'sclang.*boot.scd' 2>/dev/null".unixCmd;
+        nil;
+    });
 });
 
 // ---------- Mixer ----------------------------------------------------

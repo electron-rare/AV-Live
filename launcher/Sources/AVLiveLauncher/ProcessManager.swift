@@ -30,6 +30,7 @@ final class ProcessManager: ObservableObject {
     private var sclangProc: Process?
     private var oscopeProc: Process?
     private var webProc: Process?
+    private var sclangWantsRestart = false
     let osc = OSCSender(host: "127.0.0.1", port: 57121)
     private let logQueue = DispatchQueue(label: "cc.saillant.avlive.log")
     private let maxLogLines = 2000
@@ -264,6 +265,7 @@ final class ProcessManager: ObservableObject {
                 DispatchQueue.main.async {
                     self?.sclangProc = nil
                     self?.sclangRunning = false
+                    self?.maybeRestartSclang()
                 }
             }
             append(source: "launcher", text: "started sclang \(sclangPath) \(soundAlgoLoadFile)")
@@ -273,6 +275,7 @@ final class ProcessManager: ObservableObject {
     }
 
     func stopSclang() {
+        sclangWantsRestart = false
         sclangProc?.terminate()
         // sclang's terminate doesn't always tear scsynth down cleanly —
         // run a belt-and-braces pkill so the next boot can grab :57110.
@@ -280,6 +283,43 @@ final class ProcessManager: ObservableObject {
         kill.executableURL = URL(fileURLWithPath: "/usr/bin/pkill")
         kill.arguments = ["-f", "scsynth"]
         try? kill.run()
+    }
+
+    /// Restart sclang : fire and forget. Sets the auto-restart flag,
+    /// terminates the current process. terminationHandler observes the
+    /// flag and re-spawns after scsynth is reaped.
+    func restartSclang() {
+        guard sclangProc != nil else { startSclang(); return }
+        append(source: "launcher", text: "restarting sclang…")
+        sclangWantsRestart = true
+        stopSclang()
+        // stopSclang resets the flag — re-set it because we want restart
+        sclangWantsRestart = true
+    }
+
+    /// Watches the .av-live-restart-sclang sentinel file. Triggered by
+    /// the bridge's /control/rebootSclang OSC handler.
+    private var sentinelTimer: Timer?
+    func startSentinelWatcher() {
+        let path = FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent(".av-live-restart-sclang").path
+        sentinelTimer?.invalidate()
+        sentinelTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
+            if FileManager.default.fileExists(atPath: path) {
+                try? FileManager.default.removeItem(atPath: path)
+                self?.append(source: "launcher", text: "sentinel detected — restarting sclang")
+                self?.restartSclang()
+            }
+        }
+    }
+
+    private func maybeRestartSclang() {
+        guard sclangWantsRestart else { return }
+        sclangWantsRestart = false
+        // Small delay so scsynth pkill finishes and the audio device is free
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { [weak self] in
+            self?.startSclang()
+        }
     }
 
     // MARK: - oscope-of

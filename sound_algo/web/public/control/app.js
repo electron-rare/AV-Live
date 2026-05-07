@@ -647,12 +647,20 @@ function makeArmedButton(btn, options) {
   });
 }
 
-makeArmedButton(document.getElementById("btnReboot"), {
-  armedLabel: "CONFIRM ⟳ ?",
+makeArmedButton(document.getElementById("btnRebootScsynth"), {
+  armedLabel: "CONFIRM ?",
   armedClass: "warn",
   sendOnConfirm: () => send("/control/rebootServer"),
-  toastArmed: "REBOOT armed — click again within 2s",
-  toastFired: "Reboot scsynth sent"
+  toastArmed: "scsynth reboot armed — click again",
+  toastFired: "scsynth reboot sent"
+});
+
+makeArmedButton(document.getElementById("btnRebootSclang"), {
+  armedLabel: "CONFIRM sclang ?",
+  armedClass: "warn",
+  sendOnConfirm: () => send("/control/rebootSclang"),
+  toastArmed: "sclang reboot armed — full engine restart",
+  toastFired: "sclang reboot sent — engine restarting"
 });
 
 makeArmedButton(document.getElementById("btnTeardown"), {
