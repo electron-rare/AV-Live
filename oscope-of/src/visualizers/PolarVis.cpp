@@ -80,8 +80,18 @@ void PolarVis::draw(int x, int y, int w, int h) {
         }
         ofEndShape(true);
     };
-    drawPetal(trace1_, ofColor(120, 220, 255, 220));
-    drawPetal(trace2_, ofColor(255, 130, 200, 220));
+    // Couleurs des pétales pilotées par les fréquences :
+    //   trace1 = pétale "haute fréquence" → hue glisse rouge avec lead
+    //   trace2 = pétale "basse fréquence" → hue glisse bleu profond avec bass
+    ofColor c1, c2;
+    c1.setHsb(ofClamp(140.0f - lead_ * 140.0f, 0.0f, 255.0f),
+              200.0f, 200.0f + 55.0f * lead_);
+    c1.a = 220;
+    c2.setHsb(ofClamp(160.0f + bass_ * 60.0f, 0.0f, 255.0f),
+              200.0f, 200.0f + 55.0f * bass_);
+    c2.a = 220;
+    drawPetal(trace1_, c1);
+    drawPetal(trace2_, c2);
 
     // Inner glowing core, modulated by kick
     ofFill();

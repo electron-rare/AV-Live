@@ -314,51 +314,39 @@ void ofApp::drawPanelLabel(int x, int y, const char* title,
 }
 
 void ofApp::drawScope4(int W, int H) {
-    // 1) Tunnel fullscreen en fond — focal central, fréquences pilotent
-    //    tile size / direction / vitesse (cf. TunnelVis).
+    // 1) Tunnel fullscreen en fond — fréquences pilotent tile size / dir.
     tunnel_->draw(0, 0, W, H);
 
-    // 2) Spectrogramme circulaire colorisé par fréquence, centré.
-    //    Anneau de barres FFT, hue bleu→rouge, magnitude = longueur radiale.
     const float cx = W * 0.5f;
     const float cy = H * 0.5f;
-    const float ringInner = std::min(W, H) * 0.18f;
-    const float ringOuter = std::min(W, H) * 0.32f;
+    const float minSide = static_cast<float>(std::min(W, H));
+
+    // 2) Polar central, focal — couleurs des pétales pilotées par les
+    //    fréquences (lead → hue rouge, bass → hue bleu profond).
+    const int   polarS = static_cast<int>(minSide * 0.55f);
+    polar_->draw(static_cast<int>(cx) - polarS / 2,
+                 static_cast<int>(cy) - polarS / 2,
+                 polarS, polarS);
+
+    // 3) Spectrogramme circulaire colorisé en anneau autour du Polar.
+    //    Pas de fond noir — alpha-blend par-dessus le Polar et le Tunnel.
+    const float ringInner = minSide * 0.30f;
+    const float ringOuter = minSide * 0.42f;
     spectro_->drawCircular(cx, cy, ringInner, ringOuter);
 
-    // 3) Trois satellites en orbite autour du tunnel — leur position
-    //    tourne lentement en suivant le BPM. Chacun garde son rendu
-    //    interne (pas de rotation du contenu, juste de la position).
-    const float bpm  = osc_.bpm();
+    // 4) Deux satellites (Waveform + Lissajous) en orbite, BPM-driven.
+    const float bpm   = osc_.bpm();
     const float orbit = ofGetElapsedTimef() * (0.04f + bpm * 0.0003f);
-    const float orbitR = std::min(W, H) * 0.40f;
-    const int satW = static_cast<int>(W * 0.24f);
-    const int satH = static_cast<int>(H * 0.20f);
-
-    struct Satellite { oscope::Visualizer* vis; const char* tag; std::string metric; };
-    const float kick = osc_.amp("kick");
-    const float lead = osc_.amp("lead");
-    const float bass = osc_.amp("bass");
-    Satellite sats[3] = {
-        {waveform_.get(),  "WAVE  ",
-            ofToString(static_cast<float>(timeMsPerDiv_), 2) + " ms"},
-        {polar_.get(),     "POLAR ",
-            ofToString(bpm, 0) + " bpm k" + ofToString(kick, 1)},
-        {lissajous_.get(), "LISSA ",
-            "L" + ofToString(lead, 1) + " B" + ofToString(bass, 1)},
-    };
-    for (int i = 0; i < 3; ++i) {
-        const float a = orbit + i * (TWO_PI / 3.0f);
+    const float orbitR = minSide * 0.46f;
+    const int satW = static_cast<int>(W * 0.22f);
+    const int satH = static_cast<int>(H * 0.18f);
+    oscope::Visualizer* sats[2] = { waveform_.get(), lissajous_.get() };
+    for (int i = 0; i < 2; ++i) {
+        const float a = orbit + i * PI;
         const int sx = static_cast<int>(cx + std::cos(a) * orbitR - satW * 0.5f);
         const int sy = static_cast<int>(cy + std::sin(a) * orbitR - satH * 0.5f);
-        sats[i].vis->draw(sx, sy, satW, satH);
-        drawPanelLabel(sx + 6, sy + 6, sats[i].tag, sats[i].metric);
+        sats[i]->draw(sx, sy, satW, satH);
     }
-
-    // 4) Label central : tunnel infos
-    drawPanelLabel(static_cast<int>(cx) - 80, 6, "TUNNEL",
-        ofToString(bpm, 1) + " bpm  dir " +
-        ofToString((osc_.amp("lead") - osc_.amp("bass")), 2));
 }
 
 void ofApp::draw() {

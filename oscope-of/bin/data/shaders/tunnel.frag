@@ -18,9 +18,14 @@ uniform float uPad;
 //   uTileZ  — bass loud  → grosses tuiles axe Z (valeur basse, défaut 2)
 //   uTileX  — lead loud  → tuiles fines axe angulaire (valeur haute, défaut 16)
 //   uDirection — signe du défilement / twist (-1..+1)
+//   uRoll      — banking (rotation 2D du plan visible) en radians
+//   uPan       — décalage 2D du vanishing point (en unités d'écran -1..+1)
+//                permet de "virer" gauche/droite/haut/bas
 uniform float uTileZ;
 uniform float uTileX;
 uniform float uDirection;
+uniform float uRoll;
+uniform vec2  uPan;
 
 vec3 palette(float t) {
     return 0.5 + 0.5 * cos(6.28318 * (vec3(1.0) * t + vec3(0.0, 0.33, 0.67)));
@@ -29,6 +34,13 @@ vec3 palette(float t) {
 void main() {
     vec2 p = (gl_FragCoord.xy / uRes) * 2.0 - 1.0;
     p.x *= uRes.x / uRes.y;
+
+    // 3D camera orientation : banking (roll) + vanishing point shift (pan).
+    // Le roll donne l'illusion qu'on incline la nef, le pan déplace le
+    // point de fuite donc le tunnel tourne réellement.
+    float cr = cos(uRoll), sr = sin(uRoll);
+    p = vec2(cr * p.x - sr * p.y, sr * p.x + cr * p.y);
+    p -= uPan;   // décalage du vanishing point
 
     // Polar coords -> tunnel space
     float r = length(p);
