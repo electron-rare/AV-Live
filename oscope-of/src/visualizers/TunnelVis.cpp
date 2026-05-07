@@ -51,6 +51,18 @@ void TunnelVis::update(const VisFrame& frame) {
         - bass_ * 0.3f;
     panX_ += (panTargetX - panX_) * 0.12f;
     panY_ += (panTargetY - panY_) * 0.12f;
+
+    // Tournant — la phase de courbure avance avec la vitesse de défilement
+    // (corrélée à travel_) pour que le virage défile en même temps qu'on
+    // progresse. L'amplitude est pilotée par la balance LF/HF + un floor
+    // qui garantit qu'il y a toujours un léger virage.
+    const float dt = static_cast<float>(ofGetLastFrameTime());
+    curvePhase_ += dt * (1.2f + bpm_ * 0.005f) * direction_;
+    const float curveTarget = 0.04f
+        + std::abs(lead_ - bass_) * 0.10f
+        + bass_ * 0.12f
+        + std::sin(t * 0.21f) * 0.03f;
+    curveAmp_ += (curveTarget - curveAmp_) * 0.05f;
 }
 
 void TunnelVis::draw(int x, int y, int w, int h) {
@@ -82,6 +94,8 @@ void TunnelVis::draw(int x, int y, int w, int h) {
     shader_.setUniform1f("uDirection", direction_);
     shader_.setUniform1f("uRoll", roll_);
     shader_.setUniform2f("uPan",  panX_, panY_);
+    shader_.setUniform1f("uCurveAmp",   curveAmp_);
+    shader_.setUniform1f("uCurvePhase", curvePhase_);
     ofDrawRectangle(x, y, w, h);
     shader_.end();
 }

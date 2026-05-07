@@ -26,6 +26,12 @@ uniform float uTileX;
 uniform float uDirection;
 uniform float uRoll;
 uniform vec2  uPan;
+// Effet de tournant : courbure du tunnel en fonction de la profondeur.
+// uCurveAmp = intensité du virage (0 = ligne droite, 0.2 = serpentin franc)
+// uCurvePhase = phase courante (avance avec uTravel pour la sensation
+//                de progresser dans un virage qui défile)
+uniform float uCurveAmp;
+uniform float uCurvePhase;
 
 vec3 palette(float t) {
     return 0.5 + 0.5 * cos(6.28318 * (vec3(1.0) * t + vec3(0.0, 0.33, 0.67)));
@@ -42,7 +48,17 @@ void main() {
     p = vec2(cr * p.x - sr * p.y, sr * p.x + cr * p.y);
     p -= uPan;   // décalage du vanishing point
 
-    // Polar coords -> tunnel space
+    // Estimation de la profondeur (1/r) pour appliquer un offset de
+    // courbure qui grandit avec la distance — simulation d'un virage.
+    float r0 = length(p);
+    float d0 = 1.0 / max(r0, 0.001);
+    vec2 curve = vec2(
+        sin(d0 * 0.45 + uCurvePhase)        * uCurveAmp,
+        cos(d0 * 0.35 + uCurvePhase * 0.7)  * uCurveAmp * 0.6
+    );
+    p -= curve;
+
+    // Polar coords -> tunnel space (recalculées après la courbure)
     float r = length(p);
     float a = atan(p.y, p.x);
     if (r < 0.001) r = 0.001;
