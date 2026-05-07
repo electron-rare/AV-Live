@@ -94,8 +94,7 @@ void ofApp::setup() {
     postfx_.setup(W, H);
 
     demo_.setup(ofToDataPath("greetings.txt", true));
-    initPresets();
-    initNarrative();
+    initDemos();
 
     gui_.setup("oscope-of");
     gui_.add(modeLabel_.setup("Mode", modeName(mode_)));
@@ -311,195 +310,254 @@ void ofApp::drawHybrid(int W, int H) {
     spectro_->draw(0, H - sh, W, sh);
 }
 
-void ofApp::initNarrative() {
+void ofApp::initDemos() {
     using SS = oscope::ScrollerStyle;
-    auto onlyStars = []{
+    auto stars = []{
         ScopeToggles s{};
-        s.tunnel = false; s.starfield = true; s.copperBars = false;
-        s.bobs = false; s.tunnelHud = false; s.polar = false;
-        s.spectroRing = false; s.waveform = false;
+        s.tunnel=false; s.starfield=true; s.copperBars=false;
+        s.bobs=false; s.tunnelHud=false; s.polar=false;
+        s.spectroRing=false; s.waveform=false;
         return s;
     };
-    auto tunnelOnly = []{
+    auto starsWave = []{
         ScopeToggles s{};
-        s.starfield = false; s.spectroRing = false; s.polar = false;
-        s.waveform = false; s.bobs = false; s.copperBars = false;
-        s.tunnelHud = false; s.scroller = true;
+        s.tunnel=false; s.starfield=true; s.copperBars=false;
+        s.bobs=false; s.tunnelHud=false; s.polar=false;
+        s.spectroRing=false; s.waveform=true;
         return s;
     };
-    auto polarSpectro = []{
+    auto tunOnly = []{
         ScopeToggles s{};
-        s.tunnel = false; s.starfield = false; s.copperBars = false;
-        s.bobs = false; s.tunnelHud = false; s.waveform = false;
+        s.starfield=false; s.spectroRing=false; s.polar=false;
+        s.waveform=false; s.bobs=false; s.copperBars=false;
+        s.tunnelHud=false;
         return s;
     };
-    auto everything = []{ return ScopeToggles{}; };
-    auto outro = []{
+    auto polSpe = []{
         ScopeToggles s{};
-        s.tunnel = false; s.starfield = true; s.copperBars = false;
-        s.bobs = false; s.tunnelHud = false; s.polar = false;
-        s.spectroRing = false; s.waveform = true;
+        s.tunnel=false; s.starfield=false; s.copperBars=false;
+        s.bobs=false; s.tunnelHud=false; s.waveform=false;
         return s;
     };
+    auto cleanScope = []{
+        ScopeToggles s{};
+        s.tunnel=false; s.starfield=false; s.copperBars=false;
+        s.bobs=false; s.tunnelHud=false;
+        return s;
+    };
+    auto all = []{ return ScopeToggles{}; };
 
-    narrativeScenes_ = {
-        // Acte I — Réveil
-        {"INTRO",    25.0f, onlyStars(),    SS::Neon,
-         "    *** AV-LIVE PRESENTS *** A LIVE PERFORMANCE FROM NOWHERE *** "
-         "    THE SIGNAL IS QUIET. THE STARS ARE WAITING. WAKE UP. ",
-         "J"}, // ambient_cinematic
-        // Acte II — Premier battement
-        {"FIRST PULSE", 35.0f, tunnelOnly(), SS::Classic,
-         "    A BEAT BEGINS    SOMETHING FAR AWAY    THE TUNNEL OPENS    "
-         "    DEEP AND ECHOING    INDUSTRIAL HEARTBEAT BREATHING    ",
-         "P"}, // industrial
-        // Acte III — Émergence
-        {"FREQUENCIES",  45.0f, polarSpectro(), SS::Wavy3D,
-         "    FREQUENCIES TAKE SHAPE    BASS WHISPERS BLUE    "
-         "    LEAD CRIES RED    THE SPECTRUM ANSWERS    EVERY HZ MATTERS    ",
-         "G"}, // detroit_soulful
-        // Acte IV — Plein régime
-        {"FULL POWER",   55.0f, everything(),    SS::Rainbow,
-         "    FULL POWER    EVERY ELEMENT ALIVE    "
-         "    GREETINGS TO ALL THE LIVE CODERS    THE SCENE IS YOURS    "
-         "    AV-LIVE / SAILLANS 2026 ",
-         "T"}, // hardcore_gabber
-        // Acte V — Dérive cyber
-        {"GLITCH",       40.0f, everything(),    SS::Glitch,
-         "    SIGNAL CORRUPTED    BUT THE BEAT GOES ON    "
-         "    REALITY GLITCHES    BUFFER OVERFLOW    CYBER REIGN    ",
-         "V"}, // glitch_idm
-        // Acte VI — Outro
-        {"OUTRO",        30.0f, outro(),         SS::Mirror,
-         "    THANK YOU FOR WATCHING    GREETINGS FROM AV-LIVE    "
-         "    UNTIL NEXT TIME    KEEP THE PHOSPHOR GLOWING    ",
-         "U"}, // vocal_trance
-    };
+    demos_.clear();
+    demos_.resize(10);
+
+    // ─── 1 · AMIGA TRIBUTE ───────────────────────────────────
+    demos_[0] = {"AMIGA TRIBUTE", {
+        {"INSERT DISK",  18.0f, stars(),     SS::Neon,
+         "    *** AMIGA 500 RELOADED ***    KICKSTART 1.3    "
+         "    INSERT WORKBENCH DISK ", "M"},
+        {"SCROLLZ",      35.0f, all(),       SS::Classic,
+         "    GREETINGS FROM 1989    COPPER BARS AND BOBS FOREVER    "
+         "    AMIGA NEVER DIES    HELLO TO ALL DEMOSCENE VETERANS    ", "M"},
+        {"COPPER STORM", 30.0f, all(),       SS::Rainbow,
+         "    COPPER LIST IS POETRY    EVERY SCANLINE A NEW COLOR    ", "G"},
+    }};
+
+    // ─── 2 · C64 LOWLIFE ─────────────────────────────────────
+    demos_[1] = {"C64 LOWLIFE", {
+        {"BOOT",     15.0f, stars(),    SS::Glitch,
+         "    READY.    LOAD \"DEMO\",8,1    SEARCHING FOR DEMO    ", "M"},
+        {"PIXEL",    35.0f, all(),      SS::Wavy3D,
+         "    8 BIT FOREVER    SID CHIP SCREAMING    "
+         "    THE FUTURE WAS LOFI ALL ALONG    ", "M"},
+        {"CLIMAX",   30.0f, all(),      SS::Glitch,
+         "    BREADBIN STILL ALIVE    NTSC COLORS DRIFTING    ", "V"},
+    }};
+
+    // ─── 3 · ACID JOURNEY ────────────────────────────────────
+    demos_[2] = {"ACID JOURNEY", {
+        {"DROP IN",    20.0f, stars(),   SS::Neon,
+         "    THE ACID IS KICKING IN    303 STARTING TO CRY    ", "A"},
+        {"303 LOOP",   45.0f, all(),     SS::Wavy3D,
+         "    SQUELCH OF THE 303    FOREVER ASCENDING    "
+         "    THE PATTERN NEVER REPEATS    HUE CYCLES IN OUR EYES    ", "A"},
+        {"PEAK",       40.0f, all(),     SS::Rainbow,
+         "    FULL ACID    NEURONS DANCING    REALITY MELTING    ", "H"},
+        {"COMEDOWN",   25.0f, starsWave(), SS::Mirror,
+         "    AND SOFTLY BACK TO EARTH    ", "J"},
+    }};
+
+    // ─── 4 · TUNNEL VISION ───────────────────────────────────
+    demos_[3] = {"TUNNEL VISION", {
+        {"DARK",     20.0f, tunOnly(), SS::Classic,
+         "    INTO THE DARK    DEEPER WE GO    "
+         "    NO STARS NO POLAR ONLY THE TUNNEL    ", "P"},
+        {"WALLS",    40.0f, tunOnly(), SS::Wavy3D,
+         "    THE WALLS BREATHE    FREQUENCIES SHAPE THE TILES    "
+         "    BASS WIDENS LEAD NARROWS    ", "P"},
+        {"OPENING",  30.0f, all(),     SS::Rainbow,
+         "    THE TUNNEL OPENS UP    EVERYTHING APPEARS    ", "F"},
+    }};
+
+    // ─── 5 · FREQUENCIES ─────────────────────────────────────
+    demos_[4] = {"FREQUENCIES", {
+        {"SILENCE",   12.0f, polSpe(), SS::Neon,
+         "    LISTEN    THE SPECTRUM IS LOADING    ", "I"},
+        {"BANDS",     45.0f, polSpe(), SS::Wavy3D,
+         "    20HZ TO 200HZ : BASS    "
+         "    200 TO 800 : LOW MID    800 TO 3200 : MID    "
+         "    3200+ : TREBLE    EVERY HZ HAS A COLOR    ", "I"},
+        {"FULL",      35.0f, all(),    SS::Rainbow,
+         "    EVERY BAND ALIVE NOW    THE SPECTRUM IS COMPLETE    ", "Q"},
+    }};
+
+    // ─── 6 · GLITCH WORLD ────────────────────────────────────
+    demos_[5] = {"GLITCH WORLD", {
+        {"PROBE",     15.0f, stars(),  SS::Neon,
+         "    SCANNING ANOMALY    REALITY UNSTABLE    ", "V"},
+        {"CORRUPT",   40.0f, all(),    SS::Glitch,
+         "    BUFFER OVERFLOW    SIGNAL CORRUPTED    "
+         "    THE GHOSTS IN THE WIRES ARE WAKING UP    ", "V"},
+        {"CRASH",     30.0f, all(),    SS::Glitch,
+         "    KERNEL PANIC    BUT THE BEAT GOES ON    ", "Q"},
+    }};
+
+    // ─── 7 · AMBIENT VOID ────────────────────────────────────
+    demos_[6] = {"AMBIENT VOID", {
+        {"DRIFT",      40.0f, stars(),     SS::Neon,
+         "    NO BEAT    JUST THE DRIFT    SLOW STARS PASSING    ", "J"},
+        {"DEEPNESS",   45.0f, polSpe(),    SS::Mirror,
+         "    THE SPECTRUM BREATHES    SLOW AND BLUE    ", "S"},
+        {"RETURN",     30.0f, starsWave(), SS::Mirror,
+         "    AND BACK TO THE STARS    REMEMBER THIS QUIET    ", "J"},
+    }};
+
+    // ─── 8 · RAVE ────────────────────────────────────────────
+    demos_[7] = {"RAVE", {
+        {"BUILD",     20.0f, all(),  SS::Wavy3D,
+         "    180 BPM    HOLD ON    "
+         "    THE WAREHOUSE IS WAITING    ", "T"},
+        {"FULL POWER",55.0f, all(),  SS::Rainbow,
+         "    NO SLEEP TIL DAWN    KICK BIAS MAXIMUM    "
+         "    HARDCORE NEVER DIES    GREETINGS TO ALL RAVERS    ", "T"},
+        {"AFTER",     30.0f, polSpe(), SS::Mirror,
+         "    THE BEAT IS GONE    THE WALLS STILL SHAKE    ", "Q"},
+    }};
+
+    // ─── 9 · MEMORY LANE ─────────────────────────────────────
+    demos_[8] = {"MEMORY LANE", {
+        {"REWIND",    20.0f, starsWave(), SS::Mirror,
+         "    *** AESTHETIC MODE ***    SLOWING DOWN    ", "U"},
+        {"VAPOR",     50.0f, all(),       SS::Mirror,
+         "    PINK NEON ON CHROME    LOST PALACES OF THE 90S    "
+         "    THIS IS HOW WE REMEMBER YOU    ", "R"},
+        {"FOG",       30.0f, polSpe(),    SS::Mirror,
+         "    THE MEMORY FADES    BUT NEVER DISAPPEARS    ", "U"},
+    }};
+
+    // ─── 10 · GREETINGS FROM SAILLANS ────────────────────────
+    demos_[9] = {"GREETINGS", {
+        {"OPENING",   20.0f, stars(),  SS::Neon,
+         "    *** GREETINGS FROM SAILLANS 2026 ***    ", "J"},
+        {"ROLL CALL", 60.0f, all(),    SS::Rainbow,
+         "    GREETINGS TO :: KXKM CREW :: HYPNEUM LAB :: SUPERCOLLIDER ::"
+         "    OPENFRAMEWORKS HACKERS :: COOKIE COLLECTIVE :: ALL LIVE CODERS    "
+         "    THIS SCROLLER IS FOR YOU    ", "L"},
+        {"FINALE",    35.0f, all(),    SS::Mirror,
+         "    SEE YOU NEXT TIME    KEEP THE PHOSPHOR ALIVE    "
+         "    AV-LIVE / L-ELECTRON RARE    ", "U"},
+    }};
+
+    launchDemo(0);
 }
 
-void ofApp::enterNarrativeScene(int idx) {
-    if (idx < 0 || idx >= (int)narrativeScenes_.size()) {
-        narrativeMode_ = false;
-        demo_.setText("");  // restore greetings.txt
-        return;
+void ofApp::launchDemo(int demoIdx) {
+    if (demoIdx < 0 || demoIdx >= (int)demos_.size()) return;
+    currentDemo_  = demoIdx;
+    narrativeMode_ = true;
+    enterScene(0);
+    ofLogNotice("ofApp") << "launch demo " << demoIdx
+                         << " : " << demos_[demoIdx].name
+                         << " (" << demos_[demoIdx].scenes.size() << " scenes)";
+}
+
+void ofApp::enterScene(int idx) {
+    auto& scenes = demos_[currentDemo_].scenes;
+    if (idx < 0 || idx >= (int)scenes.size()) {
+        // Fin de démo : reboucle sur la 1ère scène.
+        idx = 0;
     }
     narrativeIdx_ = idx;
     narrativeT_   = 0.0f;
-    const auto& s = narrativeScenes_[idx];
+    const auto& s = scenes[idx];
     scope4_ = s.toggles;
     demo_.setScrollerStyle(s.scroller);
     demo_.setText(s.narration);
     if (s.albumLetter) {
         osc_.sendControl("/control/playAlbum", std::string(s.albumLetter));
     }
-    ofLogNotice("ofApp") << "narrative scene " << idx << " : " << s.name;
 }
 
 void ofApp::updateNarrative(float dt) {
     if (!narrativeMode_) return;
+    auto& scenes = demos_[currentDemo_].scenes;
+    if (narrativeIdx_ >= (int)scenes.size()) return;
     narrativeT_ += dt;
-    if (narrativeT_ >= narrativeScenes_[narrativeIdx_].durSec) {
-        if (narrativeIdx_ + 1 >= (int)narrativeScenes_.size()) {
-            // Fin : retour au mode preset 0
-            narrativeMode_ = false;
-            demo_.setText("");
-            applyPreset(0);
+    if (narrativeT_ >= scenes[narrativeIdx_].durSec) {
+        if (narrativeIdx_ + 1 >= (int)scenes.size()) {
+            // Fin : reboucle l'acte 0 de la même démo (loop continu).
+            enterScene(0);
         } else {
-            enterNarrativeScene(narrativeIdx_ + 1);
+            enterScene(narrativeIdx_ + 1);
         }
     }
 }
 
 void ofApp::drawNarrativeOverlay(int W, int H) {
     if (!narrativeMode_) return;
-    const auto& s = narrativeScenes_[narrativeIdx_];
+    auto& scenes = demos_[currentDemo_].scenes;
+    if (narrativeIdx_ >= (int)scenes.size()) return;
+    const auto& s = scenes[narrativeIdx_];
     const float prog = std::min(1.0f, narrativeT_ / s.durSec);
 
     ofPushStyle();
     ofEnableBlendMode(OF_BLENDMODE_ADD);
 
-    // Bandeau "ACT N — TITLE" en haut, fade in/out aux bords de la scène.
     const float fadeIn  = std::min(1.0f, narrativeT_ / 1.5f);
     const float fadeOut = std::min(1.0f, (s.durSec - narrativeT_) / 1.5f);
     const int alpha = static_cast<int>(220 * std::min(fadeIn, fadeOut));
 
+    // Ligne 1 : nom de la démo (petit)
+    const std::string demoTag = std::string("DEMO ") +
+        ofToString(currentDemo_ < 9 ? currentDemo_ + 1 : 0) + " / 10   " +
+        demos_[currentDemo_].name;
+    ofSetColor(140, 255, 200, alpha);
+    ofDrawBitmapString(demoTag, W / 2 - demoTag.size() * 4, 18);
+
+    // Ligne 2 : "ACT N — TITLE" en gros
     const std::string title = "ACT " + ofToString(narrativeIdx_ + 1) +
-                              " / " + ofToString(narrativeScenes_.size())
+                              " / " + ofToString(scenes.size())
                               + "   " + s.name;
     ofSetColor(255, 200, 100, alpha);
     ofPushMatrix();
-    ofTranslate(W / 2 - title.size() * 10, 36);
+    ofTranslate(W / 2 - title.size() * 10, 50);
     ofScale(2.5f, 2.5f, 1.0f);
     ofDrawBitmapString(title, 0, 0);
     ofPopMatrix();
 
-    // Barre de progression de la scène
+    // Barre de progression
     const float barW = W - 200;
     ofSetColor(60, 130, 80, 140);
-    ofDrawRectangle(100, 56, barW, 3);
+    ofDrawRectangle(100, 70, barW, 3);
     ofSetColor(100, 220, 140, 220);
-    ofDrawRectangle(100, 56, barW * prog, 3);
+    ofDrawRectangle(100, 70, barW * prog, 3);
 
-    // Hint en bas-gauche (sous l'overlay FX mults)
+    // Hint clavier
     ofSetColor(200, 220, 220, 180);
-    ofDrawBitmapString("[b] narrative   [n] next scene   [esc] exit",
+    ofDrawBitmapString("[1-9 0] demo   [enter] next act   [esc] live mode",
                        100, H - 48);
 
     ofDisableBlendMode();
     ofPopStyle();
-}
-
-void ofApp::initPresets() {
-    using SS = oscope::ScrollerStyle;
-    auto allOn = []{ return ScopeToggles{}; };
-    auto onlyTunnel = []{
-        ScopeToggles s{};
-        s.starfield = false; s.spectroRing = false; s.polar = false;
-        s.waveform = false; s.bobs = false; s.copperBars = false;
-        return s;
-    };
-    auto cleanScope = []{
-        ScopeToggles s{};
-        s.tunnel = false; s.starfield = false; s.copperBars = false;
-        s.bobs = false; s.tunnelHud = false;
-        return s;
-    };
-    auto starOnly = []{
-        ScopeToggles s{};
-        s.tunnel = false; s.starfield = true; s.copperBars = false;
-        s.bobs = false; s.tunnelHud = false; s.polar = false;
-        s.spectroRing = false; s.waveform = true;
-        return s;
-    };
-
-    // 10 presets demoparty — chacun avec son ambiance + track SC associée.
-    presets_[0] = {"AMIGA",       allOn(),       SS::Classic,  "A"};  // acid
-    presets_[1] = {"C64",         allOn(),       SS::Wavy3D,   "M"};  // chiptune
-    presets_[2] = {"OLDSKOOL",    allOn(),       SS::Mirror,   "G"};  // detroit
-    presets_[3] = {"NEWSKOOL",    allOn(),       SS::Rainbow,  "L"};  // future garage
-    presets_[4] = {"TUNNEL",      onlyTunnel(),  SS::Classic,  "P"};  // industrial
-    presets_[5] = {"STARFIELD",   starOnly(),    SS::Neon,     "J"};  // ambient
-    presets_[6] = {"SCOPE",       cleanScope(),  SS::Classic,  "I"};  // dnb liquide
-    presets_[7] = {"CYBER",       allOn(),       SS::Glitch,   "V"};  // glitch idm
-    presets_[8] = {"VAPOR",       allOn(),       SS::Mirror,   "U"};  // vocal trance
-    presets_[9] = {"RAVE",        allOn(),       SS::Rainbow,  "T"};  // hardcore gabber
-
-    // Defaults : appliquer preset 0 au boot.
-    applyPreset(0);
-}
-
-void ofApp::applyPreset(int idx) {
-    if (idx < 0 || idx >= 10) return;
-    presetIdx_ = idx;
-    const auto& p = presets_[idx];
-    scope4_ = p.toggles;
-    demo_.setScrollerStyle(p.scroller);
-    if (p.albumLetter) {
-        osc_.sendControl("/control/playAlbum",
-                         std::string(p.albumLetter));
-    }
-    ofLogNotice("ofApp") << "preset " << idx << " : " << p.name
-                         << " -> album " << (p.albumLetter ?: "none");
 }
 
 void ofApp::drawTunnelHud(int W, int H) {
@@ -692,13 +750,15 @@ void ofApp::drawScope4(int W, int H) {
             ofSetColor(120, 200, 100, 130);
             ofDrawRectangle(sx + barW * 0.5f - 0.5f, rowY + 14, 1, 6);
         }
-        // Hint reset à droite + nom du preset courant en gros
+        // Hint reset à droite + nom de la démo en cours en magenta
         ofSetColor(140, 200, 200, 180);
         ofDrawBitmapString("[w] reset", W - 100, rowY);
-        ofSetColor(255, 100, 200, 200);
-        ofDrawBitmapString(std::string("[") +
-            ofToString(presetIdx_ < 9 ? presetIdx_ + 1 : 0) + "] " +
-            presets_[presetIdx_].name, W - 220, rowY - 18);
+        if (narrativeMode_ && currentDemo_ < (int)demos_.size()) {
+            ofSetColor(255, 100, 200, 200);
+            ofDrawBitmapString(std::string("[") +
+                ofToString(currentDemo_ < 9 ? currentDemo_ + 1 : 0) + "] " +
+                demos_[currentDemo_].name, W - 240, rowY - 18);
+        }
         ofDisableBlendMode();
         ofPopStyle();
     }
@@ -802,40 +862,29 @@ void ofApp::windowResized(int w, int h) {
 }
 
 void ofApp::keyPressed(int key) {
-    // Touches 1..9 + 0 — lance un preset demoparty (visuel + track SC).
-    // 'q' reste libre pour le mode live (pas de preset, contrôle manuel).
+    // Touches 1..9 + 0 — lance une démoparty narrative complète.
+    // 'q' reste libre pour le mode live (pas de scénario auto).
     switch (key) {
-        case '1': applyPreset(0); break;  // AMIGA + acid
-        case '2': applyPreset(1); break;  // C64 + chiptune
-        case '3': applyPreset(2); break;  // OLDSKOOL + detroit
-        case '4': applyPreset(3); break;  // NEWSKOOL + future garage
-        case '5': applyPreset(4); break;  // TUNNEL + industrial
-        case '6': applyPreset(5); break;  // STARFIELD + ambient
-        case '7': applyPreset(6); break;  // SCOPE + dnb liquide
-        case '8': applyPreset(7); break;  // CYBER + glitch idm
-        case '9': applyPreset(8); break;  // VAPOR + vocal trance
-        case '0': applyPreset(9); break;  // RAVE + hardcore gabber
+        case '1': launchDemo(0); break;  // AMIGA TRIBUTE
+        case '2': launchDemo(1); break;  // C64 LOWLIFE
+        case '3': launchDemo(2); break;  // ACID JOURNEY
+        case '4': launchDemo(3); break;  // TUNNEL VISION
+        case '5': launchDemo(4); break;  // FREQUENCIES
+        case '6': launchDemo(5); break;  // GLITCH WORLD
+        case '7': launchDemo(6); break;  // AMBIENT VOID
+        case '8': launchDemo(7); break;  // RAVE
+        case '9': launchDemo(8); break;  // MEMORY LANE
+        case '0': launchDemo(9); break;  // GREETINGS
 
-        // Mode narratif scripté (touche 'b' = "begin").
-        case 'b':
-            narrativeMode_ = true;
-            enterNarrativeScene(0);
-            break;
-        // Skip à la scène suivante du mode narratif.
+        // Skip à la scène suivante de la démo en cours.
         case OF_KEY_RETURN:
-            if (narrativeMode_) {
-                if (narrativeIdx_ + 1 < (int)narrativeScenes_.size())
-                    enterNarrativeScene(narrativeIdx_ + 1);
-                else { narrativeMode_ = false; demo_.setText(""); }
-            }
+            if (narrativeMode_) enterScene(narrativeIdx_ + 1);
             break;
-        // Sortir du mode narratif (escape).
+        // Sortir du mode narratif (mode live).
+        case 'q':
         case OF_KEY_ESC:
-            if (narrativeMode_) {
-                narrativeMode_ = false;
-                demo_.setText("");
-                applyPreset(presetIdx_);
-            }
+            narrativeMode_ = false;
+            demo_.setText("");
             break;
         case 'f':
             fullscreen_ = !fullscreen_;

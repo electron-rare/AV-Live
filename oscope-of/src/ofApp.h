@@ -86,35 +86,29 @@ private:
         bool waveform     = true;
     } scope4_;
 
-    // 10 demoparty presets — appliqués via touches 1..9 + 0.
-    // Chaque preset = nom + état toggles + style scroller + lettre album SC.
-    struct DemoPreset {
-        const char*           name;
-        ScopeToggles          toggles;
-        oscope::ScrollerStyle scroller;
-        const char*           albumLetter;  // A..W ou nullptr
-    };
-    DemoPreset presets_[10];
-    int presetIdx_ = 0;
-    void initPresets();
-    void applyPreset(int idx);
-
-    // Mode narratif scripté (touche 'b') — séquence de scènes qui
-    // évoluent dans le temps avec narration, transitions et tracks.
+    // 10 démoparties narratives multi-actes (touches 1..9 + 0).
+    // Chaque démo = liste de scènes qui défilent dans le temps avec
+    // narration scénarisée + track SC + transitions.
     struct DemoScene {
         const char*           name;
         float                 durSec;
         ScopeToggles          toggles;
         oscope::ScrollerStyle scroller;
-        const char*           narration;     // texte du scroller pour cette scène
-        const char*           albumLetter;   // OSC playAlbum (ou nullptr)
+        const char*           narration;
+        const char*           albumLetter;
     };
-    std::vector<DemoScene> narrativeScenes_;
-    bool  narrativeMode_  = false;
-    int   narrativeIdx_   = 0;
-    float narrativeT_     = 0.0f;
-    void initNarrative();
-    void enterNarrativeScene(int idx);
+    struct Demo {
+        const char*            name;
+        std::vector<DemoScene> scenes;
+    };
+    std::vector<Demo> demos_;
+    int   currentDemo_   = 0;
+    int   narrativeIdx_  = 0;
+    float narrativeT_    = 0.0f;
+    bool  narrativeMode_ = false;
+    void initDemos();
+    void launchDemo(int demoIdx);
+    void enterScene(int sceneIdx);
     void updateNarrative(float dt);
     void drawNarrativeOverlay(int W, int H);
 
