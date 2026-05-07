@@ -37,6 +37,9 @@ Routine({
         (~base ++ "palette/scales.scd").load;
         (~base ++ "palette/melodies/index.scd").load;
         (~base ++ "palette/harmonics/index.scd").load;
+        // Helpers humanity : humanize est dans engine, rotation + layer ici.
+        (~base ++ "palette/synth_rotation.scd").load;
+        (~base ++ "palette/auto_layer.scd").load;
 
         // --- 2. setup.scd : definit ~check / ~setupAll / ~teardown -----
         "[live/_load] setup.scd ...".postln;

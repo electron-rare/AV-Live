@@ -186,51 +186,69 @@ s.waitForBoot {
         ~acidPan    = ~acidPan    ? 0;
         ~melodyPan  = ~melodyPan  ? 0;
         ~harmonyPan = ~harmonyPan ? 0;
+        // Humanize subtil : variations naturelles de timing + velocity +
+        // micro-detune pour eviter le rendu robotique. Toggle via ~humanizeOn.
+        // Niveaux subtils (cf. user choice) : timing 1.5%, vel 10%, detune 3c.
+        ~humanizeOn       = ~humanizeOn       ? true;
+        ~humanizeTiming   = ~humanizeTiming   ? 0.0035; // +/- 3.5ms sur dur 0.25s = 1.4%
+        ~humanizeVelocity = ~humanizeVelocity ? 0.10;   // +/- 10%
+        ~humanizeDetune   = ~humanizeDetune   ? 0.03;   // +/- 3 cents (0.03 semitone)
+        // Pfunc renvoie un offset de timing pour chaque note, ou 0 si OFF.
+        ~hTime = { Pfunc { if (~humanizeOn) { rrand(~humanizeTiming.neg, ~humanizeTiming) } { 0 } } };
+        ~hVel  = { Pfunc { if (~humanizeOn) { 1 + rrand(~humanizeVelocity.neg, ~humanizeVelocity) } { 1 } } };
+        ~hDet  = { Pfunc { if (~humanizeOn) { rrand(~humanizeDetune.neg, ~humanizeDetune) } { 0 } } };
         Pdef(\kickSeq, Pbind(
             \instrument, \kick, \dur, 0.25,
-            \amp, Pseq(~kickSteps.collect { |s| s * ~kickAmp }, inf),
+            \timingOffset, ~hTime.value,
+            \amp, Pseq(~kickSteps.collect { |s| s * ~kickAmp }, inf) * ~hVel.value,
             \freq, Pfunc { ~kickFreq }, \pitchAmt, Pfunc { ~kickPitchAmt },
             \decay, Pfunc { ~kickDecay }, \drive, Pfunc { ~kickDrive }, \click, Pfunc { ~kickClick },
             \scBus, ~scBus.index, \scShape, Pfunc { ~kickScShape },
         ));
         Pdef(\hatSeq, Pbind(
             \instrument, \hat, \dur, 0.25,
-            \amp, Pseq(~hatSteps.collect { |s| s * ~hatAmp }, inf),
+            \timingOffset, ~hTime.value,
+            \amp, Pseq(~hatSteps.collect { |s| s * ~hatAmp }, inf) * ~hVel.value,
         ));
         Pdef(\snareSeq, Pbind(
             \instrument, \snare, \dur, 0.25,
-            \amp, Pseq(~snareSteps.collect { |s| s * ~snareAmp }, inf),
+            \timingOffset, ~hTime.value,
+            \amp, Pseq(~snareSteps.collect { |s| s * ~snareAmp }, inf) * ~hVel.value,
             \freq, Pfunc { ~snareFreq }, \noiseAmt, Pfunc { ~snareNoiseAmt }, \decay, Pfunc { ~snareDecay },
         ));
         Pdef(\clapSeq, Pbind(
             \instrument, \clap, \dur, 0.25,
-            \amp, Pseq(~clapSteps.collect { |s| s * ~clapAmp }, inf),
+            \timingOffset, ~hTime.value,
+            \amp, Pseq(~clapSteps.collect { |s| s * ~clapAmp }, inf) * ~hVel.value,
         ));
         Pdef(\percSeq, Pbind(
             \instrument, ~percInst, \dur, 0.25,
-            \amp, Pseq(~percSteps.collect { |s| s * ~percAmp }, inf),
+            \timingOffset, ~hTime.value,
+            \amp, Pseq(~percSteps.collect { |s| s * ~percAmp }, inf) * ~hVel.value,
             \freq, Pfunc { if (~percInst == \tom) { ~tomFreq } { ~cowbellFreq } },
         ));
         Pdef(\acidSeq, PmonoArtic(\acid,
-            \dur,        0.25,
-            \legato,     0.85,
-            \midinote,   Pseq(~acidNotes, inf),
-            \accent,     Pseq(~acidAccents, inf),
-            \slideTime,  Pseq(~acidSlides.collect { |s| if(s == 1) {0.12} {0.005} }, inf),
-            \cutoff,     Pfunc { ~acidCutoff },
-            \cutoffEnv,  Pfunc { ~acidCutoffEnv },
-            \rq,         Pfunc { ~acidRq },
-            \drive,      Pfunc { ~acidDrive },
-            \amp,        Pfunc { ~acidAmp },
-            \pan,        Pfunc { ~acidPan ? 0 },
-            \scBus,      ~scBus.index,      // lit le sidechain
-            \scAmt,      Pfunc { ~acidScAmt },
+            \dur,         0.25,
+            \timingOffset,~hTime.value,
+            \legato,      0.85,
+            \midinote,    Pseq(~acidNotes, inf) + ~hDet.value,
+            \accent,      Pseq(~acidAccents, inf),
+            \slideTime,   Pseq(~acidSlides.collect { |s| if(s == 1) {0.12} {0.005} }, inf),
+            \cutoff,      Pfunc { ~acidCutoff },
+            \cutoffEnv,   Pfunc { ~acidCutoffEnv },
+            \rq,          Pfunc { ~acidRq },
+            \drive,       Pfunc { ~acidDrive },
+            \amp,         Pfunc { ~acidAmp } * ~hVel.value,
+            \pan,         Pfunc { ~acidPan ? 0 },
+            \scBus,       ~scBus.index,      // lit le sidechain
+            \scAmt,       Pfunc { ~acidScAmt },
         ));
         Pdef(\melodySeq, Pbind(
             \instrument, ~melodyInst, \dur, 0.25,
+            \timingOffset, ~hTime.value,
             \legato,   0.9,
             \type,     Pseq(~melodyNotes.collect { |n| if(n > 0) { \note } { \rest } }, inf),
-            \midinote, Pseq(~melodyNotes.collect { |n| if(n > 0) { n } { 60 } }, inf),
+            \midinote, Pseq(~melodyNotes.collect { |n| if(n > 0) { n } { 60 } }, inf) + ~hDet.value,
             \cutoff,   Pfunc { ~melodyCutoff },
             \rq,       Pfunc { ~melodyRq },
             \attack,   Pfunc { ~melodyAttack },
@@ -242,7 +260,7 @@ s.waitForBoot {
             \wobbleDepth, Pfunc { ~melodyWobbleDepth },
             \wobbleShape, Pfunc { ~melodyWobbleShape },
             \subAmt,      Pfunc { ~melodySubAmt },
-            \amp,         Pfunc { ~melodyAmp * ~melodyBoost },
+            \amp,         Pfunc { ~melodyAmp * ~melodyBoost } * ~hVel.value,
             \pan,         Pfunc { ~melodyPan ? 0 },
             \scBus,       ~scBus.index,
             \scAmt,       Pfunc { ~leadScAmt },
@@ -251,9 +269,10 @@ s.waitForBoot {
         // (32th, 16th, 8th) pour creer du contrepoint / phasing
         Pdef(\harmonySeq, Pbind(
             \instrument, ~harmonyInst, \dur, Pfunc { ~harmonyDur },
+            \timingOffset, ~hTime.value,
             \legato,   0.9,
             \type,     Pseq(~harmonyNotes.collect { |n| if(n > 0) { \note } { \rest } }, inf),
-            \midinote, Pseq(~harmonyNotes.collect { |n| if(n > 0) { n } { 60 } }, inf),
+            \midinote, Pseq(~harmonyNotes.collect { |n| if(n > 0) { n } { 60 } }, inf) + ~hDet.value,
             \cutoff,   Pfunc { ~harmonyCutoff },
             \rq,       Pfunc { ~harmonyRq },
             \attack,   Pfunc { ~harmonyAttack },
@@ -263,7 +282,7 @@ s.waitForBoot {
             \drive,    Pfunc { ~harmonyDrive },
             \detune,   Pfunc { ~harmonyDetune },
             \sawAmt,   Pfunc { ~harmonySawAmt },
-            \amp,      Pfunc { ~harmonyAmp * ~melodyBoost },
+            \amp,      Pfunc { ~harmonyAmp * ~melodyBoost } * ~hVel.value,
             \pan,      Pfunc { ~harmonyPan ? 0 },
             \scBus,    ~scBus.index,
             \scAmt,    Pfunc { ~leadScAmt },
