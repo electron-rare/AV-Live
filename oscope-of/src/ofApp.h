@@ -98,7 +98,9 @@ private:
                         Caustics, Vortex, Octahedron, VectorCubes,
                         Mobius, Klein, TrefoilTube, TwistedTorus, Lucy,
                         Helix, Catenoid, Hyperboloid, Boys, Lemniscate,
-                        Penrose, Sphere3D, IcoMesh, DodMesh, TorusMesh };
+                        Penrose, Sphere3D, IcoMesh, DodMesh, TorusMesh,
+                        Supershape, Lorenz, Hopf, Enneper, HopfLink,
+                        BoingBall, Mode7, PlasmaC64, DotTunnel };
     struct DemoScene {
         const char*           name;
         float                 durSec;
@@ -186,6 +188,15 @@ private:
     std::unique_ptr<oscope::ModelVis> modelIco_;
     std::unique_ptr<oscope::ModelVis> modelDod_;
     std::unique_ptr<oscope::ModelVis> modelTorus_;
+    std::unique_ptr<oscope::ModelVis> modelSupershape_;
+    std::unique_ptr<oscope::ModelVis> modelLorenz_;
+    std::unique_ptr<oscope::ModelVis> modelHopf_;
+    std::unique_ptr<oscope::ModelVis> modelEnneper_;
+    std::unique_ptr<oscope::ModelVis> modelHopfLink_;
+    std::unique_ptr<oscope::ShaderVis> boing_;
+    std::unique_ptr<oscope::ShaderVis> mode7_;
+    std::unique_ptr<oscope::ShaderVis> plasmaC64_;
+    std::unique_ptr<oscope::ShaderVis> dotTunnel_;
 
     std::vector<float> ch1_, ch2_;
     Mode mode_ = Mode::Scope4;

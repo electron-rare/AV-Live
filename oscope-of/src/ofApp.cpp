@@ -114,6 +114,15 @@ void ofApp::setup() {
     modelIco_          = mp("icosahedron.ply");
     modelDod_          = mp("dodecahedron.ply");
     modelTorus_        = mp("torus.ply");
+    modelSupershape_   = mp("supershape.ply");
+    modelLorenz_       = mp("lorenz.ply");
+    modelHopf_         = mp("hopf.ply");
+    modelEnneper_      = mp("enneper.ply");
+    modelHopfLink_     = mp("hopf_link.ply");
+    boing_     = std::make_unique<oscope::ShaderVis>("shaders/boing");
+    mode7_     = std::make_unique<oscope::ShaderVis>("shaders/mode7");
+    plasmaC64_ = std::make_unique<oscope::ShaderVis>("shaders/plasma_c64");
+    dotTunnel_ = std::make_unique<oscope::ShaderVis>("shaders/dot_tunnel");
     lissajous_->setup(W, H);
     spectro_->setup(W, H / 4);
     reactive_->setup(W, H);
@@ -154,6 +163,15 @@ void ofApp::setup() {
     modelIco_->setup(W, H);
     modelDod_->setup(W, H);
     modelTorus_->setup(W, H);
+    modelSupershape_->setup(W, H);
+    modelLorenz_->setup(W, H);
+    modelHopf_->setup(W, H);
+    modelEnneper_->setup(W, H);
+    modelHopfLink_->setup(W, H);
+    boing_->setup(W, H);
+    mode7_->setup(W, H);
+    plasmaC64_->setup(W, H);
+    dotTunnel_->setup(W, H);
 
     postfx_.setup(W, H);
 
@@ -353,6 +371,15 @@ void ofApp::update() {
     modelIco_->update(frame);
     modelDod_->update(frame);
     modelTorus_->update(frame);
+    modelSupershape_->update(frame);
+    modelLorenz_->update(frame);
+    modelHopf_->update(frame);
+    modelEnneper_->update(frame);
+    modelHopfLink_->update(frame);
+    boing_->update(frame);
+    mode7_->update(frame);
+    plasmaC64_->update(frame);
+    dotTunnel_->update(frame);
 
     applyOscFx();
 
@@ -504,34 +531,46 @@ void ofApp::initDemos() {
 
     // ─── 1 · AMIGA TRIBUTE ───────────────────────────────────
     demos_[0] = {"AMIGA TRIBUTE", {
-        {"INSERT DISK",  18.0f, stars(),     SS::Neon,
+        {"INSERT DISK",  15.0f, stars(),     SS::Neon,
          "    *** AMIGA 500 RELOADED ***    KICKSTART 1.3    "
          "    INSERT WORKBENCH DISK ", "M", BgKind::Starfield},
-        {"SCROLLZ",      35.0f, all(),       SS::Classic,
+        {"BOING BALL",   30.0f, all(),       SS::Bouncy,
+         "    *** BOING BALL ***    JULY 1984 RJ MICAL DALE LUCK    "
+         "    THE FIRST AMIGA DEMO    8 MERIDIANS RED AND WHITE    "
+         "    GREETINGS TO COMMODORE-AMIGA INC    ", "M",
+         BgKind::BoingBall},
+        {"SCROLLZ",      30.0f, all(),       SS::Classic,
          "    GREETINGS FROM 1989    COPPER BARS AND BOBS FOREVER    "
          "    AMIGA NEVER DIES    HELLO TO ALL DEMOSCENE VETERANS    ", "M",
          BgKind::Twister},
-        {"COPPER STORM", 30.0f, all(),       SS::Rainbow,
-         "    COPPER LIST IS POETRY    EVERY SCANLINE A NEW COLOR    ", "G",
+        {"COPPER STORM", 25.0f, all(),       SS::Rainbow,
+         "    COPPER LIST IS POETRY    EVERY SCANLINE A NEW COLOR    "
+         "    GREETINGS TO SPACEBALLS AND ANARCHY    ", "G",
          BgKind::Twister},
+        {"VECTOR DEMO",  25.0f, all(),       SS::Chrome,
+         "    VECTOR GRAPHICS    BEFORE TEXTURES THERE WAS GEOMETRY    ",
+         "G", BgKind::VectorCubes},
     }};
 
     // ─── 2 · C64 LOWLIFE ─────────────────────────────────────
     demos_[1] = {"C64 LOWLIFE", {
-        {"BOOT",     15.0f, stars(),    SS::Glitch,
+        {"BOOT",      15.0f, stars(),    SS::Glitch,
          "    **** COMMODORE 64 BASIC V2 ****    "
          "    64K RAM SYSTEM 38911 BASIC BYTES FREE    "
          "    READY.    LOAD \"DEMO\",8,1    SEARCHING FOR DEMO    ", "M",
          BgKind::Starfield},
-        {"PIXEL",    35.0f, all(),      SS::Wavy3D,
-         "    8 BIT FOREVER    SID CHIP 6581 SCREAMING    "
-         "    THE FUTURE WAS LOFI ALL ALONG    "
+        {"PLASMA",    25.0f, all(),      SS::Wavy3D,
+         "    *** PLASMA EFFECT ***    SID CHIP 6581 SCREAMING    "
+         "    8 COULEURS INDEXEES PALETTE FIXE    "
          "    GREETINGS TO BOOZE DESIGN AND HOKUTO FORCE    ", "M",
-         BgKind::Rotozoom},
-        {"FREEZE",   25.0f, all(),      SS::Mirror,
+         BgKind::PlasmaC64},
+        {"DOT TUNNEL",25.0f, all(),      SS::Bouncy,
+         "    DOT TUNNEL CLASSIC    PRECOMPUTED TABLES IN ZP    "
+         "    1MHZ NEVER FELT SO FAST    ", "M", BgKind::DotTunnel},
+        {"FREEZE",    20.0f, all(),      SS::Mirror,
          "    HARDWARE SCROLLER LOCKED IN VIC-II    "
          "    GROOVE THAT DEFIED 1MHZ    ", "M", BgKind::Rotozoom},
-        {"CLIMAX",   30.0f, all(),      SS::Glitch,
+        {"CLIMAX",    25.0f, all(),      SS::Glitch,
          "    BREADBIN STILL ALIVE    NTSC COLORS DRIFTING    "
          "    LOAD\"$\",8 LIST    NEVER STOP    ", "V", BgKind::Voronoi},
     }};
@@ -541,20 +580,23 @@ void ofApp::initDemos() {
         {"DROP IN",    20.0f, stars(),   SS::Neon,
          "    THE ACID IS KICKING IN    303 STARTING TO CRY    "
          "    BREATHE SLOW    LET IT TAKE YOU    ", "A", BgKind::PlasmaFbm},
-        {"303 LOOP",   45.0f, all(),     SS::Wavy3D,
+        {"303 LOOP",   35.0f, all(),     SS::Wavy3D,
          "    SQUELCH OF THE 303    FOREVER ASCENDING    "
          "    THE PATTERN NEVER REPEATS    HUE CYCLES IN OUR EYES    "
          "    EVERY KNOB TURN A NEW UNIVERSE    ", "A", BgKind::Truchet},
-        {"PEAK",       40.0f, all(),     SS::Rainbow,
+        {"SUPERSHAPE", 25.0f, polSpe(),  SS::Wavy3D,
+         "    GEOMETRIC PSYCHEDELIA    GIELIS SUPER FORMULA    "
+         "    LIVING SHAPE BREATHING    ", "A", BgKind::Supershape},
+        {"PEAK",       30.0f, all(),     SS::Rainbow,
          "    FULL ACID    NEURONS DANCING    REALITY MELTING    "
          "    THE FILTER OPENS THE FILTER CLOSES    "
          "    AND THE HEAVENS SQUELCH BACK    ", "H", BgKind::Metaballs},
-        {"FRACTAL",    30.0f, all(),     SS::Rainbow,
-         "    THE BEAT FRACTALS    SELF SIMILAR INFINITE    "
-         "    GREETINGS TO MERCURY AND TBL    ", "H", BgKind::Truchet},
+        {"VORTEX",     25.0f, all(),     SS::Rainbow,
+         "    DOWN THE SPIRAL    YOUR EGO DISSOLVES    "
+         "    GREETINGS TO MERCURY AND TBL    ", "H", BgKind::Vortex},
         {"COMEDOWN",   25.0f, starsWave(), SS::Mirror,
          "    AND SOFTLY BACK TO EARTH    "
-         "    THE 303 SLEEPS IN ITS CIRCUIT    ", "J", BgKind::Starfield},
+         "    THE 303 SLEEPS IN ITS CIRCUIT    ", "J", BgKind::Caustics},
     }};
 
     // ─── 4 · TUNNEL VISION ───────────────────────────────────
@@ -579,18 +621,24 @@ void ofApp::initDemos() {
 
     // ─── 5 · FREQUENCIES ─────────────────────────────────────
     demos_[4] = {"FREQUENCIES", {
-        {"SILENCE",   12.0f, polSpe(), SS::Neon,
+        {"SILENCE",     12.0f, polSpe(), SS::Neon,
          "    LISTEN    THE SPECTRUM IS LOADING    "
          "    FFT 1024 BINS WAITING    ", "I", BgKind::PlasmaFbm},
-        {"BANDS",     45.0f, polSpe(), SS::Wavy3D,
+        {"BANDS",       30.0f, polSpe(), SS::Wavy3D,
          "    20HZ TO 200HZ : BASS    "
          "    200 TO 800 : LOW MID    800 TO 3200 : MID    "
          "    3200+ : TREBLE    EVERY HZ HAS A COLOR    "
          "    NYQUIST IS WATCHING    ", "I", BgKind::PlasmaFbm},
-        {"HARMONICS", 35.0f, polSpe(), SS::Mirror,
+        {"HARMONICS",   30.0f, polSpe(), SS::Mirror,
          "    EVERY NOTE A SERIES    FUNDAMENTAL PLUS OVERTONES    "
          "    THE HARMONIC LADDER NEVER ENDS    ", "I", BgKind::Truchet},
-        {"FULL",      35.0f, all(),    SS::Rainbow,
+        {"LORENZ",      25.0f, polSpe(), SS::Cascade,
+         "    THE STRANGE ATTRACTOR    CHAOS IN ORDER    "
+         "    EVERY SIGNAL TENDS HERE    ", "Q", BgKind::Lorenz},
+        {"HOPF",        25.0f, polSpe(), SS::Wavy3D,
+         "    HOPF FIBRATION    SPHERES INSIDE SPHERES    "
+         "    HARMONIC DECOMPOSITION VISUAL    ", "Q", BgKind::Hopf},
+        {"FULL",        25.0f, all(),    SS::Rainbow,
          "    EVERY BAND ALIVE NOW    THE SPECTRUM IS COMPLETE    "
          "    FROM SUBSONIC TO ULTRASONIC    ", "Q", BgKind::Voronoi},
     }};
@@ -599,44 +647,63 @@ void ofApp::initDemos() {
     demos_[5] = {"GLITCH WORLD", {
         {"PROBE",     15.0f, stars(),  SS::Neon,
          "    SCANNING ANOMALY    REALITY UNSTABLE    ", "V", BgKind::Voronoi},
-        {"CORRUPT",   40.0f, all(),    SS::Glitch,
+        {"HOPF LINK", 25.0f, polSpe(), SS::Glitch,
+         "    TWO RINGS LINKED IMPOSSIBLY    "
+         "    TOPOLOGY CORRUPT    ", "V", BgKind::HopfLink},
+        {"CORRUPT",   30.0f, all(),    SS::Glitch,
          "    BUFFER OVERFLOW    SIGNAL CORRUPTED    "
          "    THE GHOSTS IN THE WIRES ARE WAKING UP    ", "V", BgKind::Voronoi},
-        {"CRASH",     30.0f, all(),    SS::Glitch,
-         "    KERNEL PANIC    BUT THE BEAT GOES ON    ", "Q", BgKind::Voronoi},
+        {"GLITCH FX", 25.0f, all(),    SS::Glitch,
+         "    EVERY PIXEL CONTAINS AN ERROR    "
+         "    ERROR IS THE NEW NORMAL    ", "V", BgKind::TunnelCubes},
+        {"CRASH",     20.0f, all(),    SS::Glitch,
+         "    KERNEL PANIC    BUT THE BEAT GOES ON    "
+         "    GREETINGS TO HACKERS EVERYWHERE    ", "Q", BgKind::Voronoi},
     }};
 
     // ─── 7 · AMBIENT VOID ────────────────────────────────────
     demos_[6] = {"AMBIENT VOID", {
-        {"DRIFT",      40.0f, stars(),     SS::Neon,
+        {"DRIFT",      30.0f, stars(),     SS::Neon,
          "    NO BEAT    JUST THE DRIFT    SLOW STARS PASSING    "
          "    SOMEWHERE BEYOND THE OORT CLOUD    ", "J", BgKind::Starfield},
-        {"DEEPNESS",   45.0f, polSpe(),    SS::Mirror,
+        {"OCTAHEDRON", 25.0f, polSpe(),    SS::Chrome,
+         "    A CHROME OCTAHEDRON IN THE VOID    "
+         "    REFLECTING NO ONE    ", "J", BgKind::Octahedron},
+        {"CAUSTICS",   30.0f, polSpe(),    SS::Mirror,
+         "    LIGHT THROUGH WATER    "
+         "    THE SURFACE OF DEEP TIME    ", "S", BgKind::Caustics},
+        {"DEEPNESS",   30.0f, polSpe(),    SS::Mirror,
          "    THE SPECTRUM BREATHES    SLOW AND BLUE    "
          "    20HZ DRONES UNDER THE SKIN    ", "S", BgKind::PlasmaFbm},
-        {"DREAM",      35.0f, polSpe(),    SS::Mirror,
-         "    THE FREQUENCIES BECOME LANDSCAPE    "
-         "    A FOG OF HARMONICS    GREETINGS TO ASD    ", "S",
-         BgKind::PlasmaFbm},
-        {"RETURN",     30.0f, starsWave(), SS::Mirror,
+        {"ENNEPER",    25.0f, polSpe(),    SS::Mirror,
+         "    A MINIMAL SURFACE    LEAST AREA POSSIBLE    "
+         "    GREETINGS TO ASD AND CONSPIRACY    ", "S", BgKind::Enneper},
+        {"RETURN",     25.0f, starsWave(), SS::Mirror,
          "    AND BACK TO THE STARS    REMEMBER THIS QUIET    "
          "    YOU WERE HERE    YOU LISTENED    ", "J", BgKind::Starfield},
     }};
 
     // ─── 8 · RAVE ────────────────────────────────────────────
     demos_[7] = {"RAVE", {
-        {"BUILD",     20.0f, all(),  SS::Wavy3D,
+        {"BUILD",      20.0f, all(),  SS::Wavy3D,
          "    180 BPM    HOLD ON    "
          "    THE WAREHOUSE IS WAITING    "
          "    SECURITY GUARD ALREADY GIVE UP    ", "T", BgKind::Twister},
-        {"DROP",      25.0f, all(),  SS::Glitch,
+        {"DROP",       20.0f, all(),  SS::Glitch,
          "    HERE WE GO    KICK PUNCH MAXIMUM    "
          "    GABBA GABBA HEY    ", "T", BgKind::Voronoi},
-        {"FULL POWER",55.0f, all(),  SS::Rainbow,
+        {"MODE7",      25.0f, all(),  SS::Bouncy,
+         "    LASER FLOOR    CARS ZOOMING ON THE NEON GRID    "
+         "    SUPER SCALER NEVER FORGOTTEN    ", "T", BgKind::Mode7},
+        {"FULL POWER", 35.0f, all(),  SS::Rainbow,
          "    NO SLEEP TIL DAWN    KICK BIAS MAXIMUM    "
          "    HARDCORE NEVER DIES    GREETINGS TO ALL RAVERS    "
          "    ALSO TO RAZOR 1911 AND FAIRLIGHT    ", "T", BgKind::Truchet},
-        {"AFTER",     30.0f, polSpe(), SS::Mirror,
+        {"INFERNO",    25.0f, all(),  SS::Glitch,
+         "    BURN THIS PLACE DOWN    180 BPM ETERNAL FLAME    "
+         "    GREETINGS TO HARDCODE TITAN ANARCHY    ", "T",
+         BgKind::Fire},
+        {"AFTER",      25.0f, polSpe(), SS::Mirror,
          "    THE BEAT IS GONE    THE WALLS STILL SHAKE    "
          "    YOUR HEART STILL THINKS IT IS RAVING    ", "Q",
          BgKind::PlasmaFbm},
@@ -667,23 +734,40 @@ void ofApp::initDemos() {
          "    UNTIL THE NEXT REWIND    ", "U", BgKind::PlasmaFbm},
     }};
 
-    // ─── 10 · GREETINGS FROM SAILLANS ────────────────────────
+    // ─── 10 · GREETINGS FROM SAILLANS (megamix demoscene) ────
     demos_[9] = {"GREETINGS", {
-        {"OPENING",   20.0f, stars(),  SS::Neon,
+        {"OPENING",    15.0f, stars(),  SS::Neon,
          "    *** GREETINGS FROM SAILLANS 2026 ***    "
          "    *** AV-LIVE / L-ELECTRON RARE ***    ", "J",
          BgKind::Starfield},
-        {"ROLL CALL", 60.0f, all(),    SS::Rainbow,
+        {"BOING BALL", 18.0f, all(),    SS::Bouncy,
+         "    AMIGA SECTION    1984 BOING BALL    "
+         "    THE FIRST DEMO EVER    ", "M", BgKind::BoingBall},
+        {"PLASMA",     18.0f, all(),    SS::Wavy3D,
+         "    C64 SECTION    PLASMA EFFECT 8 COLORS    ", "M",
+         BgKind::PlasmaC64},
+        {"DOT TUNNEL", 18.0f, all(),    SS::Cascade,
+         "    DOT TUNNEL CLASSIC    1MHZ POWER    ", "M",
+         BgKind::DotTunnel},
+        {"TWISTER",    18.0f, all(),    SS::Classic,
+         "    TWISTER BARS SPACEBALLS STYLE    ", "G", BgKind::Twister},
+        {"COPPER",     15.0f, all(),    SS::Rainbow,
+         "    COPPER LIST POETRY    ", "G", BgKind::Twister},
+        {"FRACTAL",    18.0f, all(),    SS::Wavy3D,
+         "    FRACTAL ITERATIONS    ", "L", BgKind::Kifs},
+        {"MOBIUS",     18.0f, all(),    SS::Mirror,
+         "    IMPOSSIBLE TOPOLOGY    ", "L", BgKind::Mobius},
+        {"ROLL CALL",  35.0f, all(),    SS::Rainbow,
          "    GREETINGS TO :: KXKM CREW :: HYPNEUM LAB :: SUPERCOLLIDER ::"
          "    OPENFRAMEWORKS HACKERS :: COOKIE COLLECTIVE :: ALL LIVE CODERS    "
          "    FAIRLIGHT :: RAZOR 1911 :: ANDROMEDA :: ASD :: CONSPIRACY ::"
          "    FARBRAUSCH :: MERCURY :: TPOLM :: TBL :: LOONIES ::"
-         "    THIS SCROLLER IS FOR YOU    ", "L", BgKind::Twister},
-        {"DEMOSCENE", 45.0f, all(),    SS::Wavy3D,
+         "    THIS SCROLLER IS FOR YOU    ", "L", BgKind::Truchet},
+        {"DEMOSCENE",  25.0f, all(),    SS::Wavy3D,
          "    THE SCENE IS NOT DEAD    THE SCENE IS EVERYWHERE    "
          "    EVERY LIVE CODER A NEW MEMBER    "
-         "    1985 - 2026 - INFINITY    ", "L", BgKind::Truchet},
-        {"FINALE",    35.0f, all(),    SS::Mirror,
+         "    1985 - 2026 - INFINITY    ", "L", BgKind::TunnelCubes},
+        {"FINALE",     25.0f, all(),    SS::Mirror,
          "    SEE YOU NEXT TIME    KEEP THE PHOSPHOR ALIVE    "
          "    AV-LIVE / L-ELECTRON RARE    "
          "    *** WRAP *** PRESS 1-9 0 TO RESTART ***    ", "U",
@@ -1054,6 +1138,15 @@ void ofApp::drawScope4(int W, int H) {
         case BgKind::IcoMesh:      modelIco_->draw(0, 0, W, H);          break;
         case BgKind::DodMesh:      modelDod_->draw(0, 0, W, H);          break;
         case BgKind::TorusMesh:    modelTorus_->draw(0, 0, W, H);        break;
+        case BgKind::Supershape:   modelSupershape_->draw(0, 0, W, H);   break;
+        case BgKind::Lorenz:       modelLorenz_->draw(0, 0, W, H);       break;
+        case BgKind::Hopf:         modelHopf_->draw(0, 0, W, H);         break;
+        case BgKind::Enneper:      modelEnneper_->draw(0, 0, W, H);      break;
+        case BgKind::HopfLink:     modelHopfLink_->draw(0, 0, W, H);     break;
+        case BgKind::BoingBall:    boing_->draw(0, 0, W, H);             break;
+        case BgKind::Mode7:        mode7_->draw(0, 0, W, H);             break;
+        case BgKind::PlasmaC64:    plasmaC64_->draw(0, 0, W, H);         break;
+        case BgKind::DotTunnel:    dotTunnel_->draw(0, 0, W, H);         break;
     }
 
     // 1bis) HUD pseudo-aléatoire de valeurs sub-10 Hz.
