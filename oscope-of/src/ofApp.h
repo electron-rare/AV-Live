@@ -113,6 +113,26 @@ private:
     float narrativeT_    = 0.0f;
     bool  narrativeMode_ = false;
     float transitionFlash_ = 0.0f;   // 1.0 au début d'une scène, decay vers 0
+
+    // Transitions FBO entre scènes (crossfade / dissolve / wipe)
+    enum class TransKind { Crossfade, Dissolve, Wipe };
+    ofFbo  sceneFbo_[2];           // ping-pong : prev + cur
+    int    sceneFboIdx_   = 0;     // index courant
+    bool   sceneFboReady_ = false;
+    float  transitionT_   = 1.0f;  // 0..1, =1 quand pas de transition active
+    float  transitionDur_ = 0.7f;  // secondes
+    TransKind transKind_  = TransKind::Crossfade;
+    ofShader transShader_[3];      // crossfade / dissolve / wipe
+
+    // Beat-sync : queue une démo, fire au prochain kick
+    bool   beatSyncEnabled_ = false;
+    int    pendingDemoIdx_  = -1;
+    float  prevKick_        = 0.0f;
+
+    void   initTransitions();
+    void   beginTransition();
+    void   drawTransitionComposite(int W, int H);
+
     void initDemos();
     void launchDemo(int demoIdx);
     void enterScene(int sceneIdx);

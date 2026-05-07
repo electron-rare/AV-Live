@@ -121,6 +121,18 @@ void ofApp::setup() {
 
     postfx_.setup(W, H);
 
+    // FBO pour transitions inter-scènes (ping-pong)
+    ofFboSettings sfx;
+    sfx.width = W; sfx.height = H; sfx.internalformat = GL_RGBA;
+    sfx.useDepth = false;
+    sfx.textureTarget = GL_TEXTURE_RECTANGLE_ARB;
+    sceneFbo_[0].allocate(sfx);
+    sceneFbo_[1].allocate(sfx);
+    sceneFbo_[0].begin(); ofClear(0, 0, 0, 255); sceneFbo_[0].end();
+    sceneFbo_[1].begin(); ofClear(0, 0, 0, 255); sceneFbo_[1].end();
+    sceneFboReady_ = true;
+    initTransitions();
+
     demo_.setup(ofToDataPath("greetings.txt", true));
     initDemos();
 
@@ -255,6 +267,15 @@ void ofApp::update() {
     demo_.update(static_cast<float>(ofGetLastFrameTime()));
     updateNarrative(static_cast<float>(ofGetLastFrameTime()));
 
+    // Beat-sync : si une démo est en attente, fire au prochain kick
+    // (rising edge sur audio_.bands().kick).
+    const float kNow = audio_.bands().kick;
+    if (pendingDemoIdx_ >= 0 && kNow > 0.55f && prevKick_ <= 0.55f) {
+        launchDemo(pendingDemoIdx_);
+        pendingDemoIdx_ = -1;
+    }
+    prevKick_ = kNow;
+
     oscope::VisFrame frame{ch1_, ch2_, osc_, audio_.bands()};
     lissajous_->update(frame);
     spectro_->update(frame);
@@ -350,6 +371,43 @@ void ofApp::drawHybrid(int W, int H) {
     // Spectrogram strip across the bottom
     const int sh = H / 6;
     spectro_->draw(0, H - sh, W, sh);
+}
+
+void ofApp::initTransitions() {
+    transShader_[0].load("shaders/transitions/crossfade");
+    transShader_[1].load("shaders/transitions/dissolve");
+    transShader_[2].load("shaders/transitions/wipe");
+}
+
+void ofApp::beginTransition() {
+    if (!sceneFboReady_) return;
+    // Le FBO courant devient le "previous" pour le composite. On choisit
+    // une transition aléatoire parmi les 3.
+    sceneFboIdx_  = 1 - sceneFboIdx_;
+    transitionT_  = 0.0f;
+    transKind_    = static_cast<TransKind>(static_cast<int>(ofRandom(0, 3)));
+}
+
+void ofApp::drawTransitionComposite(int W, int H) {
+    if (!sceneFboReady_) return;
+    const int curI  = sceneFboIdx_;
+    const int prevI = 1 - sceneFboIdx_;
+    if (transitionT_ >= 1.0f) {
+        sceneFbo_[curI].draw(0, 0, W, H);
+        return;
+    }
+    auto& sh = transShader_[static_cast<int>(transKind_)];
+    if (!sh.isLoaded()) {
+        sceneFbo_[curI].draw(0, 0, W, H);
+        return;
+    }
+    sh.begin();
+    sh.setUniformTexture("uPrev", sceneFbo_[prevI].getTexture(), 0);
+    sh.setUniformTexture("uCur",  sceneFbo_[curI].getTexture(),  1);
+    sh.setUniform2f("uRes", static_cast<float>(W), static_cast<float>(H));
+    sh.setUniform1f("uT",   transitionT_);
+    sceneFbo_[curI].draw(0, 0, W, H);
+    sh.end();
 }
 
 void ofApp::initDemos() {
@@ -673,6 +731,14 @@ void ofApp::initDemos() {
 
 void ofApp::launchDemo(int demoIdx) {
     if (demoIdx < 0 || demoIdx >= (int)demos_.size()) return;
+    // Si beat-sync actif, on queue plutôt que de fire immédiatement.
+    // Le déclenchement aura lieu au prochain rising edge du kick.
+    if (beatSyncEnabled_) {
+        pendingDemoIdx_ = demoIdx;
+        ofLogNotice("ofApp") << "queued demo " << demoIdx
+                             << " (waiting kick)";
+        return;
+    }
     currentDemo_  = demoIdx;
     narrativeMode_ = true;
     enterScene(0);
@@ -699,6 +765,8 @@ void ofApp::enterScene(int idx) {
     // Transition punchy : flash blanc + glitch postfx 0.5s.
     transitionFlash_ = 1.0f;
     postfx_.triggerGlitch(0.7f, 0.45f);
+    // Transition FBO crossfade/dissolve/wipe en plus du flash.
+    beginTransition();
 }
 
 void ofApp::updateNarrative(float dt) {
@@ -1020,6 +1088,17 @@ void ofApp::draw() {
     const int W = ofGetWidth();
     const int H = ofGetHeight();
 
+    // Avance la progression de la transition FBO
+    if (transitionT_ < 1.0f) {
+        transitionT_ += static_cast<float>(ofGetLastFrameTime()) / transitionDur_;
+        if (transitionT_ > 1.0f) transitionT_ = 1.0f;
+    }
+
+    // 1) Render scene complète dans le FBO courant (pas directement à l'écran)
+    if (sceneFboReady_) {
+        sceneFbo_[sceneFboIdx_].begin();
+        ofClear(0, 0, 0, 255);
+    }
     if (postFxEnabled_) {
         postfx_.beginScene();
         ofClear(0, 255);
@@ -1029,6 +1108,12 @@ void ofApp::draw() {
     } else {
         ofBackground(0);
         drawMode(mode_, 0, 0, W, H);
+    }
+    if (sceneFboReady_) {
+        sceneFbo_[sceneFboIdx_].end();
+        // Composite : si transition en cours, blend prev↔cur via shader ;
+        // sinon dessine simplement le FBO courant à l'écran.
+        drawTransitionComposite(W, H);
     }
 
     if (showGui_) {
@@ -1121,6 +1206,12 @@ void ofApp::keyPressed(int key) {
         case '#': launchDemo(12); break;  // OUTRUN
         case '$': launchDemo(13); break;  // CUBE STORM
         case '%': launchDemo(14); break;  // GRAND FINAL
+        // Beat-sync toggle : quand actif, les démos lancent au prochain kick
+        case '*':
+            beatSyncEnabled_ = !beatSyncEnabled_;
+            if (!beatSyncEnabled_) pendingDemoIdx_ = -1;
+            ofLogNotice("ofApp") << "beatSync " << (beatSyncEnabled_ ? "ON" : "OFF");
+            break;
 
         // Skip à la scène suivante de la démo en cours.
         case OF_KEY_RETURN:
