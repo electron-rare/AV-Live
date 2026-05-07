@@ -565,9 +565,13 @@ void ofApp::initDemos() {
          "    COPPER LIST IS POETRY    EVERY SCANLINE A NEW COLOR    "
          "    GREETINGS TO SPACEBALLS AND ANARCHY    ", "B",
          BgKind::Twister},
-        {"VECTOR DEMO",  25.0f, all(),       SS::Chrome,
+        {"VECTOR DEMO",  20.0f, all(),       SS::Chrome,
          "    VECTOR GRAPHICS    BEFORE TEXTURES THERE WAS GEOMETRY    ",
          "C", BgKind::VectorCubes},
+        {"PYRAMIDE",     20.0f, polSpe(),    SS::Chrome,
+         "    PYRAMID OF MEMORY    GIZA OF VECTORS    "
+         "    A 4-SIDED MONUMENT FROM 1986    ", "B",
+         BgKind::Pyramid},
     }};
 
     // ─── 2 · C64 LOWLIFE ─────────────────────────────────────
@@ -609,9 +613,15 @@ void ofApp::initDemos() {
          "    FULL ACID    NEURONS DANCING    REALITY MELTING    "
          "    THE FILTER OPENS THE FILTER CLOSES    "
          "    AND THE HEAVENS SQUELCH BACK    ", "H", BgKind::Metaballs},
-        {"VORTEX",     25.0f, all(),     SS::Rainbow,
+        {"VORTEX",     20.0f, all(),     SS::Rainbow,
          "    DOWN THE SPIRAL    YOUR EGO DISSOLVES    "
          "    GREETINGS TO MERCURY AND TBL    ", "H", BgKind::Vortex},
+        {"DNA HELIX",  25.0f, polSpe(),  SS::Cascade,
+         "    DOUBLE HELIX OF SOUND    THE ACID IS IN OUR DNA    "
+         "    A T C G TURNED INTO A B Eb F#    ", "D", BgKind::DNA},
+        {"ROSACE",     20.0f, polSpe(),  SS::Wavy3D,
+         "    K=5 PETALS POLAR ROSE    EACH PETAL A KICK    ", "H",
+         BgKind::Rose3d},
         {"COMEDOWN",   25.0f, starsWave(), SS::Mirror,
          "    AND SOFTLY BACK TO EARTH    "
          "    THE 303 SLEEPS IN ITS CIRCUIT    ", "J", BgKind::Caustics},
@@ -1305,11 +1315,9 @@ void ofApp::draw() {
         if (transitionT_ > 1.0f) transitionT_ = 1.0f;
     }
 
-    // 1) Render scene complète dans le FBO courant (pas directement à l'écran)
-    if (sceneFboReady_) {
-        sceneFbo_[sceneFboIdx_].begin();
-        ofClear(0, 0, 0, 255);
-    }
+    // FBO transition désactivée : provoquait un flip Y des textes (FBO
+    // rendu top-left vs gl_FragCoord bottom-left). On garde flash + glitch
+    // postfx qui suffisent à marquer les changements de scène.
     if (postFxEnabled_) {
         postfx_.beginScene();
         ofClear(0, 255);
@@ -1319,12 +1327,6 @@ void ofApp::draw() {
     } else {
         ofBackground(0);
         drawMode(mode_, 0, 0, W, H);
-    }
-    if (sceneFboReady_) {
-        sceneFbo_[sceneFboIdx_].end();
-        // Composite : si transition en cours, blend prev↔cur via shader ;
-        // sinon dessine simplement le FBO courant à l'écran.
-        drawTransitionComposite(W, H);
     }
 
     if (showGui_) {
