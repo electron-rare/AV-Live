@@ -39,6 +39,12 @@ public:
     /// Beat impulse : retourne true une seule fois quand le beat change.
     bool beatPulse();
 
+    /// Read a /oscope/fx/<name> value (0..1 by convention). Returns
+    /// fallback when nothing has been received for that name.
+    float fx(const std::string& name, float fallback = 0.0f) const;
+    /// True once when /oscope/glitch <amount> arrives, then consumed.
+    bool consumeGlitchPulse(float& outAmount);
+
     /// Helpers d'envoi.
     void sendKick(const std::string& name);
     void sendMelody(const std::string& name);
@@ -55,6 +61,9 @@ private:
     int lastBeatPulsed_ = -1;
     float rms_ = 0.0f;
     std::unordered_map<std::string, float> amp_;
+    std::unordered_map<std::string, float> fx_;
+    float pendingGlitchPulse_ = 0.0f;
+    bool hasGlitchPulse_ = false;
     std::string album_;
     std::string melody_;
     std::string synthdef_;

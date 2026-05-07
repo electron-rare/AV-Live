@@ -36,8 +36,26 @@ void OscClient::update() {
             melody_ = m.getArgAsString(0);
         } else if (a == "/sync/synthdef" && m.getNumArgs() >= 1) {
             synthdef_ = m.getArgAsString(0);
+        } else if (a.rfind("/oscope/fx/", 0) == 0 && m.getNumArgs() >= 1) {
+            // /oscope/fx/<name> <float>
+            fx_[a.substr(11)] = m.getArgAsFloat(0);
+        } else if (a == "/oscope/glitch" && m.getNumArgs() >= 1) {
+            pendingGlitchPulse_ = m.getArgAsFloat(0);
+            hasGlitchPulse_ = true;
         }
     }
+}
+
+float OscClient::fx(const std::string& name, float fallback) const {
+    auto it = fx_.find(name);
+    return (it == fx_.end()) ? fallback : it->second;
+}
+
+bool OscClient::consumeGlitchPulse(float& outAmount) {
+    if (!hasGlitchPulse_) return false;
+    outAmount = pendingGlitchPulse_;
+    hasGlitchPulse_ = false;
+    return true;
 }
 
 float OscClient::amp(const std::string& voice) const {
