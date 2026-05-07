@@ -83,7 +83,7 @@ private:
     std::unique_ptr<oscope::MeshVis>        mesh_;
 
     std::vector<float> ch1_, ch2_;
-    Mode mode_ = Mode::Hybrid;
+    Mode mode_ = Mode::Scope4;
     bool showGui_ = true;
     bool fullscreen_ = false;
     bool postFxEnabled_ = true;

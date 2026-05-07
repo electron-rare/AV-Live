@@ -143,7 +143,7 @@ void ofApp::loadSettings() {
     oscSendPort_   = static_cast<int>(extractNumber(s, "send_port", oscSendPort_));
     oscSendHost_   = extractString(s, "send_host", oscSendHost_);
     bufferSize_    = static_cast<int>(extractNumber(s, "buffer_size", bufferSize_));
-    const std::string m = extractString(s, "default_mode", "hybrid");
+    const std::string m = extractString(s, "default_mode", "scope4");
     if      (m == "lissajous")    mode_ = Mode::Lissajous;
     else if (m == "spectro" ||
              m == "spectrogram")  mode_ = Mode::Spectrogram;
