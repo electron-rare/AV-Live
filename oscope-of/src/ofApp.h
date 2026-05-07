@@ -100,7 +100,8 @@ private:
                         Helix, Catenoid, Hyperboloid, Boys, Lemniscate,
                         Penrose, Sphere3D, IcoMesh, DodMesh, TorusMesh,
                         Supershape, Lorenz, Hopf, Enneper, HopfLink,
-                        BoingBall, Mode7, PlasmaC64, DotTunnel };
+                        BoingBall, Mode7, PlasmaC64, DotTunnel,
+                        Gear, Cone, Pyramid, Rose3d, Geosphere, DNA };
     struct DemoScene {
         const char*           name;
         float                 durSec;
@@ -197,6 +198,12 @@ private:
     std::unique_ptr<oscope::ShaderVis> mode7_;
     std::unique_ptr<oscope::ShaderVis> plasmaC64_;
     std::unique_ptr<oscope::ShaderVis> dotTunnel_;
+    std::unique_ptr<oscope::ModelVis> modelGear_;
+    std::unique_ptr<oscope::ModelVis> modelCone_;
+    std::unique_ptr<oscope::ModelVis> modelPyramid_;
+    std::unique_ptr<oscope::ModelVis> modelRose_;
+    std::unique_ptr<oscope::ModelVis> modelGeosphere_;
+    std::unique_ptr<oscope::ModelVis> modelDNA_;
 
     std::vector<float> ch1_, ch2_;
     Mode mode_ = Mode::Scope4;

@@ -123,6 +123,12 @@ void ofApp::setup() {
     mode7_     = std::make_unique<oscope::ShaderVis>("shaders/mode7");
     plasmaC64_ = std::make_unique<oscope::ShaderVis>("shaders/plasma_c64");
     dotTunnel_ = std::make_unique<oscope::ShaderVis>("shaders/dot_tunnel");
+    modelGear_      = mp("gear.ply");
+    modelCone_      = mp("cone.ply");
+    modelPyramid_   = mp("pyramid.ply");
+    modelRose_      = mp("rose3d.ply");
+    modelGeosphere_ = mp("geosphere.ply");
+    modelDNA_       = mp("dna.ply");
     lissajous_->setup(W, H);
     spectro_->setup(W, H / 4);
     reactive_->setup(W, H);
@@ -172,6 +178,12 @@ void ofApp::setup() {
     mode7_->setup(W, H);
     plasmaC64_->setup(W, H);
     dotTunnel_->setup(W, H);
+    modelGear_->setup(W, H);
+    modelCone_->setup(W, H);
+    modelPyramid_->setup(W, H);
+    modelRose_->setup(W, H);
+    modelGeosphere_->setup(W, H);
+    modelDNA_->setup(W, H);
 
     postfx_.setup(W, H);
 
@@ -380,6 +392,12 @@ void ofApp::update() {
     mode7_->update(frame);
     plasmaC64_->update(frame);
     dotTunnel_->update(frame);
+    modelGear_->update(frame);
+    modelCone_->update(frame);
+    modelPyramid_->update(frame);
+    modelRose_->update(frame);
+    modelGeosphere_->update(frame);
+    modelDNA_->update(frame);
 
     applyOscFx();
 
@@ -536,25 +554,20 @@ void ofApp::initDemos() {
          "    THE FIRST AMIGA DEMO    8 MERIDIANS RED AND WHITE    "
          "    GREETINGS TO COMMODORE-AMIGA INC    ", "M",
          BgKind::BoingBall},
-        {"INSERT DISK",  10.0f, stars(),     SS::Neon,
+        {"INSERT DISK",  12.0f, stars(),     SS::Neon,
          "    *** AMIGA 500 RELOADED ***    KICKSTART 1.3    "
-         "    INSERT WORKBENCH DISK ", "M", BgKind::Starfield},
-        {"BOING BALL 2", 25.0f, all(),       SS::Bouncy,
-         "    *** BOING BALL ***    JULY 1984 RJ MICAL DALE LUCK    "
-         "    THE FIRST AMIGA DEMO    8 MERIDIANS RED AND WHITE    "
-         "    GREETINGS TO COMMODORE-AMIGA INC    ", "M",
-         BgKind::BoingBall},
-        {"SCROLLZ",      30.0f, all(),       SS::Classic,
+         "    INSERT WORKBENCH DISK ", "R", BgKind::Starfield},
+        {"SCROLLZ",      28.0f, all(),       SS::Classic,
          "    GREETINGS FROM 1989    COPPER BARS AND BOBS FOREVER    "
-         "    AMIGA NEVER DIES    HELLO TO ALL DEMOSCENE VETERANS    ", "M",
+         "    AMIGA NEVER DIES    HELLO TO ALL DEMOSCENE VETERANS    ", "G",
          BgKind::Twister},
         {"COPPER STORM", 25.0f, all(),       SS::Rainbow,
          "    COPPER LIST IS POETRY    EVERY SCANLINE A NEW COLOR    "
-         "    GREETINGS TO SPACEBALLS AND ANARCHY    ", "G",
+         "    GREETINGS TO SPACEBALLS AND ANARCHY    ", "B",
          BgKind::Twister},
         {"VECTOR DEMO",  25.0f, all(),       SS::Chrome,
          "    VECTOR GRAPHICS    BEFORE TEXTURES THERE WAS GEOMETRY    ",
-         "G", BgKind::VectorCubes},
+         "C", BgKind::VectorCubes},
     }};
 
     // ─── 2 · C64 LOWLIFE ─────────────────────────────────────
@@ -567,14 +580,14 @@ void ofApp::initDemos() {
         {"PLASMA",    25.0f, all(),      SS::Wavy3D,
          "    *** PLASMA EFFECT ***    SID CHIP 6581 SCREAMING    "
          "    8 COULEURS INDEXEES PALETTE FIXE    "
-         "    GREETINGS TO BOOZE DESIGN AND HOKUTO FORCE    ", "M",
+         "    GREETINGS TO BOOZE DESIGN AND HOKUTO FORCE    ", "C",
          BgKind::PlasmaC64},
         {"DOT TUNNEL",25.0f, all(),      SS::Bouncy,
          "    DOT TUNNEL CLASSIC    PRECOMPUTED TABLES IN ZP    "
-         "    1MHZ NEVER FELT SO FAST    ", "M", BgKind::DotTunnel},
+         "    1MHZ NEVER FELT SO FAST    ", "D", BgKind::DotTunnel},
         {"FREEZE",    20.0f, all(),      SS::Mirror,
          "    HARDWARE SCROLLER LOCKED IN VIC-II    "
-         "    GROOVE THAT DEFIED 1MHZ    ", "M", BgKind::Rotozoom},
+         "    GROOVE THAT DEFIED 1MHZ    ", "K", BgKind::Rotozoom},
         {"CLIMAX",    25.0f, all(),      SS::Glitch,
          "    BREADBIN STILL ALIVE    NTSC COLORS DRIFTING    "
          "    LOAD\"$\",8 LIST    NEVER STOP    ", "V", BgKind::Voronoi},
@@ -588,10 +601,10 @@ void ofApp::initDemos() {
         {"303 LOOP",   35.0f, all(),     SS::Wavy3D,
          "    SQUELCH OF THE 303    FOREVER ASCENDING    "
          "    THE PATTERN NEVER REPEATS    HUE CYCLES IN OUR EYES    "
-         "    EVERY KNOB TURN A NEW UNIVERSE    ", "A", BgKind::Truchet},
+         "    EVERY KNOB TURN A NEW UNIVERSE    ", "H", BgKind::Truchet},
         {"SUPERSHAPE", 25.0f, polSpe(),  SS::Wavy3D,
          "    GEOMETRIC PSYCHEDELIA    GIELIS SUPER FORMULA    "
-         "    LIVING SHAPE BREATHING    ", "A", BgKind::Supershape},
+         "    LIVING SHAPE BREATHING    ", "D", BgKind::Supershape},
         {"PEAK",       30.0f, all(),     SS::Rainbow,
          "    FULL ACID    NEURONS DANCING    REALITY MELTING    "
          "    THE FILTER OPENS THE FILTER CLOSES    "
@@ -612,12 +625,12 @@ void ofApp::initDemos() {
          "    HOLD YOUR BREATH    ", "P", BgKind::SdfTunnel},
         {"TREFOIL",  35.0f, tunOnly(), SS::Wavy3D,
          "    THE PATH KNOTS ITSELF    A REAL TREFOIL KNOT    "
-         "    NO ENDS NO BEGINNINGS    PURE TOPOLOGY    ", "P",
+         "    NO ENDS NO BEGINNINGS    PURE TOPOLOGY    ", "S",
          BgKind::TrefoilTube},
         {"TORUS",    35.0f, tunOnly(), SS::Wavy3D,
          "    REALITY BENDS AROUND THE PATH    "
          "    A NEVER ENDING TORUS    "
-         "    GREETINGS TO ANDROMEDA AND CONSPIRACY    ", "P",
+         "    GREETINGS TO ANDROMEDA AND CONSPIRACY    ", "E",
          BgKind::TorusMesh},
         {"OPENING",  30.0f, all(),     SS::Rainbow,
          "    THE TUNNEL OPENS UP    EVERYTHING APPEARS    "
@@ -633,16 +646,16 @@ void ofApp::initDemos() {
          "    20HZ TO 200HZ : BASS    "
          "    200 TO 800 : LOW MID    800 TO 3200 : MID    "
          "    3200+ : TREBLE    EVERY HZ HAS A COLOR    "
-         "    NYQUIST IS WATCHING    ", "I", BgKind::PlasmaFbm},
+         "    NYQUIST IS WATCHING    ", "W", BgKind::PlasmaFbm},
         {"HARMONICS",   30.0f, polSpe(), SS::Mirror,
          "    EVERY NOTE A SERIES    FUNDAMENTAL PLUS OVERTONES    "
-         "    THE HARMONIC LADDER NEVER ENDS    ", "I", BgKind::Truchet},
+         "    THE HARMONIC LADDER NEVER ENDS    ", "C", BgKind::Truchet},
         {"LORENZ",      25.0f, polSpe(), SS::Cascade,
          "    THE STRANGE ATTRACTOR    CHAOS IN ORDER    "
          "    EVERY SIGNAL TENDS HERE    ", "Q", BgKind::Lorenz},
         {"HOPF",        25.0f, polSpe(), SS::Wavy3D,
          "    HOPF FIBRATION    SPHERES INSIDE SPHERES    "
-         "    HARMONIC DECOMPOSITION VISUAL    ", "Q", BgKind::Hopf},
+         "    HARMONIC DECOMPOSITION VISUAL    ", "B", BgKind::Hopf},
         {"FULL",        25.0f, all(),    SS::Rainbow,
          "    EVERY BAND ALIVE NOW    THE SPECTRUM IS COMPLETE    "
          "    FROM SUBSONIC TO ULTRASONIC    ", "Q", BgKind::Voronoi},
@@ -673,7 +686,7 @@ void ofApp::initDemos() {
          "    SOMEWHERE BEYOND THE OORT CLOUD    ", "J", BgKind::Starfield},
         {"OCTAHEDRON", 25.0f, polSpe(),    SS::Chrome,
          "    A CHROME OCTAHEDRON IN THE VOID    "
-         "    REFLECTING NO ONE    ", "J", BgKind::Octahedron},
+         "    REFLECTING NO ONE    ", "O", BgKind::Octahedron},
         {"CAUSTICS",   30.0f, polSpe(),    SS::Mirror,
          "    LIGHT THROUGH WATER    "
          "    THE SURFACE OF DEEP TIME    ", "S", BgKind::Caustics},
@@ -1152,6 +1165,12 @@ void ofApp::drawScope4(int W, int H) {
         case BgKind::Mode7:        mode7_->draw(0, 0, W, H);             break;
         case BgKind::PlasmaC64:    plasmaC64_->draw(0, 0, W, H);         break;
         case BgKind::DotTunnel:    dotTunnel_->draw(0, 0, W, H);         break;
+        case BgKind::Gear:         modelGear_->draw(0, 0, W, H);         break;
+        case BgKind::Cone:         modelCone_->draw(0, 0, W, H);         break;
+        case BgKind::Pyramid:      modelPyramid_->draw(0, 0, W, H);      break;
+        case BgKind::Rose3d:       modelRose_->draw(0, 0, W, H);         break;
+        case BgKind::Geosphere:    modelGeosphere_->draw(0, 0, W, H);    break;
+        case BgKind::DNA:          modelDNA_->draw(0, 0, W, H);          break;
     }
 
     // 1bis) HUD pseudo-aléatoire de valeurs sub-10 Hz.
