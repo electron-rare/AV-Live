@@ -95,6 +95,7 @@ void ofApp::setup() {
 
     demo_.setup(ofToDataPath("greetings.txt", true));
     initPresets();
+    initNarrative();
 
     gui_.setup("oscope-of");
     gui_.add(modeLabel_.setup("Mode", modeName(mode_)));
@@ -225,6 +226,7 @@ void ofApp::update() {
     // les visualizers (Tunnel, Polar) sans dépendre de l'OSC.
     audio_.update(ch1_, ch2_, static_cast<float>(lastSampleRateApplied_));
     demo_.update(static_cast<float>(ofGetLastFrameTime()));
+    updateNarrative(static_cast<float>(ofGetLastFrameTime()));
 
     oscope::VisFrame frame{ch1_, ch2_, osc_, audio_.bands()};
     lissajous_->update(frame);
@@ -307,6 +309,144 @@ void ofApp::drawHybrid(int W, int H) {
     // Spectrogram strip across the bottom
     const int sh = H / 6;
     spectro_->draw(0, H - sh, W, sh);
+}
+
+void ofApp::initNarrative() {
+    using SS = oscope::ScrollerStyle;
+    auto onlyStars = []{
+        ScopeToggles s{};
+        s.tunnel = false; s.starfield = true; s.copperBars = false;
+        s.bobs = false; s.tunnelHud = false; s.polar = false;
+        s.spectroRing = false; s.waveform = false;
+        return s;
+    };
+    auto tunnelOnly = []{
+        ScopeToggles s{};
+        s.starfield = false; s.spectroRing = false; s.polar = false;
+        s.waveform = false; s.bobs = false; s.copperBars = false;
+        s.tunnelHud = false; s.scroller = true;
+        return s;
+    };
+    auto polarSpectro = []{
+        ScopeToggles s{};
+        s.tunnel = false; s.starfield = false; s.copperBars = false;
+        s.bobs = false; s.tunnelHud = false; s.waveform = false;
+        return s;
+    };
+    auto everything = []{ return ScopeToggles{}; };
+    auto outro = []{
+        ScopeToggles s{};
+        s.tunnel = false; s.starfield = true; s.copperBars = false;
+        s.bobs = false; s.tunnelHud = false; s.polar = false;
+        s.spectroRing = false; s.waveform = true;
+        return s;
+    };
+
+    narrativeScenes_ = {
+        // Acte I — Réveil
+        {"INTRO",    25.0f, onlyStars(),    SS::Neon,
+         "    *** AV-LIVE PRESENTS *** A LIVE PERFORMANCE FROM NOWHERE *** "
+         "    THE SIGNAL IS QUIET. THE STARS ARE WAITING. WAKE UP. ",
+         "J"}, // ambient_cinematic
+        // Acte II — Premier battement
+        {"FIRST PULSE", 35.0f, tunnelOnly(), SS::Classic,
+         "    A BEAT BEGINS    SOMETHING FAR AWAY    THE TUNNEL OPENS    "
+         "    DEEP AND ECHOING    INDUSTRIAL HEARTBEAT BREATHING    ",
+         "P"}, // industrial
+        // Acte III — Émergence
+        {"FREQUENCIES",  45.0f, polarSpectro(), SS::Wavy3D,
+         "    FREQUENCIES TAKE SHAPE    BASS WHISPERS BLUE    "
+         "    LEAD CRIES RED    THE SPECTRUM ANSWERS    EVERY HZ MATTERS    ",
+         "G"}, // detroit_soulful
+        // Acte IV — Plein régime
+        {"FULL POWER",   55.0f, everything(),    SS::Rainbow,
+         "    FULL POWER    EVERY ELEMENT ALIVE    "
+         "    GREETINGS TO ALL THE LIVE CODERS    THE SCENE IS YOURS    "
+         "    AV-LIVE / SAILLANS 2026 ",
+         "T"}, // hardcore_gabber
+        // Acte V — Dérive cyber
+        {"GLITCH",       40.0f, everything(),    SS::Glitch,
+         "    SIGNAL CORRUPTED    BUT THE BEAT GOES ON    "
+         "    REALITY GLITCHES    BUFFER OVERFLOW    CYBER REIGN    ",
+         "V"}, // glitch_idm
+        // Acte VI — Outro
+        {"OUTRO",        30.0f, outro(),         SS::Mirror,
+         "    THANK YOU FOR WATCHING    GREETINGS FROM AV-LIVE    "
+         "    UNTIL NEXT TIME    KEEP THE PHOSPHOR GLOWING    ",
+         "U"}, // vocal_trance
+    };
+}
+
+void ofApp::enterNarrativeScene(int idx) {
+    if (idx < 0 || idx >= (int)narrativeScenes_.size()) {
+        narrativeMode_ = false;
+        demo_.setText("");  // restore greetings.txt
+        return;
+    }
+    narrativeIdx_ = idx;
+    narrativeT_   = 0.0f;
+    const auto& s = narrativeScenes_[idx];
+    scope4_ = s.toggles;
+    demo_.setScrollerStyle(s.scroller);
+    demo_.setText(s.narration);
+    if (s.albumLetter) {
+        osc_.sendControl("/control/playAlbum", std::string(s.albumLetter));
+    }
+    ofLogNotice("ofApp") << "narrative scene " << idx << " : " << s.name;
+}
+
+void ofApp::updateNarrative(float dt) {
+    if (!narrativeMode_) return;
+    narrativeT_ += dt;
+    if (narrativeT_ >= narrativeScenes_[narrativeIdx_].durSec) {
+        if (narrativeIdx_ + 1 >= (int)narrativeScenes_.size()) {
+            // Fin : retour au mode preset 0
+            narrativeMode_ = false;
+            demo_.setText("");
+            applyPreset(0);
+        } else {
+            enterNarrativeScene(narrativeIdx_ + 1);
+        }
+    }
+}
+
+void ofApp::drawNarrativeOverlay(int W, int H) {
+    if (!narrativeMode_) return;
+    const auto& s = narrativeScenes_[narrativeIdx_];
+    const float prog = std::min(1.0f, narrativeT_ / s.durSec);
+
+    ofPushStyle();
+    ofEnableBlendMode(OF_BLENDMODE_ADD);
+
+    // Bandeau "ACT N — TITLE" en haut, fade in/out aux bords de la scène.
+    const float fadeIn  = std::min(1.0f, narrativeT_ / 1.5f);
+    const float fadeOut = std::min(1.0f, (s.durSec - narrativeT_) / 1.5f);
+    const int alpha = static_cast<int>(220 * std::min(fadeIn, fadeOut));
+
+    const std::string title = "ACT " + ofToString(narrativeIdx_ + 1) +
+                              " / " + ofToString(narrativeScenes_.size())
+                              + "   " + s.name;
+    ofSetColor(255, 200, 100, alpha);
+    ofPushMatrix();
+    ofTranslate(W / 2 - title.size() * 10, 36);
+    ofScale(2.5f, 2.5f, 1.0f);
+    ofDrawBitmapString(title, 0, 0);
+    ofPopMatrix();
+
+    // Barre de progression de la scène
+    const float barW = W - 200;
+    ofSetColor(60, 130, 80, 140);
+    ofDrawRectangle(100, 56, barW, 3);
+    ofSetColor(100, 220, 140, 220);
+    ofDrawRectangle(100, 56, barW * prog, 3);
+
+    // Hint en bas-gauche (sous l'overlay FX mults)
+    ofSetColor(200, 220, 220, 180);
+    ofDrawBitmapString("[b] narrative   [n] next scene   [esc] exit",
+                       100, H - 48);
+
+    ofDisableBlendMode();
+    ofPopStyle();
 }
 
 void ofApp::initPresets() {
@@ -572,6 +712,9 @@ void ofApp::drawScope4(int W, int H) {
 
     // 6) Sine scroller — toggle 3 (synchronisé avec demo_.scrollerEnabled).
     demo_.drawScroller(W, H);
+
+    // 7) Overlay narratif (titre acte + barre progression) si actif.
+    drawNarrativeOverlay(W, H);
 }
 
 void ofApp::draw() {
@@ -672,6 +815,28 @@ void ofApp::keyPressed(int key) {
         case '8': applyPreset(7); break;  // CYBER + glitch idm
         case '9': applyPreset(8); break;  // VAPOR + vocal trance
         case '0': applyPreset(9); break;  // RAVE + hardcore gabber
+
+        // Mode narratif scripté (touche 'b' = "begin").
+        case 'b':
+            narrativeMode_ = true;
+            enterNarrativeScene(0);
+            break;
+        // Skip à la scène suivante du mode narratif.
+        case OF_KEY_RETURN:
+            if (narrativeMode_) {
+                if (narrativeIdx_ + 1 < (int)narrativeScenes_.size())
+                    enterNarrativeScene(narrativeIdx_ + 1);
+                else { narrativeMode_ = false; demo_.setText(""); }
+            }
+            break;
+        // Sortir du mode narratif (escape).
+        case OF_KEY_ESC:
+            if (narrativeMode_) {
+                narrativeMode_ = false;
+                demo_.setText("");
+                applyPreset(presetIdx_);
+            }
+            break;
         case 'f':
             fullscreen_ = !fullscreen_;
             ofSetFullscreen(fullscreen_);

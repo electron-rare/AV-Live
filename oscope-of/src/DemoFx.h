@@ -33,6 +33,9 @@ public:
     void drawScroller(int W, int H);
     void setScrollerStyle(ScrollerStyle s) { scrollerStyle_ = s; }
     ScrollerStyle scrollerStyle() const { return scrollerStyle_; }
+    /// Override le texte du scroller (utilisé par le mode narratif).
+    /// Passer "" pour revenir au contenu greetings.txt initial.
+    void setText(const std::string& t);
 
     /// Starfield 3D fullscreen (peut être utilisé en place du tunnel).
     void drawStarfield(int W, int H);
@@ -51,6 +54,7 @@ public:
 private:
     // Scroller
     std::string text_;
+    std::string baseText_;   // copie du contenu initial (greetings.txt)
     float       scrollX_ = 0.0f;
     bool        scrollerOn_ = true;
     ScrollerStyle scrollerStyle_ = ScrollerStyle::Classic;

@@ -99,6 +99,25 @@ private:
     void initPresets();
     void applyPreset(int idx);
 
+    // Mode narratif scripté (touche 'b') — séquence de scènes qui
+    // évoluent dans le temps avec narration, transitions et tracks.
+    struct DemoScene {
+        const char*           name;
+        float                 durSec;
+        ScopeToggles          toggles;
+        oscope::ScrollerStyle scroller;
+        const char*           narration;     // texte du scroller pour cette scène
+        const char*           albumLetter;   // OSC playAlbum (ou nullptr)
+    };
+    std::vector<DemoScene> narrativeScenes_;
+    bool  narrativeMode_  = false;
+    int   narrativeIdx_   = 0;
+    float narrativeT_     = 0.0f;
+    void initNarrative();
+    void enterNarrativeScene(int idx);
+    void updateNarrative(float dt);
+    void drawNarrativeOverlay(int W, int H);
+
     std::unique_ptr<oscope::LissajousVis>   lissajous_;
     std::unique_ptr<oscope::SpectrogramVis> spectro_;
     std::unique_ptr<oscope::ReactiveVis>    reactive_;

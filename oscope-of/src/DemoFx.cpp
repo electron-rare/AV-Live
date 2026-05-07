@@ -24,6 +24,7 @@ void DemoFx::setup(const std::string& greetingsPath) {
         "*** AV-LIVE *** GREETINGS *** ");
     // Nettoie newlines pour rester sur 1 ligne de scroller.
     for (auto& c : text_) if (c == '\n' || c == '\r') c = ' ';
+    baseText_ = text_;
 
     stars_.resize(kStarCount);
     for (auto& s : stars_) {
@@ -31,6 +32,12 @@ void DemoFx::setup(const std::string& greetingsPath) {
         s.y = ofRandom(-1.0f, 1.0f);
         s.z = ofRandom(0.05f, 1.0f);
     }
+}
+
+void DemoFx::setText(const std::string& t) {
+    text_ = t.empty() ? baseText_ : t;
+    for (auto& c : text_) if (c == '\n' || c == '\r') c = ' ';
+    scrollX_ = 0.0f;  // reset position pour le nouveau texte
 }
 
 void DemoFx::update(float dt) {
