@@ -1,3 +1,4 @@
+import AppKit
 import Combine
 import Foundation
 
@@ -12,17 +13,23 @@ final class ProcessManager: ObservableObject {
     // Observable state
     @Published var sclangRunning = false
     @Published var oscopeRunning = false
+    @Published var webRunning = false
     @Published private(set) var logs: [LogLine] = []
 
     // Persisted paths (UserDefaults, key/value)
     @Published var sclangPath: String { didSet { defaults.set(sclangPath, forKey: "sclangPath") } }
     @Published var soundAlgoLoadFile: String { didSet { defaults.set(soundAlgoLoadFile, forKey: "soundAlgoLoadFile") } }
     @Published var oscopePath: String { didSet { defaults.set(oscopePath, forKey: "oscopePath") } }
+    @Published var nodePath: String { didSet { defaults.set(nodePath, forKey: "nodePath") } }
+    @Published var webServerScript: String { didSet { defaults.set(webServerScript, forKey: "webServerScript") } }
+    @Published var webPort: Int { didSet { defaults.set(webPort, forKey: "webPort") } }
     @Published var autoStart: Bool { didSet { defaults.set(autoStart, forKey: "autoStart") } }
+    @Published var autoOpenBrowser: Bool { didSet { defaults.set(autoOpenBrowser, forKey: "autoOpenBrowser") } }
 
     private let defaults = UserDefaults.standard
     private var sclangProc: Process?
     private var oscopeProc: Process?
+    private var webProc: Process?
     private let logQueue = DispatchQueue(label: "cc.saillant.avlive.log")
     private let maxLogLines = 2000
 
@@ -73,7 +80,21 @@ final class ProcessManager: ObservableObject {
         } else {
             oscopePath = bare
         }
+        webServerScript = defaults.string(forKey: "webServerScript")
+            ?? "\(avLive)/sound_algo/web/server.js"
+
+        // Discover node : try /usr/local/bin (Intel Homebrew or stock pkg),
+        // /opt/homebrew/bin (Apple Silicon Homebrew), then `which node`
+        // resolved against an extended PATH.
+        let nodeCandidates = ["/usr/local/bin/node", "/opt/homebrew/bin/node",
+                              "/usr/bin/node"]
+        nodePath = defaults.string(forKey: "nodePath")
+            ?? (nodeCandidates.first(where: { fm.isExecutableFile(atPath: $0) })
+                ?? "/usr/local/bin/node")
+
+        webPort = (defaults.object(forKey: "webPort") as? Int) ?? 3000
         autoStart = (defaults.object(forKey: "autoStart") as? Bool) ?? true
+        autoOpenBrowser = (defaults.object(forKey: "autoOpenBrowser") as? Bool) ?? true
     }
 
     /// Start everything that's currently stopped. Used by AppDelegate on
@@ -85,6 +106,69 @@ final class ProcessManager: ObservableObject {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { [weak self] in
             guard let self = self else { return }
             if !self.oscopeRunning { self.startOscope() }
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) { [weak self] in
+            guard let self = self else { return }
+            if !self.webRunning { self.startWeb() }
+        }
+        if autoOpenBrowser {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 3.5) { [weak self] in
+                guard let self = self else { return }
+                if let url = URL(string: "http://localhost:\(self.webPort)/") {
+                    NSWorkspace.shared.open(url)
+                }
+            }
+        }
+    }
+
+    // MARK: - web server
+
+    func startWeb() {
+        guard webProc == nil else { return }
+        guard FileManager.default.isExecutableFile(atPath: nodePath) else {
+            append(source: "launcher", text: "node not found at \(nodePath)")
+            return
+        }
+        guard FileManager.default.fileExists(atPath: webServerScript) else {
+            append(source: "launcher", text: "server.js not found at \(webServerScript)")
+            return
+        }
+        let p = Process()
+        p.executableURL = URL(fileURLWithPath: nodePath)
+        p.arguments = [webServerScript]
+        p.currentDirectoryURL = URL(fileURLWithPath: webServerScript)
+            .deletingLastPathComponent()
+        // node needs PATH to resolve helper subprocesses + npm dep binaries
+        var env = ProcessInfo.processInfo.environment
+        let extraPath = "/usr/local/bin:/opt/homebrew/bin"
+        env["PATH"] = (env["PATH"] ?? "/usr/bin:/bin") + ":" + extraPath
+        env["HTTP_PORT"] = String(webPort)
+        p.environment = env
+        attach(process: p, label: "web")
+        do {
+            try p.run()
+            webProc = p
+            DispatchQueue.main.async { self.webRunning = true }
+            p.terminationHandler = { [weak self] proc in
+                self?.append(source: "web", text: "exited with status \(proc.terminationStatus)")
+                DispatchQueue.main.async {
+                    self?.webProc = nil
+                    self?.webRunning = false
+                }
+            }
+            append(source: "launcher", text: "started web server on :\(webPort)")
+        } catch {
+            append(source: "launcher", text: "failed to start web server: \(error)")
+        }
+    }
+
+    func stopWeb() {
+        webProc?.terminate()
+    }
+
+    func openBrowser() {
+        if let url = URL(string: "http://localhost:\(webPort)/") {
+            NSWorkspace.shared.open(url)
         }
     }
 
@@ -181,6 +265,7 @@ final class ProcessManager: ObservableObject {
     func stopAll() {
         sclangProc?.terminate()
         oscopeProc?.terminate()
+        webProc?.terminate()
     }
 
     func clearLogs() {

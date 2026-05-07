@@ -28,6 +28,22 @@ struct MenuBarContent: View {
                 stop: processManager.stopOscope
             )
 
+            ProcessRow(
+                title: "Web UI",
+                subtitle: "Express :\(processManager.webPort) — control + Hydra",
+                isRunning: processManager.webRunning,
+                start: processManager.startWeb,
+                stop: processManager.stopWeb
+            )
+
+            HStack {
+                Button(action: processManager.openBrowser) {
+                    Label("Open in browser", systemImage: "safari")
+                }
+                .disabled(!processManager.webRunning)
+                Spacer()
+            }
+
             Divider()
 
             HStack {
@@ -87,6 +103,11 @@ private struct SettingsView: View {
                     get: { processManager.autoStart },
                     set: { processManager.autoStart = $0 }
                    ))
+            Toggle("Open browser at http://localhost:\(processManager.webPort) on launch",
+                   isOn: Binding(
+                    get: { processManager.autoOpenBrowser },
+                    set: { processManager.autoOpenBrowser = $0 }
+                   ))
             Divider()
             Text("Paths").font(.headline)
             PathField(
@@ -110,6 +131,22 @@ private struct SettingsView: View {
                 path: Binding(
                     get: { processManager.oscopePath },
                     set: { processManager.oscopePath = $0 }
+                ),
+                isDirectory: false
+            )
+            PathField(
+                label: "node binary",
+                path: Binding(
+                    get: { processManager.nodePath },
+                    set: { processManager.nodePath = $0 }
+                ),
+                isDirectory: false
+            )
+            PathField(
+                label: "Web server.js",
+                path: Binding(
+                    get: { processManager.webServerScript },
+                    set: { processManager.webServerScript = $0 }
                 ),
                 isDirectory: false
             )
