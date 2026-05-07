@@ -135,6 +135,24 @@ void ofApp::setup() {
     oceanLoader_   = std::make_unique<oscope::ShaderVis>("shaders/ocean_loader");
     win95_         = std::make_unique<oscope::ShaderVis>("shaders/win95");
     sphereWave_    = std::make_unique<oscope::SphereWaveVis>();
+    auto img = [](const char* fn){
+        return std::make_unique<oscope::ImageVis>(
+            ofToDataPath(std::string("sprites/") + fn, true));
+    };
+    imgWin1_   = img("windows_1_0.png");
+    imgWin311_ = img("windows_311.png");
+    imgWin95_  = img("windows_95.png");
+    imgLotus_  = img("lotus_123.png");
+    imgDos_    = img("msdos.png");
+    imgAtari_  = img("atari_fuji.png");
+    imgApple_  = img("apple_rainbow.png");
+    imgWB_     = img("amiga_wb.png");
+    imgNeXT_   = img("nextstep.png");
+    imgBeOS_   = img("beos.png");
+    imgOS2_    = img("os2_warp.png");
+    imgIrix_   = img("irix.png");
+    imgZX_     = img("zx_spectrum.png");
+    imgC64_    = img("c64_basic.png");
     lissajous_->setup(W, H);
     spectro_->setup(W, H / 4);
     reactive_->setup(W, H);
@@ -196,6 +214,12 @@ void ofApp::setup() {
     oceanLoader_->setup(W, H);
     win95_->setup(W, H);
     sphereWave_->setup(W, H);
+    imgWin1_->setup(W, H);   imgWin311_->setup(W, H); imgWin95_->setup(W, H);
+    imgLotus_->setup(W, H);  imgDos_->setup(W, H);
+    imgAtari_->setup(W, H);  imgApple_->setup(W, H);
+    imgWB_->setup(W, H);     imgNeXT_->setup(W, H);   imgBeOS_->setup(W, H);
+    imgOS2_->setup(W, H);    imgIrix_->setup(W, H);
+    imgZX_->setup(W, H);     imgC64_->setup(W, H);
 
     postfx_.setup(W, H);
 
@@ -416,6 +440,12 @@ void ofApp::update() {
     oceanLoader_->update(frame);
     win95_->update(frame);
     sphereWave_->update(frame);
+    imgWin1_->update(frame); imgWin311_->update(frame); imgWin95_->update(frame);
+    imgLotus_->update(frame); imgDos_->update(frame);
+    imgAtari_->update(frame); imgApple_->update(frame);
+    imgWB_->update(frame);   imgNeXT_->update(frame); imgBeOS_->update(frame);
+    imgOS2_->update(frame);  imgIrix_->update(frame);
+    imgZX_->update(frame);   imgC64_->update(frame);
 
     applyOscFx();
 
@@ -590,15 +620,19 @@ void ofApp::initDemos() {
          "    PYRAMID OF MEMORY    GIZA OF VECTORS    "
          "    A 4-SIDED MONUMENT FROM 1986    ", "B",
          BgKind::Pyramid},
+        {"WORKBENCH",    22.0f, polSpe(),    SS::Cascade,
+         "    WORKBENCH 1.3    KICKSTART READY    "
+         "    DH0: DISK CONTAINS THE DEMO    ", "M",
+         BgKind::ImgWB},
     }};
 
     // ─── 2 · C64 LOWLIFE ─────────────────────────────────────
     demos_[1] = {"C64 LOWLIFE", {
-        {"BOOT",      15.0f, stars(),    SS::Glitch,
+        {"BOOT",      18.0f, stars(),    SS::Glitch,
          "    **** COMMODORE 64 BASIC V2 ****    "
          "    64K RAM SYSTEM 38911 BASIC BYTES FREE    "
          "    READY.    LOAD \"DEMO\",8,1    SEARCHING FOR DEMO    ", "N",
-         BgKind::Starfield},
+         BgKind::ImgC64},
         {"PLASMA",    25.0f, all(),      SS::Wavy3D,
          "    *** PLASMA EFFECT ***    SID CHIP 6581 SCREAMING    "
          "    8 COULEURS INDEXEES PALETTE FIXE    "
@@ -763,9 +797,16 @@ void ofApp::initDemos() {
 
     // ─── 9 · MEMORY LANE ─────────────────────────────────────
     demos_[8] = {"MEMORY LANE", {
-        {"REWIND",    20.0f, starsWave(), SS::Mirror,
+        {"REWIND",    18.0f, starsWave(), SS::Mirror,
          "    *** AESTHETIC MODE ***    SLOWING DOWN    "
          "    LET THE TAPE WHIRR    ", "U", BgKind::Rotozoom},
+        {"NEXTSTEP",  18.0f, polSpe(),    SS::Chrome,
+         "    NEXTSTEP / OPENSTEP    1989 PURE OBJC ELEGANCE    "
+         "    GREETINGS TO STEVE JOBS AND BERTRAND SERLET    ", "U",
+         BgKind::ImgNeXT},
+        {"BEOS",      18.0f, polSpe(),    SS::Cascade,
+         "    BEOS R5    1995 MULTITASK BEAUTIFUL    "
+         "    JEAN LOUIS GASSEE WAS RIGHT    ", "R", BgKind::ImgBeOS},
         {"STATUE",    30.0f, polSpe(),    SS::Chrome,
          "    AN ANGEL FROM THE STANFORD ARCHIVE    "
          "    LUCY 50K POINTS MARBLE FROZEN IN TIME    ", "R",
@@ -805,10 +846,29 @@ void ofApp::initDemos() {
          "    TWISTER BARS SPACEBALLS STYLE    ", "G", BgKind::Twister},
         {"COPPER",     15.0f, all(),    SS::Rainbow,
          "    COPPER LIST POETRY    ", "G", BgKind::Twister},
-        {"FRACTAL",    18.0f, all(),    SS::Wavy3D,
+        {"FRACTAL",    15.0f, all(),    SS::Wavy3D,
          "    FRACTAL ITERATIONS    ", "L", BgKind::Kifs},
-        {"MOBIUS",     18.0f, all(),    SS::Mirror,
+        {"MOBIUS",     15.0f, all(),    SS::Mirror,
          "    IMPOSSIBLE TOPOLOGY    ", "L", BgKind::Mobius},
+        {"WIN 1.0",    12.0f, polSpe(), SS::Bouncy,
+         "    1985 WINDOWS 1.0    ", "M", BgKind::ImgWin1},
+        {"LOTUS 123",  12.0f, polSpe(), SS::Cascade,
+         "    LOTUS 1-2-3    SPREADSHEET KING 1983    ", "M",
+         BgKind::ImgLotus},
+        {"ATARI",      12.0f, polSpe(), SS::Rainbow,
+         "    ATARI 1972    GAME OVER OR NEW HIGH SCORE    ", "M",
+         BgKind::ImgAtari},
+        {"APPLE 6",    12.0f, polSpe(), SS::Mirror,
+         "    APPLE RAINBOW LOGO 1977    ", "M", BgKind::ImgApple},
+        {"OS/2 WARP",  12.0f, polSpe(), SS::Cascade,
+         "    OS/2 WARP IBM 1996    "
+         "    THE OS THAT COULD HAVE BEEN    ", "M", BgKind::ImgOS2},
+        {"IRIX SGI",   12.0f, polSpe(), SS::Chrome,
+         "    SILICON GRAPHICS IRIX    JURASSIC PARK MAGIC    ",
+         "M", BgKind::ImgIrix},
+        {"ZX SPECTRUM",12.0f, polSpe(), SS::Rainbow,
+         "    SINCLAIR 1982    UK COMPUTING REVOLUTION    ", "M",
+         BgKind::ImgZX},
         {"ROLL CALL",  35.0f, all(),    SS::Rainbow,
          "    GREETINGS TO :: KXKM CREW :: HYPNEUM LAB :: SUPERCOLLIDER ::"
          "    OPENFRAMEWORKS HACKERS :: COOKIE COLLECTIVE :: ALL LIVE CODERS    "
@@ -863,6 +923,10 @@ void ofApp::initDemos() {
         {"WILDFIRE",   25.0f, all(),     SS::Glitch,
          "    FLAMES RISE FAST    EVERY KICK FUELS THE BLAZE    "
          "    GREETINGS TO HARDCODE AND TITAN    ", "T", BgKind::Vortex},
+        {"DOS PROMPT",  20.0f, polSpe(),  SS::Glitch,
+         "    C:\\DEMOS\\>RUN INFERNO.EXE    "
+         "    640K OUGHT TO BE ENOUGH FOR ANYBODY    ", "E",
+         BgKind::ImgDos},
         {"FORGE",      25.0f, polSpe(),  SS::Cascade,
          "    THE METAL MELTS    GEAR TURNS IN MOLTEN STEEL    "
          "    HEPHAESTUS WORKS THE ANVIL    ", "P", BgKind::Gear},
@@ -1232,6 +1296,20 @@ void ofApp::drawScope4(int W, int H) {
         case BgKind::OceanLoader:  oceanLoader_->draw(0, 0, W, H);  break;
         case BgKind::Win95:        win95_->draw(0, 0, W, H);        break;
         case BgKind::SphereWave:   sphereWave_->draw(0, 0, W, H);   break;
+        case BgKind::ImgWin1:    imgWin1_->draw(0, 0, W, H);    break;
+        case BgKind::ImgWin311:  imgWin311_->draw(0, 0, W, H);  break;
+        case BgKind::ImgWin95:   imgWin95_->draw(0, 0, W, H);   break;
+        case BgKind::ImgLotus:   imgLotus_->draw(0, 0, W, H);   break;
+        case BgKind::ImgDos:     imgDos_->draw(0, 0, W, H);     break;
+        case BgKind::ImgAtari:   imgAtari_->draw(0, 0, W, H);   break;
+        case BgKind::ImgApple:   imgApple_->draw(0, 0, W, H);   break;
+        case BgKind::ImgWB:      imgWB_->draw(0, 0, W, H);      break;
+        case BgKind::ImgNeXT:    imgNeXT_->draw(0, 0, W, H);    break;
+        case BgKind::ImgBeOS:    imgBeOS_->draw(0, 0, W, H);    break;
+        case BgKind::ImgOS2:     imgOS2_->draw(0, 0, W, H);     break;
+        case BgKind::ImgIrix:    imgIrix_->draw(0, 0, W, H);    break;
+        case BgKind::ImgZX:      imgZX_->draw(0, 0, W, H);      break;
+        case BgKind::ImgC64:     imgC64_->draw(0, 0, W, H);     break;
     }
 
     // 1bis) HUD pseudo-aléatoire de valeurs sub-10 Hz.

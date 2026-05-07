@@ -28,6 +28,7 @@
 #include "visualizers/VectorCubesVis.h"
 #include "visualizers/ModelVis.h"
 #include "visualizers/SphereWaveVis.h"
+#include "visualizers/ImageVis.h"
 
 #include <memory>
 
@@ -104,7 +105,10 @@ private:
                         BoingBall, Mode7, PlasmaC64, DotTunnel,
                         Gear, Cone, Pyramid, Rose3d, Geosphere, DNA,
                         Workbench, MacOSClassic, AtariFuji, OceanLoader, Win95,
-                        SphereWave };
+                        SphereWave,
+                        ImgWin1, ImgWin311, ImgWin95, ImgLotus, ImgDos,
+                        ImgAtari, ImgApple, ImgWB, ImgNeXT, ImgBeOS,
+                        ImgOS2, ImgIrix, ImgZX, ImgC64 };
     struct DemoScene {
         const char*           name;
         float                 durSec;
@@ -219,6 +223,10 @@ private:
     std::unique_ptr<oscope::ShaderVis> oceanLoader_;
     std::unique_ptr<oscope::ShaderVis> win95_;
     std::unique_ptr<oscope::SphereWaveVis> sphereWave_;
+    std::unique_ptr<oscope::ImageVis> imgWin1_, imgWin311_, imgWin95_;
+    std::unique_ptr<oscope::ImageVis> imgLotus_, imgDos_, imgAtari_, imgApple_;
+    std::unique_ptr<oscope::ImageVis> imgWB_, imgNeXT_, imgBeOS_, imgOS2_;
+    std::unique_ptr<oscope::ImageVis> imgIrix_, imgZX_, imgC64_;
 
     std::vector<float> ch1_, ch2_;
     Mode mode_ = Mode::Scope4;
