@@ -341,7 +341,7 @@ void ofApp::drawScope4(int W, int H) {
     const float lead = osc_.amp("lead");
     const float bass = osc_.amp("bass");
     drawPanelLabel(8, 6, "WAVE   ",
-        ofToString(timeMsPerDiv_, 2) + " ms/div  " +
+        ofToString(static_cast<float>(timeMsPerDiv_), 2) + " ms/div  " +
         ofToString(lastSampleRateApplied_ * 1e-6f, 1) + " MS/s");
     drawPanelLabel(hw + 8, 6, "SPECTRO",
         "lead " + ofToString(lead, 2) + "  bass " + ofToString(bass, 2));
