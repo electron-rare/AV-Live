@@ -175,9 +175,48 @@ function saveHarmony() {
 const HARMONY_PRESETS = ["off","third","fifth","octave","power","shell","sus2","sus4"];
 const ACID_NOTE_CYCLE = [0, 36, 38, 41, 43, 46, 48, 51, 53];
 
+// ---------------- Toasts -------------------------------------------
+const toastsHost = document.getElementById("toasts");
+function toast(msg, kind = "info", ttl = 3000) {
+  if (!toastsHost) return;
+  const t = document.createElement("div");
+  t.className = `toast toast-${kind}`;
+  t.textContent = msg;
+  toastsHost.appendChild(t);
+  setTimeout(() => { t.classList.add("leaving"); }, ttl - 300);
+  setTimeout(() => { t.remove(); }, ttl);
+}
+
+// ---------------- Pills active state -------------------------------
+// Adds .active class to the clicked pill within its panel and removes it
+// from any siblings of the same type. Listens at document level to handle
+// dynamically rendered buttons.
+document.addEventListener("click", (ev) => {
+  const btn = ev.target.closest("button[data-pill-group]");
+  if (!btn) return;
+  const group = btn.dataset.pillGroup;
+  document.querySelectorAll(`button[data-pill-group="${group}"]`).forEach(b => {
+    b.classList.toggle("active", b === btn);
+  });
+});
+
 // ---------------- WebSocket bridge ----------------------------------
 const wsDot = document.getElementById("wsDot");
 const wsLabel = document.getElementById("wsLabel");
+const scDot = document.getElementById("scDot");
+const scLabel = document.getElementById("scLabel");
+
+// sclang heartbeat : last time we saw any /sync/* message
+let lastSyncAt = 0;
+function markSync() { lastSyncAt = Date.now(); }
+function refreshSclangStatus() {
+  const dt = Date.now() - lastSyncAt;
+  const live = lastSyncAt > 0 && dt < 4000;
+  if (scDot) scDot.classList.toggle("online", live);
+  if (scDot) scDot.classList.toggle("offline", !live);
+  if (scLabel) scLabel.textContent = live ? "sclang" : "no sync";
+}
+setInterval(refreshSclangStatus, 500);
 
 function connect() {
   const proto = location.protocol === "https:" ? "wss:" : "ws:";
@@ -186,7 +225,8 @@ function connect() {
   state.ws.addEventListener("open", () => {
     wsDot.classList.add("online");
     wsDot.classList.remove("offline");
-    wsLabel.textContent = "online";
+    wsLabel.textContent = "bridge";
+    toast("Bridge connecté", "success", 1500);
     // Au démarrage : demander la liste des sections pour peupler le tab Jump
     send("/control/listSections");
     // Et la liste des albums pour peupler le tab Album
@@ -217,10 +257,23 @@ function connect() {
   state.ws.addEventListener("message", (ev) => {
     try {
       const msg = JSON.parse(ev.data);
+      markSync();
       handleSync(msg.address, msg.args || []);
     } catch {}
   });
 }
+
+// Auto-retry album list if still empty 4s after WS open (sclang slow boot)
+let albumRetryDone = false;
+setInterval(() => {
+  if (!albumRetryDone && state.ws && state.ws.readyState === WebSocket.OPEN
+      && state.albums && state.albums.size === 0
+      && Date.now() - lastSyncAt < 4000) {
+    send("/control/listAlbums");
+    send("/control/listSections");
+    albumRetryDone = true;
+  }
+}, 2000);
 
 function send(address, ...args) {
   if (!state.ws || state.ws.readyState !== WebSocket.OPEN) return;
@@ -475,10 +528,32 @@ document.getElementById("btnFadeOut").addEventListener("click", () => {
   if (!confirm(`Fade out ${dur}s ?`)) return;
   send("/control/masterFadeOut", dur);
 });
-document.getElementById("btnTeardown").addEventListener("click", () => {
-  if (!confirm("TEARDOWN — couper toute la session ?")) return;
-  send("/control/teardown");
-});
+// Two-step teardown: first click arms (red flash), second click within 2s sends
+{
+  const btn = document.getElementById("btnTeardown");
+  let armed = false;
+  let armedTimer = null;
+  btn.addEventListener("click", () => {
+    if (!armed) {
+      armed = true;
+      btn.classList.add("armed");
+      btn.textContent = "CONFIRM ?";
+      toast("TEARDOWN armed — click again within 2s", "warn", 2000);
+      armedTimer = setTimeout(() => {
+        armed = false;
+        btn.classList.remove("armed");
+        btn.textContent = "TEARDOWN";
+      }, 2000);
+      return;
+    }
+    clearTimeout(armedTimer);
+    armed = false;
+    btn.classList.remove("armed");
+    btn.textContent = "TEARDOWN";
+    send("/control/teardown");
+    toast("TEARDOWN sent", "danger", 1500);
+  });
+}
 document.getElementById("btnPing").addEventListener("click", () => {
   document.getElementById("pingResult").textContent = "…";
   send("/control/ping");

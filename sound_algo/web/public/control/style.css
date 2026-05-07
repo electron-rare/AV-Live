@@ -1143,3 +1143,70 @@ input[type="text"]:focus, input[type="number"]:focus, select:focus {
   margin-top: 0.4rem;
 }
 .cat-pager .btn { padding: 0.2rem 0.6rem; }
+
+/* ======================== UX additions =============================== */
+
+/* Toasts (transient notifications) */
+.toasts {
+    position: fixed;
+    top: 76px;
+    right: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    z-index: 1000;
+    pointer-events: none;
+}
+.toast {
+    background: rgba(20, 24, 36, 0.95);
+    color: #e7eef7;
+    padding: 8px 14px;
+    border-radius: 8px;
+    border-left: 3px solid #5cd0ff;
+    font-size: 0.85rem;
+    font-weight: 500;
+    box-shadow: 0 6px 24px rgba(0,0,0,0.4);
+    animation: toast-in 0.18s ease-out;
+    max-width: 320px;
+}
+.toast-success { border-left-color: #5fe8a3; }
+.toast-warn    { border-left-color: #ffc24a; }
+.toast-danger  { border-left-color: #ee99a0; color: #ffd5d8; }
+.toast.leaving { animation: toast-out 0.3s ease-in forwards; }
+@keyframes toast-in  { from { opacity: 0; transform: translateX(20px); }
+                       to   { opacity: 1; transform: translateX(0); } }
+@keyframes toast-out { from { opacity: 1; transform: translateX(0); }
+                       to   { opacity: 0; transform: translateX(20px); } }
+
+/* TEARDOWN armed state */
+.btn.danger.armed {
+    background: #ee99a0 !important;
+    color: #1a0506 !important;
+    box-shadow: 0 0 0 4px rgba(238, 153, 160, 0.3),
+                0 0 24px rgba(238, 153, 160, 0.6) !important;
+    animation: armed-pulse 0.5s ease-in-out infinite alternate;
+}
+@keyframes armed-pulse {
+    from { box-shadow: 0 0 0 4px rgba(238, 153, 160, 0.3),
+                       0 0 24px rgba(238, 153, 160, 0.6); }
+    to   { box-shadow: 0 0 0 8px rgba(238, 153, 160, 0.15),
+                       0 0 32px rgba(238, 153, 160, 0.9); }
+}
+
+/* Pills active state — applies to any button with [data-pill-group] */
+button[data-pill-group].active {
+    background: rgba(92, 208, 255, 0.18) !important;
+    border-color: rgba(92, 208, 255, 0.7) !important;
+    color: #5cd0ff !important;
+    box-shadow: inset 0 0 0 1px rgba(92, 208, 255, 0.4),
+                0 0 12px rgba(92, 208, 255, 0.25);
+}
+
+/* Highlight last-clicked pill briefly even without explicit grouping */
+.btn.just-clicked {
+    animation: just-clicked 0.6s ease-out;
+}
+@keyframes just-clicked {
+    0%   { box-shadow: 0 0 0 0 rgba(92, 208, 255, 0.7); }
+    100% { box-shadow: 0 0 0 12px rgba(92, 208, 255, 0); }
+}

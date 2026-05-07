@@ -27,13 +27,20 @@
       <span class="hud-label">BEAT</span>
       <div class="beat-pulse" id="beatPulse"></div>
     </div>
-    <div class="hud-item ws-display">
+    <div class="hud-item ws-display" title="WebSocket bridge to Node">
       <span class="ws-dot offline" id="wsDot"></span>
-      <span class="ws-label" id="wsLabel">offline</span>
+      <span class="ws-label" id="wsLabel">bridge</span>
     </div>
-    <button class="btn danger teardown" id="btnTeardown">TEARDOWN</button>
+    <div class="hud-item ws-display" title="SuperCollider /sync/* heartbeat (last beat &lt; 4s)">
+      <span class="ws-dot offline" id="scDot"></span>
+      <span class="ws-label" id="scLabel">sclang</span>
+    </div>
+    <button class="btn danger teardown" id="btnTeardown" title="Click twice within 2s to confirm">TEARDOWN</button>
   </div>
 </header>
+
+<!-- Toast container : transient notifications -->
+<div id="toasts" class="toasts" aria-live="polite"></div>
 
 <!-- ============================== TABS ============================== -->
 <nav class="tabs" id="tabs">
