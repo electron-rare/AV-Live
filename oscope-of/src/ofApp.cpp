@@ -91,6 +91,9 @@ void ofApp::setup() {
     fire_       = std::make_unique<oscope::ShaderVis>("shaders/fire");
     gridPersp_  = std::make_unique<oscope::ShaderVis>("shaders/grid_persp");
     tunnelCubes_= std::make_unique<oscope::ShaderVis>("shaders/tunnel_cubes");
+    caustics_   = std::make_unique<oscope::ShaderVis>("shaders/caustics");
+    vortex_     = std::make_unique<oscope::ShaderVis>("shaders/vortex");
+    octahedron_ = std::make_unique<oscope::ShaderVis>("shaders/octahedron");
     lissajous_->setup(W, H);
     spectro_->setup(W, H / 4);
     reactive_->setup(W, H);
@@ -112,6 +115,9 @@ void ofApp::setup() {
     fire_->setup(W, H);
     gridPersp_->setup(W, H);
     tunnelCubes_->setup(W, H);
+    caustics_->setup(W, H);
+    vortex_->setup(W, H);
+    octahedron_->setup(W, H);
 
     postfx_.setup(W, H);
 
@@ -271,6 +277,9 @@ void ofApp::update() {
     fire_->update(frame);
     gridPersp_->update(frame);
     tunnelCubes_->update(frame);
+    caustics_->update(frame);
+    vortex_->update(frame);
+    octahedron_->update(frame);
 
     applyOscFx();
 
@@ -880,6 +889,9 @@ void ofApp::drawScope4(int W, int H) {
         case BgKind::Fire:        fire_->draw(0, 0, W, H);        break;
         case BgKind::GridPersp:   gridPersp_->draw(0, 0, W, H);   break;
         case BgKind::TunnelCubes: tunnelCubes_->draw(0, 0, W, H); break;
+        case BgKind::Caustics:    caustics_->draw(0, 0, W, H);    break;
+        case BgKind::Vortex:      vortex_->draw(0, 0, W, H);      break;
+        case BgKind::Octahedron:  octahedron_->draw(0, 0, W, H);  break;
     }
 
     // 1bis) HUD pseudo-aléatoire de valeurs sub-10 Hz.

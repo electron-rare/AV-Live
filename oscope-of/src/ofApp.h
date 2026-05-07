@@ -92,7 +92,8 @@ private:
     // narration scénarisée + track SC + transitions.
     enum class BgKind { Tunnel, Starfield, Metaballs, Voronoi, Twister,
                         PlasmaFbm, Rotozoom, Truchet, SdfTunnel,
-                        Kifs, Fire, GridPersp, TunnelCubes };
+                        Kifs, Fire, GridPersp, TunnelCubes,
+                        Caustics, Vortex, Octahedron };
     struct DemoScene {
         const char*           name;
         float                 durSec;
@@ -140,6 +141,9 @@ private:
     std::unique_ptr<oscope::ShaderVis>      fire_;
     std::unique_ptr<oscope::ShaderVis>      gridPersp_;
     std::unique_ptr<oscope::ShaderVis>      tunnelCubes_;
+    std::unique_ptr<oscope::ShaderVis>      caustics_;
+    std::unique_ptr<oscope::ShaderVis>      vortex_;
+    std::unique_ptr<oscope::ShaderVis>      octahedron_;
 
     std::vector<float> ch1_, ch2_;
     Mode mode_ = Mode::Scope4;

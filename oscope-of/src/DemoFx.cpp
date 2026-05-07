@@ -146,6 +146,49 @@ void DemoFx::drawScroller(int W, int H) {
             drawChar(text_[i], cx, baseY + wob, scale, scale, 0.0f, core);
             break;
         }
+        case ScrollerStyle::Cascade: {
+            // Chaque char "tombe" du haut vers la position finale
+            const float dropPhase = std::fmod(t_ * 1.2f + i * 0.06f, 4.0f);
+            const float dy = (dropPhase < 1.0f)
+                ? -200.0f * (1.0f - dropPhase) * (1.0f - dropPhase)
+                : 0.0f;
+            const float lum = (dropPhase < 1.0f) ? 1.0f : 0.85f;
+            ofColor c; c.setHsb(140.0f + i * 2.0f, 200.0f, 255.0f * lum);
+            c.a = 230;
+            drawChar(text_[i], cx, baseY + dy + wob, scale, scale, 0.0f, c);
+            break;
+        }
+        case ScrollerStyle::Chrome: {
+            // 3 couches métalliques superposées avec offset Y
+            ofColor top(220, 230, 240, 200);
+            ofColor mid(180, 190, 210, 200);
+            ofColor bot(120, 130, 160, 220);
+            drawChar(text_[i], cx, baseY + wob - 4.0f, scale, scale, 0.0f, top);
+            drawChar(text_[i], cx, baseY + wob,         scale, scale, 0.0f, mid);
+            drawChar(text_[i], cx, baseY + wob + 4.0f, scale, scale, 0.0f, bot);
+            break;
+        }
+        case ScrollerStyle::Bouncy: {
+            // Bond avec gravité par char, phase décalée
+            const float p = std::fmod(t_ * 2.0f + i * 0.3f, 2.0f);
+            const float dy = (p < 1.0f) ? -80.0f * 4.0f * p * (1.0f - p) : 0.0f;
+            ofColor c; c.setHsb(40.0f + i * 6.0f, 220.0f, 255.0f);
+            c.a = 240;
+            drawChar(text_[i], cx, baseY + dy + wob * 0.3f,
+                     scale, scale, 0.0f, c);
+            break;
+        }
+        case ScrollerStyle::Squashy: {
+            // Squash & stretch X/Y inverse, modulé par t
+            const float pulse = 0.5f + 0.5f * std::sin(t_ * 4.0f + i * 0.5f);
+            const float sxv = scale * (0.7f + pulse * 0.6f);
+            const float syv = scale * (1.3f - pulse * 0.6f);
+            ofColor c; c.setHsb(std::fmod(i * 5.0f + t_ * 30.0f, 255.0f),
+                                230.0f, 255.0f);
+            c.a = 230;
+            drawChar(text_[i], cx, baseY + wob, sxv, syv, 0.0f, c);
+            break;
+        }
         }
     }
     ofDisableBlendMode();

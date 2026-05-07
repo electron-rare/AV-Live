@@ -21,7 +21,11 @@ enum class ScrollerStyle {
     Rainbow,    // hue cycle large par char (cycle complet sur le texte)
     Mirror,     // classic + reflet vertical en bas avec gradient alpha
     Glitch,     // jitter horizontal aléatoire + couleurs cassées
-    Neon        // double passe : outline cyan + cœur magenta
+    Neon,       // double passe : outline cyan + cœur magenta
+    Cascade,    // chaque char tombe d'un offset Y, fade lumineux
+    Chrome,     // 3 couches superposées effet métallique vertical
+    Bouncy,     // chars bondissent sur la baseline avec gravité
+    Squashy     // distortion squash & stretch synchro audio
 };
 
 class DemoFx {
