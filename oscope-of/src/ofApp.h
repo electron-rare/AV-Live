@@ -27,6 +27,7 @@
 #include "visualizers/ShaderVis.h"
 #include "visualizers/VectorCubesVis.h"
 #include "visualizers/ModelVis.h"
+#include "visualizers/SphereWaveVis.h"
 
 #include <memory>
 
@@ -102,7 +103,8 @@ private:
                         Supershape, Lorenz, Hopf, Enneper, HopfLink,
                         BoingBall, Mode7, PlasmaC64, DotTunnel,
                         Gear, Cone, Pyramid, Rose3d, Geosphere, DNA,
-                        Workbench, MacOSClassic, AtariFuji, OceanLoader, Win95 };
+                        Workbench, MacOSClassic, AtariFuji, OceanLoader, Win95,
+                        SphereWave };
     struct DemoScene {
         const char*           name;
         float                 durSec;
@@ -216,6 +218,7 @@ private:
     std::unique_ptr<oscope::ShaderVis> atariFuji_;
     std::unique_ptr<oscope::ShaderVis> oceanLoader_;
     std::unique_ptr<oscope::ShaderVis> win95_;
+    std::unique_ptr<oscope::SphereWaveVis> sphereWave_;
 
     std::vector<float> ch1_, ch2_;
     Mode mode_ = Mode::Scope4;

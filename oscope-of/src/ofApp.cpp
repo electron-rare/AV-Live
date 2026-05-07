@@ -134,6 +134,7 @@ void ofApp::setup() {
     atariFuji_     = std::make_unique<oscope::ShaderVis>("shaders/atari_fuji");
     oceanLoader_   = std::make_unique<oscope::ShaderVis>("shaders/ocean_loader");
     win95_         = std::make_unique<oscope::ShaderVis>("shaders/win95");
+    sphereWave_    = std::make_unique<oscope::SphereWaveVis>();
     lissajous_->setup(W, H);
     spectro_->setup(W, H / 4);
     reactive_->setup(W, H);
@@ -194,6 +195,7 @@ void ofApp::setup() {
     atariFuji_->setup(W, H);
     oceanLoader_->setup(W, H);
     win95_->setup(W, H);
+    sphereWave_->setup(W, H);
 
     postfx_.setup(W, H);
 
@@ -413,6 +415,7 @@ void ofApp::update() {
     atariFuji_->update(frame);
     oceanLoader_->update(frame);
     win95_->update(frame);
+    sphereWave_->update(frame);
 
     applyOscFx();
 
@@ -1228,6 +1231,7 @@ void ofApp::drawScope4(int W, int H) {
         case BgKind::AtariFuji:    atariFuji_->draw(0, 0, W, H);    break;
         case BgKind::OceanLoader:  oceanLoader_->draw(0, 0, W, H);  break;
         case BgKind::Win95:        win95_->draw(0, 0, W, H);        break;
+        case BgKind::SphereWave:   sphereWave_->draw(0, 0, W, H);   break;
     }
 
     // 1bis) HUD pseudo-aléatoire de valeurs sub-10 Hz.
