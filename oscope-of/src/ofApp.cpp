@@ -1226,51 +1226,59 @@ void ofApp::drawScope4(int W, int H) {
         const int rowY = H - 22;
         const int padX = 14;
         ofSetColor(0, 0, 0, 0); // pure additif, pas de fond
-        struct Slot { const char* label; const char* keys; float val; };
+        struct Slot { const char* label; const char* key; float val; };
         Slot slots[] = {
-            {"SPD", "a/z", m.speed},
-            {"KCK", "s/x", m.kickBoost},
-            {"ROLL","d/c", m.rollAmp},
-            {"PAN", "e/v", m.panAmp},
-            {"CRV", "t/n", m.curveAmp},
-            {"TLX", "u/m", m.tileX},
-            {"TLZ", "i/l", m.tileZ},
-            {"DIR", "o/h", m.dirLerp},
+            {"SPD",  "s", m.speed},
+            {"KCK",  "c", m.kickBoost},
+            {"ROLL", "l", m.rollAmp},
+            {"PAN",  "d", m.panAmp},
+            {"CRV",  "v", m.curveAmp},
+            {"TLX",  "x", m.tileX},
+            {"TLZ",  "z", m.tileZ},
+            {"DIR",  "n", m.dirLerp},
         };
         const int nSlots = static_cast<int>(sizeof(slots) / sizeof(Slot));
         const int slotW = (W - padX * 2) / nSlots;
         for (int i = 0; i < nSlots; ++i) {
             const int sx = padX + i * slotW;
-            // Color glow par valeur : 1.0 = vert calme, > 1.0 vire ambre,
-            // < 1.0 vire bleu.
+            const bool sel = (i == selectedFx_);
+            // Cadre de sélection magenta autour du slot actif
+            if (sel) {
+                ofSetColor(255, 100, 200, 180);
+                ofNoFill();
+                ofDrawRectangle(sx - 4, rowY - 14, slotW - 4, 38);
+                ofFill();
+            }
             const float v = slots[i].val;
             int rC = static_cast<int>(80 + std::max(0.0f, v - 1.0f) * 120);
             int gC = 230;
             int bC = static_cast<int>(80 + std::max(0.0f, 1.0f - v) * 120);
             rC = std::min(255, rC);
             bC = std::min(255, bC);
-            ofSetColor(rC, gC, bC, 200);
+            ofSetColor(rC, gC, bC, sel ? 255 : 200);
             ofDrawBitmapString(slots[i].label, sx, rowY);
-            ofSetColor(rC, gC, bC, 140);
-            ofDrawBitmapString(slots[i].keys, sx, rowY + 12);
-            // Valeur en chiffre
+            ofSetColor(sel ? 255 : rC, sel ? 100 : gC, sel ? 200 : bC,
+                       sel ? 230 : 140);
+            ofDrawBitmapString(std::string("[") + slots[i].key + "]",
+                               sx, rowY + 12);
             ofSetColor(180, 255, 180, 230);
             ofDrawBitmapString(ofToString(v, 2) + "x", sx + 28, rowY);
-            // Petite barre horizontale ; centre = 1.0, extrémités 0.05 / 12
             const float barW = static_cast<float>(slotW - 12);
             const float t = std::min(1.0f, std::max(0.0f,
                 std::log(v) / std::log(12.0f) * 0.5f + 0.5f));
             ofSetColor(60, 130, 80, 90);
             ofDrawRectangle(sx, rowY + 16, barW, 2);
-            ofSetColor(80, 220, 140, 200);
+            ofSetColor(sel ? 255 : 80, sel ? 100 : 220, sel ? 200 : 140,
+                       sel ? 230 : 200);
             ofDrawRectangle(sx, rowY + 16, barW * t, 2);
-            // Marqueur central (= 1.0)
             ofSetColor(120, 200, 100, 130);
             ofDrawRectangle(sx + barW * 0.5f - 0.5f, rowY + 14, 1, 6);
         }
-        // Hint reset à droite + nom de la démo en cours en magenta
-        ofSetColor(140, 200, 200, 180);
-        ofDrawBitmapString("[w] reset", W - 100, rowY);
+        // Hints clavier centre haut + reset à droite
+        ofSetColor(140, 220, 220, 180);
+        ofDrawBitmapString("[s c l d v x z n] select   "
+                           "[UP DOWN] adjust   [w] reset all",
+                           padX, rowY - 28);
         if (narrativeMode_ && currentDemo_ < (int)demos_.size()) {
             ofSetColor(255, 100, 200, 200);
             ofDrawBitmapString(std::string("[") +
@@ -1454,42 +1462,46 @@ void ofApp::keyPressed(int key) {
             ofLogNotice("ofApp") << "Shaders rechargés";
             break;
 
-        // FX live — multiplicateurs tunnel par paires (down/up). Chaque
-        // pression scale ×0.83 (down) ou ×1.20 (up). Clamp 0.05..12.
-        // 'w' = reset all to 1.0 (n'écrase pas qwerty mode_ déjà mappés).
-        case 'a': case 'z': case 's': case 'x':
-        case 'd': case 'c': case 'e': case 'v':
-        case 't': case 'n': case 'u': case 'm':
-        case 'i': case 'l': case 'o': case 'h':
-        case 'j': case 'y':
+        // FX live — sélecteur 1 lettre = 1 paramètre, flèches haut/bas
+        // pour ajuster la valeur du paramètre sélectionné.
+        // Lettres mnémoniques (évite f g p k r b déjà bindés ailleurs) :
+        //   s = Speed (tunnel)
+        //   c = Crushing kick boost
+        //   l = roLL amplitude
+        //   d = pan amplitude (Drift)
+        //   v = curVe amplitude
+        //   x = tile X (angulaire)
+        //   z = tile Z (profondeur)
+        //   n = directioN lerp
+        case 's': selectedFx_ = 0; break;
+        case 'c': selectedFx_ = 1; break;
+        case 'l': selectedFx_ = 2; break;
+        case 'd': selectedFx_ = 3; break;
+        case 'v': selectedFx_ = 4; break;
+        case 'x': selectedFx_ = 5; break;
+        case 'z': selectedFx_ = 6; break;
+        case 'n': selectedFx_ = 7; break;
         case 'w': {
+            tunnel_->setMults(oscope::TunnelVis::Mults{});
+            break;
+        }
+        case OF_KEY_UP:
+        case OF_KEY_DOWN: {
             auto m = tunnel_->mults();
-            auto bump = [](float v, bool up) {
+            const bool up = (key == OF_KEY_UP);
+            auto bump = [&](float v) {
                 v *= up ? 1.20f : 0.83f;
                 return std::max(0.05f, std::min(12.0f, v));
             };
-            switch (key) {
-                case 'a': m.speed     = bump(m.speed,     false); break;
-                case 'z': m.speed     = bump(m.speed,     true);  break;
-                case 's': m.kickBoost = bump(m.kickBoost, false); break;
-                case 'x': m.kickBoost = bump(m.kickBoost, true);  break;
-                case 'd': m.rollAmp   = bump(m.rollAmp,   false); break;
-                case 'c': m.rollAmp   = bump(m.rollAmp,   true);  break;
-                case 'e': m.panAmp    = bump(m.panAmp,    false); break;
-                case 'v': m.panAmp    = bump(m.panAmp,    true);  break;
-                case 't': m.curveAmp  = bump(m.curveAmp,  false); break;
-                case 'n': m.curveAmp  = bump(m.curveAmp,  true);  break;
-                case 'u': m.tileX     = bump(m.tileX,     false); break;
-                case 'm': m.tileX     = bump(m.tileX,     true);  break;
-                case 'i': m.tileZ     = bump(m.tileZ,     false); break;
-                case 'l': m.tileZ     = bump(m.tileZ,     true);  break;
-                case 'o': m.dirLerp   = bump(m.dirLerp,   false); break;
-                case 'h': m.dirLerp   = bump(m.dirLerp,   true);  break;
-                case 'j': m.speed     = bump(m.speed,     false);
-                          m.kickBoost = bump(m.kickBoost, false); break;
-                case 'y': m.speed     = bump(m.speed,     true);
-                          m.kickBoost = bump(m.kickBoost, true);  break;
-                case 'w': m = oscope::TunnelVis::Mults{};         break;
+            switch (selectedFx_) {
+                case 0: m.speed     = bump(m.speed);     break;
+                case 1: m.kickBoost = bump(m.kickBoost); break;
+                case 2: m.rollAmp   = bump(m.rollAmp);   break;
+                case 3: m.panAmp    = bump(m.panAmp);    break;
+                case 4: m.curveAmp  = bump(m.curveAmp);  break;
+                case 5: m.tileX     = bump(m.tileX);     break;
+                case 6: m.tileZ     = bump(m.tileZ);     break;
+                case 7: m.dirLerp   = bump(m.dirLerp);   break;
             }
             tunnel_->setMults(m);
             break;

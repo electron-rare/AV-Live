@@ -137,6 +137,10 @@ private:
     int    pendingDemoIdx_  = -1;
     float  prevKick_        = 0.0f;
 
+    // Live FX selector : une lettre sélectionne un paramètre, flèches
+    // haut/bas pour ajuster la valeur du paramètre sélectionné.
+    int  selectedFx_ = 0;   // 0..7, index dans l'array fxNames_
+
     void   initTransitions();
     void   beginTransition();
     void   drawTransitionComposite(int W, int H);
