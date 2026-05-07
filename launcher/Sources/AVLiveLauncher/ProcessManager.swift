@@ -30,6 +30,7 @@ final class ProcessManager: ObservableObject {
     private var sclangProc: Process?
     private var oscopeProc: Process?
     private var webProc: Process?
+    let osc = OSCSender(host: "127.0.0.1", port: 57121)
     private let logQueue = DispatchQueue(label: "cc.saillant.avlive.log")
     private let maxLogLines = 2000
 
@@ -180,6 +181,60 @@ final class ProcessManager: ObservableObject {
         if let url = URL(string: "http://localhost:\(webPort)/hydra/") {
             NSWorkspace.shared.open(url)
         }
+    }
+
+    // MARK: - Album catalog (filesystem-derived)
+
+    struct Album: Identifiable {
+        let letter: String
+        let slug: String        // e.g. "acid_journey"
+        let displayTitle: String  // e.g. "Acid Journey"
+        var id: String { letter }
+    }
+
+    /// Scans <avLive>/sound_algo/tracks/ for X_slug subdirectories and
+    /// returns an Album entry per letter, sorted alphabetically.
+    func discoverAlbums() -> [Album] {
+        let fm = FileManager.default
+        let tracksRoot = URL(fileURLWithPath: soundAlgoLoadFile)
+            .deletingLastPathComponent()
+            .appendingPathComponent("tracks", isDirectory: true)
+        guard let entries = try? fm.contentsOfDirectory(
+                atPath: tracksRoot.path) else {
+            return []
+        }
+        var albums: [Album] = []
+        for name in entries {
+            // X_slug pattern with X = single uppercase letter
+            guard name.count >= 3,
+                  name[name.index(name.startIndex, offsetBy: 1)] == "_",
+                  let first = name.first, first.isUppercase, first.isLetter else {
+                continue
+            }
+            let dir = tracksRoot.appendingPathComponent(name).path
+            var isDir: ObjCBool = false
+            guard fm.fileExists(atPath: dir, isDirectory: &isDir),
+                  isDir.boolValue else { continue }
+            let letter = String(first)
+            let slug = String(name.dropFirst(2))
+            let title = slug.split(separator: "_")
+                            .map { $0.prefix(1).uppercased() + $0.dropFirst() }
+                            .joined(separator: " ")
+            albums.append(Album(letter: letter, slug: slug, displayTitle: title))
+        }
+        return albums.sorted { $0.letter < $1.letter }
+    }
+
+    func playAlbum(_ letter: String, gap: Int = 8) {
+        osc.send("/control/playAlbum", letter, gap)
+    }
+
+    func playTrack(_ letter: String, _ n: Int) {
+        osc.send("/control/playTrack", letter, n)
+    }
+
+    func stopAlbum() {
+        osc.send("/control/stopAlbum")
     }
 
     // MARK: - sclang

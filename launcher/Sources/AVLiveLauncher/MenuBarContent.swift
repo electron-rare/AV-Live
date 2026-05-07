@@ -50,6 +50,11 @@ struct MenuBarContent: View {
 
             Divider()
 
+            // Album quick-launcher : sends /control/playAlbum <letter> over OSC
+            AlbumLauncher(processManager: processManager)
+
+            Divider()
+
             HStack {
                 Button(action: openLogs) {
                     Label("Logs", systemImage: "text.alignleft")
@@ -63,11 +68,65 @@ struct MenuBarContent: View {
             }
         }
         .padding(14)
-        .frame(width: 360)
+        .frame(width: 380)
         .sheet(isPresented: $showSettings) {
             SettingsView(processManager: processManager,
                          dismiss: { showSettings = false })
         }
+    }
+}
+
+private struct AlbumLauncher: View {
+    @ObservedObject var processManager: ProcessManager
+    @State private var albums: [ProcessManager.Album] = []
+    @State private var gap: Int = 8
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack {
+                Text("Albums").font(.subheadline).bold()
+                Spacer()
+                Text("gap").font(.caption).foregroundColor(.secondary)
+                Stepper(value: $gap, in: 0...32) {
+                    Text("\(gap)s").font(.system(.caption, design: .monospaced))
+                }
+                .labelsHidden()
+                .frame(width: 60)
+                Button(action: processManager.stopAlbum) {
+                    Image(systemName: "stop.fill")
+                }
+                .help("Stop album")
+            }
+            if albums.isEmpty {
+                Text("no tracks/ folder found")
+                    .font(.caption).foregroundColor(.secondary)
+            } else {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 4) {
+                        ForEach(albums) { album in
+                            Button(action: {
+                                processManager.playAlbum(album.letter, gap: gap)
+                            }) {
+                                VStack(spacing: 1) {
+                                    Text(album.letter)
+                                        .font(.system(.caption, design: .monospaced).bold())
+                                    Text(album.displayTitle)
+                                        .font(.system(size: 9))
+                                        .lineLimit(1)
+                                        .truncationMode(.tail)
+                                }
+                                .frame(width: 64, height: 30)
+                                .padding(.horizontal, 2)
+                            }
+                            .help("\(album.letter) — \(album.displayTitle)")
+                            .buttonStyle(.bordered)
+                        }
+                    }
+                    .padding(.vertical, 2)
+                }
+            }
+        }
+        .onAppear { albums = processManager.discoverAlbums() }
     }
 }
 
