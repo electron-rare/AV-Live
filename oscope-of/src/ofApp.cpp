@@ -397,35 +397,47 @@ void ofApp::drawPanelLabel(int x, int y, const char* title,
 }
 
 void ofApp::drawScope4(int W, int H) {
-    // 1) Fond : tunnel 3D OU starfield demoscene si toggle actif.
-    if (starfieldReplaceTunnel_) {
+    // Synchronise les flags du DemoFx avec ScopeToggles (touches 0-9).
+    demo_.scrollerEnabled()  = scope4_.scroller;
+    demo_.copperEnabled()    = scope4_.copperBars;
+    demo_.bobsEnabled()      = scope4_.bobs;
+    demo_.starfieldEnabled() = scope4_.starfield;
+
+    // 1) Fond : starfield remplace le tunnel si toggle actif, sinon tunnel.
+    if (scope4_.starfield) {
         ofBackground(0);
         demo_.drawStarfield(W, H);
-    } else {
+    } else if (scope4_.tunnel) {
         tunnel_->draw(0, 0, W, H);
+    } else {
+        ofBackground(0);
     }
 
-    // 1bis) HUD pseudo-aléatoire de valeurs sub-10 Hz sur les "carreaux".
-    drawTunnelHud(W, H);
+    // 1bis) HUD pseudo-aléatoire de valeurs sub-10 Hz.
+    if (scope4_.tunnelHud) drawTunnelHud(W, H);
 
-    // 1ter) Copper bars demoscene en haut + logo bobs.
-    demo_.drawCopperBars(W, H);
-    demo_.drawBobs(W, H, "AV-LIVE");
+    // 1ter) Copper bars + logo bobs.
+    if (scope4_.copperBars) demo_.drawCopperBars(W, H);
+    if (scope4_.bobs)       demo_.drawBobs(W, H, "AV-LIVE");
 
     const float cx = W * 0.5f;
     const float cy = H * 0.5f;
     const float minSide = static_cast<float>(std::min(W, H));
 
-    // 2) Polar central, focal, centré PILE sur le tunnel (cx, cy).
-    const int polarS = static_cast<int>(minSide * 0.55f);
-    polar_->draw(static_cast<int>(cx) - polarS / 2,
-                 static_cast<int>(cy) - polarS / 2,
-                 polarS, polarS);
+    // 2) Polar central — toggle 8.
+    if (scope4_.polar) {
+        const int polarS = static_cast<int>(minSide * 0.55f);
+        polar_->draw(static_cast<int>(cx) - polarS / 2,
+                     static_cast<int>(cy) - polarS / 2,
+                     polarS, polarS);
+    }
 
-    // 3) Spectrogramme circulaire en anneau autour du polar.
-    const float ringInner = minSide * 0.27f;
-    const float ringOuter = minSide * 0.36f;
-    spectro_->drawCircular(cx, cy, ringInner, ringOuter);
+    // 3) Spectro ring colorisé — toggle 7.
+    if (scope4_.spectroRing) {
+        const float ringInner = minSide * 0.27f;
+        const float ringOuter = minSide * 0.36f;
+        spectro_->drawCircular(cx, cy, ringInner, ringOuter);
+    }
 
     // 4) Lissajous additif fullscreen pour le glow ambiant (sous le scope).
     ofEnableBlendMode(OF_BLENDMODE_ADD);
@@ -493,14 +505,14 @@ void ofApp::drawScope4(int W, int H) {
         ofPopStyle();
     }
 
-    // 5) WAVEFORM circulaire FULLSCREEN, en PREMIER PLAN — look CRT rétro
-    //    avec phosphor additif, ticks de timeline, vignette interne. Les
-    //    rings CH1/CH2/slow font le tour complet (timeline → angle 0..2π).
-    waveform_->setCircular(true);
-    waveform_->draw(0, 0, W, H);
-    waveform_->setCircular(false);
+    // 5) WAVEFORM circulaire CRT rétro — toggle 9.
+    if (scope4_.waveform) {
+        waveform_->setCircular(true);
+        waveform_->draw(0, 0, W, H);
+        waveform_->setCircular(false);
+    }
 
-    // 6) Sine scroller demoscene depuis greetings.txt, par-dessus tout.
+    // 6) Sine scroller — toggle 3 (synchronisé avec demo_.scrollerEnabled).
     demo_.drawScroller(W, H);
 }
 
@@ -589,19 +601,19 @@ void ofApp::windowResized(int w, int h) {
 }
 
 void ofApp::keyPressed(int key) {
+    // Toggles Scope4 — touches 1..9 chacune un effet demoscene, 0 = reset.
+    auto resetToggles = [&]() { scope4_ = ScopeToggles{}; };
     switch (key) {
-        case '1': mode_ = Mode::Lissajous;   break;
-        case '2': mode_ = Mode::Spectrogram; break;
-        case '3': mode_ = Mode::Reactive;    break;
-        case '4': mode_ = Mode::Hybrid;      break;
-        case '5': mode_ = Mode::Waveform;    break;
-        case '6': mode_ = Mode::Polar;       break;
-        case '7': mode_ = Mode::Plasma;      break;
-        case '8': mode_ = Mode::Particles;   break;
-        case '9': mode_ = Mode::Kaleido;     break;
-        case '0': mode_ = Mode::Tunnel;      break;
-        case '-': mode_ = Mode::Mesh;        break;
-        case 'q': mode_ = Mode::Scope4;      break;
+        case '1': scope4_.tunnel       = !scope4_.tunnel;      break;
+        case '2': scope4_.starfield    = !scope4_.starfield;   break;
+        case '3': scope4_.scroller     = !scope4_.scroller;    break;
+        case '4': scope4_.copperBars   = !scope4_.copperBars;  break;
+        case '5': scope4_.bobs         = !scope4_.bobs;        break;
+        case '6': scope4_.tunnelHud    = !scope4_.tunnelHud;   break;
+        case '7': scope4_.spectroRing  = !scope4_.spectroRing; break;
+        case '8': scope4_.polar        = !scope4_.polar;       break;
+        case '9': scope4_.waveform     = !scope4_.waveform;    break;
+        case '0': resetToggles();                              break;
         case 'f':
             fullscreen_ = !fullscreen_;
             ofSetFullscreen(fullscreen_);
@@ -611,14 +623,6 @@ void ofApp::keyPressed(int key) {
         case 'k': autoGlitchOnKick_ = !autoGlitchOnKick_; break;
         case ' ': postfx_.triggerGlitch(0.8f); break;
 
-        // Demoscene toggles (touches symboles, hors zone a-z FX live).
-        case '\'': demo_.scrollerEnabled()  = !demo_.scrollerEnabled();  break;
-        case ';':  demo_.copperEnabled()    = !demo_.copperEnabled();    break;
-        case ',':  demo_.bobsEnabled()      = !demo_.bobsEnabled();      break;
-        case '.':
-            demo_.starfieldEnabled() = !demo_.starfieldEnabled();
-            starfieldReplaceTunnel_  = demo_.starfieldEnabled();
-            break;
         case 'r':
             lissajous_->reloadShaders();
             reactive_->reloadShaders();

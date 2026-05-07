@@ -72,7 +72,19 @@ private:
     oscope::PostFx postfx_;
     oscope::AudioAnalyzer audio_;
     oscope::DemoFx demo_;
-    bool starfieldReplaceTunnel_ = false;
+
+    // Toggles Scope4 — touches 1-9 + 0 reset.
+    struct ScopeToggles {
+        bool tunnel       = true;   // 1 — tunnel 3D background
+        bool starfield    = false;  // 2 — starfield (remplace le tunnel)
+        bool scroller     = true;   // 3 — sine scroller greetings.txt
+        bool copperBars   = true;   // 4 — copper bars haut
+        bool bobs         = true;   // 5 — logo bobs
+        bool tunnelHud    = true;   // 6 — HUD aléatoire sub-10Hz
+        bool spectroRing  = true;   // 7 — spectro circular ring
+        bool polar        = true;   // 8 — polar central
+        bool waveform     = true;   // 9 — waveform circular CRT
+    } scope4_;
 
     std::unique_ptr<oscope::LissajousVis>   lissajous_;
     std::unique_ptr<oscope::SpectrogramVis> spectro_;
