@@ -167,8 +167,15 @@ void HantekDevice::stop() {
 void HantekDevice::setSampleRate(uint32_t hz) {
     sampleRateHz_.store(hz);
     if (handle_ != nullptr && running_.load()) {
-        const uint8_t code = sampleRateCode(hz);
+        // Le FX2 (firmware OpenHantek6022) attend la séquence : stop (0xE3=0)
+        // → set sample rate (0xE2) → start (0xE3=1). Sans le re-start, le
+        // bulk endpoint cesse d'émettre et le stream se fige.
+        const uint8_t stopTrig  = 0x00;
+        const uint8_t code      = sampleRateCode(hz);
+        const uint8_t startTrig = 0x01;
+        sendVendorControl(0xE3, 0, 0, &stopTrig, 1);
         sendVendorControl(kReqSetSampleRate, 0, 0, &code, 1);
+        sendVendorControl(0xE3, 0, 0, &startTrig, 1);
     }
 }
 

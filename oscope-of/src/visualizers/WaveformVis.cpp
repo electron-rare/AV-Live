@@ -9,10 +9,11 @@ void WaveformVis::setup(int w, int h) {
     h_ = h;
     trace1_.assign(syntheticSize_, 0.0f);
     trace2_.assign(syntheticSize_, 0.0f);
-    // Ring d'historique : ~16x la fenêtre pour pouvoir scroller en arrière
-    // sans trou même avec un timebase lent.
-    ring1_.assign(syntheticSize_ * 16, 0.0f);
-    ring2_.assign(syntheticSize_ * 16, 0.0f);
+    // Ring d'historique : assez grand pour que le timebase puisse aller
+    // jusqu'à ~125 ms à 8 MS/s (ou 1 s à 1 MS/s). 1 M floats ≈ 4 Mo par
+    // canal, soit 8 Mo total — acceptable pour une vue scope live.
+    ring1_.assign(1 << 20, 0.0f);
+    ring2_.assign(1 << 20, 0.0f);
     ringHead_ = 0;
 }
 
@@ -42,12 +43,13 @@ void WaveformVis::update(const VisFrame& frame) {
         if (scrollSpeed_ < 0.01f) return;
 
         // Largeur de la fenêtre = timebase × divisions, convertie en samples.
-        // (sampleRate * (ms/div × divX) / 1000)
+        // (sampleRate * (ms/div × divX) / 1000). On NE clamp PAS à
+        // trace1_.size() : on downsample lors du remplissage du trace, ce
+        // qui rend le slider timebase réellement effectif.
         const float winSec   = (timeMsPerDiv_ * 0.001f) * divX_;
         std::size_t winSamples = static_cast<std::size_t>(
             std::max(64.0f, std::min(static_cast<float>(cap),
                                      winSec * sampleRateHz_)));
-        winSamples = std::min(winSamples, trace1_.size());
 
         // Position de lecture : tail = head - winSamples (mode freeze) ou
         // tail décalé pour un effet de scroll continu.
