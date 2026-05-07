@@ -206,8 +206,9 @@ thisProcess.openUDPPort(~webBridgeIn);
 // Reboot serveur web (Node) : ecrit un sentinel que le launcher
 // surveille. sclang reste en vie, juste le serveur Node redemarre.
 ~webBridgeAdd.("/control/rebootWeb", {
+    var sentinel;
     "[web_bridge] /control/rebootWeb reçu — relance Node...".postln;
-    var sentinel = Platform.userHomeDir ++ "/.av-live-restart-web";
+    sentinel = Platform.userHomeDir ++ "/.av-live-restart-web";
     File.use(sentinel, "w") { |f| f.write("1") };
 });
 
