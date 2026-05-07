@@ -21,6 +21,8 @@
 #include "visualizers/PlasmaVis.h"
 #include "visualizers/ParticleVis.h"
 #include "visualizers/KaleidoVis.h"
+#include "visualizers/TunnelVis.h"
+#include "visualizers/MeshVis.h"
 
 #include <memory>
 
@@ -29,6 +31,7 @@ public:
     enum class Mode {
         Lissajous, Spectrogram, Reactive, Waveform,
         Polar, Plasma, Particles, Kaleido,
+        Tunnel, Mesh,
         Hybrid
     };
 
@@ -58,6 +61,8 @@ private:
     std::unique_ptr<oscope::PlasmaVis>      plasma_;
     std::unique_ptr<oscope::ParticleVis>    particles_;
     std::unique_ptr<oscope::KaleidoVis>     kaleido_;
+    std::unique_ptr<oscope::TunnelVis>      tunnel_;
+    std::unique_ptr<oscope::MeshVis>        mesh_;
 
     std::vector<float> ch1_, ch2_;
     Mode mode_ = Mode::Hybrid;

@@ -44,6 +44,8 @@ const char* modeName(ofApp::Mode m) {
         case ofApp::Mode::Plasma:      return "Plasma";
         case ofApp::Mode::Particles:   return "Particles";
         case ofApp::Mode::Kaleido:     return "Kaleido";
+        case ofApp::Mode::Tunnel:      return "Tunnel 3D";
+        case ofApp::Mode::Mesh:        return "Mesh 3D";
         case ofApp::Mode::Hybrid:      return "Hybrid";
     }
     return "?";
@@ -75,6 +77,8 @@ void ofApp::setup() {
     plasma_    = std::make_unique<oscope::PlasmaVis>();
     particles_ = std::make_unique<oscope::ParticleVis>();
     kaleido_   = std::make_unique<oscope::KaleidoVis>();
+    tunnel_    = std::make_unique<oscope::TunnelVis>();
+    mesh_      = std::make_unique<oscope::MeshVis>();
     lissajous_->setup(W, H);
     spectro_->setup(W, H / 4);
     reactive_->setup(W, H);
@@ -83,6 +87,8 @@ void ofApp::setup() {
     plasma_->setup(W, H);
     particles_->setup(W, H);
     kaleido_->setup(W, H);
+    tunnel_->setup(W, H);
+    mesh_->setup(W, H);
 
     postfx_.setup(W, H);
 
@@ -137,6 +143,8 @@ void ofApp::loadSettings() {
     else if (m == "plasma")       mode_ = Mode::Plasma;
     else if (m == "particles")    mode_ = Mode::Particles;
     else if (m == "kaleido")      mode_ = Mode::Kaleido;
+    else if (m == "tunnel")       mode_ = Mode::Tunnel;
+    else if (m == "mesh")         mode_ = Mode::Mesh;
     else                          mode_ = Mode::Hybrid;
 }
 
@@ -186,6 +194,8 @@ void ofApp::update() {
     plasma_->update(frame);
     particles_->update(frame);
     kaleido_->update(frame);
+    tunnel_->update(frame);
+    mesh_->update(frame);
 
     applyOscFx();
 
@@ -229,13 +239,15 @@ void ofApp::drawMode(Mode m, int x, int y, int w, int h) {
             particles_->draw(x, y, w, h);
             break;
         case Mode::Kaleido:     kaleido_->draw(x, y, w, h);     break;
+        case Mode::Tunnel:      tunnel_->draw(x, y, w, h);      break;
+        case Mode::Mesh:        mesh_->draw(x, y, w, h);        break;
         case Mode::Hybrid:      drawHybrid(w, h);               break;
     }
 }
 
 void ofApp::drawHybrid(int W, int H) {
-    // Background plasma stretches across the full canvas
-    plasma_->draw(0, 0, W, H);
+    // Background : the 3D tunnel fills the canvas
+    tunnel_->draw(0, 0, W, H);
 
     // 2x2 quadrant overlay with additive blending
     ofEnableBlendMode(OF_BLENDMODE_ADD);
@@ -244,7 +256,7 @@ void ofApp::drawHybrid(int W, int H) {
     lissajous_->draw(0,  0,  hw, hh);
     polar_->draw   (hw, 0,  hw, hh);
     kaleido_->draw (0,  hh, hw, hh);
-    reactive_->draw(hw, hh, hw, hh);
+    mesh_->draw    (hw, hh, hw, hh);
     ofDisableBlendMode();
 
     // Particle field on top, fullscreen
@@ -307,6 +319,8 @@ void ofApp::keyPressed(int key) {
         case '7': mode_ = Mode::Plasma;      break;
         case '8': mode_ = Mode::Particles;   break;
         case '9': mode_ = Mode::Kaleido;     break;
+        case '0': mode_ = Mode::Tunnel;      break;
+        case '-': mode_ = Mode::Mesh;        break;
         case 'f':
             fullscreen_ = !fullscreen_;
             ofSetFullscreen(fullscreen_);
@@ -319,6 +333,7 @@ void ofApp::keyPressed(int key) {
             lissajous_->reloadShaders();
             reactive_->reloadShaders();
             plasma_->reloadShaders();
+            tunnel_->reloadShaders();
             postfx_.reloadShader();
             ofLogNotice("ofApp") << "Shaders rechargés";
             break;
