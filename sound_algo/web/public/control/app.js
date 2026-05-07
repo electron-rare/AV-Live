@@ -263,17 +263,20 @@ function connect() {
   });
 }
 
-// Auto-retry album list if still empty 4s after WS open (sclang slow boot)
-let albumRetryDone = false;
+// Auto-retry catalog queries while empty. sclang takes 60-90s to boot
+// from a cold start, and may get restarted out from under the browser
+// (operator relaunching the launcher). Keep retrying every 5s as long
+// as the bridge is alive AND the local catalog is empty AND we've heard
+// from sclang at least once in the last 4s.
 setInterval(() => {
-  if (!albumRetryDone && state.ws && state.ws.readyState === WebSocket.OPEN
-      && state.albums && state.albums.size === 0
+  if (state.ws && state.ws.readyState === WebSocket.OPEN
       && Date.now() - lastSyncAt < 4000) {
-    send("/control/listAlbums");
-    send("/control/listSections");
-    albumRetryDone = true;
+    if (state.albums && state.albums.size === 0) {
+      send("/control/listAlbums");
+      send("/control/listSections");
+    }
   }
-}, 2000);
+}, 5000);
 
 function send(address, ...args) {
   if (!state.ws || state.ws.readyState !== WebSocket.OPEN) return;
