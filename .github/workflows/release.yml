@@ -54,10 +54,18 @@ jobs:
           cd ~/of/apps/myApps/oscope-of
           make OF_ROOT=$HOME/of -j4 Release
 
-      - name: Build launcher
+      - name: Build launcher (universal)
         run: |
           cd launcher
-          bash build.sh || true   # tolère build.sh peut être manquant
+          chmod +x build.sh 2>/dev/null || true
+          if [ -f build.sh ]; then
+            bash build.sh || true
+          else
+            xcodebuild -scheme AVLiveLauncher -configuration Release \
+              -destination 'platform=macOS' \
+              -derivedDataPath build ARCHS='arm64 x86_64' || true
+          fi
+          ls -la build/ 2>/dev/null || true
 
       - name: Verify binary
         run: |
@@ -72,27 +80,72 @@ jobs:
           # accessibles depuis n'importe où).
           cp -r data oscope-of.app/Contents/Resources/data || mkdir -p oscope-of.app/Contents/Resources/ && cp -r data oscope-of.app/Contents/Resources/
 
-      - name: Create DMG
+      - name: Stage DMG payload
         run: |
           cd "$GITHUB_WORKSPACE"
-          mkdir -p dist
-          create-dmg \
-            --volname "AV-Live" \
-            --volicon "oscope-of/bin/data/sprites/amiga_wb.png" \
-            --window-pos 200 120 \
-            --window-size 600 400 \
-            --icon-size 100 \
-            --icon "oscope-of.app" 175 200 \
-            --hide-extension "oscope-of.app" \
-            --app-drop-link 425 200 \
-            "dist/AV-Live-${{ github.ref_name }}.dmg" \
-            "oscope-of/bin/oscope-of.app" \
-          || true
-          # Fallback si create-dmg échoue : tar.gz du .app
-          if [ ! -f "dist/AV-Live-${{ github.ref_name }}.dmg" ]; then
-            tar czf "dist/AV-Live-${{ github.ref_name }}.tar.gz" -C oscope-of/bin oscope-of.app
+          mkdir -p dist payload
+          # 1. oscope-of.app (visualizer)
+          cp -R oscope-of/bin/oscope-of.app payload/
+          # 2. AVLiveLauncher.app si build OK
+          if [ -d launcher/build/Release/AVLiveLauncher.app ]; then
+            cp -R launcher/build/Release/AVLiveLauncher.app payload/
+          elif [ -d launcher/build/Build/Products/Release/AVLiveLauncher.app ]; then
+            cp -R launcher/build/Build/Products/Release/AVLiveLauncher.app payload/
           fi
-          ls -la dist/
+          # 3. sound_algo source (pour sclang)
+          cp -R sound_algo payload/
+          # 4. INSTALL.txt avec prérequis et marche à suivre
+          cat > payload/INSTALL.txt <<'EOF'
+          AV-Live ${{ github.ref_name }}
+          ==============================
+
+          Ce paquet contient :
+            - oscope-of.app          : visualizer 41 backgrounds + 15 demoparties
+            - AVLiveLauncher.app     : menubar coordinateur (si build OK)
+            - sound_algo/            : moteur SuperCollider (1099 SynthDef, 345 tracks)
+            - INSTALL.txt            : ce fichier
+
+          PREREQUIS (à installer manuellement, non bundlés ici) :
+            1. SuperCollider 3.14+
+                 brew install --cask supercollider
+                 OU télécharger : https://supercollider.github.io/downloads
+            2. Node.js (pour l'UI web :3000)
+                 brew install node
+            3. libusb (pour Hantek 6022BL, optionnel)
+                 brew install libusb
+
+          INSTALLATION :
+            1. Copiez oscope-of.app et AVLiveLauncher.app dans /Applications
+            2. Copiez sound_algo/ dans ~/AV-Live/ (ou autre chemin de votre choix)
+            3. Au premier lancement, clic-droit > Ouvrir (Gatekeeper unsigned)
+            4. Le launcher autostart sclang + oscope-of + node web
+
+          DEMOPARTIES :
+            Touches 1-9, 0     -> 10 demos principales
+            Touches F6-F10     -> 5 demos additionnelles
+            Touche q / Esc     -> mode live (sphere wave 3D + override clavier)
+
+          Documentation complète : https://github.com/electron-rare/AV-Live
+          EOF
+
+          create-dmg \
+            --volname "AV-Live ${{ github.ref_name }}" \
+            --window-pos 200 120 \
+            --window-size 700 480 \
+            --icon-size 90 \
+            --icon "oscope-of.app" 130 180 \
+            --icon "AVLiveLauncher.app" 280 180 \
+            --icon "sound_algo" 430 180 \
+            --icon "INSTALL.txt" 580 180 \
+            --app-drop-link 350 360 \
+            "dist/AV-Live-${{ github.ref_name }}.dmg" \
+            payload/ \
+          || true
+          # Fallback tar.gz si create-dmg fail
+          if [ ! -f "dist/AV-Live-${{ github.ref_name }}.dmg" ]; then
+            tar czf "dist/AV-Live-${{ github.ref_name }}.tar.gz" -C payload .
+          fi
+          ls -la dist/ payload/
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
@@ -111,12 +164,28 @@ jobs:
 
             Build automatique pour macOS (Apple Silicon).
 
-            **Installation** :
-            1. Téléchargez le `.dmg` ci-dessous
-            2. Ouvrez-le, glissez `oscope-of.app` dans Applications
-            3. **Premier lancement** : clic-droit sur l'app > Ouvrir (Gatekeeper)
-            4. Pour le sound engine SuperCollider, voir le [README](https://github.com/electron-rare/AV-Live#quick-start)
+            ## Contenu du DMG
 
-            **Note** : binaire non signé Apple Developer. Les utilisateurs verront un avertissement Gatekeeper au premier lancement, c'est normal.
+            - `oscope-of.app` — visualizer (41 backgrounds, 15 demoparties, 35 modèles 3D)
+            - `AVLiveLauncher.app` — menubar coordinateur
+            - `sound_algo/` — moteur SuperCollider (1099 SynthDef, 345 tracks)
+            - `INSTALL.txt` — instructions complètes
+
+            ## Prérequis externes (à installer)
+
+            ```bash
+            brew install --cask supercollider     # moteur audio
+            brew install node libusb              # web UI + Hantek
+            ```
+
+            ## Installation
+
+            1. Téléchargez `AV-Live-${{ github.ref_name }}.dmg`
+            2. Glissez `oscope-of.app` + `AVLiveLauncher.app` dans `/Applications`
+            3. Copiez `sound_algo/` dans `~/AV-Live/sound_algo/`
+            4. **Premier lancement** : clic-droit sur l'app > Ouvrir (Gatekeeper non signé)
+            5. AVLiveLauncher démarre automatiquement sclang + oscope-of + node web
+
+            **Note** : binaire non signé Apple Developer. Avertissement Gatekeeper attendu au premier lancement.
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
