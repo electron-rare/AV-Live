@@ -305,6 +305,81 @@ void ofApp::drawHybrid(int W, int H) {
     spectro_->draw(0, H - sh, W, sh);
 }
 
+void ofApp::drawTunnelHud(int W, int H) {
+    const float now = ofGetElapsedTimef();
+    const float dt  = ofGetLastFrameTime();
+
+    // Refresh : ajoute 1-2 nouveaux items toutes les ~150-400 ms et
+    // remplace les expirés. Cap à 14 items simultanés.
+    if (now > tunnelHudNext_) {
+        tunnelHudNext_ = now + ofRandom(0.15f, 0.40f);
+        const int spawn = static_cast<int>(ofRandom(1.0f, 2.99f));
+        for (int s = 0; s < spawn && tunnelHud_.size() < 14; ++s) {
+            HudItem it;
+            // Position périphérique : on évite le quart central pour rester
+            // "sur les carreaux" et pas sur le polar/spectro.
+            const float ang = ofRandom(0.0f, TWO_PI);
+            const float rad = ofRandom(0.34f, 0.49f);  // 0.5 = bord
+            it.u = 0.5f + std::cos(ang) * rad;
+            it.v = 0.5f + std::sin(ang) * rad;
+            it.life  = ofRandom(0.8f, 2.5f);
+            it.born  = 0.0f;
+            it.scale = ofRandom(0.85f, 1.4f);
+            const float hz = ofRandom(0.2f, 9.9f);
+            it.text  = ofToString(hz, 1) + " Hz";
+            const char* labels[] = {
+                "LFO", "DC ", "DRIFT", "SUB", "MOD", "Δf",
+                "PHASE", "GAIN", "BIAS", "TRIG", "PWM", "ENV"
+            };
+            it.label = labels[static_cast<int>(ofRandom(0, 12))];
+            tunnelHud_.push_back(std::move(it));
+        }
+    }
+
+    // Update + draw
+    ofPushStyle();
+    ofEnableBlendMode(OF_BLENDMODE_ADD);
+    for (auto it = tunnelHud_.begin(); it != tunnelHud_.end(); ) {
+        it->life -= dt;
+        it->born += dt;
+        if (it->life <= 0.0f) {
+            it = tunnelHud_.erase(it);
+            continue;
+        }
+        // Alpha : fade-in 0.2s, fade-out dernière 0.4s.
+        const float fadeIn  = std::min(1.0f, it->born / 0.2f);
+        const float fadeOut = std::min(1.0f, it->life / 0.4f);
+        const int alpha = static_cast<int>(180 * fadeIn * fadeOut);
+
+        const float x = it->u * W;
+        const float y = it->v * H;
+
+        // Petit cadre rectangulaire phosphor — texture "tile HUD".
+        ofPushMatrix();
+        ofTranslate(x, y);
+        // Léger flicker scintillant
+        const float jitter = std::sin(now * 30.0f + it->born * 10.0f) * 0.5f + 0.5f;
+        ofSetColor(0, 200, 130, static_cast<int>(alpha * (0.4f + 0.6f * jitter)));
+        ofNoFill();
+        ofSetLineWidth(1);
+        const float bw = 64 * it->scale;
+        const float bh = 22 * it->scale;
+        ofDrawRectangle(-bw * 0.5f, -bh * 0.5f, bw, bh);
+        // Tick gauche (style cadran)
+        ofDrawLine(-bw * 0.5f - 6, 0, -bw * 0.5f, 0);
+
+        // Texte
+        ofSetColor(120, 255, 180, alpha);
+        ofDrawBitmapString(it->label, -bw * 0.5f + 4, -bh * 0.5f + 9);
+        ofSetColor(80, 220, 140, alpha);
+        ofDrawBitmapString(it->text,  -bw * 0.5f + 4,  bh * 0.5f - 3);
+        ofPopMatrix();
+        ++it;
+    }
+    ofDisableBlendMode();
+    ofPopStyle();
+}
+
 void ofApp::drawPanelLabel(int x, int y, const char* title,
                            const std::string& metric) {
     ofPushStyle();
@@ -324,6 +399,10 @@ void ofApp::drawScope4(int W, int H) {
     //    les uniformes uPan / uCurve modulent l'intérieur sans bouger le
     //    cadre, donc le polar central reste aligné avec la nef.
     tunnel_->draw(0, 0, W, H);
+
+    // 1bis) HUD pseudo-aléatoire de valeurs sub-10 Hz sur les "carreaux"
+    //       (zones périphériques visibles du tunnel).
+    drawTunnelHud(W, H);
 
     const float cx = W * 0.5f;
     const float cy = H * 0.5f;

@@ -50,6 +50,20 @@ private:
     void drawHybrid(int W, int H);
     void drawScope4(int W, int H);
     void drawPanelLabel(int x, int y, const char* title, const std::string& metric);
+    void drawTunnelHud(int W, int H);
+
+    // HUD pseudo-aléatoire sur les "carreaux" du tunnel : labels Hz < 10
+    // (composantes LF / sub-bass extraites de la magnitude FFT).
+    struct HudItem {
+        float u, v;       // pos écran 0..1
+        float life;       // secondes restantes
+        float born;       // âge total pour fade-in
+        float scale;
+        std::string text;
+        std::string label;
+    };
+    std::vector<HudItem> tunnelHud_;
+    float tunnelHudNext_ = 0.0f;
     void applyOscFx();
 
     oscope::HantekDevice scope_;
