@@ -203,6 +203,39 @@ thisProcess.openUDPPort(~webBridgeIn);
     }).play(AppClock);
 });
 
+// Reboot serveur web (Node) : ecrit un sentinel que le launcher
+// surveille. sclang reste en vie, juste le serveur Node redemarre.
+~webBridgeAdd.("/control/rebootWeb", {
+    "[web_bridge] /control/rebootWeb reçu — relance Node...".postln;
+    var sentinel = Platform.userHomeDir ++ "/.av-live-restart-web";
+    File.use(sentinel, "w") { |f| f.write("1") };
+});
+
+// ---------- Live tab : triggers FX one-shot ------------------------
+// /control/triggerSynth <name> -- joue un Synth one-shot du catalogue
+// trick : impact / riser / sweep / crash / gong / ...
+~webBridgeAdd.("/control/triggerSynth", { |msg|
+    var name = msg[1].asString.asSymbol;
+    {
+        Synth(name, [\decay, 2, \amp, 0.5]);
+    }.try { |err|
+        ("[web_bridge] triggerSynth " ++ name ++ " : " ++ err.errorString).postln;
+    };
+});
+
+~webBridgeAdd.("/control/snareFill", {
+    currentEnvironment[\snareFill] !? { ~snareFill.value }
+        ?? { "[web_bridge] ~snareFill n/a".postln };
+});
+~webBridgeAdd.("/control/tomFill", {
+    currentEnvironment[\tomFill] !? { ~tomFill.value }
+        ?? { "[web_bridge] ~tomFill n/a".postln };
+});
+~webBridgeAdd.("/control/randomTweak", {
+    currentEnvironment[\randomTweak] !? { ~randomTweak.value }
+        ?? { "[web_bridge] ~randomTweak n/a".postln };
+});
+
 // Reboot complet sclang : suicide via pkill, le launcher detecte
 // l'exit et relance sclang via terminationHandler + wantsAutoRestart.
 ~webBridgeAdd.("/control/rebootSclang", {

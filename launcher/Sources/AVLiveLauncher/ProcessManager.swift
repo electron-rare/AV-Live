@@ -160,6 +160,12 @@ final class ProcessManager: ObservableObject {
                 DispatchQueue.main.async {
                     self?.webProc = nil
                     self?.webRunning = false
+                    if self?.webWantsRestart == true {
+                        self?.webWantsRestart = false
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+                            self?.startWeb()
+                        }
+                    }
                 }
             }
             append(source: "launcher", text: "started web server on :\(webPort)")
@@ -169,7 +175,18 @@ final class ProcessManager: ObservableObject {
     }
 
     func stopWeb() {
+        webWantsRestart = false
         webProc?.terminate()
+    }
+
+    private var webWantsRestart = false
+
+    func restartWeb() {
+        guard webProc != nil else { startWeb(); return }
+        append(source: "launcher", text: "restarting web server…")
+        webWantsRestart = true
+        webProc?.terminate()
+        webWantsRestart = true
     }
 
     func openBrowser() {
@@ -297,18 +314,24 @@ final class ProcessManager: ObservableObject {
         sclangWantsRestart = true
     }
 
-    /// Watches the .av-live-restart-sclang sentinel file. Triggered by
-    /// the bridge's /control/rebootSclang OSC handler.
+    /// Watches both .av-live-restart-sclang and .av-live-restart-web
+    /// sentinel files. Triggered by the bridge's reboot handlers.
     private var sentinelTimer: Timer?
     func startSentinelWatcher() {
-        let path = FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent(".av-live-restart-sclang").path
+        let home = FileManager.default.homeDirectoryForCurrentUser
+        let sclangSentinel = home.appendingPathComponent(".av-live-restart-sclang").path
+        let webSentinel    = home.appendingPathComponent(".av-live-restart-web").path
         sentinelTimer?.invalidate()
         sentinelTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
-            if FileManager.default.fileExists(atPath: path) {
-                try? FileManager.default.removeItem(atPath: path)
+            if FileManager.default.fileExists(atPath: sclangSentinel) {
+                try? FileManager.default.removeItem(atPath: sclangSentinel)
                 self?.append(source: "launcher", text: "sentinel detected — restarting sclang")
                 self?.restartSclang()
+            }
+            if FileManager.default.fileExists(atPath: webSentinel) {
+                try? FileManager.default.removeItem(atPath: webSentinel)
+                self?.append(source: "launcher", text: "sentinel detected — restarting web")
+                self?.restartWeb()
             }
         }
     }

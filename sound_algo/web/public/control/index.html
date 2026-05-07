@@ -35,7 +35,8 @@
       <span class="ws-dot offline" id="scDot"></span>
       <span class="ws-label" id="scLabel">sclang</span>
     </div>
-    <button class="btn warn small" id="btnRebootScsynth" title="Reboot scsynth seul (click twice within 2s)">⟳ scsynth</button>
+    <button class="btn warn small" id="btnRebootScsynth" title="Reboot scsynth seul (click twice within 2s)">⟳ sc</button>
+    <button class="btn warn small" id="btnRebootWeb" title="Reboot serveur web Node (click twice within 2s)">⟳ web</button>
     <button class="btn warn" id="btnRebootSclang" title="Reboot sclang complet — recharge le moteur (click twice within 2s)">⟳ sclang</button>
     <button class="btn danger teardown" id="btnTeardown" title="Click twice within 2s to confirm">TEARDOWN</button>
   </div>
@@ -79,6 +80,7 @@
 <!-- ============================== TABS ============================== -->
 <nav class="tabs" id="tabs">
   <button class="tab active" data-target="tab-transport">Transport</button>
+  <button class="tab" data-target="tab-live">Live</button>
   <button class="tab" data-target="tab-album">Album</button>
   <button class="tab" data-target="tab-mixer">Mixer</button>
   <button class="tab" data-target="tab-steps">Steps</button>
@@ -137,6 +139,17 @@
       </div>
       <p class="hint">play/stop des Pdef principaux</p>
     </div>
+  </div>
+</section>
+
+<!-- ============================== LIVE ============================== -->
+<section class="tabpane" data-tab="tab-live">
+  <div class="card">
+    <div class="live-head">
+      <h2>Live pads</h2>
+      <span class="live-hint">Chaque pad est cablé sur la touche affichée en bas. Les sections : <b>Chains</b> (cyan, ligne 1), <b>One-shots</b> (orange, ligne 2), <b>Mutes / FX</b> (violet, ligne 3).</span>
+    </div>
+    <div class="live-grid" id="livePads"></div>
   </div>
 </section>
 

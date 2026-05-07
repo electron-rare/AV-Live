@@ -655,6 +655,14 @@ makeArmedButton(document.getElementById("btnRebootScsynth"), {
   toastFired: "scsynth reboot sent"
 });
 
+makeArmedButton(document.getElementById("btnRebootWeb"), {
+  armedLabel: "CONFIRM ?",
+  armedClass: "warn",
+  sendOnConfirm: () => send("/control/rebootWeb"),
+  toastArmed: "web reboot armed — click again",
+  toastFired: "web reboot sent — Node restarting"
+});
+
 makeArmedButton(document.getElementById("btnRebootSclang"), {
   armedLabel: "CONFIRM sclang ?",
   armedClass: "warn",
@@ -1784,3 +1792,121 @@ const HYDRA_PARAMS = [
 // ---------------- Init final ----------------------------------------
 // Underline calé après render initial (fonts, layout)
 window.addEventListener("load", () => requestAnimationFrame(positionUnderline));
+
+// =====================================================================
+// LIVE PADS — 30 boutons mappés sur les 3 rangées qwerty / asdf / zxcv
+// =====================================================================
+const LIVE_PADS = [
+  // Row 1 — CHAINS (cyan)
+  { key: "q", label: "INTRO",   sub: "chain",      kind: "chain",  arg: "intro"     },
+  { key: "w", label: "DROP",    sub: "chain",      kind: "chain",  arg: "drop"      },
+  { key: "e", label: "BRK",     sub: "breakdown",  kind: "chain",  arg: "breakdown" },
+  { key: "r", label: "BLD ×4",  sub: "buildup",    kind: "chain",  arg: "buildup", arg2: 4 },
+  { key: "t", label: "BLD ×8",  sub: "buildup",    kind: "chain",  arg: "buildup", arg2: 8 },
+  { key: "y", label: "TECHNO",  sub: "chain",      kind: "chain",  arg: "techno",  arg2: 4 },
+  { key: "u", label: "DNB",     sub: "chain",      kind: "chain",  arg: "dnb",     arg2: 4 },
+  { key: "i", label: "FADE",    sub: "outro fade", kind: "chain",  arg: "outroFade", arg2: 16 },
+  { key: "o", label: "C-STOP",  sub: "chain stop", kind: "chain",  arg: "stop"      },
+  { key: "p", label: "PLAY",    sub: "playAll",    kind: "playAll" },
+
+  // Row 2 — ONESHOTS (orange)
+  { key: "a", label: "RISER",   sub: "FX trick",  kind: "synth",  arg: "riser"   },
+  { key: "s", label: "STOP",    sub: "stopAll",   kind: "stopAll" },
+  { key: "d", label: "SN-FILL", sub: "fill",      kind: "fn",     arg: "snareFill" },
+  { key: "f", label: "TM-FILL", sub: "fill",      kind: "fn",     arg: "tomFill"   },
+  { key: "g", label: "SWEEP",   sub: "down",      kind: "synth",  arg: "sweep"   },
+  { key: "h", label: "CRASH",   sub: "FX trick",  kind: "synth",  arg: "crash"   },
+  { key: "j", label: "GONG",    sub: "FX trick",  kind: "synth",  arg: "gong"    },
+  { key: "k", label: "IMPACT",  sub: "FX trick",  kind: "synth",  arg: "impact"  },
+  { key: "l", label: "TAP",     sub: "BPM tap",   kind: "tap" },
+  { key: ";", label: "RANDOM",  sub: "tweak",     kind: "fn",     arg: "randomTweak" },
+
+  // Row 3 — MUTES + FX (purple)
+  { key: "z", label: "KICK",    sub: "mute",      kind: "muteToggle", voice: "kick"    },
+  { key: "x", label: "HAT",     sub: "mute",      kind: "muteToggle", voice: "hat"     },
+  { key: "c", label: "SNARE",   sub: "mute",      kind: "muteToggle", voice: "snare"   },
+  { key: "v", label: "CLAP",    sub: "mute",      kind: "muteToggle", voice: "clap"    },
+  { key: "b", label: "PERC",    sub: "mute",      kind: "muteToggle", voice: "perc"    },
+  { key: "n", label: "ACID",    sub: "mute",      kind: "muteToggle", voice: "acid"    },
+  { key: "m", label: "MELODY",  sub: "mute",      kind: "muteToggle", voice: "melody"  },
+  { key: ",", label: "HARMONY", sub: "mute",      kind: "muteToggle", voice: "harmony" },
+  { key: ".", label: "UNSOLO",  sub: "clear",     kind: "unsolo" },
+  { key: "/", label: "PING",    sub: "round-trip",kind: "ping" },
+];
+
+const liveMuteState = new Set();   // voices currently muted
+
+function firePad(pad, padEl) {
+  switch (pad.kind) {
+    case "chain":
+      if (pad.arg2 != null) send("/control/chain", pad.arg, pad.arg2);
+      else                   send("/control/chain", pad.arg);
+      break;
+    case "playAll":  send("/control/playAll");  break;
+    case "stopAll":  send("/control/stopAll");  break;
+    case "synth":    send("/control/triggerSynth", pad.arg); break;
+    case "fn":       send("/control/" + pad.arg);             break;
+    case "tap":      document.getElementById("btnTap")?.click(); break;
+    case "ping":     send("/control/ping");     break;
+    case "unsolo":   send("/control/unsolo");   break;
+    case "muteToggle": {
+      if (liveMuteState.has(pad.voice)) {
+        send("/control/unmute", pad.voice);
+        liveMuteState.delete(pad.voice);
+        padEl?.classList.remove("muted");
+      } else {
+        send("/control/mute", pad.voice);
+        liveMuteState.add(pad.voice);
+        padEl?.classList.add("muted");
+      }
+      break;
+    }
+  }
+  if (padEl) {
+    padEl.classList.remove("hit");
+    void padEl.offsetWidth;
+    padEl.classList.add("hit");
+  }
+}
+
+(function initLivePads() {
+  const host = document.getElementById("livePads");
+  if (!host) return;
+  const byKey = new Map();
+  LIVE_PADS.forEach(pad => {
+    const el = document.createElement("button");
+    const sectionClass =
+      LIVE_PADS.indexOf(pad) < 10 ? "live-pad-chain" :
+      LIVE_PADS.indexOf(pad) < 20 ? "live-pad-shot"  :
+                                    "live-pad-mute";
+    el.className = `live-pad ${sectionClass}`;
+    el.dataset.key = pad.key;
+    if (pad.voice) el.dataset.voice = pad.voice;
+    el.innerHTML =
+      `<div class="live-pad-label">${pad.label}</div>` +
+      `<div class="live-pad-sub">${pad.sub}</div>` +
+      `<div class="live-pad-key">${pad.key.toUpperCase()}</div>`;
+    el.addEventListener("click", () => firePad(pad, el));
+    host.appendChild(el);
+    byKey.set(pad.key, { pad, el });
+  });
+
+  // Keyboard handling — only when the Live tab is active. Overrides the
+  // global keymap (tab nav, refresh, stop, help) for the duration of
+  // the tab. Always honors Esc, ?/h, m for fallthrough.
+  document.addEventListener("keydown", (ev) => {
+    const t = ev.target;
+    if (t.matches?.("input, textarea, select, [contenteditable=true]")) return;
+    if (ev.metaKey || ev.ctrlKey || ev.altKey) return;
+
+    const liveTab = document.querySelector('.tabpane[data-tab="tab-live"]');
+    const isLive = liveTab && liveTab.classList.contains("active");
+    if (!isLive) return;
+
+    const pair = byKey.get(ev.key.toLowerCase());
+    if (!pair) return;
+    firePad(pair.pad, pair.el);
+    ev.preventDefault();
+    ev.stopPropagation();
+  }, true);  // capture phase so we win against the global handler
+})();
