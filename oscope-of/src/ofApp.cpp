@@ -46,6 +46,7 @@ const char* modeName(ofApp::Mode m) {
         case ofApp::Mode::Kaleido:     return "Kaleido";
         case ofApp::Mode::Tunnel:      return "Tunnel 3D";
         case ofApp::Mode::Mesh:        return "Mesh 3D";
+        case ofApp::Mode::Scope4:      return "Scope 4-up";
         case ofApp::Mode::Hybrid:      return "Hybrid";
     }
     return "?";
@@ -100,6 +101,10 @@ void ofApp::setup() {
     gui_.add(gainCh2_.setup("CH2 V/div", 1.0f, 0.25f, 5.0f));
     gui_.add(trailFade_.setup("Trail fade", 0.07f, 0.0f, 1.0f));
     gui_.add(sampleRateHz_.setup("Sample rate", 8000000, 1000000, 48000000));
+    gui_.add(timeMsPerDiv_.setup("Time ms/div", 5.0f, 0.05f, 200.0f));
+    gui_.add(scrollSpeed_.setup("Scroll", 0.0f, 0.0f, 1.0f));
+    lastSampleRateApplied_ = sampleRateHz_;
+    scope_.setSampleRate(static_cast<uint32_t>(lastSampleRateApplied_));
 
     // PostFx panel — placed to the right of the main GUI
     fxGui_.setup("post-fx", "fx-settings.xml", 230, 10);
@@ -145,6 +150,8 @@ void ofApp::loadSettings() {
     else if (m == "kaleido")      mode_ = Mode::Kaleido;
     else if (m == "tunnel")       mode_ = Mode::Tunnel;
     else if (m == "mesh")         mode_ = Mode::Mesh;
+    else if (m == "scope4" ||
+             m == "quad")         mode_ = Mode::Scope4;
     else                          mode_ = Mode::Hybrid;
 }
 
@@ -183,6 +190,15 @@ void ofApp::applyOscFx() {
 
 void ofApp::update() {
     osc_.update();
+    // Re-apply sample rate to the scope when the slider changes.
+    if (sampleRateHz_ != lastSampleRateApplied_) {
+        lastSampleRateApplied_ = sampleRateHz_;
+        scope_.setSampleRate(static_cast<uint32_t>(lastSampleRateApplied_));
+    }
+    // Push live timebase + scroll into WaveformVis.
+    waveform_->setTimeMsPerDiv(timeMsPerDiv_);
+    waveform_->setScrollSpeed(scrollSpeed_);
+    waveform_->setSampleRate(static_cast<float>(lastSampleRateApplied_));
     scope_.ring().readLatest(ch1_, ch2_, static_cast<std::size_t>(bufferSize_));
 
     oscope::VisFrame frame{ch1_, ch2_, osc_};
@@ -241,6 +257,15 @@ void ofApp::drawMode(Mode m, int x, int y, int w, int h) {
         case Mode::Kaleido:     kaleido_->draw(x, y, w, h);     break;
         case Mode::Tunnel:      tunnel_->draw(x, y, w, h);      break;
         case Mode::Mesh:        mesh_->draw(x, y, w, h);        break;
+        case Mode::Scope4: {
+            const int hw = w / 2;
+            const int hh = h / 2;
+            waveform_->draw (x,        y,         hw, hh);
+            spectro_->draw  (x + hw,   y,         hw, hh);
+            polar_->draw    (x,        y + hh,    hw, hh);
+            lissajous_->draw(x + hw,   y + hh,    hw, hh);
+            break;
+        }
         case Mode::Hybrid:      drawHybrid(w, h);               break;
     }
 }
@@ -364,6 +389,7 @@ void ofApp::keyPressed(int key) {
         case '9': mode_ = Mode::Kaleido;     break;
         case '0': mode_ = Mode::Tunnel;      break;
         case '-': mode_ = Mode::Mesh;        break;
+        case 'q': mode_ = Mode::Scope4;      break;
         case 'f':
             fullscreen_ = !fullscreen_;
             ofSetFullscreen(fullscreen_);

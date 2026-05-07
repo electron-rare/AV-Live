@@ -32,6 +32,7 @@ public:
         Lissajous, Spectrogram, Reactive, Waveform,
         Polar, Plasma, Particles, Kaleido,
         Tunnel, Mesh,
+        Scope4,   // waveform + spectrogram + polar pulsing + lissajous
         Hybrid
     };
 
@@ -76,6 +77,9 @@ private:
     ofxFloatSlider gainCh1_, gainCh2_;
     ofxFloatSlider trailFade_;
     ofxIntSlider sampleRateHz_;
+    ofxFloatSlider timeMsPerDiv_;
+    ofxFloatSlider scrollSpeed_;
+    int lastSampleRateApplied_ = 0;
     ofxLabel scopeStatusLabel_;
     ofxLabel oscStatusLabel_;
     ofxLabel modeLabel_;

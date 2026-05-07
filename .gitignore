@@ -10,8 +10,13 @@ launcher/**/xcuserdata/
 launcher/**/*.xcuserstate
 launcher/**/Package.resolved
 
-# openFrameworks
-oscope-of/bin/
+# openFrameworks — on garde les shaders + settings.json pour qu'ils
+# arrivent sur les autres machines, mais on ignore les binaires.
+oscope-of/bin/*
+!oscope-of/bin/data/
+oscope-of/bin/data/*
+!oscope-of/bin/data/shaders/
+!oscope-of/bin/data/settings.json
 oscope-of/obj/
 oscope-of/.vscode/
 oscope-of/Project.xcconfig

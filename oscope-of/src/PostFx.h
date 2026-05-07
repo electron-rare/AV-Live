@@ -14,7 +14,7 @@ public:
     struct Params {
         // Color
         float chroma       = 0.0f;  // chromatic aberration radius
-        float bloom        = 0.4f;  // bright-pass blur strength
+        float bloom        = 0.15f; // bright-pass blur strength (was 0.4 — saturated)
         float rgbShift     = 0.0f;  // hue rotation 0..1 = 0..2π
         float saturation   = 1.0f;  // 0..2 (1 = neutral)
 

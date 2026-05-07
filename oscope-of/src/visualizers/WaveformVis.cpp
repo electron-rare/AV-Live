@@ -9,6 +9,11 @@ void WaveformVis::setup(int w, int h) {
     h_ = h;
     trace1_.assign(syntheticSize_, 0.0f);
     trace2_.assign(syntheticSize_, 0.0f);
+    // Ring d'historique : ~16x la fenêtre pour pouvoir scroller en arrière
+    // sans trou même avec un timebase lent.
+    ring1_.assign(syntheticSize_ * 16, 0.0f);
+    ring2_.assign(syntheticSize_ * 16, 0.0f);
+    ringHead_ = 0;
 }
 
 void WaveformVis::update(const VisFrame& frame) {
@@ -22,16 +27,38 @@ void WaveformVis::update(const VisFrame& frame) {
     }
     beatPhase_ *= 0.92f;
 
-    // Si Hantek a fourni des samples, on les copie tels quels
+    // Si Hantek a fourni des samples, on alimente le ring d'historique
     if (frame.ch1.size() > 16) {
-        std::size_t n = std::min(frame.ch1.size(), trace1_.size());
+        const std::size_t cap = ring1_.size();
+        const std::size_t n = std::min(frame.ch1.size(), cap);
         for (std::size_t i = 0; i < n; ++i) {
-            trace1_[i] = frame.ch1[i];
-            trace2_[i] = (i < frame.ch2.size()) ? frame.ch2[i] : 0.0f;
+            ring1_[ringHead_] = frame.ch1[i];
+            ring2_[ringHead_] = (i < frame.ch2.size()) ? frame.ch2[i] : 0.0f;
+            ringHead_ = (ringHead_ + 1) % cap;
         }
-        if (n < trace1_.size()) {
-            std::fill(trace1_.begin() + n, trace1_.end(), 0.0f);
-            std::fill(trace2_.begin() + n, trace2_.end(), 0.0f);
+
+        // Mode FREEZE — scrollSpeed_ ~ 0 : on n'actualise pas la fenêtre
+        // affichée, le trace gèle tel qu'il était (utile pour analyser).
+        if (scrollSpeed_ < 0.01f) return;
+
+        // Largeur de la fenêtre = timebase × divisions, convertie en samples.
+        // (sampleRate * (ms/div × divX) / 1000)
+        const float winSec   = (timeMsPerDiv_ * 0.001f) * divX_;
+        std::size_t winSamples = static_cast<std::size_t>(
+            std::max(64.0f, std::min(static_cast<float>(cap),
+                                     winSec * sampleRateHz_)));
+        winSamples = std::min(winSamples, trace1_.size());
+
+        // Position de lecture : tail = head - winSamples (mode freeze) ou
+        // tail décalé pour un effet de scroll continu.
+        const std::size_t off = (cap + ringHead_ - winSamples) % cap;
+        for (std::size_t i = 0; i < trace1_.size(); ++i) {
+            const float t = static_cast<float>(i) /
+                            static_cast<float>(trace1_.size() - 1);
+            const std::size_t k = static_cast<std::size_t>(t * (winSamples - 1));
+            const std::size_t idx = (off + k) % cap;
+            trace1_[i] = ring1_[idx];
+            trace2_[i] = ring2_[idx];
         }
         return;
     }
@@ -119,11 +146,14 @@ void WaveformVis::draw(int x, int y, int w, int h) {
     ofSetColor(160, 220, 180);
     const float vdiv1 = 0.5f;
     const float vdiv2 = 0.5f;
-    const float tdiv  = 5.0f; // ms/div approximatif
     ofDrawBitmapString("CH1  " + ofToString(vdiv1, 2) + " V/div", x + 10, y + 16);
     ofDrawBitmapString("CH2  " + ofToString(vdiv2, 2) + " V/div", x + 10, y + 32);
-    ofDrawBitmapString("Time " + ofToString(tdiv, 1) + " ms/div", x + 10, y + 48);
-    ofDrawBitmapString("Trig auto", x + 10, y + 64);
+    ofDrawBitmapString("Time " + ofToString(timeMsPerDiv_, 2) + " ms/div",
+                       x + 10, y + 48);
+    ofDrawBitmapString(scrollSpeed_ < 0.01f ? "FROZEN" : "ROLL",
+                       x + 10, y + 64);
+    ofDrawBitmapString("Sr   " + ofToString(sampleRateHz_ * 1e-6f, 1) + " MS/s",
+                       x + 10, y + 80);
 
     ofPopMatrix();
     ofPopStyle();
