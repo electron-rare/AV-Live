@@ -187,6 +187,93 @@ function toast(msg, kind = "info", ttl = 3000) {
   setTimeout(() => { t.remove(); }, ttl);
 }
 
+// ---------------- Hamburger menu (responsive) ----------------------
+{
+  const btn = document.getElementById("tabMenuBtn");
+  const tabs = document.getElementById("tabs");
+  function toggleMenu(force) {
+    const willOpen = force !== undefined ? force : !tabs.classList.contains("open");
+    tabs.classList.toggle("open", willOpen);
+    if (btn) btn.classList.toggle("open", willOpen);
+  }
+  if (btn) btn.addEventListener("click", () => toggleMenu());
+  // Close menu on tab click (mobile)
+  if (tabs) tabs.addEventListener("click", (ev) => {
+    if (ev.target.matches("button.tab")) toggleMenu(false);
+  });
+}
+
+// ---------------- Help modal --------------------------------------
+{
+  const modal = document.getElementById("helpModal");
+  const open = () => { modal.hidden = false; };
+  const close = () => { modal.hidden = true; };
+  const btn = document.getElementById("helpBtn");
+  if (btn) btn.addEventListener("click", open);
+  document.getElementById("helpClose")?.addEventListener("click", close);
+  modal?.addEventListener("click", (ev) => {
+    if (ev.target === modal) close();
+  });
+  window.__helpOpen = open;
+  window.__helpClose = close;
+}
+
+// ---------------- Keyboard shortcuts -------------------------------
+document.addEventListener("keydown", (ev) => {
+  // Skip when user is typing in a form field
+  const t = ev.target;
+  if (t.matches?.("input, textarea, select, [contenteditable=true]")) return;
+  if (ev.metaKey || ev.ctrlKey || ev.altKey) return;
+
+  const tabsEl = document.getElementById("tabs");
+  const tabBtns = tabsEl ? Array.from(tabsEl.querySelectorAll("button.tab")) : [];
+  const activeIdx = tabBtns.findIndex(b => b.classList.contains("active"));
+
+  switch (ev.key) {
+    case "ArrowLeft":
+      if (tabBtns.length && activeIdx > 0) tabBtns[activeIdx - 1].click();
+      ev.preventDefault();
+      break;
+    case "ArrowRight":
+      if (tabBtns.length && activeIdx < tabBtns.length - 1) tabBtns[activeIdx + 1].click();
+      ev.preventDefault();
+      break;
+    case "?": case "h":
+      window.__helpOpen?.();
+      ev.preventDefault();
+      break;
+    case "Escape":
+      window.__helpClose?.();
+      break;
+    case "r":
+      send("/control/listAlbums");
+      send("/control/listSections");
+      send("/control/listMelodies");
+      send("/control/listSynthdefs");
+      toast("Catalogues rafraîchis", "info", 1200);
+      ev.preventDefault();
+      break;
+    case "s":
+      send("/control/stopAll");
+      toast("stop all", "info", 1000);
+      ev.preventDefault();
+      break;
+    case "m":
+      document.getElementById("tabMenuBtn")?.click();
+      ev.preventDefault();
+      break;
+    default:
+      // 1-9, 0 → tab N
+      if (/^[0-9]$/.test(ev.key)) {
+        const idx = ev.key === "0" ? 9 : (parseInt(ev.key, 10) - 1);
+        if (tabBtns[idx]) {
+          tabBtns[idx].click();
+          ev.preventDefault();
+        }
+      }
+  }
+});
+
 // ---------------- Pills active state -------------------------------
 // Adds .active class to the clicked pill within its panel and removes it
 // from any siblings of the same type. Listens at document level to handle
@@ -531,32 +618,50 @@ document.getElementById("btnFadeOut").addEventListener("click", () => {
   if (!confirm(`Fade out ${dur}s ?`)) return;
   send("/control/masterFadeOut", dur);
 });
-// Two-step teardown: first click arms (red flash), second click within 2s sends
-{
-  const btn = document.getElementById("btnTeardown");
+// Two-step "armed" pattern factored out — used by Reboot and Teardown
+function makeArmedButton(btn, options) {
+  const { armedLabel, armedClass, sendOnConfirm, toastArmed, toastFired } = options;
   let armed = false;
-  let armedTimer = null;
+  let timer = null;
+  const originalLabel = btn.textContent;
+  const originalClass = "armed-" + (armedClass || "");
   btn.addEventListener("click", () => {
     if (!armed) {
       armed = true;
-      btn.classList.add("armed");
-      btn.textContent = "CONFIRM ?";
-      toast("TEARDOWN armed — click again within 2s", "warn", 2000);
-      armedTimer = setTimeout(() => {
+      btn.classList.add(originalClass, "armed");
+      btn.textContent = armedLabel;
+      if (toastArmed) toast(toastArmed, "warn", 2000);
+      timer = setTimeout(() => {
         armed = false;
-        btn.classList.remove("armed");
-        btn.textContent = "TEARDOWN";
+        btn.classList.remove(originalClass, "armed");
+        btn.textContent = originalLabel;
       }, 2000);
       return;
     }
-    clearTimeout(armedTimer);
+    clearTimeout(timer);
     armed = false;
-    btn.classList.remove("armed");
-    btn.textContent = "TEARDOWN";
-    send("/control/teardown");
-    toast("TEARDOWN sent", "danger", 1500);
+    btn.classList.remove(originalClass, "armed");
+    btn.textContent = originalLabel;
+    sendOnConfirm();
+    if (toastFired) toast(toastFired, originalClass.includes("danger") ? "danger" : "info", 1500);
   });
 }
+
+makeArmedButton(document.getElementById("btnReboot"), {
+  armedLabel: "CONFIRM ⟳ ?",
+  armedClass: "warn",
+  sendOnConfirm: () => send("/control/rebootServer"),
+  toastArmed: "REBOOT armed — click again within 2s",
+  toastFired: "Reboot scsynth sent"
+});
+
+makeArmedButton(document.getElementById("btnTeardown"), {
+  armedLabel: "CONFIRM ?",
+  armedClass: "danger",
+  sendOnConfirm: () => send("/control/teardown"),
+  toastArmed: "TEARDOWN armed — click again within 2s",
+  toastFired: "TEARDOWN sent"
+});
 document.getElementById("btnPing").addEventListener("click", () => {
   document.getElementById("pingResult").textContent = "…";
   send("/control/ping");

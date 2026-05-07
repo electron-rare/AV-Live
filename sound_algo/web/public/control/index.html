@@ -35,12 +35,45 @@
       <span class="ws-dot offline" id="scDot"></span>
       <span class="ws-label" id="scLabel">sclang</span>
     </div>
+    <button class="btn warn" id="btnReboot" title="Reboot scsynth (click twice within 2s)">⟳ REBOOT</button>
     <button class="btn danger teardown" id="btnTeardown" title="Click twice within 2s to confirm">TEARDOWN</button>
   </div>
 </header>
 
 <!-- Toast container : transient notifications -->
 <div id="toasts" class="toasts" aria-live="polite"></div>
+
+<!-- Help / shortcut modal -->
+<div id="helpModal" class="help-modal" hidden>
+  <div class="help-modal-card">
+    <div class="help-modal-head">
+      <h2>Raccourcis clavier</h2>
+      <button class="btn ghost" id="helpClose" aria-label="Close">×</button>
+    </div>
+    <div class="help-modal-body">
+      <table class="kbd-table">
+        <tbody>
+          <tr><td><kbd>←</kbd> <kbd>→</kbd></td><td>onglet précédent / suivant</td></tr>
+          <tr><td><kbd>1</kbd>–<kbd>9</kbd>, <kbd>0</kbd></td><td>aller à l'onglet N</td></tr>
+          <tr><td><kbd>r</kbd></td><td>rafraîchir les catalogues (albums, sections, melodies)</td></tr>
+          <tr><td><kbd>s</kbd></td><td>stop all (Pdef)</td></tr>
+          <tr><td><kbd>?</kbd> ou <kbd>h</kbd></td><td>afficher cette aide</td></tr>
+          <tr><td><kbd>Esc</kbd></td><td>fermer la modal</td></tr>
+          <tr><td><kbd>m</kbd></td><td>ouvrir / fermer le menu (mobile)</td></tr>
+        </tbody>
+      </table>
+      <p class="help-note">Les raccourcis sont désactivés quand un champ est focus (input, textarea).</p>
+    </div>
+  </div>
+</div>
+
+<!-- Hamburger toggle (only visible < 1200px) -->
+<button class="tab-menu-btn" id="tabMenuBtn" aria-label="Menu" title="Menu (raccourcis clavier : ?)">
+  <span></span><span></span><span></span>
+</button>
+
+<!-- Help modal trigger -->
+<button class="help-btn" id="helpBtn" aria-label="Help" title="Raccourcis clavier (?)">?</button>
 
 <!-- ============================== TABS ============================== -->
 <nav class="tabs" id="tabs">

@@ -190,6 +190,19 @@ thisProcess.openUDPPort(~webBridgeIn);
 
 ~webBridgeAdd.("/control/teardown", { ~teardown.() });
 
+// Reboot scsynth + replay setupAll (recharge engine + wrappers + tracks
+// + web_bridge). Conserve l'etat sclang (catalogues, dicts, OSCdef).
+// Le client web doit re-emettre listAlbums/Sections apres ~5s.
+~webBridgeAdd.("/control/rebootServer", {
+    "[web_bridge] /control/rebootServer reçu — quit puis ~setupAll".postln;
+    Routine({
+        Server.default.quit;
+        2.wait;
+        ~setupAll_done = nil;
+        ~setupAll.();
+    }).play(AppClock);
+});
+
 // ---------- Mixer ----------------------------------------------------
 ~webBridgeAdd.("/control/setVol", { |msg|
     ~setVol.(msg[1].asString.asSymbol, msg[2]);
