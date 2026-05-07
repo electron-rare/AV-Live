@@ -335,7 +335,7 @@ void ofApp::drawScope4(int W, int H) {
     const int satW = static_cast<int>(W * 0.24f);
     const int satH = static_cast<int>(H * 0.20f);
 
-    struct Satellite { Visualizer* vis; const char* tag; std::string metric; };
+    struct Satellite { oscope::Visualizer* vis; const char* tag; std::string metric; };
     const float kick = osc_.amp("kick");
     const float lead = osc_.amp("lead");
     const float bass = osc_.amp("bass");
