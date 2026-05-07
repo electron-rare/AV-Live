@@ -38,7 +38,7 @@ public:
     static constexpr float audioSr() { return kAudioSr; }
 
 private:
-    static constexpr std::size_t kFftSize  = 1024;
+    static constexpr std::size_t kFftSize  = 2048;  // 23.4 Hz/bin a 48k
     static constexpr float       kAudioSr  = 48000.0f;
 
     FFT  fft_;

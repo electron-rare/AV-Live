@@ -1645,8 +1645,10 @@ void ofApp::keyPressed(int key) {
         case ' ': postfx_.triggerGlitch(0.8f); break;
         case 'q':
         case OF_KEY_ESC:
+            // Live mode : sphere wave 3D par défaut comme background.
             narrativeMode_ = false;
-            liveBgOverride_ = false;
+            liveBg_ = BgKind::SphereWave;
+            liveBgOverride_ = true;
             demo_.setText("");
             break;
 
