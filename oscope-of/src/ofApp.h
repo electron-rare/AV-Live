@@ -101,7 +101,8 @@ private:
                         Penrose, Sphere3D, IcoMesh, DodMesh, TorusMesh,
                         Supershape, Lorenz, Hopf, Enneper, HopfLink,
                         BoingBall, Mode7, PlasmaC64, DotTunnel,
-                        Gear, Cone, Pyramid, Rose3d, Geosphere, DNA };
+                        Gear, Cone, Pyramid, Rose3d, Geosphere, DNA,
+                        Workbench, MacOSClassic, AtariFuji, OceanLoader, Win95 };
     struct DemoScene {
         const char*           name;
         float                 durSec;
@@ -210,6 +211,11 @@ private:
     std::unique_ptr<oscope::ModelVis> modelRose_;
     std::unique_ptr<oscope::ModelVis> modelGeosphere_;
     std::unique_ptr<oscope::ModelVis> modelDNA_;
+    std::unique_ptr<oscope::ShaderVis> workbench_;
+    std::unique_ptr<oscope::ShaderVis> macosClassic_;
+    std::unique_ptr<oscope::ShaderVis> atariFuji_;
+    std::unique_ptr<oscope::ShaderVis> oceanLoader_;
+    std::unique_ptr<oscope::ShaderVis> win95_;
 
     std::vector<float> ch1_, ch2_;
     Mode mode_ = Mode::Scope4;

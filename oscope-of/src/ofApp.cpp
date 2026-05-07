@@ -129,6 +129,11 @@ void ofApp::setup() {
     modelRose_      = mp("rose3d.ply");
     modelGeosphere_ = mp("geosphere.ply");
     modelDNA_       = mp("dna.ply");
+    workbench_     = std::make_unique<oscope::ShaderVis>("shaders/workbench");
+    macosClassic_  = std::make_unique<oscope::ShaderVis>("shaders/macos_classic");
+    atariFuji_     = std::make_unique<oscope::ShaderVis>("shaders/atari_fuji");
+    oceanLoader_   = std::make_unique<oscope::ShaderVis>("shaders/ocean_loader");
+    win95_         = std::make_unique<oscope::ShaderVis>("shaders/win95");
     lissajous_->setup(W, H);
     spectro_->setup(W, H / 4);
     reactive_->setup(W, H);
@@ -184,6 +189,11 @@ void ofApp::setup() {
     modelRose_->setup(W, H);
     modelGeosphere_->setup(W, H);
     modelDNA_->setup(W, H);
+    workbench_->setup(W, H);
+    macosClassic_->setup(W, H);
+    atariFuji_->setup(W, H);
+    oceanLoader_->setup(W, H);
+    win95_->setup(W, H);
 
     postfx_.setup(W, H);
 
@@ -398,6 +408,11 @@ void ofApp::update() {
     modelRose_->update(frame);
     modelGeosphere_->update(frame);
     modelDNA_->update(frame);
+    workbench_->update(frame);
+    macosClassic_->update(frame);
+    atariFuji_->update(frame);
+    oceanLoader_->update(frame);
+    win95_->update(frame);
 
     applyOscFx();
 
@@ -1208,6 +1223,11 @@ void ofApp::drawScope4(int W, int H) {
         case BgKind::Rose3d:       modelRose_->draw(0, 0, W, H);         break;
         case BgKind::Geosphere:    modelGeosphere_->draw(0, 0, W, H);    break;
         case BgKind::DNA:          modelDNA_->draw(0, 0, W, H);          break;
+        case BgKind::Workbench:    workbench_->draw(0, 0, W, H);    break;
+        case BgKind::MacOSClassic: macosClassic_->draw(0, 0, W, H); break;
+        case BgKind::AtariFuji:    atariFuji_->draw(0, 0, W, H);    break;
+        case BgKind::OceanLoader:  oceanLoader_->draw(0, 0, W, H);  break;
+        case BgKind::Win95:        win95_->draw(0, 0, W, H);        break;
     }
 
     // 1bis) HUD pseudo-aléatoire de valeurs sub-10 Hz.
