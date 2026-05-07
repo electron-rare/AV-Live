@@ -10,6 +10,7 @@
 #include "ofMain.h"
 #include "ofxGui.h"
 
+#include "DemoFx.h"
 #include "HantekDevice.h"
 #include "OscClient.h"
 #include "PostFx.h"
@@ -70,6 +71,8 @@ private:
     oscope::OscClient osc_;
     oscope::PostFx postfx_;
     oscope::AudioAnalyzer audio_;
+    oscope::DemoFx demo_;
+    bool starfieldReplaceTunnel_ = false;
 
     std::unique_ptr<oscope::LissajousVis>   lissajous_;
     std::unique_ptr<oscope::SpectrogramVis> spectro_;

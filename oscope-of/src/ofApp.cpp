@@ -93,6 +93,8 @@ void ofApp::setup() {
 
     postfx_.setup(W, H);
 
+    demo_.setup(ofToDataPath("greetings.txt", true));
+
     gui_.setup("oscope-of");
     gui_.add(modeLabel_.setup("Mode", modeName(mode_)));
     gui_.add(scopeStatusLabel_.setup("Scope", scope_.statusString()));
@@ -221,6 +223,7 @@ void ofApp::update() {
     // bandes bass/lowMid/mid/treble + transitoires kick/snare. Pilote
     // les visualizers (Tunnel, Polar) sans dépendre de l'OSC.
     audio_.update(ch1_, ch2_, static_cast<float>(lastSampleRateApplied_));
+    demo_.update(static_cast<float>(ofGetLastFrameTime()));
 
     oscope::VisFrame frame{ch1_, ch2_, osc_, audio_.bands()};
     lissajous_->update(frame);
@@ -394,15 +397,20 @@ void ofApp::drawPanelLabel(int x, int y, const char* title,
 }
 
 void ofApp::drawScope4(int W, int H) {
-    // 1) Tunnel fullscreen en fond — fréquences pilotent tile size / dir
-    //    + curve. Le centre du tunnel reste pile au milieu de l'écran ;
-    //    les uniformes uPan / uCurve modulent l'intérieur sans bouger le
-    //    cadre, donc le polar central reste aligné avec la nef.
-    tunnel_->draw(0, 0, W, H);
+    // 1) Fond : tunnel 3D OU starfield demoscene si toggle actif.
+    if (starfieldReplaceTunnel_) {
+        ofBackground(0);
+        demo_.drawStarfield(W, H);
+    } else {
+        tunnel_->draw(0, 0, W, H);
+    }
 
-    // 1bis) HUD pseudo-aléatoire de valeurs sub-10 Hz sur les "carreaux"
-    //       (zones périphériques visibles du tunnel).
+    // 1bis) HUD pseudo-aléatoire de valeurs sub-10 Hz sur les "carreaux".
     drawTunnelHud(W, H);
+
+    // 1ter) Copper bars demoscene en haut + logo bobs.
+    demo_.drawCopperBars(W, H);
+    demo_.drawBobs(W, H, "AV-LIVE");
 
     const float cx = W * 0.5f;
     const float cy = H * 0.5f;
@@ -491,6 +499,9 @@ void ofApp::drawScope4(int W, int H) {
     waveform_->setCircular(true);
     waveform_->draw(0, 0, W, H);
     waveform_->setCircular(false);
+
+    // 6) Sine scroller demoscene depuis greetings.txt, par-dessus tout.
+    demo_.drawScroller(W, H);
 }
 
 void ofApp::draw() {
@@ -599,6 +610,15 @@ void ofApp::keyPressed(int key) {
         case 'p': fxEnableToggle_ = !fxEnableToggle_; break;
         case 'k': autoGlitchOnKick_ = !autoGlitchOnKick_; break;
         case ' ': postfx_.triggerGlitch(0.8f); break;
+
+        // Demoscene toggles (touches symboles, hors zone a-z FX live).
+        case '\'': demo_.scrollerEnabled()  = !demo_.scrollerEnabled();  break;
+        case ';':  demo_.copperEnabled()    = !demo_.copperEnabled();    break;
+        case ',':  demo_.bobsEnabled()      = !demo_.bobsEnabled();      break;
+        case '.':
+            demo_.starfieldEnabled() = !demo_.starfieldEnabled();
+            starfieldReplaceTunnel_  = demo_.starfieldEnabled();
+            break;
         case 'r':
             lissajous_->reloadShaders();
             reactive_->reloadShaders();

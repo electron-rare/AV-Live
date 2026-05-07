@@ -1,0 +1,63 @@
+#pragma once
+
+// Effets demoscene classiques pour Scope4 :
+//   - Sine scroller depuis greetings.txt
+//   - Starfield 3D (peut remplacer le tunnel)
+//   - Copper bars horizontales
+//   - Logo bobs (texte qui rebondit / tourne)
+//
+// Tous les effets sont indépendants et togglables.
+
+#include "ofMain.h"
+
+#include <string>
+#include <vector>
+
+namespace oscope {
+
+class DemoFx {
+public:
+    void setup(const std::string& greetingsPath);
+    void update(float dt);
+
+    /// Scroller bas d'écran. Lit text_, défile, sine wave par char.
+    void drawScroller(int W, int H);
+
+    /// Starfield 3D fullscreen (peut être utilisé en place du tunnel).
+    void drawStarfield(int W, int H);
+
+    /// Copper bars : 4-6 bandes horizontales cycliques en haut.
+    void drawCopperBars(int W, int H);
+
+    /// Logo bobs : 4-5 caractères qui rebondissent en arc de cercle.
+    void drawBobs(int W, int H, const std::string& logo);
+
+    bool& scrollerEnabled()  { return scrollerOn_;  }
+    bool& starfieldEnabled() { return starOn_;     }
+    bool& copperEnabled()    { return copperOn_;   }
+    bool& bobsEnabled()      { return bobsOn_;     }
+
+private:
+    // Scroller
+    std::string text_;
+    float       scrollX_ = 0.0f;
+    bool        scrollerOn_ = true;
+
+    // Starfield
+    struct Star { float x, y, z; };
+    std::vector<Star> stars_;
+    bool starOn_ = false;
+
+    // Copper bars phase
+    float copperPhase_ = 0.0f;
+    bool  copperOn_   = true;
+
+    // Bobs
+    float bobsPhase_ = 0.0f;
+    bool  bobsOn_    = true;
+
+    // Time accumulator for steady animation
+    float t_ = 0.0f;
+};
+
+} // namespace oscope
