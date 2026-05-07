@@ -86,7 +86,11 @@ void ofApp::setup() {
     plasmaFbm_ = std::make_unique<oscope::ShaderVis>("shaders/plasma_fbm");
     rotozoom_  = std::make_unique<oscope::ShaderVis>("shaders/rotozoom");
     truchet_   = std::make_unique<oscope::ShaderVis>("shaders/truchet");
-    sdfTunnel_ = std::make_unique<oscope::ShaderVis>("shaders/sdf_tunnel");
+    sdfTunnel_  = std::make_unique<oscope::ShaderVis>("shaders/sdf_tunnel");
+    kifs_       = std::make_unique<oscope::ShaderVis>("shaders/kifs");
+    fire_       = std::make_unique<oscope::ShaderVis>("shaders/fire");
+    gridPersp_  = std::make_unique<oscope::ShaderVis>("shaders/grid_persp");
+    tunnelCubes_= std::make_unique<oscope::ShaderVis>("shaders/tunnel_cubes");
     lissajous_->setup(W, H);
     spectro_->setup(W, H / 4);
     reactive_->setup(W, H);
@@ -104,6 +108,10 @@ void ofApp::setup() {
     rotozoom_->setup(W, H);
     truchet_->setup(W, H);
     sdfTunnel_->setup(W, H);
+    kifs_->setup(W, H);
+    fire_->setup(W, H);
+    gridPersp_->setup(W, H);
+    tunnelCubes_->setup(W, H);
 
     postfx_.setup(W, H);
 
@@ -259,6 +267,10 @@ void ofApp::update() {
     rotozoom_->update(frame);
     truchet_->update(frame);
     sdfTunnel_->update(frame);
+    kifs_->update(frame);
+    fire_->update(frame);
+    gridPersp_->update(frame);
+    tunnelCubes_->update(frame);
 
     applyOscFx();
 
@@ -369,7 +381,7 @@ void ofApp::initDemos() {
     auto all = []{ return ScopeToggles{}; };
 
     demos_.clear();
-    demos_.resize(10);
+    demos_.resize(15);
 
     // ─── 1 · AMIGA TRIBUTE ───────────────────────────────────
     demos_[0] = {"AMIGA TRIBUTE", {
@@ -551,6 +563,102 @@ void ofApp::initDemos() {
          BgKind::Starfield},
     }};
 
+    // ─── 11 · FRACTAL DREAMS (KIFS) ─────────────────────────
+    demos_[10] = {"FRACTAL DREAMS", {
+        {"GENESIS",   18.0f, polSpe(),  SS::Neon,
+         "    *** FRACTAL DREAMS ***    BEGIN ITERATION 0    ", "J",
+         BgKind::Kifs},
+        {"FOLD",      35.0f, polSpe(),  SS::Wavy3D,
+         "    REFLECTION OF REFLECTION OF REFLECTION    "
+         "    AT EVERY SCALE THE SAME PATTERN    ", "S", BgKind::Kifs},
+        {"INFINITE",  40.0f, all(),     SS::Rainbow,
+         "    THE FRACTAL HAS NO END    "
+         "    GREETINGS TO INIGO QUILEZ AND KNIGHTY    ", "L",
+         BgKind::Kifs},
+        {"COLLAPSE",  25.0f, polSpe(),  SS::Mirror,
+         "    AND THE FUNCTION RESETS    BACK TO X = 0 Y = 0    ", "J",
+         BgKind::Starfield},
+    }};
+
+    // ─── 12 · INFERNO (Fire) ────────────────────────────────
+    demos_[11] = {"INFERNO", {
+        {"SPARK",     15.0f, stars(),   SS::Glitch,
+         "    *** INFERNO ***    A SPARK IGNITES    ", "T", BgKind::Fire},
+        {"FLAME",     45.0f, all(),     SS::Glitch,
+         "    THE FLAMES RISE    EVERY KICK FUELS THE BLAZE    "
+         "    GREETINGS TO HARDCODE AND TITAN    ", "T", BgKind::Fire},
+        {"BURNOUT",   35.0f, all(),     SS::Rainbow,
+         "    EVERYTHING IS BURNING    NOTHING REMAINS    "
+         "    KICK BIAS IS THE FUEL    ", "P", BgKind::Fire},
+        {"ASHES",     25.0f, polSpe(),  SS::Mirror,
+         "    THE EMBERS COOL    BUT THEY DO NOT DIE    ", "S",
+         BgKind::PlasmaFbm},
+    }};
+
+    // ─── 13 · OUTRUN (Grid persp) ────────────────────────────
+    demos_[12] = {"OUTRUN", {
+        {"DRIVE OFF",   18.0f, all(),    SS::Neon,
+         "    *** OUTRUN ***    SUNSET IGNITES THE HORIZON    ", "R",
+         BgKind::GridPersp},
+        {"NEON HIGHWAY",45.0f, all(),    SS::Mirror,
+         "    PINK NEON ON CHROME ROAD    "
+         "    1985 STILL SPEEDING    "
+         "    GREETINGS TO STILL AND RGBA    ", "R",
+         BgKind::GridPersp},
+        {"OVERDRIVE",   35.0f, all(),    SS::Rainbow,
+         "    KICKDOWN    THE VECTOR SUN BENDS    ", "T",
+         BgKind::GridPersp},
+        {"HORIZON",     25.0f, starsWave(), SS::Mirror,
+         "    AND THE ENGINE FADES INTO THE NIGHT    ", "U",
+         BgKind::Starfield},
+    }};
+
+    // ─── 14 · CUBE STORM (tunnel cubes) ──────────────────────
+    demos_[13] = {"CUBE STORM", {
+        {"INCOMING",  18.0f, polSpe(),   SS::Neon,
+         "    *** CUBE STORM ***    SOMETHING APPROACHES    ", "Q",
+         BgKind::TunnelCubes},
+        {"CASCADE",   45.0f, all(),      SS::Wavy3D,
+         "    THOUSANDS OF CUBES    EACH ONE A NOTE    "
+         "    THEY FALL THEY FLY THEY FALL AGAIN    ", "Q",
+         BgKind::TunnelCubes},
+        {"GEOMETRY",  35.0f, all(),      SS::Glitch,
+         "    EUCLIDEAN SPACE COLLAPSES    "
+         "    GREETINGS TO FARBRAUSCH AND ANDROMEDA    ", "V",
+         BgKind::TunnelCubes},
+        {"ZERO",      20.0f, polSpe(),   SS::Mirror,
+         "    BACK TO ORIGIN    DIMENSION COLLAPSED    ", "J",
+         BgKind::Starfield},
+    }};
+
+    // ─── 15 · GRAND FINAL (mix everything) ───────────────────
+    demos_[14] = {"GRAND FINAL", {
+        {"OPEN",       12.0f, stars(),    SS::Neon,
+         "    *** GRAND FINAL ***    ALL EFFECTS ENGAGED    ", "L",
+         BgKind::Starfield},
+        {"AMIGA",      18.0f, all(),      SS::Classic,
+         "    AMIGA SECTION    COPPER LIST POETRY    ", "M",
+         BgKind::Twister},
+        {"FRACTAL",    18.0f, all(),      SS::Wavy3D,
+         "    FRACTAL SECTION    INFINITE DETAIL    ", "L",
+         BgKind::Kifs},
+        {"FIRE",       18.0f, all(),      SS::Glitch,
+         "    FIRE SECTION    BURN IT ALL DOWN    ", "T",
+         BgKind::Fire},
+        {"OUTRUN",     18.0f, all(),      SS::Mirror,
+         "    OUTRUN SECTION    NEON HORIZON    ", "R",
+         BgKind::GridPersp},
+        {"CUBES",      18.0f, all(),      SS::Wavy3D,
+         "    CUBE STORM    GEOMETRY ATTACK    ", "Q",
+         BgKind::TunnelCubes},
+        {"FAREWELL",   30.0f, all(),      SS::Rainbow,
+         "    THIS IS THE GRAND FINAL    "
+         "    GREETINGS TO EVERYBODY OUT THERE    "
+         "    THE SCENE IS YOUR FAMILY    THE PHOSPHOR YOUR HOME    "
+         "    AV-LIVE / L-ELECTRON RARE / 2026    ", "U",
+         BgKind::PlasmaFbm},
+    }};
+
     launchDemo(0);
 }
 
@@ -617,7 +725,7 @@ void ofApp::drawNarrativeOverlay(int W, int H) {
 
     // Ligne 1 : nom de la démo (petit)
     const std::string demoTag = std::string("DEMO ") +
-        ofToString(currentDemo_ < 9 ? currentDemo_ + 1 : 0) + " / 10   " +
+        ofToString(currentDemo_ + 1) + " / " + ofToString(demos_.size()) + "   " +
         demos_[currentDemo_].name;
     ofSetColor(140, 255, 200, alpha);
     ofDrawBitmapString(demoTag, W / 2 - demoTag.size() * 4, 18);
@@ -768,6 +876,10 @@ void ofApp::drawScope4(int W, int H) {
         case BgKind::Rotozoom:  rotozoom_->draw(0, 0, W, H);  break;
         case BgKind::Truchet:   truchet_->draw(0, 0, W, H);   break;
         case BgKind::SdfTunnel: sdfTunnel_->draw(0, 0, W, H); break;
+        case BgKind::Kifs:        kifs_->draw(0, 0, W, H);        break;
+        case BgKind::Fire:        fire_->draw(0, 0, W, H);        break;
+        case BgKind::GridPersp:   gridPersp_->draw(0, 0, W, H);   break;
+        case BgKind::TunnelCubes: tunnelCubes_->draw(0, 0, W, H); break;
     }
 
     // 1bis) HUD pseudo-aléatoire de valeurs sub-10 Hz.
@@ -861,7 +973,7 @@ void ofApp::drawScope4(int W, int H) {
         if (narrativeMode_ && currentDemo_ < (int)demos_.size()) {
             ofSetColor(255, 100, 200, 200);
             ofDrawBitmapString(std::string("[") +
-                ofToString(currentDemo_ < 9 ? currentDemo_ + 1 : 0) + "] " +
+                ofToString(currentDemo_ + 1) + "] " +
                 demos_[currentDemo_].name, W - 240, rowY - 18);
         }
         ofDisableBlendMode();
@@ -990,6 +1102,13 @@ void ofApp::keyPressed(int key) {
         case '8': launchDemo(7); break;  // RAVE
         case '9': launchDemo(8); break;  // MEMORY LANE
         case '0': launchDemo(9); break;  // GREETINGS
+        // Demos 11..15 — symboles. Shift+1..5 sur US (! @ # $ %),
+        // ou les chars correspondants sur AZERTY FR.
+        case '!': launchDemo(10); break;  // FRACTAL DREAMS
+        case '@': launchDemo(11); break;  // INFERNO
+        case '#': launchDemo(12); break;  // OUTRUN
+        case '$': launchDemo(13); break;  // CUBE STORM
+        case '%': launchDemo(14); break;  // GRAND FINAL
 
         // Skip à la scène suivante de la démo en cours.
         case OF_KEY_RETURN:

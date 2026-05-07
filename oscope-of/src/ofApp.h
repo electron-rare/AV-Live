@@ -91,7 +91,8 @@ private:
     // Chaque démo = liste de scènes qui défilent dans le temps avec
     // narration scénarisée + track SC + transitions.
     enum class BgKind { Tunnel, Starfield, Metaballs, Voronoi, Twister,
-                        PlasmaFbm, Rotozoom, Truchet, SdfTunnel };
+                        PlasmaFbm, Rotozoom, Truchet, SdfTunnel,
+                        Kifs, Fire, GridPersp, TunnelCubes };
     struct DemoScene {
         const char*           name;
         float                 durSec;
@@ -135,6 +136,10 @@ private:
     std::unique_ptr<oscope::ShaderVis>      rotozoom_;
     std::unique_ptr<oscope::ShaderVis>      truchet_;
     std::unique_ptr<oscope::ShaderVis>      sdfTunnel_;
+    std::unique_ptr<oscope::ShaderVis>      kifs_;
+    std::unique_ptr<oscope::ShaderVis>      fire_;
+    std::unique_ptr<oscope::ShaderVis>      gridPersp_;
+    std::unique_ptr<oscope::ShaderVis>      tunnelCubes_;
 
     std::vector<float> ch1_, ch2_;
     Mode mode_ = Mode::Scope4;
