@@ -1,0 +1,27 @@
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Xcode
+launcher/build/
+launcher/DerivedData/
+launcher/**/xcuserdata/
+launcher/**/*.xcuserstate
+launcher/**/Package.resolved
+
+# openFrameworks
+oscope-of/bin/
+oscope-of/obj/
+oscope-of/.vscode/
+oscope-of/Project.xcconfig
+
+# SuperCollider
+sound_algo/synthdefs/*.scsyndef
+sound_algo/*.log
+
+# Editors
+.idea/
+.vscode/
+*.swp
+*~
