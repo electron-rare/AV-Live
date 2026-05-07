@@ -1,0 +1,42 @@
+name: CI build oscope-of
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build-check:
+    runs-on: macos-14
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+      - name: brew deps
+        run: brew install libusb
+      - name: Cache openFrameworks
+        id: cache-of
+        uses: actions/cache@v4
+        with:
+          path: ~/of
+          key: of-0.12.1-macos-${{ runner.arch }}
+      - name: Download openFrameworks 0.12.1
+        if: steps.cache-of.outputs.cache-hit != 'true'
+        run: |
+          cd ~
+          curl -sL -o of.tar.gz https://github.com/openframeworks/openFrameworks/releases/download/0.12.1/of_v0.12.1_osx_release.tar.gz
+          tar xzf of.tar.gz
+          mv of_v0.12.1_osx_release of
+          rm of.tar.gz
+      - name: symlink + build
+        run: |
+          ln -sf "$GITHUB_WORKSPACE/oscope-of" ~/of/apps/myApps/oscope-of
+          cd ~/of/apps/myApps/oscope-of
+          make OF_ROOT=$HOME/of -j4 Release 2>&1 | tail -30
+      - name: Verify binary
+        run: |
+          test -f "$GITHUB_WORKSPACE/oscope-of/bin/oscope-of.app/Contents/MacOS/oscope-of"
+          file  "$GITHUB_WORKSPACE/oscope-of/bin/oscope-of.app/Contents/MacOS/oscope-of"

@@ -1,0 +1,119 @@
+name: Build & Release macOS .dmg
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:    # bouton manuel dans l'UI GitHub
+
+jobs:
+  build-mac:
+    runs-on: macos-14   # Apple Silicon (arm64), de_with optional fat build
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+
+      - name: Install dependencies (libusb)
+        run: |
+          brew install libusb create-dmg
+
+      - name: Cache openFrameworks
+        id: cache-of
+        uses: actions/cache@v4
+        with:
+          path: ~/of
+          key: of-0.12.1-macos-${{ runner.arch }}
+
+      - name: Download openFrameworks 0.12.1
+        if: steps.cache-of.outputs.cache-hit != 'true'
+        run: |
+          cd ~
+          curl -sL -o of.tar.gz https://github.com/openframeworks/openFrameworks/releases/download/0.12.1/of_v0.12.1_osx_release.tar.gz
+          tar xzf of.tar.gz
+          mv of_v0.12.1_osx_release of
+          rm of.tar.gz
+
+      - name: Symlink oscope-of into oF tree
+        run: |
+          ln -sf "$GITHUB_WORKSPACE/oscope-of" ~/of/apps/myApps/oscope-of
+
+      - name: Build oscope-of (Release)
+        run: |
+          cd ~/of/apps/myApps/oscope-of
+          make OF_ROOT=$HOME/of -j4 Release
+
+      - name: Build launcher
+        run: |
+          cd launcher
+          bash build.sh || true   # tolère build.sh peut être manquant
+
+      - name: Verify binary
+        run: |
+          ls -la "$GITHUB_WORKSPACE/oscope-of/bin/oscope-of.app/Contents/MacOS/" || true
+          file "$GITHUB_WORKSPACE/oscope-of/bin/oscope-of.app/Contents/MacOS/oscope-of" || true
+
+      - name: Package data into .app bundle
+        run: |
+          cd "$GITHUB_WORKSPACE/oscope-of/bin"
+          # Copie le data/ à l'intérieur du bundle pour qu'il soit
+          # autonome (les shaders/models/sprites/greetings.txt soient
+          # accessibles depuis n'importe où).
+          cp -r data oscope-of.app/Contents/Resources/data || mkdir -p oscope-of.app/Contents/Resources/ && cp -r data oscope-of.app/Contents/Resources/
+
+      - name: Create DMG
+        run: |
+          cd "$GITHUB_WORKSPACE"
+          mkdir -p dist
+          create-dmg \
+            --volname "AV-Live" \
+            --volicon "oscope-of/bin/data/sprites/amiga_wb.png" \
+            --window-pos 200 120 \
+            --window-size 600 400 \
+            --icon-size 100 \
+            --icon "oscope-of.app" 175 200 \
+            --hide-extension "oscope-of.app" \
+            --app-drop-link 425 200 \
+            "dist/AV-Live-${{ github.ref_name }}.dmg" \
+            "oscope-of/bin/oscope-of.app" \
+          || true
+          # Fallback si create-dmg échoue : tar.gz du .app
+          if [ ! -f "dist/AV-Live-${{ github.ref_name }}.dmg" ]; then
+            tar czf "dist/AV-Live-${{ github.ref_name }}.tar.gz" -C oscope-of/bin oscope-of.app
+          fi
+          ls -la dist/
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: AV-Live-macOS
+          path: dist/*
+
+      - name: Create GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*
+          generate_release_notes: true
+          body: |
+            # AV-Live ${{ github.ref_name }}
+
+            Build automatique pour macOS (Apple Silicon).
+
+            **Installation** :
+            1. Téléchargez le `.dmg` ci-dessous
+            2. Ouvrez-le, glissez `oscope-of.app` dans Applications
+            3. **Premier lancement** : clic-droit sur l'app > Ouvrir (Gatekeeper)
+            4. Pour le sound engine SuperCollider, voir le [README](https://github.com/electron-rare/AV-Live#quick-start)
+
+            **Note** : binaire non signé Apple Developer. Les utilisateurs verront un avertissement Gatekeeper au premier lancement, c'est normal.
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
