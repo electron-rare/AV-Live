@@ -68,4 +68,50 @@ void SpectrogramVis::draw(int x, int y, int w, int h) {
     ofPopStyle();
 }
 
+void SpectrogramVis::drawCircular(int cx, int cy, float innerR, float outerR) {
+    if (mag_.empty()) return;
+    ofPushStyle();
+    ofPushMatrix();
+    ofTranslate(cx, cy);
+
+    // Anneau central — chaque bin FFT occupe un secteur angulaire,
+    // longueur radiale = magnitude, hue = bin (basses bleu → aigus rouge).
+    const std::size_t bins = mag_.size();
+    // On limite au quart bas (~Nyquist/4) car la moitié haute est très
+    // sparse et brouille le rendu.
+    const std::size_t shown = bins / 4;
+    const float step = TWO_PI / static_cast<float>(shown);
+    ofSetLineWidth(2);
+    for (std::size_t i = 0; i < shown; ++i) {
+        const float a = i * step;
+        // Mapping log : on remap i sur le spectre log pour étaler les basses.
+        const float t = std::pow(static_cast<float>(i) / shown, 0.55f);
+        const std::size_t bin = static_cast<std::size_t>(t * (bins - 1));
+        const float magdb = 20.0f * std::log10(std::max(mag_[bin], 1e-6f)) + 60.0f;
+        const float v = ofClamp(magdb / 60.0f, 0.0f, 1.0f);
+
+        // Hue colorisée par fréquence : 220 (bleu) → 0 (rouge) en hue HSB
+        const float hue = 220.0f - 220.0f * t;
+        ofColor col;
+        col.setHsb(hue, 200.0f, 80.0f + 175.0f * v);
+        col.a = static_cast<unsigned char>(120 + 135 * v);
+        ofSetColor(col);
+
+        const float r0 = innerR;
+        const float r1 = innerR + (outerR - innerR) * v;
+        const float ca = std::cos(a);
+        const float sa = std::sin(a);
+        ofDrawLine(ca * r0, sa * r0, ca * r1, sa * r1);
+    }
+
+    // Anneau interne discret pour cadrer
+    ofNoFill();
+    ofSetLineWidth(1);
+    ofSetColor(60, 100, 140, 120);
+    ofDrawCircle(0, 0, innerR);
+
+    ofPopMatrix();
+    ofPopStyle();
+}
+
 } // namespace oscope

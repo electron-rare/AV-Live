@@ -15,6 +15,9 @@ public:
     void setup(int w, int h) override;
     void update(const VisFrame& frame) override;
     void draw(int x, int y, int w, int h) override;
+    /// Render circulaire : anneau de barres FFT centré, couleur par bande
+    /// (bleu = basses, vert = mediums, rouge = aigus). Utilisé en Scope4.
+    void drawCircular(int cx, int cy, float innerR, float outerR);
 
 private:
     ofFbo fbo_;

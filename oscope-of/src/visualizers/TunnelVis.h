@@ -17,8 +17,9 @@ public:
     void reloadShaders() override;
 
 private:
-    int w_ = 0, h_ = 0;
-    float travel_ = 0.0f;
+    int   w_ = 0, h_ = 0;
+    float travel_    = 0.0f;
+    float direction_ = 1.0f;   // smooth -1..+1 (lead-bass driven)
     float bpm_ = 120.0f, kick_ = 0.0f, bass_ = 0.0f, lead_ = 0.0f, pad_ = 0.0f;
     ofShader shader_;
 };

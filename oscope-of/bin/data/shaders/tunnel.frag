@@ -14,6 +14,13 @@ uniform float uKick;
 uniform float uBass;
 uniform float uLead;
 uniform float uPad;
+// Pilotage par fréquence :
+//   uTileZ  — bass loud  → grosses tuiles axe Z (valeur basse, défaut 2)
+//   uTileX  — lead loud  → tuiles fines axe angulaire (valeur haute, défaut 16)
+//   uDirection — signe du défilement / twist (-1..+1)
+uniform float uTileZ;
+uniform float uTileX;
+uniform float uDirection;
 
 vec3 palette(float t) {
     return 0.5 + 0.5 * cos(6.28318 * (vec3(1.0) * t + vec3(0.0, 0.33, 0.67)));
@@ -30,15 +37,15 @@ void main() {
 
     // depth z = 1/r so r→0 is far. Travel scrolls slices.
     float z = 1.0 / r + uTravel;
-    // Twist: deeper = more rotation, modulated by lead
-    a += z * (0.15 + uLead * 0.6);
+    // Twist: deeper = more rotation, modulated by lead, signé par direction
+    a += z * (0.15 + uLead * 0.6) * uDirection;
 
-    // Slice index for repeating bands
-    float slice = floor(z * 2.0);
-    float frac  = fract(z * 2.0);
+    // Slice index — densité Z pilotée par bass (uTileZ).
+    float slice = floor(z * uTileZ);
+    float frac  = fract(z * uTileZ);
 
-    // Brick / ring pattern — checker on (slice, angle)
-    float ang  = a / 6.28318 * 16.0;
+    // Brick / ring pattern — densité angulaire pilotée par lead (uTileX).
+    float ang  = a / 6.28318 * uTileX;
     float wall = mod(floor(ang) + slice, 2.0);
 
     // Base color cycles along depth + slight bass push
