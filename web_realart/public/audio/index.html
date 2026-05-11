@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="fr">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>realart / audio (Web Audio portage SC)</title>
+    <style>
+        :root { color-scheme: dark; }
+        body { margin: 0; min-height: 100vh; background: #050308;
+               color: #e8e8e8; font-family: ui-monospace, Menlo, monospace;
+               display: flex; flex-direction: column; align-items: center;
+               padding: 2rem; gap: 1.4rem; }
+        h1 { margin: 0; font-size: 1.4rem; letter-spacing: -0.01em; }
+        h1 a { color: #5b8bff; text-decoration: none; }
+        p.lead { color: #888; max-width: 560px; text-align: center; margin: 0;
+                 font-size: 0.85rem; line-height: 1.5; }
+        .presets { display: grid; gap: 0.6rem;
+                   grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+                   width: 100%; max-width: 720px; }
+        button {
+            background: #1b1b27; border: 1px solid #2c2c36; color: #e8e8e8;
+            padding: 0.7rem 0.5rem; border-radius: 6px; cursor: pointer;
+            font-family: inherit; font-size: 0.8rem; transition: border-color 0.15s;
+        }
+        button:hover { border-color: #5b8bff; }
+        button.active { border-color: #38d977; background: #182218; }
+        button:disabled { opacity: 0.4; cursor: not-allowed; }
+        #start { padding: 1rem 2rem; font-size: 1rem; border-color: #5b8bff;
+                 background: #15151f; color: #5b8bff; }
+        #start:hover { background: #1d1d2c; }
+        #meters { display: flex; gap: 1rem; font-size: 0.7rem; color: #999;
+                  background: rgba(255,255,255,0.03); padding: 0.6rem 1rem;
+                  border-radius: 6px; border: 1px solid rgba(255,255,255,0.06); }
+        #meters .v { color: #5b8bff; min-width: 40px; display: inline-block; }
+        #meters .alive { color: #38d977; }
+        #meters .dead  { color: #ff5151; }
+        #now { font-size: 0.7rem; color: #777; max-width: 720px;
+               line-height: 1.5; text-align: center; }
+        #now .name { color: #38d977; }
+        #vol-row { display: flex; gap: 0.8rem; align-items: center; }
+        #vol-row label { color: #888; font-size: 0.75rem; }
+        #vol { width: 200px; }
+        canvas { display: block; }
+        #scope { width: 720px; max-width: 100%; height: 80px;
+                 background: #0a0a12; border: 1px solid rgba(255,255,255,0.06);
+                 border-radius: 6px; }
+    </style>
+</head>
+<body>
+    <h1><a href="/">/ realart</a> · audio (portage SC)</h1>
+    <p class="lead">
+        Synthese Web Audio pilotee par les memes flux que les presets
+        SuperCollider (sound_algo/examples/16+17). Cliquer "start audio"
+        (geste utilisateur requis), puis selectionner un preset.
+    </p>
+
+    <button id="start">START AUDIO</button>
+
+    <div id="meters">
+        <div>feeds : <span id="alive">…</span></div>
+        <div>kp <span class="v" id="kp">--</span></div>
+        <div>bz <span class="v" id="bz">--</span> nT</div>
+        <div>wind <span class="v" id="wind">--</span> km/s</div>
+        <div>netz <span class="v" id="netz">--</span> Hz</div>
+        <div>flare <span class="v" id="flare">--</span></div>
+    </div>
+
+    <div class="presets">
+        <button data-preset="cavity"  disabled>Cavity (16-A)</button>
+        <button data-preset="mix"     disabled>Mix (16-B)</button>
+        <button data-preset="geo"     disabled>Geo (16-C)</button>
+        <button data-preset="aurora"  disabled>Aurora (17-D)</button>
+        <button data-preset="pulse"   disabled>Pulse (17-E)</button>
+        <button data-preset="stop"    disabled>STOP</button>
+    </div>
+
+    <div id="vol-row">
+        <label>master</label>
+        <input id="vol" type="range" min="0" max="1" step="0.01" value="0.4" />
+        <span id="vol-v" style="color:#5b8bff;font-size:0.7rem;width:30px">0.40</span>
+    </div>
+
+    <canvas id="scope"></canvas>
+
+    <p id="now">aucun preset actif. <span class="name">cavity</span>
+       = drone Schumann + foudre, <span class="name">aurora</span>
+       = pad geomagnetique, <span class="name">pulse</span>
+       = kick netz + sub seismes...</p>
+
+    <script src="/feeds_client.js"></script>
+    <script type="module" src="./app.js"></script>
+</body>
+</html>

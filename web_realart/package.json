@@ -1,0 +1,19 @@
+{
+  "name": "av-live-realart",
+  "version": "0.1.0",
+  "description": "AV-Live data_feeds standalone -- portage web (WebGL + Web Audio + Hydra) deployable sur real.art.saillant.cc",
+  "type": "module",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js"
+  },
+  "dependencies": {
+    "express": "^4.21.0",
+    "osc": "^2.4.5",
+    "ws": "^8.18.0"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

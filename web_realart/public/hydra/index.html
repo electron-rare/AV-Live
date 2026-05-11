@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="fr">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>realart / hydra</title>
+    <style>
+        :root { color-scheme: dark; }
+        * { box-sizing: border-box; }
+        body { margin: 0; min-height: 100vh; background: #000; color: #e8e8e8;
+               font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+               overflow: hidden; }
+        #hydra-canvas { position: fixed; inset: 0; width: 100vw; height: 100vh; z-index: 0; }
+        #ui { position: fixed; top: 0; left: 0; right: 0; z-index: 10;
+              display: flex; justify-content: space-between; padding: 1rem;
+              pointer-events: none; }
+        #ui > * { pointer-events: auto; }
+        a { color: #888; text-decoration: none; }
+        a:hover { color: #5b8bff; }
+        .badge { background: rgba(0,0,0,0.6); backdrop-filter: blur(8px);
+                 border: 1px solid rgba(255,255,255,0.1); padding: 0.5rem 0.75rem;
+                 border-radius: 6px; font-size: 0.75rem; color: #b0b0b0; }
+        .badge .v { color: #5b8bff; font-variant-numeric: tabular-nums; }
+        .badge .alive { color: #38d977; }
+        .badge .dead  { color: #ff5151; }
+        button { background: rgba(0,0,0,0.6); border: 1px solid rgba(255,255,255,0.15);
+                 color: white; padding: 0.4rem 0.7rem; border-radius: 5px; cursor: pointer;
+                 font-family: inherit; font-size: 0.7rem; }
+        button:hover { border-color: #5b8bff; }
+        button.active { border-color: #38d977; }
+        #presets { position: fixed; bottom: 0; left: 0; right: 0; z-index: 10;
+                   display: flex; gap: 0.4rem; padding: 0.8rem 1rem; flex-wrap: wrap;
+                   justify-content: center; background: linear-gradient(transparent, rgba(0,0,0,0.6)); }
+    </style>
+</head>
+<body>
+    <canvas id="hydra-canvas"></canvas>
+    <div id="ui">
+        <div class="badge">
+            <a href="/">/ realart</a> · hydra ·
+            feeds <span id="alive">…</span>
+        </div>
+        <div class="badge">
+            kp <span class="v" id="kp">--</span> ·
+            bz <span class="v" id="bz">--</span> ·
+            wind <span class="v" id="wind">--</span>
+        </div>
+    </div>
+    <div id="presets">
+        <button data-p="aurora">aurora</button>
+        <button data-p="quake">quake</button>
+        <button data-p="lightning">lightning</button>
+        <button data-p="flightmap">flights</button>
+        <button data-p="gridpulse">grid</button>
+        <button data-p="solarwind">solar</button>
+        <button data-p="bskyrain">bsky</button>
+    </div>
+
+    <script src="/feeds_client.js"></script>
+    <script src="https://unpkg.com/hydra-synth@1.3.29/dist/hydra-synth.js"></script>
+    <script src="./app.js"></script>
+</body>
+</html>

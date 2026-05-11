@@ -29,6 +29,7 @@
 #include "visualizers/ModelVis.h"
 #include "visualizers/SphereWaveVis.h"
 #include "visualizers/ImageVis.h"
+#include "visualizers/WebcamVis.h"
 
 #include <memory>
 
@@ -108,7 +109,8 @@ private:
                         SphereWave,
                         ImgWin1, ImgWin311, ImgWin95, ImgLotus, ImgDos,
                         ImgAtari, ImgApple, ImgWB, ImgNeXT, ImgBeOS,
-                        ImgOS2, ImgIrix, ImgZX, ImgC64 };
+                        ImgOS2, ImgIrix, ImgZX, ImgC64,
+                        Webcam };
     struct DemoScene {
         const char*           name;
         float                 durSec;
@@ -227,6 +229,8 @@ private:
     std::unique_ptr<oscope::ImageVis> imgLotus_, imgDos_, imgAtari_, imgApple_;
     std::unique_ptr<oscope::ImageVis> imgWB_, imgNeXT_, imgBeOS_, imgOS2_;
     std::unique_ptr<oscope::ImageVis> imgIrix_, imgZX_, imgC64_;
+    // Webcam + ofxOpenCv + overlay du skeleton OSC (/data/pose/*).
+    std::unique_ptr<oscope::WebcamVis> webcam_;
 
     std::vector<float> ch1_, ch2_;
     Mode mode_ = Mode::Scope4;

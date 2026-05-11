@@ -8,7 +8,7 @@ et les rebalance en OSC vers SuperCollider (`:57121`) et openFrameworks
 
 ## Architecture
 
-```
+```text
                 ┌────────────────────────────────┐
                 │  data_feeds/bridge.py          │
                 │  ├─ usgs        (HTTP 60 s)    │
@@ -75,6 +75,7 @@ complet.
 | `rte_eco2mix`  | `mix`                                       | 15 min      |
 | `github`       | `event`                                     | 30 s        |
 | `gcn`          | `alert`                                     | rare        |
+| `pose`         | `count`, `person`, `skel`, `bone`           | ~20 fps     |
 
 ## Configuration
 
@@ -92,6 +93,10 @@ Flux nécessitant des identifiants (désactivés par défaut) :
   <https://data.rte-france.com/> puis renseigner `client_id` /
   `client_secret`.
 - `gcn` : <https://gcn.nasa.gov/quickstart> + `uv add gcn-kafka`.
+- `pose` : install les deps optionnelles avec `uv sync --extra pose`
+  (opencv-python + ultralytics). Sur Mac M5 utiliser `device = "mps"`.
+  Une seule app peut grabber la webcam : si oF tourne `WebcamVis` en
+  capture locale, mettre `feeds.pose.enabled = false` (et inversement).
 
 ## Diagnostic
 

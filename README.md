@@ -78,6 +78,16 @@ Each act lasts 12-55 s, transitions between acts trigger flash + glitch postfx +
 - `Espace` — manual glitch pulse
 - `F1`–`F5` — fullscreen / GUI / postFx / autoglitch / reload shaders
 
+### 🌐 Real-world data feeds — `data_feeds/` + `web_realart/`
+- **9 live sources** ingested by `data_feeds/bridge.py` and broadcast as OSC `/data/<source>/<sub>` to SC (`:57121`), oF (`:57123`) and the web bridge (`:57124`) :
+  USGS quakes · NOAA SWPC (solar wind, Bz IMF, Kp, X-ray flares) · Mainsfrequenz.de · RTE eCO2mix · Blitzortung lightning · OpenSky ADS-B · Bluesky firehose · Bitcoin mempool · GitHub events · GCN astrophysics · YOLOv8 webcam pose
+- **SC presets** `sound_algo/examples/16_data_feeds.scd` and `17_data_feeds_more.scd` map each source to synthesis : Schumann cavity drone (foudre), aurora additive pad (Bz/wind/Kp), Netzfrequenz pulse kick, RTE 8-op carbon FM, OpenSky granular swarm
+- **Web standalone** `web_realart/` ports the visualizers and synths to the browser for `real.art.saillant.cc` :
+  - **WebGPU + three.js TSL** globe with quake/strike/flight particles (auto-fallback WebGL2)
+  - **Web Audio** ports of 5 SC SynthDef presets (cavity, mix, geo, aurora, pulse)
+  - **Hydra** with 7 data-driven patches (aurora, quake, lightning, flightmap, gridpulse, solarwind, bskyrain)
+  - All three layers share `feeds_client.js` (window.feeds) over one WebSocket
+
 ### 📡 Audio reactivity pipeline
 
 ```

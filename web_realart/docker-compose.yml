@@ -1,0 +1,55 @@
+# =====================================================================
+#  web_realart -- stack de production pour real.art.saillant.cc
+#
+#  Deux containers :
+#    web    -- Node, sert /webgl /audio /hydra + WS, ecoute UDP :57124
+#    bridge -- Python, lit les flux temps reel et pousse en OSC sur web:57124
+#
+#  Network "data" interne pour la cible OSC bridge -> web (UDP).
+#  Network "traefik" externe pour HTTPS via le tunnel cloudflared.
+# =====================================================================
+services:
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: av-live-realart:latest
+    container_name: realart-web
+    restart: unless-stopped
+    environment:
+      - HTTP_PORT=4400
+      - DATA_PORT_IN=57124
+    networks:
+      - traefik
+      - data
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=traefik"
+      - "traefik.http.routers.realart.rule=Host(`real.art.saillant.cc`)"
+      - "traefik.http.routers.realart.entrypoints=websecure"
+      - "traefik.http.routers.realart.tls=true"
+      - "traefik.http.routers.realart.tls.certresolver=letsencrypt"
+      - "traefik.http.services.realart.loadbalancer.server.port=4400"
+      # WS endpoint /ws : Traefik gere upgrade auto via header `Connection: Upgrade`
+
+  bridge:
+    build:
+      context: ./bridge
+      dockerfile: Dockerfile
+    image: av-live-realart-bridge:latest
+    container_name: realart-bridge
+    restart: unless-stopped
+    depends_on:
+      - web
+    networks:
+      - data
+    # config.toml monte en read-only -- modifie sans rebuild
+    volumes:
+      - ./bridge/config.toml:/app/config.toml:ro
+    command: ["python", "bridge.py", "--config", "/app/config.toml"]
+
+networks:
+  traefik:
+    external: true
+  data:
+    driver: bridge

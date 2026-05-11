@@ -27,6 +27,34 @@ window.amp  = { kick: 0, hat: 0, snare: 0, clap: 0, perc: 0,
 window.rms  = { master: 0 };
 window.hydraParams = { intensity: 1, hueShift: 0, speed: 1, density: 1, feedback: 0.5 };
 
+// ---------------------------------------------------------------------
+//  Flux temps reel externes -- alimente par /data/<source>/<sub> via WS
+//  (server.js DATA_PORT_IN <- bridge.py)
+//
+//  Cles agregees pour faciliter l'usage Hydra :
+//    feeds.netz   = { freq, dev, time_dev }
+//    feeds.swpc   = { wind_speed, wind_dens, bz, bt, kp, a, flare_norm }
+//    feeds.usgs   = { last_mag, last_age, rate_h }
+//    feeds.light  = { rate_min, last_lat, last_lon, last_age }
+//    feeds.sky    = { count, last_alt, last_vel, last_pan }
+//    feeds.bsky   = { rate_s }
+//    feeds.rte    = { renew_pct, total }
+//    feeds.tick   = compteur incremente a chaque /data/<...>
+//    feeds.alive  = bool (heartbeat < 15s)
+// ---------------------------------------------------------------------
+window.feeds = {
+    netz:  { freq: 50, dev: 0, time_dev: 0 },
+    swpc:  { wind_speed: 400, wind_dens: 5, bz: 0, bt: 5, kp: 2, a: 5, flare_norm: 0 },
+    usgs:  { last_mag: 0, last_age: 9999, rate_h: 0 },
+    light: { rate_min: 0, last_lat: 0, last_lon: 0, last_age: 9999 },
+    sky:   { count: 0, last_alt: 0, last_vel: 0, last_pan: 0 },
+    bsky:  { rate_s: 0 },
+    rte:   { renew_pct: 0.25, total: 50000 },
+    tick:  0,
+    alive: false,
+    _lastHb: 0,
+};
+
 const wsState    = document.getElementById("ws-state");
 const bpmDisplay = document.getElementById("bpm");
 const beatDisplay = document.getElementById("beat");
@@ -85,6 +113,8 @@ function connect() {
                     codeArea.value = code;
                     run();
                 }
+            } else if (addr.startsWith("/data/")) {
+                ingestDataFeed(addr, msg.args);
             } else if (addr === "/hydra/param") {
                 const [name, val] = msg.args;
                 if (name in window.hydraParams) {
@@ -94,6 +124,105 @@ function connect() {
         } catch {}
     });
 }
+
+// ---------- ingestion data_feeds -------------------------------------
+function ingestDataFeed(addr, args) {
+    window.feeds.tick++;
+    const a = args || [];
+    switch (addr) {
+        case "/data/heartbeat":
+            window.feeds._lastHb = Date.now();
+            window.feeds.alive = true;
+            return;
+        case "/data/netzfrequenz/freq":   window.feeds.netz.freq = a[0]; break;
+        case "/data/netzfrequenz/dev":    window.feeds.netz.dev = a[0]; break;
+        case "/data/netzfrequenz/time_dev": window.feeds.netz.time_dev = a[0]; break;
+        case "/data/swpc/wind":
+            window.feeds.swpc.wind_speed = a[0];
+            window.feeds.swpc.wind_dens = a[1];
+            break;
+        case "/data/swpc/bz":
+            window.feeds.swpc.bz = a[0];
+            window.feeds.swpc.bt = a[1];
+            break;
+        case "/data/swpc/kp":
+            window.feeds.swpc.kp = a[0];
+            window.feeds.swpc.a = a[1];
+            break;
+        case "/data/swpc/xray":
+            window.feeds.swpc.flare_norm = a[2];
+            break;
+        case "/data/usgs/event":
+            window.feeds.usgs.last_mag = a[0];
+            window.feeds.usgs.last_age = a[4];
+            // marqueur visuel : pulse pendant 2 s via window.feeds._quakeHit
+            window.feeds._quakeHit = Date.now();
+            break;
+        case "/data/usgs/rate":
+            window.feeds.usgs.rate_h = a[0];
+            break;
+        case "/data/blitzortung/strike":
+            window.feeds.light.last_lat = a[0];
+            window.feeds.light.last_lon = a[1];
+            window.feeds.light.last_age = a[2];
+            window.feeds._strikeHit = Date.now();
+            break;
+        case "/data/blitzortung/rate":
+            window.feeds.light.rate_min = a[0];
+            break;
+        case "/data/opensky/count":
+            window.feeds.sky.count = a[0];
+            break;
+        case "/data/opensky/plane":
+            window.feeds.sky.last_alt = a[3];
+            window.feeds.sky.last_vel = a[4];
+            window.feeds.sky.last_pan = (a[1] - 4.9) / 0.6; // bbox-relative
+            break;
+        case "/data/bluesky/rate":
+            window.feeds.bsky.rate_s = a[0];
+            break;
+        case "/data/rte_eco2mix/mix": {
+            const total = (a[0]||0)+(a[1]||0)+(a[2]||0)+(a[3]||0)+
+                          (a[4]||0)+(a[5]||0)+(a[6]||0)+(a[7]||0);
+            const renew = (a[4]||0)+(a[5]||0)+(a[6]||0)+(a[7]||0);
+            window.feeds.rte.total = total;
+            window.feeds.rte.renew_pct = total > 0 ? renew / total : 0.25;
+            break;
+        }
+    }
+}
+
+// helpers exposes pour les patches Hydra (acces concis)
+window.f = {
+    quakePulse: () => {
+        const t = window.feeds._quakeHit;
+        if (!t) return 0;
+        const age = (Date.now() - t) / 1000;
+        return Math.max(0, 1 - age / 2);
+    },
+    strikePulse: () => {
+        const t = window.feeds._strikeHit;
+        if (!t) return 0;
+        const age = (Date.now() - t) / 1000;
+        return Math.max(0, 1 - age / 1.2);
+    },
+    flarePulse: () => Math.min(1, (window.feeds.swpc.flare_norm||0) * 2),
+    netzDev: () => window.feeds.netz.dev || 0,
+    bz: () => window.feeds.swpc.bz || 0,
+    kp01: () => Math.min(1, (window.feeds.swpc.kp||0) / 9),
+    wind01: () => Math.min(1, ((window.feeds.swpc.wind_speed||400) - 250) / 650),
+    renew: () => window.feeds.rte.renew_pct || 0.25,
+    skyCount01: () => Math.min(1, (window.feeds.sky.count||0) / 50),
+    bskyDensity: () => Math.min(1, (window.feeds.bsky.rate_s||0) / 30),
+    lightRate01: () => Math.min(1, (window.feeds.light.rate_min||0) / 60),
+};
+
+// heartbeat watchdog
+setInterval(() => {
+    if (window.feeds._lastHb && Date.now() - window.feeds._lastHb > 15000) {
+        window.feeds.alive = false;
+    }
+}, 5000);
 
 // ---------- Hydra setup ----------------------------------------------
 const canvas = document.getElementById("hydra-canvas");
@@ -301,6 +430,96 @@ voronoi(20, 0.1, 0.5)
   .modulate(osc(1, 0.05).rotate(0.1))
   .color(() => 0.3 + window.amp.harmony, () => 0.4 + window.amp.melody, 0.7)
   .contrast(1.4)
+  .out()
+`.trim(),
+
+    // ============ DATA FEEDS PRESETS ============
+    // Tous utilisent window.feeds (alimente par /data/* via WS).
+    // Lance d'abord : cd data_feeds && uv run python bridge.py
+
+    feeds_aurora: `
+// Aurora : Bz IMF + vent solaire + Kp -> drape de lumiere
+osc(() => 6 + window.f.wind01() * 18, 0.05, () => 1 + window.f.kp01())
+  .modulate(noise(() => 2 + window.f.kp01() * 6, 0.1).scrollY(() => window.beat * 0.002))
+  .rotate(() => window.f.bz() * 0.03)
+  .color(() => 0.2 + window.f.kp01() * 0.4,
+         () => 0.6 + window.f.wind01() * 0.4,
+         () => 0.4 + window.f.flarePulse())
+  .scale(() => 1 + window.f.flarePulse() * 0.6)
+  .out()
+`.trim(),
+
+    feeds_quake: `
+// Quake : USGS magnitude -> onde de choc radiale
+shape(() => 4 + Math.floor(window.feeds.usgs.last_mag), 0.05, 0.02)
+  .repeat(8, 8)
+  .scale(() => 0.5 + window.f.quakePulse() * 2.5)
+  .modulateRotate(noise(2, 0.2), () => window.f.quakePulse() * 3)
+  .color(() => 0.8 + window.f.quakePulse(),
+         () => 0.2 - window.f.quakePulse() * 0.2,
+         0.1)
+  .add(osc(20, 0.05, 1).pixelate(8, 8), () => window.f.quakePulse() * 0.4)
+  .out()
+`.trim(),
+
+    feeds_lightning: `
+// Lightning : foudre Blitzortung -> flash blanc + voronoi rapide
+voronoi(() => 8 + window.f.lightRate01() * 30, 0.3, 0.1)
+  .modulate(noise(6, 0.3))
+  .invert(() => window.f.strikePulse() > 0.6 ? 1 : 0)
+  .add(solid(1, 1, 1, () => window.f.strikePulse() * 0.6))
+  .color(0.7, 0.7, () => 0.9 + window.f.strikePulse())
+  .out()
+`.trim(),
+
+    feeds_flightmap: `
+// Flightmap : OpenSky count + altitude + cap
+osc(() => 10 + window.feeds.sky.count, 0.05, 1)
+  .kaleid(() => 4 + Math.floor(window.f.skyCount01() * 8))
+  .modulate(osc(2).scrollX(() => window.feeds.sky.last_pan * 0.1)
+                   .scrollY(() => window.feeds.sky.last_alt / 50000))
+  .rotate(() => window.feeds.sky.last_pan * 0.5)
+  .color(() => 0.3 + window.f.skyCount01() * 0.5,
+         () => 0.5 + window.feeds.sky.last_vel / 500,
+         () => 0.6 + window.feeds.sky.last_alt / 20000)
+  .out()
+`.trim(),
+
+    feeds_gridpulse: `
+// Gridpulse : derivation Netzfrequenz -> tremblement micro
+osc(() => 30 + window.feeds.netz.freq * 0.5, 0.05, 1.5)
+  .modulateScale(osc(8).rotate(() => window.beat * 0.01),
+                 () => 0.05 + Math.abs(window.f.netzDev()) * 4)
+  .scale(() => 1 + window.f.netzDev() * 8)
+  .color(() => 0.5 - window.f.netzDev() * 5,
+         () => 0.5 + window.f.netzDev() * 5,
+         () => 0.5 + window.f.renew() * 0.5)
+  .contrast(() => 1.2 + Math.abs(window.f.netzDev()) * 8)
+  .out()
+`.trim(),
+
+    feeds_solarwind: `
+// Solar wind : vent + densite + flare X-ray
+noise(() => 2 + window.f.wind01() * 8, () => 0.05 + window.f.flarePulse() * 0.3)
+  .modulate(osc(() => 5 + window.f.wind01() * 10, 0.05).rotate(() => window.beat * 0.02))
+  .colorama(() => 0.05 + window.f.kp01() * 0.4)
+  .add(solid(1, 0.6, 0.2, () => window.f.flarePulse() * 0.5))
+  .scale(() => 0.8 + window.f.wind01() * 0.5)
+  .saturate(() => 1.3 + window.f.flarePulse() * 2)
+  .out()
+`.trim(),
+
+    feeds_bskyrain: `
+// Bskyrain : pluie de pixels proportionnelle au firehose Bluesky
+shape(4, 0.005, 0.001)
+  .repeat(() => 40 + window.f.bskyDensity() * 80,
+          () => 40 + window.f.bskyDensity() * 80)
+  .scrollY(() => time * (0.05 + window.f.bskyDensity() * 0.3))
+  .scrollX(() => Math.sin(time * 0.3) * 0.02)
+  .color(() => 0.4 + window.f.bskyDensity() * 0.4,
+         () => 0.7 + window.f.kp01() * 0.3,
+         1)
+  .modulate(noise(2, 0.2), 0.05)
   .out()
 `.trim(),
 

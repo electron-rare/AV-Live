@@ -2,7 +2,11 @@
   "permissions": {
     "allow": [
       "Bash(awk 'BEGIN{p=0;b=0;tlb=0;depth=0} /^\\\\\\(/{if\\(depth==0\\)tlb++; depth++} {for\\(i=1;i<=length\\($0\\);i++\\){c=substr\\($0,i,1\\); if\\(c==\"\\(\"\\)p++; else if\\(c==\"\\)\"\\)p--; else if\\(c==\"[\"\\)b++; else if\\(c==\"]\"\\)b--}} END{print \"P:\" p \" B:\" b \" TLB:\" tlb}' sound_algo/control/data_feeds.scd)",
-      "Bash(awk '{for\\(i=1;i<=length\\($0\\);i++\\){c=substr\\($0,i,1\\); if\\(c==\"\\(\"\\)p++; else if\\(c==\"\\)\"\\)p--; else if\\(c==\"[\"\\)b++; else if\\(c==\"]\"\\)b--}} END{print \"P:\" p \" B:\" b}' sound_algo/examples/16_data_feeds.scd sound_algo/control/data_feeds.scd)"
+      "Bash(awk '{for\\(i=1;i<=length\\($0\\);i++\\){c=substr\\($0,i,1\\); if\\(c==\"\\(\"\\)p++; else if\\(c==\"\\)\"\\)p--; else if\\(c==\"[\"\\)b++; else if\\(c==\"]\"\\)b--}} END{print \"P:\" p \" B:\" b}' sound_algo/examples/16_data_feeds.scd sound_algo/control/data_feeds.scd)",
+      "Bash(awk '{for\\(i=1;i<=length\\($0\\);i++\\){c=substr\\($0,i,1\\); if\\(c==\"\\(\"\\)p++; else if\\(c==\"\\)\"\\)p--; else if\\(c==\"[\"\\)b++; else if\\(c==\"]\"\\)b--}} END{print \"P:\" p \" B:\" b}' sound_algo/control/data_feeds.scd)",
+      "Bash(find . -name \"*.yml\" -path \"*workflows*\" 2>/dev/null *)",
+      "Read(//Applications/**)",
+      "Bash(swift build *)"
     ]
   }
 }

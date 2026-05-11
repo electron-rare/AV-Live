@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="fr">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>realart / globe (three.js + WebGPU TSL)</title>
+    <style>
+        :root { color-scheme: dark; }
+        body { margin: 0; background: #000; color: #eee;
+                font-family: ui-monospace, Menlo, monospace; overflow: hidden; }
+        #c { position: fixed; inset: 0; width: 100vw; height: 100vh; display: block; }
+        #hud {
+            position: fixed; top: 0; left: 0; right: 0; padding: 0.6rem 1rem;
+            display: flex; justify-content: space-between; align-items: flex-start;
+            font-size: 0.7rem; color: #888; pointer-events: none; z-index: 10;
+        }
+        #hud .right { text-align: right; }
+        #hud .v { color: #5b8bff; }
+        #hud .alive { color: #38d977; }
+        #hud .dead  { color: #ff5151; }
+        a { color: #888; text-decoration: none; pointer-events: auto; }
+        a:hover { color: #5b8bff; }
+        #renderer {
+            position: fixed; bottom: 0.6rem; right: 0.8rem;
+            font-size: 0.65rem; color: #555;
+        }
+    </style>
+    <script type="importmap">
+    {
+        "imports": {
+            "three":          "https://unpkg.com/three@0.171.0/build/three.webgpu.js",
+            "three/tsl":      "https://unpkg.com/three@0.171.0/build/three.tsl.js",
+            "three/addons/":  "https://unpkg.com/three@0.171.0/examples/jsm/"
+        }
+    }
+    </script>
+</head>
+<body>
+    <canvas id="c"></canvas>
+    <div id="hud">
+        <div>
+            <a href="/">/ realart</a> · globe (three.js TSL)
+            <br><span id="legend">quakes · strikes · flights · aurore</span>
+        </div>
+        <div class="right">
+            feeds <span id="alive">…</span> ·
+            evt <span id="evt" class="v">0</span> ·
+            kp <span id="kp" class="v">--</span> ·
+            wind <span id="wind" class="v">--</span> km/s
+        </div>
+    </div>
+    <div id="renderer">backend : <span id="backend">…</span></div>
+
+    <script src="/feeds_client.js"></script>
+    <script type="module" src="./app.js"></script>
+</body>
+</html>

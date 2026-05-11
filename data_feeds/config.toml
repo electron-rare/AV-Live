@@ -11,9 +11,34 @@
 targets = [
     { host = "127.0.0.1", port = 57121 },  # SuperCollider
     { host = "127.0.0.1", port = 57123 },  # openFrameworks
+    { host = "127.0.0.1", port = 57124 },  # web bridge (sound_algo/web + web_realart)
 ]
 # Préfixe commun. Toutes les routes sont /data/<feed>/...
 prefix = "/data"
+
+# -- Pose / webcam --------------------------------------------------------
+
+[feeds.pose]
+enabled  = true
+# YOLOv8/v11-pose via ultralytics. Auto-download du .pt au premier run.
+# Modeles : yolov8n-pose (fast), yolov8s-pose, yolov8m-pose, yolov8l-pose.
+# Sur Mac M5 prefere `n` ou `s`, device="mps" (Metal).
+model       = "yolov8n-pose.pt"
+device      = "mps"      # "cpu", "mps" (Apple Silicon), "cuda:0"
+camera      = 0          # index ofVideoGrabber-style (0 = camera par defaut)
+width       = 640
+height      = 480
+target_fps  = 20         # plafond (le serveur peut faire moins)
+conf_thresh = 0.35
+max_persons = 4
+# Si false, n'emit que `/data/pose/count` et les bbox (pas les 17 kp).
+emit_keypoints = true
+
+# Routes :
+#   /data/pose/count <n>
+#   /data/pose/person <idx> <cx> <cy> <w> <h> <conf>      (normalises 0..1)
+#   /data/pose/skel   <idx> <conf_avg> <x0 y0 c0 ... x16 y16 c16>  (17 kp COCO)
+#   /data/pose/bone   <idx> <kp_a> <kp_b>                 (segments du skeleton)
 
 # -- Sismique / géophysique ------------------------------------------------
 

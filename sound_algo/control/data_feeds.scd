@@ -175,6 +175,63 @@
 });
 
 // =====================================================================
+//  POSE  -- webcam + YOLOv8-pose (17 keypoints COCO)
+// =====================================================================
+// Layout COCO :
+//   0 nose, 1/2 eyes L/R, 3/4 ears L/R,
+//   5/6 shoulders L/R, 7/8 elbows L/R, 9/10 wrists L/R,
+//   11/12 hips L/R, 13/14 knees L/R, 15/16 ankles L/R
+~poseKpNames = [\nose, \eye_l, \eye_r, \ear_l, \ear_r,
+    \sho_l, \sho_r, \elb_l, \elb_r, \wri_l, \wri_r,
+    \hip_l, \hip_r, \kne_l, \kne_r, \ank_l, \ank_r];
+
+~_feedDef.(\d_pose_count, '/data/pose/count', { |msg|
+    ~feedSet.(\pose_count, msg[1]);
+});
+~_feedDef.(\d_pose_person, '/data/pose/person', { |msg|
+    var idx = msg[1].asInteger;
+    var persons = ~feeds[\pose_persons] ? IdentityDictionary.new;
+    persons[idx] = (cx: msg[2], cy: msg[3], w: msg[4], h: msg[5], conf: msg[6]);
+    ~feedSet.(\pose_persons, persons);
+});
+~_feedDef.(\d_pose_skel, '/data/pose/skel', { |msg|
+    var idx = msg[1].asInteger;
+    var avg = msg[2];
+    // msg[3..] = [x0,y0,c0, x1,y1,c1, ..., x16,y16,c16]  (51 floats)
+    var flat = msg.copyRange(3, msg.size - 1);
+    var skel = Array.new(17);
+    17.do { |k|
+        var off = k * 3;
+        skel = skel.add((
+            x: flat[off],
+            y: flat[off + 1],
+            c: flat[off + 2],
+            name: ~poseKpNames[k]
+        ));
+    };
+    var all = ~feeds[\pose_skels] ? IdentityDictionary.new;
+    all[idx] = (avg: avg, kp: skel);
+    ~feedSet.(\pose_skels, all);
+    // raccourci : premier sujet
+    if(idx == 0) { ~feedSet.(\pose_skel0, skel) };
+});
+~_feedDef.(\d_pose_bone, '/data/pose/bone', { |msg|
+    // Annonce du squelette a la connexion. On stocke la liste des paires.
+    var bones = ~feeds[\pose_bones] ? Array.new;
+    var pair = [msg[1].asInteger, msg[2].asInteger];
+    if(bones.indexOfEqual(pair).isNil) {
+        ~feedSet.(\pose_bones, bones.add(pair));
+    };
+});
+
+// Helper : lit le keypoint `name` du sujet 0. Renvoie (x:, y:, c:).
+~poseKp = { |name|
+    var skel = ~feeds[\pose_skel0];
+    var i = ~poseKpNames.indexOf(name);
+    if(skel.notNil and: { i.notNil }) { skel[i] } { nil }
+};
+
+// =====================================================================
 //  Heartbeat -- detection de pont down
 // =====================================================================
 ~_feedDef.(\d_heartbeat, '/data/heartbeat', { |msg|

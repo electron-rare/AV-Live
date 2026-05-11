@@ -36,6 +36,14 @@ struct MenuBarContent: View {
                 stop: processManager.stopWeb
             )
 
+            ProcessRow(
+                title: "Data Feeds",
+                subtitle: "USGS · SWPC · Grid · Lightning · Pose · …",
+                isRunning: processManager.dataFeedsRunning,
+                start: processManager.startDataFeeds,
+                stop: processManager.stopDataFeeds
+            )
+
             HStack {
                 Button(action: processManager.openBrowser) {
                     Label("Control", systemImage: "slider.horizontal.3")
@@ -171,6 +179,11 @@ private struct SettingsView: View {
                     get: { processManager.autoOpenBrowser },
                     set: { processManager.autoOpenBrowser = $0 }
                    ))
+            Toggle("Auto-start data_feeds bridge (USGS, SWPC, grid, pose…)",
+                   isOn: Binding(
+                    get: { processManager.autoStartDataFeeds },
+                    set: { processManager.autoStartDataFeeds = $0 }
+                   ))
             Divider()
             Text("Paths").font(.headline)
             PathField(
@@ -212,6 +225,22 @@ private struct SettingsView: View {
                     set: { processManager.webServerScript = $0 }
                 ),
                 isDirectory: false
+            )
+            PathField(
+                label: "uv binary",
+                path: Binding(
+                    get: { processManager.uvPath },
+                    set: { processManager.uvPath = $0 }
+                ),
+                isDirectory: false
+            )
+            PathField(
+                label: "data_feeds directory",
+                path: Binding(
+                    get: { processManager.dataFeedsDir },
+                    set: { processManager.dataFeedsDir = $0 }
+                ),
+                isDirectory: true
             )
             HStack {
                 Spacer()

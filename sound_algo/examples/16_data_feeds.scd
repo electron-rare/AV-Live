@@ -209,10 +209,82 @@ s.sync;
 
 
 // ---------------------------------------------------------------------
+// [4] PRESET D -- "Body"
+//   Corps detecte (YOLOv8-pose) pilote 4 synths :
+//     - poignet droit  -> filtre passe-bas (X hor) + amp (Y vert)
+//     - poignet gauche -> pitch d'un drone
+//     - hauteur des epaules -> seuil de granulateur
+//     - confiance moyenne -> reverb wet
+// ---------------------------------------------------------------------
+(
+SynthDef(\body_drone, { |out=0, freq=80, amp=0.25, cutoff=800, q=0.4, pan=0|
+    var sig = Saw.ar(freq * [1, 1.005, 0.503]);
+    sig = RLPF.ar(sig, cutoff.lag(0.05).clip(80, 8000), q);
+    sig = sig.sum * amp;
+    Out.ar(out, Pan2.ar(sig, pan));
+}).add;
+
+SynthDef(\body_gran, { |out=0, dens=10, rate=1.0, amp=0.3|
+    var trig = Impulse.kr(dens);
+    var grain = SinOsc.ar(
+        TRand.kr(200, 1200, trig) * rate.lag(0.1),
+        0,
+        EnvGen.kr(Env.perc(0.005, 0.05), trig)
+    );
+    Out.ar(out, Pan2.ar(grain * amp, TRand.kr(-1, 1, trig)));
+}).add;
+
+s.sync;
+
+~bodyDrone = Synth(\body_drone, [\amp, 0.2]);
+~bodyGran  = Synth(\body_gran,  [\amp, 0.15]);
+
+~bodyR = Routine({
+    inf.do {
+        var wr = ~poseKp.(\wri_r);
+        var wl = ~poseKp.(\wri_l);
+        var sl = ~poseKp.(\sho_l), sR = ~poseKp.(\sho_r);
+        var avg, shoY;
+        if(wr.notNil and: { wr.c > 0.3 }) {
+            ~bodyDrone.set(\cutoff, wr.x.linexp(0, 1, 200, 6000));
+            ~bodyDrone.set(\amp, (1 - wr.y).linlin(0, 1, 0.05, 0.5));
+        };
+        if(wl.notNil and: { wl.c > 0.3 }) {
+            ~bodyDrone.set(\freq, wl.y.linexp(0, 1, 220, 55));
+        };
+        if(sl.notNil and: { sR.notNil }) {
+            shoY = (sl.y + sR.y) * 0.5;
+            ~bodyGran.set(\dens, (1 - shoY).linexp(0, 1, 2, 80));
+            ~bodyGran.set(\rate, (1 - shoY).linlin(0, 1, 0.5, 2.5));
+        };
+        avg = ~feedGet.(\pose_count, 0);
+        if(avg < 1) {
+            // personne -> on baisse tout
+            ~bodyDrone.set(\amp, 0.0);
+            ~bodyGran.set(\amp, 0.0);
+        } {
+            ~bodyGran.set(\amp, 0.15);
+        };
+        0.05.wait;
+    };
+}).play(AppClock);
+
+"[body] up. arret : ~bodyStop.value".postln;
+~bodyStop = {
+    ~bodyDrone.release(2);
+    ~bodyGran.release(1);
+    ~bodyR.stop;
+    "[body] off".postln;
+};
+)
+
+
+// ---------------------------------------------------------------------
 // [9] ARRET TOTAL
 // ---------------------------------------------------------------------
 (
 ~cavityStop !? { ~cavityStop.value };
 ~mixStop    !? { ~mixStop.value };
 ~geoStop    !? { ~geoStop.value };
+~bodyStop   !? { ~bodyStop.value };
 )

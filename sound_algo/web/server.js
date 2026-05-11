@@ -33,6 +33,7 @@ const HTTP_PORT = parseInt(process.env.HTTP_PORT ?? "3000", 10);
 const SC_HOST = process.env.SC_HOST ?? "127.0.0.1";
 const SC_PORT_OUT = parseInt(process.env.SC_PORT_OUT ?? "57121", 10); // -> SC
 const SC_PORT_IN = parseInt(process.env.SC_PORT_IN ?? "57122", 10);  // <- SC
+const DATA_PORT_IN = parseInt(process.env.DATA_PORT_IN ?? "57124", 10); // <- data_feeds bridge.py
 
 // ---------------------------------------------------------------------
 //  HTTP : Express sert public/
@@ -130,6 +131,32 @@ oscPort.on("error", (err) => {
 
 oscPort.open();
 
+// ---------------------------------------------------------------------
+//  OSC : server.js <- data_feeds/bridge.py (UDP, lecture seule)
+//  Le pont Python emet /data/<source>/<sub> et /data/heartbeat sur ce
+//  port. On les reflechit en WS sous forme JSON pour les clients web.
+// ---------------------------------------------------------------------
+const dataPort = new osc.UDPPort({
+    localAddress: "0.0.0.0",
+    localPort: DATA_PORT_IN,
+    metadata: false,
+});
+
+dataPort.on("ready", () => {
+    console.log(`[data] ready -- ecoute :${DATA_PORT_IN} <- bridge.py`);
+});
+
+dataPort.on("message", (oscMsg) => {
+    // broadcast direct, meme format que /sync/* : { address, args }
+    broadcast({ address: oscMsg.address, args: oscMsg.args });
+});
+
+dataPort.on("error", (err) => {
+    console.error("[data] erreur:", err.message);
+});
+
+dataPort.open();
+
 function sendToSC(address, args) {
     const payload = args.map((v) => {
         if (typeof v === "number") {
@@ -165,6 +192,7 @@ function shutdown() {
     console.log("\n[server] shutdown...");
     wss.close();
     oscPort.close();
+    dataPort.close();
     httpServer.close(() => process.exit(0));
 }
 

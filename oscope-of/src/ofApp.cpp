@@ -74,6 +74,7 @@ void ofApp::setup() {
     spectro_   = std::make_unique<oscope::SpectrogramVis>();
     reactive_  = std::make_unique<oscope::ReactiveVis>();
     waveform_  = std::make_unique<oscope::WaveformVis>();
+    webcam_    = std::make_unique<oscope::WebcamVis>();
     polar_     = std::make_unique<oscope::PolarVis>();
     plasma_    = std::make_unique<oscope::PlasmaVis>();
     particles_ = std::make_unique<oscope::ParticleVis>();
@@ -157,6 +158,7 @@ void ofApp::setup() {
     spectro_->setup(W, H / 4);
     reactive_->setup(W, H);
     waveform_->setup(W, H);
+    webcam_->setup(W, H);
     polar_->setup(W, H);
     plasma_->setup(W, H);
     particles_->setup(W, H);
@@ -385,6 +387,7 @@ void ofApp::update() {
     spectro_->update(frame);
     reactive_->update(frame);
     waveform_->update(frame);
+    webcam_->update(frame);
     polar_->update(frame);
     plasma_->update(frame);
     particles_->update(frame);
@@ -1354,6 +1357,7 @@ void ofApp::drawScope4(int W, int H) {
         case BgKind::ImgIrix:    imgIrix_->draw(0, 0, W, H);    break;
         case BgKind::ImgZX:      imgZX_->draw(0, 0, W, H);      break;
         case BgKind::ImgC64:     imgC64_->draw(0, 0, W, H);     break;
+        case BgKind::Webcam:     webcam_->draw(0, 0, W, H);     break;
     }
 
     // 1bis) HUD pseudo-aléatoire de valeurs sub-10 Hz.
@@ -1663,6 +1667,8 @@ void ofApp::keyPressed(int key) {
         case 'i': liveBg_ = BgKind::Mode7;       liveBgOverride_=true; break;
         case 'o': liveBg_ = BgKind::Octahedron;  liveBgOverride_=true; break;
         case 'p': liveBg_ = BgKind::PlasmaC64;   liveBgOverride_=true; break;
+        // Webcam + ofxOpenCv + overlay pose (touche '&' = AZERTY shift+1).
+        case '&': liveBg_ = BgKind::Webcam;      liveBgOverride_=true; break;
 
         // --- 17 paramètres FX (middle + bottom row) ---
         // Tunnel mults (multiplicatifs ×0.83/×1.20, clamp 0.05..12)

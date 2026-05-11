@@ -1,0 +1,71 @@
+# Config bridge data_feeds pour le deploiement real.art.saillant.cc.
+#
+# Cible OSC unique : container web sur le network "data" (docker compose).
+# Le hostname "web" est resolu par le DNS Docker interne.
+
+[osc]
+targets = [
+    { host = "web", port = 57124 },
+]
+prefix = "/data"
+
+# -- Pose : DESACTIVE en prod (besoin d'une webcam, pas pertinent serveur)
+[feeds.pose]
+enabled = false
+
+# -- Sismique / geophysique
+[feeds.usgs]
+enabled = true
+url = "https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/all_hour.geojson"
+poll_seconds = 60
+
+[feeds.swpc]
+enabled = true
+url_plasma = "https://services.swpc.noaa.gov/products/solar-wind/plasma-1-day.json"
+url_mag    = "https://services.swpc.noaa.gov/products/solar-wind/mag-1-day.json"
+url_kp     = "https://services.swpc.noaa.gov/products/noaa-planetary-k-index.json"
+url_xray   = "https://services.swpc.noaa.gov/json/goes/primary/xrays-1-day.json"
+poll_seconds = 60
+
+# -- Reseau electrique
+[feeds.netzfrequenz]
+enabled = true
+ws_url  = "wss://www.mainsfrequenz.de/frequenz.socket"
+
+[feeds.rte_eco2mix]
+enabled       = false   # token RTE requis -- a remplir si besoin
+client_id     = ""
+client_secret = ""
+poll_seconds  = 900
+
+# -- Foudre
+[feeds.blitzortung]
+enabled = true
+ws_url  = "wss://ws1.blitzortung.org:443/"
+
+# -- Aviation
+[feeds.opensky]
+enabled = true
+url     = "https://opensky-network.org/api/states/all"
+poll_seconds = 30
+# bbox Europe occidentale plus large pour avoir du trafic visible
+bbox    = [42.0, -5.0, 51.0, 10.0]
+
+# -- Pouls numerique
+[feeds.bluesky]
+enabled = true
+ws_url  = "wss://jetstream2.us-east.bsky.network/subscribe?wantedCollections=app.bsky.feed.post"
+sample_rate = 0.02
+
+[feeds.mempool]
+enabled = false
+ws_url  = "wss://mempool.space/api/v1/ws"
+
+[feeds.github]
+enabled = false
+url     = "https://api.github.com/events"
+
+[feeds.gcn]
+enabled = false
+client_id     = ""
+client_secret = ""

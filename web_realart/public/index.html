@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="fr">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>real.art -- AV-Live data_feeds</title>
+    <style>
+        :root { color-scheme: dark; }
+        * { box-sizing: border-box; }
+        body {
+            margin: 0; min-height: 100vh;
+            background: radial-gradient(ellipse at 30% 20%, #1a1029, #050308 70%);
+            color: #e8e8e8; font-family: ui-sans-serif, system-ui, sans-serif;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            padding: 2rem; gap: 2rem;
+        }
+        h1 { font-size: clamp(1.8rem, 4vw, 3rem); margin: 0; letter-spacing: -0.02em; }
+        h1 .dot { color: #ff5b5b; }
+        p.lead { color: #a0a0b0; max-width: 640px; text-align: center; margin: 0; line-height: 1.5; }
+        .grid {
+            display: grid; gap: 1rem;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            width: 100%; max-width: 800px;
+        }
+        a.card {
+            display: block; padding: 1.4rem 1.2rem; border-radius: 10px;
+            background: rgba(255,255,255,0.03);
+            border: 1px solid rgba(255,255,255,0.08);
+            color: inherit; text-decoration: none;
+            transition: transform 0.15s, border-color 0.15s, background 0.15s;
+        }
+        a.card:hover { transform: translateY(-2px); border-color: #5b8bff;
+                        background: rgba(91,139,255,0.06); }
+        a.card .k { font-size: 0.7rem; text-transform: uppercase; color: #6b6b85;
+                    letter-spacing: 0.1em; }
+        a.card .t { font-size: 1.2rem; margin-top: 0.3rem; }
+        a.card .d { font-size: 0.85rem; color: #9090a0; margin-top: 0.4rem; line-height: 1.4; }
+        #status {
+            position: fixed; bottom: 1rem; left: 1rem;
+            font-family: ui-monospace, Menlo, monospace; font-size: 0.7rem;
+            color: #6b6b75; padding: 0.5rem 0.8rem;
+            background: rgba(0,0,0,0.5); border-radius: 6px;
+            border: 1px solid rgba(255,255,255,0.08);
+        }
+        #status .alive { color: #38d977; }
+        #status .dead { color: #ff5151; }
+        footer { color: #5b5b6f; font-size: 0.75rem; }
+        footer a { color: #7a7a90; }
+    </style>
+</head>
+<body>
+    <h1>real<span class="dot">.</span>art</h1>
+    <p class="lead">
+        Captation audiovisuelle continue de flux temps reel : sismicite,
+        vent solaire, foudre, trafic aerien, frequence reseau, mix electrique.
+        Trois portages -- WebGL globe, Web Audio synthese, Hydra DSL --
+        partageant le meme bus de donnees.
+    </p>
+
+    <div class="grid">
+        <a class="card" href="/webgl/">
+            <div class="k">visuel · portage oF</div>
+            <div class="t">Globe WebGL</div>
+            <div class="d">Quakes · foudre · vols ADS-B · flares geo-localises sur sphere temps reel.</div>
+        </a>
+        <a class="card" href="/audio/">
+            <div class="k">sonore · portage SC</div>
+            <div class="t">Web Audio engine</div>
+            <div class="d">5 presets portes des SynthDef SC (cavity, aurora, pulse, geo, mix).</div>
+        </a>
+        <a class="card" href="/hydra/">
+            <div class="k">visuel · DSL</div>
+            <div class="t">Hydra patches</div>
+            <div class="d">7 patches data-driven (aurora, quake, lightning, flightmap, gridpulse...).</div>
+        </a>
+    </div>
+
+    <footer>
+        <a href="/api/health">/api/health</a> ·
+        bridge UDP :57124 ·
+        <a href="https://github.com/electron-rare/AV-Live">source</a>
+    </footer>
+
+    <div id="status">feeds : <span id="alive">…</span> · ticks <span id="ticks">0</span></div>
+
+    <script src="/feeds_client.js"></script>
+    <script>
+        const aliveEl = document.getElementById("alive");
+        const ticksEl = document.getElementById("ticks");
+        setInterval(() => {
+            const a = window.feeds?.alive;
+            aliveEl.textContent = a ? "ALIVE" : "DOWN";
+            aliveEl.className   = a ? "alive" : "dead";
+            ticksEl.textContent = window.feeds?.tick ?? 0;
+        }, 500);
+    </script>
+</body>
+</html>

@@ -14,6 +14,7 @@ final class ProcessManager: ObservableObject {
     @Published var sclangRunning = false
     @Published var oscopeRunning = false
     @Published var webRunning = false
+    @Published var dataFeedsRunning = false
     @Published private(set) var logs: [LogLine] = []
 
     // Persisted paths (UserDefaults, key/value)
@@ -23,13 +24,18 @@ final class ProcessManager: ObservableObject {
     @Published var nodePath: String { didSet { defaults.set(nodePath, forKey: "nodePath") } }
     @Published var webServerScript: String { didSet { defaults.set(webServerScript, forKey: "webServerScript") } }
     @Published var webPort: Int { didSet { defaults.set(webPort, forKey: "webPort") } }
+    @Published var uvPath: String { didSet { defaults.set(uvPath, forKey: "uvPath") } }
+    @Published var dataFeedsDir: String { didSet { defaults.set(dataFeedsDir, forKey: "dataFeedsDir") } }
     @Published var autoStart: Bool { didSet { defaults.set(autoStart, forKey: "autoStart") } }
     @Published var autoOpenBrowser: Bool { didSet { defaults.set(autoOpenBrowser, forKey: "autoOpenBrowser") } }
+    @Published var autoStartDataFeeds: Bool { didSet { defaults.set(autoStartDataFeeds, forKey: "autoStartDataFeeds") } }
 
     private let defaults = UserDefaults.standard
     private var sclangProc: Process?
     private var oscopeProc: Process?
     private var webProc: Process?
+    private var dataFeedsProc: Process?
+    private var dataFeedsWantsRestart = false
     private var sclangWantsRestart = false
     let osc = OSCSender(host: "127.0.0.1", port: 57121)
     private let logQueue = DispatchQueue(label: "cc.saillant.avlive.log")
@@ -101,6 +107,17 @@ final class ProcessManager: ObservableObject {
         webPort = (defaults.object(forKey: "webPort") as? Int) ?? 3000
         autoStart = (defaults.object(forKey: "autoStart") as? Bool) ?? true
         autoOpenBrowser = (defaults.object(forKey: "autoOpenBrowser") as? Bool) ?? true
+
+        // uv (Astral) — usually installed via curl|sh or brew. Use ~/.local/bin
+        // for the curl installer, /opt/homebrew/bin for Apple Silicon brew.
+        let uvCandidates = ["/opt/homebrew/bin/uv", "/usr/local/bin/uv",
+                            "\(home)/.local/bin/uv", "/usr/bin/uv"]
+        uvPath = defaults.string(forKey: "uvPath")
+            ?? (uvCandidates.first(where: { fm.isExecutableFile(atPath: $0) })
+                ?? "/opt/homebrew/bin/uv")
+        dataFeedsDir = defaults.string(forKey: "dataFeedsDir")
+            ?? "\(avLive)/data_feeds"
+        autoStartDataFeeds = (defaults.object(forKey: "autoStartDataFeeds") as? Bool) ?? false
     }
 
     /// Start everything that's currently stopped. Used by AppDelegate on
@@ -116,6 +133,12 @@ final class ProcessManager: ObservableObject {
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) { [weak self] in
             guard let self = self else { return }
             if !self.webRunning { self.startWeb() }
+        }
+        if autoStartDataFeeds {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { [weak self] in
+                guard let self = self else { return }
+                if !self.dataFeedsRunning { self.startDataFeeds() }
+            }
         }
         if autoOpenBrowser {
             DispatchQueue.main.asyncAfter(deadline: .now() + 3.5) { [weak self] in
@@ -394,12 +417,77 @@ final class ProcessManager: ObservableObject {
         return URL(fileURLWithPath: binaryPath).deletingLastPathComponent()
     }
 
+    // MARK: - data_feeds bridge (Python → OSC)
+
+    /// Lance `uv run python bridge.py -v` depuis `dataFeedsDir`. uv s'occupe
+    /// de creer/sync le venv au premier run. Le pont diffuse sur :57121
+    /// (sclang) et :57123 (oF) selon config.toml.
+    func startDataFeeds() {
+        guard dataFeedsProc == nil else { return }
+        guard FileManager.default.isExecutableFile(atPath: uvPath) else {
+            append(source: "launcher", text: "uv not found at \(uvPath) — install with: curl -LsSf https://astral.sh/uv/install.sh | sh")
+            return
+        }
+        let bridgePy = dataFeedsDir + "/bridge.py"
+        guard FileManager.default.fileExists(atPath: bridgePy) else {
+            append(source: "launcher", text: "bridge.py not found at \(bridgePy)")
+            return
+        }
+        let p = Process()
+        p.executableURL = URL(fileURLWithPath: uvPath)
+        p.arguments = ["run", "python", "bridge.py", "-v"]
+        p.currentDirectoryURL = URL(fileURLWithPath: dataFeedsDir)
+        // uv resout les binaries depuis ~/.local/bin et /opt/homebrew/bin
+        var env = ProcessInfo.processInfo.environment
+        env["PATH"] = (env["PATH"] ?? "/usr/bin:/bin")
+            + ":/usr/local/bin:/opt/homebrew/bin:\(env["HOME"] ?? "")/.local/bin"
+        // Force la couleur off pour des logs propres dans la TextView
+        env["NO_COLOR"] = "1"
+        p.environment = env
+        attach(process: p, label: "feeds")
+        do {
+            try p.run()
+            dataFeedsProc = p
+            DispatchQueue.main.async { self.dataFeedsRunning = true }
+            p.terminationHandler = { [weak self] proc in
+                self?.append(source: "feeds", text: "exited with status \(proc.terminationStatus)")
+                DispatchQueue.main.async {
+                    self?.dataFeedsProc = nil
+                    self?.dataFeedsRunning = false
+                    if self?.dataFeedsWantsRestart == true {
+                        self?.dataFeedsWantsRestart = false
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+                            self?.startDataFeeds()
+                        }
+                    }
+                }
+            }
+            append(source: "launcher", text: "started data_feeds bridge (\(dataFeedsDir))")
+        } catch {
+            append(source: "launcher", text: "failed to start data_feeds: \(error)")
+        }
+    }
+
+    func stopDataFeeds() {
+        dataFeedsWantsRestart = false
+        dataFeedsProc?.terminate()
+    }
+
+    func restartDataFeeds() {
+        guard dataFeedsProc != nil else { startDataFeeds(); return }
+        append(source: "launcher", text: "restarting data_feeds…")
+        dataFeedsWantsRestart = true
+        dataFeedsProc?.terminate()
+        dataFeedsWantsRestart = true
+    }
+
     // MARK: - utilities
 
     func stopAll() {
         sclangProc?.terminate()
         oscopeProc?.terminate()
         webProc?.terminate()
+        dataFeedsProc?.terminate()
     }
 
     func clearLogs() {
