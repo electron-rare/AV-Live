@@ -16,9 +16,16 @@
 
 #include "ofxOsc.h"
 
+#include <deque>
 #include <string>
 #include <unordered_map>
 #include <vector>
+
+// En complement, ce client recoit aussi les flux /data/<source>/<sub>
+// emis par data_feeds/bridge.py. Les arguments numeriques de chaque
+// message sont conserves dans un vector accessible via data(source, sub).
+// Le dernier evenement est aussi disponible comme "pulse" consommable
+// (events de foudre, transactions BTC, posts Bluesky, etc.).
 
 namespace oscope {
 
@@ -52,7 +59,30 @@ public:
     void sendControl(const std::string& addr, float value);
     void sendControl(const std::string& addr, const std::string& value);
 
+    /// ----- Flux temps reel externes (data_feeds bridge) -----
+    /// Acces direct au dernier tuple recu sur /data/<source>/<sub>.
+    /// Renvoie vide si rien n'a encore ete recu.
+    const std::vector<float>& data(const std::string& source,
+                                   const std::string& sub) const;
+    /// Helper : premier arg float du dernier tuple, avec fallback.
+    float dataf(const std::string& source, const std::string& sub,
+                float fallback = 0.0f, std::size_t index = 0) const;
+    /// Heartbeat du pont Python (true si recu il y a < 15 s).
+    bool dataAlive() const;
+
+    /// Pulse pour les flux event-based : retourne true UNE fois si un
+    /// nouvel evenement /data/<source>/<sub> est arrive depuis le
+    /// dernier appel, et remplit `outArgs` avec ses arguments float.
+    bool consumeDataPulse(const std::string& source, const std::string& sub,
+                          std::vector<float>& outArgs);
+
 private:
+    struct DataSlot {
+        std::vector<float> last;
+        bool pending = false;
+    };
+    DataSlot* dataSlot(const std::string& key);
+    void storeData(const std::string& addr, const ofxOscMessage& m);
     ofxOscReceiver receiver_;
     ofxOscSender sender_;
 
@@ -67,6 +97,10 @@ private:
     std::string album_;
     std::string melody_;
     std::string synthdef_;
+
+    // Flux /data/<source>/<sub>. Cle = "<source>/<sub>".
+    std::unordered_map<std::string, DataSlot> data_;
+    double lastHeartbeat_ = -1.0;
 };
 
 } // namespace oscope

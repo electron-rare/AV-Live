@@ -1,0 +1,108 @@
+# Configuration du pont data_feeds → OSC.
+#
+# - SC écoute par défaut sur 57121 (cf. sound_algo/web_bridge.scd).
+# - oF écoute sur 57123 (cf. ofApp::setup, oscListenPort_).
+# Le pont diffuse en broadcast vers TOUS les `osc_targets` listés.
+#
+# Activer/désactiver un flux : `enabled = true|false`.
+# Régler le débit avec `poll_seconds` (HTTP) ou laisser les WS gérer.
+
+[osc]
+targets = [
+    { host = "127.0.0.1", port = 57121 },  # SuperCollider
+    { host = "127.0.0.1", port = 57123 },  # openFrameworks
+]
+# Préfixe commun. Toutes les routes sont /data/<feed>/...
+prefix = "/data"
+
+# -- Sismique / géophysique ------------------------------------------------
+
+[feeds.usgs]
+enabled  = true
+url      = "https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/all_hour.geojson"
+poll_seconds = 60
+# Émet /data/usgs/event <mag> <lon> <lat> <depth> <age_sec>
+#   /data/usgs/rate <events_per_hour>
+
+[feeds.swpc]
+enabled  = true
+# Vent solaire (DSCOVR plasma)
+url_plasma = "https://services.swpc.noaa.gov/products/solar-wind/plasma-1-day.json"
+url_mag    = "https://services.swpc.noaa.gov/products/solar-wind/mag-1-day.json"
+url_kp     = "https://services.swpc.noaa.gov/products/noaa-planetary-k-index.json"
+url_xray   = "https://services.swpc.noaa.gov/json/goes/primary/xrays-1-day.json"
+poll_seconds = 60
+# /data/swpc/wind <speed_kms> <density_pcm3> <temp_K>
+# /data/swpc/bz <Bz_nT> <Bt_nT>
+# /data/swpc/kp <kp> <a_index>
+# /data/swpc/xray <short_W_m2> <long_W_m2> <flare_class_norm>
+
+# -- Réseau électrique -----------------------------------------------------
+
+[feeds.netzfrequenz]
+enabled  = true
+# Mainsfrequenz.de WebSocket (résolution ~200 ms, mesure Karlsruhe)
+ws_url   = "wss://www.mainsfrequenz.de/frequenz.socket"
+# /data/grid/freq <hz>          50.000 ± 0.200
+# /data/grid/dev <delta_hz>     écart vs 50 Hz
+# /data/grid/time_dev <sec>     dérive intégrée
+
+[feeds.rte_eco2mix]
+enabled  = false   # nécessite token OAuth RTE (gratuit, register)
+client_id     = ""
+client_secret = ""
+poll_seconds  = 900
+# /data/rte/mix <nuclear> <gas> <coal> <oil> <hydro> <wind> <solar> <bio>
+# /data/rte/co2 <gCO2_per_kWh>
+
+# -- Foudre / atmosphère ---------------------------------------------------
+
+[feeds.blitzortung]
+enabled  = true
+# LightningMaps relay (Blitzortung dérivé, public)
+ws_url   = "wss://ws1.blitzortung.org:443/"
+# /data/lightning/strike <lat> <lon> <age_sec> <multiplicity>
+# /data/lightning/rate <strikes_per_min>
+
+# -- Aviation / mouvement --------------------------------------------------
+
+[feeds.opensky]
+enabled  = true
+url      = "https://opensky-network.org/api/states/all"
+poll_seconds = 15
+# Bbox optionnelle (Lyon par défaut : lamin,lomin,lamax,lomax)
+bbox     = [45.5, 4.6, 46.0, 5.2]
+# /data/aviation/count <n>
+# /data/aviation/plane <icao> <lon> <lat> <alt_m> <vel_ms> <heading_deg>
+
+# -- Pouls numérique -------------------------------------------------------
+
+[feeds.bluesky]
+enabled  = true
+# Jetstream firehose (posts publics WS, JSON décompressé)
+ws_url   = "wss://jetstream2.us-east.bsky.network/subscribe?wantedCollections=app.bsky.feed.post"
+sample_rate = 0.02   # garde 2 % des événements pour pas saturer
+# /data/social/post <text_len> <lang_hash>
+# /data/social/rate <posts_per_sec>
+
+[feeds.mempool]
+enabled  = false
+ws_url   = "wss://mempool.space/api/v1/ws"
+# /data/btc/tx <value_btc> <fee_sat_vb>
+# /data/btc/block <height> <tx_count> <reward_btc>
+
+[feeds.github]
+enabled  = false
+url      = "https://api.github.com/events"
+poll_seconds = 30
+# /data/github/event <type_hash> <repo_hash>
+
+# -- Espace / GCN ----------------------------------------------------------
+
+[feeds.gcn]
+enabled  = false
+# GCN Classic over Kafka : nécessite credentials.
+# Voir https://gcn.nasa.gov/quickstart pour générer un token.
+client_id     = ""
+client_secret = ""
+# /data/gcn/alert <mission_hash> <ra_deg> <dec_deg> <error_arcmin>

@@ -1,8 +1,14 @@
 #include "OscClient.h"
 
 #include "ofLog.h"
+#include "ofUtils.h"
 
 namespace oscope {
+
+namespace {
+constexpr const char* kDataPrefix = "/data/";
+}
+
 
 void OscClient::setup(int listenPort, const std::string& sendHost, int sendPort) {
     receiver_.setup(listenPort);
@@ -42,8 +48,71 @@ void OscClient::update() {
         } else if (a == "/oscope/glitch" && m.getNumArgs() >= 1) {
             pendingGlitchPulse_ = m.getArgAsFloat(0);
             hasGlitchPulse_ = true;
+        } else if (a.rfind(kDataPrefix, 0) == 0) {
+            // /data/heartbeat ou /data/<source>/<sub>
+            if (a == "/data/heartbeat") {
+                lastHeartbeat_ = ofGetElapsedTimef();
+            } else {
+                storeData(a, m);
+            }
         }
     }
+}
+
+void OscClient::storeData(const std::string& addr, const ofxOscMessage& m) {
+    // strip "/data/" prefix → key = "source/sub"
+    std::string key = addr.substr(6);
+    if (key.empty()) return;
+    auto& slot = data_[key];
+    slot.last.clear();
+    slot.last.reserve(m.getNumArgs());
+    for (std::size_t i = 0; i < (std::size_t)m.getNumArgs(); ++i) {
+        // Les flux poussent surtout des floats ; on tente string→hash
+        // pour rester homogene. Les ints sont remontes en float aussi.
+        auto t = m.getArgType(i);
+        if (t == OFXOSC_TYPE_FLOAT) {
+            slot.last.push_back(m.getArgAsFloat(i));
+        } else if (t == OFXOSC_TYPE_INT32) {
+            slot.last.push_back((float)m.getArgAsInt32(i));
+        } else if (t == OFXOSC_TYPE_DOUBLE) {
+            slot.last.push_back((float)m.getArgAsDouble(i));
+        } else if (t == OFXOSC_TYPE_STRING) {
+            // hash djb2 16 bits pour cohérence avec le pont Python
+            const auto& s = m.getArgAsString(i);
+            std::uint32_t h = 5381;
+            for (char c : s) h = ((h << 5) + h + (unsigned char)c) & 0xFFFF;
+            slot.last.push_back((float)h);
+        }
+    }
+    slot.pending = true;
+}
+
+const std::vector<float>& OscClient::data(const std::string& source,
+                                          const std::string& sub) const {
+    static const std::vector<float> empty;
+    auto it = data_.find(source + "/" + sub);
+    return (it == data_.end()) ? empty : it->second.last;
+}
+
+float OscClient::dataf(const std::string& source, const std::string& sub,
+                       float fallback, std::size_t index) const {
+    const auto& v = data(source, sub);
+    return (index < v.size()) ? v[index] : fallback;
+}
+
+bool OscClient::dataAlive() const {
+    return lastHeartbeat_ >= 0.0 &&
+           (ofGetElapsedTimef() - lastHeartbeat_) < 15.0f;
+}
+
+bool OscClient::consumeDataPulse(const std::string& source,
+                                 const std::string& sub,
+                                 std::vector<float>& outArgs) {
+    auto it = data_.find(source + "/" + sub);
+    if (it == data_.end() || !it->second.pending) return false;
+    outArgs = it->second.last;
+    it->second.pending = false;
+    return true;
 }
 
 float OscClient::fx(const std::string& name, float fallback) const {

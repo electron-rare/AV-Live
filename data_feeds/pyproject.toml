@@ -1,0 +1,16 @@
+[project]
+name = "av-live-data-feeds"
+version = "0.1.0"
+description = "Real-world data → OSC bridge for AV-Live (SuperCollider + openFrameworks)"
+requires-python = ">=3.11"
+dependencies = [
+    "python-osc>=1.8.3",
+    "httpx>=0.27",
+    "websockets>=12.0",
+    "aiomqtt>=2.3",
+    "tomli>=2.0;python_version<'3.11'",
+    "skyfield>=1.49",
+]
+
+[tool.uv]
+package = false
