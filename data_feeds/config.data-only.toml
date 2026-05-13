@@ -119,6 +119,29 @@ poll_seconds = 3600
 enabled  = true
 poll_seconds = 60
 
+# -- GDELT (evenements monde 15-min) --------------------------------------
+[feeds.gdelt]
+enabled  = true
+poll_seconds = 900
+
+# -- Wikipedia recent changes ---------------------------------------------
+[feeds.wikimedia]
+enabled  = true
+sample_rate = 0.05
+rate_window_s = 5
+
+# -- NOAA tides + lune ----------------------------------------------------
+[feeds.tides]
+enabled  = true
+station  = "8443970"
+poll_seconds = 360
+
+# -- LiveATC hubs ---------------------------------------------------------
+[feeds.atc]
+enabled  = true
+hubs     = ["KJFK", "KLAX", "KSFO", "KORD", "EGLL", "LFPG"]
+poll_seconds = 300
+
 [feeds.gcn]
 enabled  = false
 client_id     = ""
