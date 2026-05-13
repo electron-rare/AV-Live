@@ -1,19 +1,16 @@
 // =====================================================================
 //  data_only_viz / web / server.js
 //
-//  Bridge OSC -> WebSocket pour le mode data-only d'AV-Live.
+//  Bridge bidirectionnel OSC <-> WebSocket pour le mode data-only.
 //
-//   data_feeds bridge.py
-//        |  OSC UDP :57124
-//        v
-//   server.js (Express :3211 + WS)
-//        |  JSON via WebSocket
-//        v
-//   browser : dashboard.html / map.html
+//   data_feeds bridge.py ----osc :57124----> server.js
+//                                              | WS broadcast
+//                                              v
+//                                         browser (dashboard / map)
 //
-//  Conversion : chaque message OSC /data/<feed>/<sub> args... devient
-//      { feed, sub, args, t }
-//  diffuse a tous les clients WS connectes.
+//   browser (/control)  --WS--> server.js --osc :57121--> SuperCollider
+//
+//   SuperCollider --osc :57125--> server.js --WS broadcast--> browser
 // =====================================================================
 import express from "express";
 import { fileURLToPath } from "node:url";
@@ -24,7 +21,10 @@ import osc from "osc";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const HTTP_PORT = parseInt(process.env.HTTP_PORT ?? "3211", 10);
-const OSC_PORT_IN = parseInt(process.env.OSC_PORT_IN ?? "57124", 10);
+const OSC_DATA_IN = parseInt(process.env.OSC_DATA_IN ?? "57124", 10);
+const OSC_SYNC_IN = parseInt(process.env.OSC_SYNC_IN ?? "57125", 10);
+const SC_HOST = process.env.SC_HOST ?? "127.0.0.1";
+const SC_PORT_OUT = parseInt(process.env.SC_PORT_OUT ?? "57121", 10);
 
 const app = express();
 app.use(express.static(join(__dirname, "public")));
@@ -33,20 +33,12 @@ app.get("/", (_req, res) => res.redirect("/dashboard.html"));
 const httpServer = createServer(app);
 const wss = new WebSocketServer({ server: httpServer });
 
-// Ring buffer for late-joiners : ~500 last messages
 const HISTORY_MAX = 500;
 const history = [];
-function record(msg) {
-  history.push(msg);
+function record(m) {
+  history.push(m);
   if (history.length > HISTORY_MAX) history.shift();
 }
-
-wss.on("connection", (ws) => {
-  // Replay recent history so a new dashboard sees the latest values
-  for (const msg of history.slice(-100)) {
-    try { ws.send(JSON.stringify(msg)); } catch {}
-  }
-});
 
 function broadcast(msg) {
   const payload = JSON.stringify(msg);
@@ -57,35 +49,79 @@ function broadcast(msg) {
   }
 }
 
-// OSC UDP listener
-const udp = new osc.UDPPort({
-  localAddress: "127.0.0.1",
-  localPort: OSC_PORT_IN,
-  metadata: false,
+wss.on("connection", (ws) => {
+  // Replay last ~100 events to fresh tabs
+  for (const m of history.slice(-100)) {
+    try { ws.send(JSON.stringify(m)); } catch {}
+  }
+  ws.on("message", (raw) => {
+    let msg;
+    try { msg = JSON.parse(String(raw)); } catch { return; }
+    // From browser : { kind: 'control'|'scene'|'xy', path, args }
+    // -> dispatch en OSC vers SC.
+    if (!msg || typeof msg.path !== "string") return;
+    if (!msg.path.startsWith("/control/")
+        && !msg.path.startsWith("/scene/")
+        && !msg.path.startsWith("/xy/")) {
+      return;
+    }
+    const args = (msg.args || []).map((v) => {
+      if (typeof v === "number") return { type: "f", value: v };
+      return { type: "s", value: String(v) };
+    });
+    udpOut.send({ address: msg.path, args }, SC_HOST, SC_PORT_OUT);
+  });
 });
 
-udp.on("message", (m) => {
-  // Path format : /data/<feed>/<sub>
+// OSC IN: data feeds + SC sync (2 sockets distincts)
+const udpData = new osc.UDPPort({
+  localAddress: "127.0.0.1", localPort: OSC_DATA_IN, metadata: false,
+});
+udpData.on("message", (m) => {
   const parts = (m.address || "").split("/").filter(Boolean);
   if (parts.length < 2 || parts[0] !== "data") return;
   const feed = parts[1];
   const sub = parts.slice(2).join("/") || "msg";
   const msg = {
-    t: Date.now(),
-    feed,
-    sub,
+    t: Date.now(), kind: "feed",
+    feed, sub, args: Array.isArray(m.args) ? m.args : [],
+  };
+  record(msg);
+  broadcast(msg);
+});
+udpData.on("error", (e) => console.error("OSC data error:", e));
+udpData.open();
+console.log(`OSC feeds in :${OSC_DATA_IN}`);
+
+const udpSync = new osc.UDPPort({
+  localAddress: "127.0.0.1", localPort: OSC_SYNC_IN, metadata: false,
+});
+udpSync.on("message", (m) => {
+  // SC poussera /sync/bpm <f>, /sync/rms <f>, /sync/amp/<voie> <f>...
+  const path = m.address || "";
+  if (!path.startsWith("/sync/")) return;
+  const sub = path.slice(6) || "msg";
+  const msg = {
+    t: Date.now(), kind: "sync", sub,
     args: Array.isArray(m.args) ? m.args : [],
   };
   record(msg);
   broadcast(msg);
 });
+udpSync.on("error", (e) => console.error("OSC sync error:", e));
+udpSync.open();
+console.log(`OSC sync from SC in :${OSC_SYNC_IN}`);
 
-udp.on("error", (e) => console.error("OSC error:", e));
-udp.open();
-console.log(`OSC listening on udp :${OSC_PORT_IN}`);
+// OSC OUT vers SuperCollider
+const udpOut = new osc.UDPPort({
+  localAddress: "127.0.0.1", localPort: 0, metadata: false,
+});
+udpOut.open();
+console.log(`OSC out to SC :${SC_HOST}:${SC_PORT_OUT}`);
 
 httpServer.listen(HTTP_PORT, () => {
   console.log(`Data-only web on http://127.0.0.1:${HTTP_PORT}/`);
-  console.log(`  Dashboard : http://127.0.0.1:${HTTP_PORT}/dashboard.html`);
-  console.log(`  Map       : http://127.0.0.1:${HTTP_PORT}/map.html`);
+  console.log(`  Dashboard : /dashboard.html`);
+  console.log(`  Map       : /map.html`);
+  console.log(`  Control   : /control.html`);
 });

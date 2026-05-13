@@ -1,0 +1,195 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <title>AV-Live · Contrôle</title>
+  <link rel="stylesheet" href="css/dashboard.css" />
+  <style>
+    main.control {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 16px;
+      padding: 20px;
+      height: calc(100vh - 65px);
+    }
+    .panel {
+      background: #14142a;
+      border: 1px solid #25254a;
+      border-radius: 12px;
+      padding: 18px;
+      display: flex; flex-direction: column; gap: 12px;
+    }
+    .panel h2 {
+      margin: 0;
+      font-size: 12px;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: #ff5e95;
+    }
+    .slider-row { display: flex; flex-direction: column; gap: 6px; }
+    .slider-row label {
+      display: flex; justify-content: space-between;
+      font-size: 13px; color: #d7d7e0;
+    }
+    .slider-row label span.val {
+      font-variant-numeric: tabular-nums;
+      color: #ff5e95; font-weight: 600;
+    }
+    input[type=range] {
+      -webkit-appearance: none;
+      width: 100%; height: 6px;
+      background: #2a2a4a; border-radius: 3px;
+      outline: none;
+    }
+    input[type=range]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 16px; height: 16px;
+      background: #ff5e95; border-radius: 50%;
+      cursor: pointer;
+    }
+    .scene-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+    }
+    .scene-btn {
+      padding: 14px 8px;
+      background: #1e1e3a;
+      color: #d7d7e0;
+      border: 1px solid #2a2a4a;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 12px;
+      letter-spacing: 0.04em;
+      transition: all 0.15s;
+    }
+    .scene-btn:hover { border-color: #ff5e95; color: #fff; }
+    .scene-btn.active {
+      background: rgba(255,94,149,0.2);
+      border-color: #ff5e95;
+      color: #fff;
+    }
+    .xy-pad {
+      flex: 1;
+      background: #0a0a14;
+      border: 1px solid #2a2a4a;
+      border-radius: 8px;
+      position: relative;
+      cursor: crosshair;
+      min-height: 240px;
+      overflow: hidden;
+    }
+    .xy-cursor {
+      position: absolute;
+      width: 18px; height: 18px;
+      background: #ff5e95;
+      border-radius: 50%;
+      transform: translate(-50%, -50%);
+      box-shadow: 0 0 12px rgba(255,94,149,0.7);
+      pointer-events: none;
+      transition: top 0.05s, left 0.05s;
+    }
+    .xy-grid {
+      position: absolute; inset: 0;
+      background:
+        linear-gradient(rgba(255,255,255,0.05) 1px, transparent 1px) 0 0 / 100% 25%,
+        linear-gradient(90deg, rgba(255,255,255,0.05) 1px, transparent 1px) 0 0 / 25% 100%;
+      pointer-events: none;
+    }
+    .xy-coords {
+      position: absolute; bottom: 8px; right: 8px;
+      font-family: Menlo, monospace; font-size: 11px;
+      color: #aaa;
+    }
+    .sync-row {
+      display: flex; justify-content: space-between;
+      font-size: 12px; color: #aaa;
+    }
+    .sync-row b { color: #6fe9b3; font-variant-numeric: tabular-nums; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>AV-Live · Contrôle</h1>
+    <span class="pill" id="conn">connexion…</span>
+    <nav>
+      <a href="/dashboard.html">Dashboard</a>
+      <a href="/map.html">Carte monde</a>
+      <a href="/control.html">Contrôle</a>
+    </nav>
+  </header>
+  <main class="control">
+
+    <!-- Panneau 1 : sliders synth -->
+    <div class="panel">
+      <h2>Synthés &amp; mix</h2>
+      <div class="slider-row" data-osc="/control/master_gain">
+        <label>Master gain <span class="val">0.80</span></label>
+        <input type="range" min="0" max="1" step="0.01" value="0.8" />
+      </div>
+      <div class="slider-row" data-osc="/control/cutoff">
+        <label>Cutoff LPF (Hz) <span class="val">1200</span></label>
+        <input type="range" min="50" max="20000" step="1" value="1200" />
+      </div>
+      <div class="slider-row" data-osc="/control/reso">
+        <label>Resonance <span class="val">0.30</span></label>
+        <input type="range" min="0" max="1" step="0.01" value="0.3" />
+      </div>
+      <div class="slider-row" data-osc="/control/reverb_mix">
+        <label>Reverb mix <span class="val">0.25</span></label>
+        <input type="range" min="0" max="1" step="0.01" value="0.25" />
+      </div>
+      <div class="slider-row" data-osc="/control/delay_time">
+        <label>Delay time (s) <span class="val">0.30</span></label>
+        <input type="range" min="0" max="2" step="0.01" value="0.3" />
+      </div>
+      <div class="slider-row" data-osc="/control/delay_feedback">
+        <label>Delay feedback <span class="val">0.40</span></label>
+        <input type="range" min="0" max="0.95" step="0.01" value="0.4" />
+      </div>
+      <div class="slider-row" data-osc="/control/tempo">
+        <label>Tempo (BPM) <span class="val">120</span></label>
+        <input type="range" min="40" max="240" step="1" value="120" />
+      </div>
+    </div>
+
+    <!-- Panneau 2 : scenes audio + pulse retour SC -->
+    <div class="panel">
+      <h2>Scènes audio</h2>
+      <div class="scene-grid" id="scenes">
+        <button class="scene-btn" data-scene="cavity">cavity</button>
+        <button class="scene-btn" data-scene="geo">geo</button>
+        <button class="scene-btn" data-scene="body">body</button>
+        <button class="scene-btn" data-scene="weather">weather</button>
+        <button class="scene-btn" data-scene="flight">flight</button>
+        <button class="scene-btn" data-scene="pulse">pulse</button>
+        <button class="scene-btn" data-scene="quiet">quiet</button>
+        <button class="scene-btn" data-scene="all">all</button>
+        <button class="scene-btn" data-scene="full">full</button>
+        <button class="scene-btn" data-scene="stop">stop</button>
+      </div>
+      <h2 style="margin-top:18px">Retour SC</h2>
+      <div class="sync-row">BPM <b id="sync-bpm">—</b></div>
+      <div class="sync-row">Beat <b id="sync-beat">—</b></div>
+      <div class="sync-row">RMS niveau <b id="sync-rms">—</b></div>
+      <div class="sync-row">Voies actives <b id="sync-voices">—</b></div>
+    </div>
+
+    <!-- Panneau 3 : XY pad pour FX modulation -->
+    <div class="panel">
+      <h2>XY pad · FX modulation</h2>
+      <div class="xy-pad" id="xy">
+        <div class="xy-grid"></div>
+        <div class="xy-cursor" id="xy-cursor" style="left:50%;top:50%"></div>
+        <div class="xy-coords" id="xy-coords">x=0.50  y=0.50</div>
+      </div>
+      <div style="font-size:11px;color:#888;line-height:1.4">
+        X mappe sur <code>/xy/x</code> (0..1)<br>
+        Y mappe sur <code>/xy/y</code> (0..1)<br>
+        Clic ou drag pour bouger le point.
+      </div>
+    </div>
+  </main>
+  <script type="module" src="js/control.js"></script>
+</body>
+</html>
