@@ -2,7 +2,7 @@
 
 // Client OSC pour le pont sound_algo.
 //
-// Reçoit sur 127.0.0.1:57122 les messages /sync/* émis par le bridge :
+// Reçoit sur 127.0.0.1:57123 les messages /sync/* émis par le bridge :
 //   /sync/bpm <float>
 //   /sync/beat <int>
 //   /sync/amp <string voice> <float val>      // 8 voies

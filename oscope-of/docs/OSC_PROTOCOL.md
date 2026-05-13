@@ -14,19 +14,19 @@ Référence des messages OSC échangés entre les deux projets. Sert aussi de sp
                 |   web_bridge.scd      | <----------------> browser (control panel)
                 |  (Node + sclang OSC)  |
                 +-----+-------------+---+
-        :57121 |        |             | :57122
+        :57121 |        |             | :57123
        (SC<-)  |        |             | (->SC, broadcast WS)
                v        v             v
                   +-----+--------------------+
                   |        oscope-of         |
-                  |  ofxOscReceiver :57122   |
+                  |  ofxOscReceiver :57123   |
                   |  ofxOscSender   :57121   |
                   +--------------------------+
 ```
 
 `oscope-of` :
 
-- **Écoute** sur `127.0.0.1:57122` les `/sync/*`
+- **Écoute** sur `127.0.0.1:57123` les `/sync/*`
 - **Envoie** sur `127.0.0.1:57121` des `/control/*` interprétés par sound_algo
 
 ## Messages reçus (sound_algo → oscope-of)
@@ -112,13 +112,13 @@ Tout autre paramètre exposé par sound_algo via OSCdef. La nomenclature suit `~
 
 ## Notes d'implémentation
 
-- Le bridge sound_algo broadcast les `/sync/*` à la fois en UDP direct (vers `oscope-of` et tout autre client OSC sur :57122) et en WebSocket (vers les browsers). oscope-of utilise UNIQUEMENT le canal UDP.
+- Le bridge sound_algo broadcast les `/sync/*` à la fois en UDP direct (vers `oscope-of` et tout autre client OSC sur :57123) et en WebSocket (vers les browsers). oscope-of utilise UNIQUEMENT le canal UDP.
 - Si vous lancez plusieurs visualizers en parallèle (par ex `oscope-of` + un autre client OF), augmenter le buffer UDP socket ou utiliser des ports distincts.
 - Le `web_bridge.scd` côté sound_algo doit avoir oscope-of dans sa liste de subscribers UDP. Vérifier dans le bridge :
 
   ```supercollider
   ~oscRelays = [
-      NetAddr("127.0.0.1", 57122),  // oscope-of
+      NetAddr("127.0.0.1", 57123),  // oscope-of
       // autres clients OSC...
   ];
   ```

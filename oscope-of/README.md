@@ -69,7 +69,7 @@ Depuis votre arbre `sound_algo` :
 ~startBridge.value;
 ```
 
-Le bridge écoute sur `127.0.0.1:57121` (SC) et `127.0.0.1:57122` (Node→SC) ; `oscope-of` se branche sur ces deux ports.
+Topologie OSC : `sclang` écoute `127.0.0.1:57121` (commandes depuis `oscope-of`), `Node↔SC` utilise `:57122`, `oscope-of` écoute `127.0.0.1:57123` les `/sync/*` émis par le bridge.
 
 ### Étape 5 — Build et run
 
@@ -101,7 +101,7 @@ make RunRelease
 ```json
 {
   "scope":   { "sample_rate": 48000000, "gain_ch1": 0.5, "gain_ch2": 0.5, "buffer_size": 4096 },
-  "osc":     { "listen_port": 57122, "send_host": "127.0.0.1", "send_port": 57121 },
+  "osc":     { "listen_port": 57123, "send_host": "127.0.0.1", "send_port": 57121 },
   "display": { "fullscreen": false, "width": 1920, "height": 1080, "default_mode": "hybrid" }
 }
 ```
@@ -132,7 +132,7 @@ Si OpenHantek6022 est lancé en parallèle, il claim le device et `oscope-of` ne
 
 ### Pas de messages OSC
 
-Vérifier dans la GUI que le port d'écoute est bien `57122`, et que `sound_algo`'s bridge a démarré (`~startBridge.value` dans SC). Tester avec `oscchief` ou `OSCdef.trace`.
+Vérifier dans la GUI que le port d'écoute est bien `57123`, et que `sound_algo`'s bridge a démarré (`~startBridge.value` dans SC). Tester avec `oscchief` ou `OSCdef.trace`.
 
 ## Architecture
 

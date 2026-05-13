@@ -264,7 +264,7 @@ private:
     ofxToggle      fxEnableToggle_;
 
     // Settings persistants.
-    int oscListenPort_ = 57122;
+    int oscListenPort_ = 57123;
     std::string oscSendHost_ = "127.0.0.1";
     int oscSendPort_ = 57121;
     int bufferSize_ = 4096;
