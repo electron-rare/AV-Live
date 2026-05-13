@@ -237,7 +237,8 @@ class AppDelegate(NSObject):
                     self._pose_worker = MultiHMRWorker(
                         self._state, num_persons=4,
                         target_fps=10.0,
-                        device=getattr(self._opts, "pose_device", "mps"))
+                        device=getattr(self._opts, "pose_device", "mps"),
+                        camera_index=getattr(self._opts, "camera_index", -1))
                     self._pose_worker.start()
                     self._smplx_tcp = SMPLXTCPSender(self._state)
                     self._smplx_tcp.start()
@@ -476,6 +477,9 @@ def main() -> int:
     p.add_argument("--multi-hmr", dest="multi_hmr", action="store_true",
                    help="Active Multi-HMR worker pour mesh SMPL-X dense "
                         "(necessite setup_multihmr.sh + SMPLX_NEUTRAL.npz)")
+    p.add_argument("--camera-index", dest="camera_index", type=int,
+                   default=-1,
+                   help="Index camera OpenCV (-1 = auto built-in Mac)")
     p.add_argument("--pose-device", default="mps",
                    choices=("cpu", "mps", "cuda:0"),
                    help="Device YOLO inference (default mps)")

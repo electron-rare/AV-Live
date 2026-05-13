@@ -38,12 +38,15 @@ N_VERTS = 10475
 class MultiHMRWorker:
     def __init__(self, state: State, num_persons: int = 4,
                  target_fps: float = 10.0, device: str = "mps",
-                 det_thresh: float = 0.3) -> None:
+                 det_thresh: float = 0.3,
+                 camera_index: int = -1) -> None:
         self.state = state
         self.num_persons = num_persons
         self.period = 1.0 / max(1.0, target_fps)
         self.device = device
         self.det_thresh = det_thresh
+        # -1 = auto-select Mac BuiltInWideAngleCamera (cf _camera_select)
+        self.camera_index = camera_index
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None
         self._smooth_shape = [
@@ -125,13 +128,16 @@ class MultiHMRWorker:
                            [0.0, focal, IMG_SIZE / 2.0],
                            [0.0, 0.0, 1.0]]], device=device)
 
-        cap = cv2.VideoCapture(0)
+        from ._camera_select import resolve_camera_index
+        cam_idx = resolve_camera_index(self.camera_index)
+        cap = cv2.VideoCapture(cam_idx)
         cap.set(cv2.CAP_PROP_FRAME_WIDTH, IMG_SIZE)
         cap.set(cv2.CAP_PROP_FRAME_HEIGHT, IMG_SIZE)
         if not cap.isOpened():
-            LOG.error("camera index 0 indisponible")
+            LOG.error("camera index %d indisponible (TCC ?)", cam_idx)
             return
-        LOG.info("camera ouverte %dx%d", IMG_SIZE, IMG_SIZE)
+        LOG.info("camera ouverte index=%d %dx%d",
+                 cam_idx, IMG_SIZE, IMG_SIZE)
 
         while not self._stop.is_set():
             t0 = time.monotonic()
