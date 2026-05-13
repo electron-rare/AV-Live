@@ -23,6 +23,8 @@ import threading
 import time
 from typing import Sequence
 
+import numpy as np
+
 from .state import SMPLXPerson, State
 
 LOG = logging.getLogger("smplx_tcp")

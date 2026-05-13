@@ -10,6 +10,8 @@ import threading
 import time
 from dataclasses import dataclass, field
 
+import numpy as np
+
 
 @dataclass
 class PoseKp:
@@ -24,12 +26,12 @@ class SMPLXPerson:
     """Resultats Multi-HMR pour une personne : params SMPL-X + vertices
     decodes en metres. Vertices en repere camera (z > 0 devant)."""
     pid: int = -1
-    vertices_3d: tuple = field(default_factory=tuple)   # ((x,y,z),) x 10475
-    joints_3d: tuple = field(default_factory=tuple)      # ((x,y,z),) x 127
-    translation: tuple = (0.0, 0.0, 0.0)
+    vertices_3d: np.ndarray = field(default_factory=lambda: np.empty((0, 3), dtype=np.float32))  # (10475, 3)
+    joints_3d: np.ndarray = field(default_factory=lambda: np.empty((0, 3), dtype=np.float32))    # (127, 3)
+    translation: np.ndarray = field(default_factory=lambda: np.zeros(3, dtype=np.float32))       # (3,)
     confidence: float = 0.0
-    betas: tuple = field(default_factory=tuple)           # (10,)
-    expression: tuple = field(default_factory=tuple)      # (10,)
+    betas: np.ndarray = field(default_factory=lambda: np.zeros(10, dtype=np.float32))            # (10,)
+    expression: np.ndarray = field(default_factory=lambda: np.zeros(10, dtype=np.float32))       # (10,)
 
 
 @dataclass

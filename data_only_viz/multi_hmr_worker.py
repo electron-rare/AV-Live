@@ -235,14 +235,14 @@ class MultiHMRWorker:
 
                 persons.append(SMPLXPerson(
                     pid=int(pid),
-                    vertices_3d=tuple(map(tuple, v3d)),
-                    joints_3d=tuple(map(tuple, j3d)),
-                    translation=tuple(float(x) for x in transl_np[:3]),
+                    vertices_3d=np.ascontiguousarray(v3d, dtype=np.float32),
+                    joints_3d=np.ascontiguousarray(j3d, dtype=np.float32),
+                    translation=np.ascontiguousarray(transl_np[:3], dtype=np.float32),
                     confidence=float(hh.get("scores", 1.0)) if not hasattr(
                         hh.get("scores", None), "item") else float(
                         hh["scores"].item()),
-                    betas=tuple(float(x) for x in shape_smooth),
-                    expression=tuple(float(x) for x in expr_smooth),
+                    betas=np.ascontiguousarray(shape_smooth, dtype=np.float32),
+                    expression=np.ascontiguousarray(expr_smooth, dtype=np.float32),
                 ))
 
             with self.state.lock():

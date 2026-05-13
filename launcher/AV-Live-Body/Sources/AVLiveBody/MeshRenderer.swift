@@ -89,10 +89,28 @@ final class MeshRenderer: ObservableObject {
     }
 
     private var lowLevelMeshes: [Int: LowLevelMesh] = [:]
+    private var currentMetallic: Bool = false
+    private var currentRoughness: Float = 0.6
+
+    /// Pousse les nouveaux parametres de materiau a chaque entity vivant.
+    /// Appelle par BodyView a chaque updateNSView pour permettre des
+    /// changements live (Metallic toggle, Roughness slider).
+    func applyMaterialSettings(metallic: Bool, roughness: Float) {
+        currentMetallic = metallic
+        currentRoughness = roughness
+        for (pid, entity) in personEntities {
+            entity.model?.materials = [SimpleMaterial(
+                color: colorForPid(pid),
+                roughness: .init(floatLiteral: roughness),
+                isMetallic: metallic)]
+        }
+    }
 
     private func makeEntity(pid: Int) -> ModelEntity {
         let material = SimpleMaterial(color: colorForPid(pid),
-                                      isMetallic: false)
+                                      roughness: .init(
+                                        floatLiteral: currentRoughness),
+                                      isMetallic: currentMetallic)
         let entity = ModelEntity()
         let initial = Array(repeating: SIMD3<Float>(0, 0, 0), count: 10475)
         if let mesh = createLowLevelMesh(vertices: initial) {
