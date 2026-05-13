@@ -4,7 +4,7 @@ Streaming GRU-1-layer + MLP per-person, with a 16-frame ring buffer.
 Trained windowed (Studio M3 Ultra MPS), inferred streaming (M5 eager CPU).
 
 Output per step: (label_idx, probs (3,), kin (3,)) where kin is
-(speed, accel_mag, symmetry_score).
+(speed_m_s, accel_m_s2, symmetry_in_minus1_plus1).
 """
 from __future__ import annotations
 
@@ -12,8 +12,14 @@ from collections import deque
 from pathlib import Path
 
 import numpy as np
+import torch
+from torch import nn
 
-# Constants (SMPL-X joint indexing as used by Multi-HMR)
+HIDDEN_DIM: int = 48
+MLP_HIDDEN: int = 32
+WARMUP_FRAMES: int = 3
+NAN_SKIP_BUDGET: int = 5
+
 WINDOW_LEN: int = 16
 J3D_JOINTS: int = 22
 J3D_DIMS: int = 3
@@ -21,7 +27,6 @@ NUM_CLASSES: int = 3
 LABELS: tuple[str, str, str] = ("debout", "assise", "danse")
 FEATURE_DIM: int = J3D_JOINTS * J3D_DIMS * 3 + 3  # j3d + vel + accel + 3 scalars
 
-# Joint indices (SMPL-X)
 HIP_LEFT: int = 1
 HIP_RIGHT: int = 2
 KNEE_LEFT: int = 4
@@ -35,68 +40,192 @@ WRIST_RIGHT: int = 21
 
 
 class FeatureExtractor:
-    """Extract kinematic features from j3d window."""
+    """Stateless feature builder over a list of recent j3d frames.
+
+    Vector layout (FEATURE_DIM = 201):
+      [0 : 66]   j3d current frame, flattened (22 joints × 3 dims)
+      [66 : 132] velocity j3d[t] - j3d[t-1] (22 × 3)
+      [132 : 198] acceleration vel[t] - vel[t-1] (22 × 3)
+      [198 : 201] kinetics scalars (hip_y, knee_angle, symmetry_score)
+    """
+
+    @staticmethod
+    def from_buffer(frames: list[np.ndarray]) -> np.ndarray:
+        if not frames:
+            return np.zeros(FEATURE_DIM, dtype=np.float32)
+        cur = frames[-1]
+        prev = frames[-2] if len(frames) >= 2 else cur
+        prev2 = frames[-3] if len(frames) >= 3 else prev
+        vel = (cur - prev).astype(np.float32, copy=False)
+        prev_vel = (prev - prev2).astype(np.float32, copy=False)
+        accel = (vel - prev_vel).astype(np.float32, copy=False)
+        hip_y = float((cur[HIP_LEFT, 1] + cur[HIP_RIGHT, 1]) * 0.5)
+        knee_angle = FeatureExtractor._mean_knee_angle(cur)
+        sym = FeatureExtractor._symmetry_score(vel)
+        feat = np.concatenate([
+            cur.reshape(-1),
+            vel.reshape(-1),
+            accel.reshape(-1),
+            np.array([hip_y, knee_angle, sym], dtype=np.float32),
+        ]).astype(np.float32, copy=False)
+        return feat
+
+    @staticmethod
+    def kinetics(frames: list[np.ndarray]) -> np.ndarray:
+        """Return (speed, accel_mag, symmetry) averaged over the buffer."""
+        if len(frames) < 2:
+            return np.zeros(3, dtype=np.float32)
+        arr = np.stack(frames).astype(np.float32, copy=False)
+        diffs = arr[1:] - arr[:-1]
+        speeds = np.linalg.norm(diffs, axis=-1).mean(axis=-1)
+        speed = float(speeds.mean())
+        if len(frames) >= 3:
+            ddiffs = diffs[1:] - diffs[:-1]
+            accel = float(np.linalg.norm(ddiffs, axis=-1).mean())
+        else:
+            accel = 0.0
+        sym = FeatureExtractor._symmetry_score(diffs[-1])
+        return np.array([speed, accel, sym], dtype=np.float32)
 
     @staticmethod
     def _mean_knee_angle(j3d: np.ndarray) -> float:
-        """Estimate mean knee angle (radians) from two frames.
-
-        j3d : (22, 3) float32
-        Returns: angle in radians (0 = fully extended, π ≈ fully bent)
-        """
-        hip_l = j3d[HIP_LEFT]
-        knee_l = j3d[KNEE_LEFT]
-        ankle_l = j3d[ANKLE_LEFT]
-
-        # Vectors: hip→knee, knee→ankle
-        v1 = knee_l - hip_l
-        v2 = ankle_l - knee_l
-
-        norm1 = np.linalg.norm(v1)
-        norm2 = np.linalg.norm(v2)
-
-        if norm1 < 1e-6 or norm2 < 1e-6:
-            return np.pi / 2  # neutral default
-
-        cos_angle = np.dot(v1, v2) / (norm1 * norm2)
-        cos_angle = np.clip(cos_angle, -1.0, 1.0)
-        angle = np.arccos(cos_angle)
-        return float(angle)
+        """Angle (rad) at left+right knees, averaged."""
+        def _angle(hip: int, knee: int, ankle: int) -> float:
+            v1 = j3d[hip] - j3d[knee]
+            v2 = j3d[ankle] - j3d[knee]
+            n1 = np.linalg.norm(v1) + 1e-6
+            n2 = np.linalg.norm(v2) + 1e-6
+            cos = float(np.dot(v1, v2) / (n1 * n2))
+            return float(np.arccos(np.clip(cos, -1.0, 1.0)))
+        return 0.5 * (_angle(HIP_LEFT, KNEE_LEFT, ANKLE_LEFT)
+                      + _angle(HIP_RIGHT, KNEE_RIGHT, ANKLE_RIGHT))
 
     @staticmethod
-    def kinetics(frames: list[np.ndarray]) -> tuple[float, float, float]:
-        """Compute speed, accel, symmetry from frame window.
+    def _symmetry_score(vel: np.ndarray) -> float:
+        """Cosine sim between left-arm and mirrored right-arm velocity."""
+        left = vel[WRIST_LEFT].copy()
+        right = vel[WRIST_RIGHT].copy()
+        right_mirror = right.copy()
+        right_mirror[0] = -right_mirror[0]
+        n1 = np.linalg.norm(left) + 1e-6
+        n2 = np.linalg.norm(right_mirror) + 1e-6
+        return float(np.dot(left, right_mirror) / (n1 * n2))
 
-        frames : list of (22, 3) float32 arrays
-        Returns: (speed m/s, accel m/s², symmetry -1..1)
-        """
-        if len(frames) < 2:
-            return 0.0, 0.0, 0.0
 
-        # Speed: mean joint velocity magnitude
-        velocities = []
-        for i in range(1, len(frames)):
-            dj3d = frames[i] - frames[i - 1]
-            vel_mag = np.linalg.norm(dj3d, axis=1).mean()
-            velocities.append(vel_mag)
+class PerPersonBuffer:
+    """Per-pid ring buffer of j3d frames (deque maxlen=WINDOW_LEN)."""
 
-        speed = float(np.mean(velocities)) if velocities else 0.0
+    __slots__ = ("_buffers",)
 
-        # Accel: finite difference of velocities
-        accel = 0.0
-        if len(velocities) >= 2:
-            accels = np.abs(np.diff(velocities))
-            accel = float(np.mean(accels)) if len(accels) > 0 else 0.0
+    def __init__(self) -> None:
+        self._buffers: dict[int, deque[np.ndarray]] = {}
 
-        # Symmetry: cosine similarity left/right shoulder and wrist
-        cur = frames[-1]
-        left_arm = np.concatenate([cur[SHOULDER_LEFT], cur[WRIST_LEFT]])
-        right_arm = np.concatenate([cur[SHOULDER_RIGHT], cur[WRIST_RIGHT]])
+    def append(self, pid: int, j3d: np.ndarray) -> None:
+        if j3d.shape != (J3D_JOINTS, J3D_DIMS):
+            raise ValueError(
+                f"j3d must be ({J3D_JOINTS}, {J3D_DIMS}), got {j3d.shape}"
+            )
+        dq = self._buffers.get(pid)
+        if dq is None:
+            dq = deque(maxlen=WINDOW_LEN)
+            self._buffers[pid] = dq
+        dq.append(j3d.astype(np.float32, copy=False))
 
-        norm_l = np.linalg.norm(left_arm)
-        norm_r = np.linalg.norm(right_arm)
-        symmetry = 0.0
-        if norm_l > 1e-6 and norm_r > 1e-6:
-            symmetry = float(np.dot(left_arm, right_arm) / (norm_l * norm_r))
+    def frames_for(self, pid: int) -> list[np.ndarray]:
+        dq = self._buffers.get(pid)
+        return list(dq) if dq is not None else []
 
-        return speed, accel, symmetry
+    def forget(self, pid: int) -> None:
+        self._buffers.pop(pid, None)
+
+    def __len__(self) -> int:
+        return len(self._buffers)
+
+    def pids(self) -> list[int]:
+        return list(self._buffers.keys())
+
+
+class ActionHeadModel(nn.Module):
+    """1-layer GRU + small MLP head.
+
+    Input  : (B, FEATURE_DIM) — single step
+    Hidden : (1, B, HIDDEN_DIM)
+    Output : (B, NUM_CLASSES) logits, new hidden
+    """
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.gru = nn.GRU(input_size=FEATURE_DIM,
+                          hidden_size=HIDDEN_DIM,
+                          num_layers=1,
+                          batch_first=True)
+        self.mlp = nn.Sequential(
+            nn.Linear(HIDDEN_DIM, MLP_HIDDEN),
+            nn.ReLU(inplace=True),
+            nn.Linear(MLP_HIDDEN, NUM_CLASSES),
+        )
+
+    def init_hidden(self, batch: int = 1, device: str = "cpu") -> torch.Tensor:
+        return torch.zeros(1, batch, HIDDEN_DIM, device=device)
+
+    def forward(self, x: torch.Tensor,
+                h: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
+        out, h_new = self.gru(x.unsqueeze(1), h)
+        logits = self.mlp(out.squeeze(1))
+        return logits, h_new
+
+
+class ActionHead:
+    """Streaming action classifier per person.
+
+    Use:
+        head = ActionHead(ckpt_path=...)
+        label, probs, kin = head.step(pid, j3d)
+        head.forget(pid)
+    """
+
+    def __init__(self,
+                 ckpt_path: Path | None = None,
+                 device: str = "cpu") -> None:
+        self._device = device
+        self._model = ActionHeadModel().to(device).eval()
+        if ckpt_path is not None:
+            payload = torch.load(ckpt_path, map_location=device,
+                                 weights_only=True)
+            state = payload.get("model_state_dict", payload)
+            self._model.load_state_dict(state)
+        self._buffers = PerPersonBuffer()
+        self._hidden: dict[int, torch.Tensor] = {}
+        self._nan_streak: dict[int, int] = {}
+
+    def step(self, pid: int, j3d: np.ndarray) -> tuple[str, np.ndarray, np.ndarray]:
+        if np.isnan(j3d).any():
+            streak = self._nan_streak.get(pid, 0) + 1
+            self._nan_streak[pid] = streak
+            if streak > NAN_SKIP_BUDGET:
+                self.forget(pid)
+            probs = np.array([1.0, 0.0, 0.0], dtype=np.float32)
+            return LABELS[0], probs, np.zeros(3, dtype=np.float32)
+        self._nan_streak[pid] = 0
+        self._buffers.append(pid, j3d)
+        frames = self._buffers.frames_for(pid)
+        if len(frames) < WARMUP_FRAMES:
+            probs = np.array([1.0, 0.0, 0.0], dtype=np.float32)
+            return LABELS[0], probs, np.zeros(3, dtype=np.float32)
+        feat = FeatureExtractor.from_buffer(frames)
+        kin = FeatureExtractor.kinetics(frames)
+        h = self._hidden.get(pid)
+        if h is None:
+            h = self._model.init_hidden(batch=1, device=self._device)
+        x = torch.from_numpy(feat).unsqueeze(0).to(self._device)
+        with torch.no_grad():
+            logits, h_new = self._model(x, h)
+            probs_t = torch.softmax(logits, dim=-1).squeeze(0)
+        self._hidden[pid] = h_new
+        probs = probs_t.cpu().numpy().astype(np.float32, copy=False)
+        return LABELS[int(np.argmax(probs))], probs, kin
+
+    def forget(self, pid: int) -> None:
+        self._buffers.forget(pid)
+        self._hidden.pop(pid, None)
+        self._nan_streak.pop(pid, None)
