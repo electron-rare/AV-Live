@@ -294,6 +294,43 @@
     ("[feeds] heartbeat: " ++ if(~feedAlive.value) { "ALIVE" } { "DOWN" }).postln;
 };
 
+// =====================================================================
+//  ACTION-HEAD  OSC handlers  (/pose/action, /pose/kin, /pose/enter, /pose/leave)
+// =====================================================================
+~poseState = ~poseState ? Dictionary.new;
+~poseKin   = ~poseKin   ? Dictionary.new;
+
+OSCdef(\poseAction, { |msg|
+    var pid = msg[1];
+    ~poseState[pid] = (
+        labelIdx: msg[2],
+        probs:    [msg[3], msg[4], msg[5]],
+    );
+}, '/pose/action');
+
+OSCdef(\poseKin, { |msg|
+    var pid = msg[1];
+    ~poseKin[pid] = (
+        speed:    msg[2],
+        accel:    msg[3],
+        symmetry: msg[4],
+    );
+}, '/pose/kin');
+
+OSCdef(\poseEnter, { |msg|
+    var pid = msg[1];
+    ~poseState[pid] = (labelIdx: 0, probs: [1.0, 0.0, 0.0]);
+    ~poseKin[pid]   = (speed: 0, accel: 0, symmetry: 0);
+}, '/pose/enter');
+
+OSCdef(\poseLeave, { |msg|
+    var pid = msg[1];
+    ~poseState.removeAt(pid);
+    ~poseKin.removeAt(pid);
+}, '/pose/leave');
+
+"[OK] action-head OSC handlers".postln;
+
 "[data_feeds] OSCdef installes (USGS, SWPC, NETZ, RTE, BLITZ, OPENSKY, BSKY, MEMPOOL, GCN).".postln;
 "[data_feeds] usage : ~feeds[\\swpc_kp], ~feedGet.(\\netz_dev, 0), ~feedDump.()".postln;
 )
