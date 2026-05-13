@@ -72,6 +72,7 @@ CACHE_DIR = Path.home() / ".cache" / "av-live-detrpose"
 REPO_DIR = CACHE_DIR / "DETRPose"
 # Modele N (nano) par defaut : 16 MB, le plus rapide.
 DEFAULT_MODEL_SIZE = "n"
+_VALID_SIZES = {"n", "s", "l"}
 DEFAULT_CKPT = CACHE_DIR / f"detrpose_hgnetv2_{DEFAULT_MODEL_SIZE}.pth"
 DEFAULT_CONFIG_REL = f"configs/detrpose/detrpose_hgnetv2_{DEFAULT_MODEL_SIZE}.py"
 
@@ -124,7 +125,7 @@ class DETRPoseWorker:
         self.period = 1.0 / max(1.0, target_fps)
         self.num_persons = num_persons
         self.score_thresh = score_thresh
-        self.model_size = model_size
+        self._configure_model_size(model_size)
         self.device_pref = device
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None
@@ -136,6 +137,14 @@ class DETRPoseWorker:
 
     def stop(self) -> None:
         self._stop.set()
+
+    def _configure_model_size(self, size: str) -> None:
+        """Validate and set model_size; raise ValueError for unknown sizes."""
+        if size not in _VALID_SIZES:
+            raise ValueError(
+                f"DETRPose model_size must be one of {sorted(_VALID_SIZES)}, got {size!r}"
+            )
+        self.model_size = size
 
     # ------------------------------------------------------------------
     # Chargement modele : on importe le repo DETRPose en ajoutant son

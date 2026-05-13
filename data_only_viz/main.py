@@ -297,7 +297,8 @@ class AppDelegate(NSObject):
                 from .detrpose import DETRPoseWorker, is_available
                 if is_available():
                     self._pose_worker = DETRPoseWorker(
-                        self._state, num_persons=4)
+                        self._state, num_persons=4,
+                        model_size=getattr(self._opts, "detrpose_model_size", "n"))
                     self._pose_worker.start()
                     LOG.info("worker: DETRPose (transformer, body 17 kp × 4)")
                     return
@@ -495,6 +496,10 @@ def main() -> int:
     p.add_argument("--pose-device", default="mps",
                    choices=("cpu", "mps", "cuda:0"),
                    help="Device YOLO inference (default mps)")
+    p.add_argument("--detrpose-model-size",
+                   choices=["n", "s", "l"],
+                   default="n",
+                   help="DETRPose model size (default: n)")
     p.add_argument("-v", "--verbose", action="store_true")
     opts = p.parse_args()
 
