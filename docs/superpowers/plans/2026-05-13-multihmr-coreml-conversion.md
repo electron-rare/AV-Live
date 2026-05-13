@@ -67,6 +67,33 @@ these as untraceable.
 single-day estimate was optimistic — backbone alone needs ~½ day of
 surgery before head can even be touched.
 
+### Task 2 + 3 attempted (2026-05-13, post-breakthrough)
+
+**Task 2 — apply_topk validation : PASS**
+
+`apply_topk(K=4)` validée comme drop-in pour `apply_threshold` :
+cosine sim 1.000000 sur 4/4 détections (image example_data), MAE
+2-4 mm = bruit float-reorder. Script : `scripts/probe_head_topk.py`.
+
+**Task 3 — Full Multi-HMR convert : en cours, patches itératifs**
+
+Tentative conversion full Multi-HMR avec :
+- apply_threshold monkey-patched → apply_topk(K=4)
+- backbone.encoder.interpolate_pos_encoding → buffer fige
+- utils.camera.inverse_perspective_projection → closed-form K_inv
+
+→ TracedMHMR.forward sanity OK, jit.trace OK, mais conversion
+coremltools échoue successivement sur :
+1. `upsample_bicubic2d` ✅ résolu par pos_embed fix
+2. `aten::inverse` ✅ résolu par closed-form K_inv
+3. `Types should have zero-rank ndarray input, got [0.]` ❌ encore
+
+Pattern : chaque patch débloque la couche suivante. Estimation
+restante : 1-2 jours pour couvrir tous les ops résiduels.
+
+Script Task 3 : `scripts/coreml_full_probe.py` (laissé en place pour
+reprise — point d'arrêt précis documenté).
+
 ### Probe v4 (2026-05-13) — BREAKTHROUGH
 
 Avec **2 patches au lieu d'1**, la conversion DINOv2 ViT-S 672x672
