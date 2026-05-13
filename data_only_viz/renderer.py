@@ -243,7 +243,9 @@ class MetalRenderer(NSObject):
 
     def _init_mesh_cpu_buffer(self) -> None:
         if getattr(self, "_mesh_cpu_buf", None) is None:
-            self._mesh_cpu_buf = np.zeros(MESH_MAX_VERTS * 5, dtype=np.float32)
+            self._mesh_cpu_buf = np.zeros(
+                MESH_MAX_VERTS * MESH_VERT_FLOATS, dtype=np.float32,
+            )
 
     # ---- Uniforms helpers ------------------------------------------
     def _update_uniforms(self) -> int:
@@ -401,7 +403,7 @@ class MetalRenderer(NSObject):
             ou triangle invalide (confiance basse)."""
             nonlocal n_verts
             tris = n_verts // 3
-            if tris >= MESH_MAX_TRIS:
+            if tris >= MESH_MAX_TRIS or n_verts + 3 > MESH_MAX_VERTS:
                 return False
             if i >= len(kp_list) or j >= len(kp_list) or k >= len(kp_list):
                 return True   # skip mais continue
@@ -464,7 +466,8 @@ class MetalRenderer(NSObject):
 
         if n_verts == 0:
             return 0
-        data = self._mesh_cpu_buf[: n_verts * 5].tobytes()
+        # Slice is exact — stale floats beyond n_verts*MESH_VERT_FLOATS never reach the GPU.
+        data = self._mesh_cpu_buf[: n_verts * MESH_VERT_FLOATS].tobytes()
         mv = self._mesh_buf.contents().as_buffer(len(data))
         mv[:] = data
         return n_verts // 3
