@@ -27,7 +27,6 @@ class SMPLXPerson:
     decodes en metres. Vertices en repere camera (z > 0 devant)."""
     pid: int = -1
     vertices_3d: np.ndarray = field(default_factory=lambda: np.empty((0, 3), dtype=np.float32))  # (10475, 3)
-    joints_3d: np.ndarray = field(default_factory=lambda: np.empty((0, 3), dtype=np.float32))    # (127, 3)
     translation: np.ndarray = field(default_factory=lambda: np.zeros(3, dtype=np.float32))       # (3,)
     confidence: float = 0.0
     betas: np.ndarray = field(default_factory=lambda: np.zeros(10, dtype=np.float32))            # (10,)

@@ -214,7 +214,6 @@ class MultiHMRWorker:
                     continue
 
                 v3d = hh["v3d"].detach().cpu().numpy()
-                j3d = hh["j3d"].detach().cpu().numpy()
                 transl = hh.get("transl_pelvis", hh.get("transl"))
                 transl_np = transl.detach().cpu().numpy().flatten()
 
@@ -236,7 +235,6 @@ class MultiHMRWorker:
                 persons.append(SMPLXPerson(
                     pid=int(pid),
                     vertices_3d=np.ascontiguousarray(v3d, dtype=np.float32),
-                    joints_3d=np.ascontiguousarray(j3d, dtype=np.float32),
                     translation=np.ascontiguousarray(transl_np[:3], dtype=np.float32),
                     confidence=float(hh.get("scores", 1.0)) if not hasattr(
                         hh.get("scores", None), "item") else float(
