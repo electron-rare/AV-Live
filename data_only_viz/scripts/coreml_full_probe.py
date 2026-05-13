@@ -259,6 +259,12 @@ class TracedMHMR(nn.Module):
         ]).squeeze(-1)
         shape = torch.stack([h["shape"] for h in humans])
         expr = torch.stack([h["expression"] for h in humans])
+        # NOTE: CoreML mlprogram conversion currently produces all-NaN
+        # outputs for v3d and transl while PyTorch eager produces valid
+        # finite values from the same trace. nan_to_num here masks the
+        # symptom but yields all-zero meshes (no information). Leave
+        # raw outputs and let downstream decide; investigation tracked
+        # in task #2 (op-by-op bisection needed).
         return v3d, transl, scores, shape, expr
 
 
