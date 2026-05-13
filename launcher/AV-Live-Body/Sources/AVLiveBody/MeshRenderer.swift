@@ -142,6 +142,7 @@ final class MeshRenderer: ObservableObject {
     /// (macOS 14+) ; fallback rebuild du MeshResource si indisponible.
     private func updateMeshVertices(_ entity: ModelEntity,
                                     vertices: [SIMD3<Float>]) {
+        let t0 = CFAbsoluteTimeGetCurrent()
         let pid = entity.components[PidComponent.self]?.pid ?? -1
         if let mesh = lowLevelMeshes[pid] {
             // Buffer 0 : positions (SIMD3<Float>)
@@ -161,9 +162,17 @@ final class MeshRenderer: ObservableObject {
                 let n = min(dst.count, normals.count)
                 for i in 0..<n { dst[i] = normals[i] }
             }
+            let dtMs = (CFAbsoluteTimeGetCurrent() - t0) * 1000
+            if dtMs > 5 {
+                NSLog("MeshRenderer.update: %.1f ms (pid=%d)", dtMs, pid)
+            }
             return
         }
         entity.model?.mesh = fallbackMesh(vertices: vertices)
+        let dtMs = (CFAbsoluteTimeGetCurrent() - t0) * 1000
+        if dtMs > 5 {
+            NSLog("MeshRenderer.update(fallback): %.1f ms (pid=%d)", dtMs, pid)
+        }
     }
 
     /// Normales par sommet : somme des normales des triangles

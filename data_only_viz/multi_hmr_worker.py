@@ -154,12 +154,13 @@ class MultiHMRWorker:
         next_heartbeat = time.monotonic() + 5.0
 
         while not self._stop.is_set():
-            t0 = time.monotonic()
+            t_cap_start = time.monotonic()
             ok, frame_bgr = cap.read(timeout_s=0.5)
             if not ok or frame_bgr is None:
                 time.sleep(self.period)
                 continue
 
+            t_pre_start = time.monotonic()
             # Crop/resize au carre 896 pour matcher Multi-HMR
             h, w = frame_bgr.shape[:2]
             if (h, w) != (IMG_SIZE, IMG_SIZE):
@@ -174,6 +175,7 @@ class MultiHMRWorker:
             tensor = torch.from_numpy(frame_rgb).permute(2, 0, 1).float()
             tensor = (tensor / 255.0).unsqueeze(0).to(device)
 
+            t_inf_start = time.monotonic()
             try:
                 with torch.no_grad():
                     humans = model(
@@ -188,6 +190,7 @@ class MultiHMRWorker:
                 time.sleep(self.period)
                 continue
 
+            t_post_start = time.monotonic()
             if not humans:
                 with self.state.lock():
                     self.state.persons_smplx = []
@@ -247,6 +250,19 @@ class MultiHMRWorker:
                 self.state.persons_smplx = persons
                 self.state.smplx_last_t = t_now
 
+            t_end = time.monotonic()
+            dt_total = (t_end - t_cap_start) * 1e3
+            if LOG.isEnabledFor(logging.DEBUG) or dt_total > 100.0:
+                LOG.log(
+                    logging.DEBUG if dt_total <= 100.0 else logging.WARNING,
+                    "frame: cap=%.1f pre=%.1f inf=%.1f post=%.1fms total=%.1fms",
+                    (t_pre_start - t_cap_start) * 1e3,
+                    (t_inf_start - t_pre_start) * 1e3,
+                    (t_post_start - t_inf_start) * 1e3,
+                    (t_end - t_post_start) * 1e3,
+                    dt_total,
+                )
+
             frame_count += 1
             persons_count += len(persons)
             if t_now >= next_heartbeat:
@@ -259,7 +275,7 @@ class MultiHMRWorker:
                 persons_count = 0
                 next_heartbeat = t_now + 5.0
 
-            dt = time.monotonic() - t0
+            dt = time.monotonic() - t_cap_start
             if dt < self.period:
                 time.sleep(self.period - dt)
 

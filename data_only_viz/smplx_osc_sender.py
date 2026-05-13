@@ -121,7 +121,9 @@ class SMPLXTCPSender:
                 persons = list(self.state.persons_smplx)
 
             if persons:
+                t_ser_start = time.monotonic()
                 payload = self._serialize_persons(persons)
+                t_send_start = time.monotonic()
                 try:
                     self._sock.sendall(
                         struct.pack("<I", len(payload)) + payload)
@@ -133,6 +135,15 @@ class SMPLXTCPSender:
                     LOG.warning("smplx_tcp: send failed (%s) — reconnecting", e)
                     self._close()
                     continue
+                t_send_end = time.monotonic()
+                dt_tcp = (t_send_end - t_ser_start) * 1e3
+                if LOG.isEnabledFor(logging.DEBUG) or dt_tcp > 20.0:
+                    LOG.log(
+                        logging.DEBUG if dt_tcp <= 20.0 else logging.WARNING,
+                        "tcp: ser=%.1f send=%.1fms",
+                        (t_send_start - t_ser_start) * 1e3,
+                        (t_send_end - t_send_start) * 1e3,
+                    )
 
             dt = time.monotonic() - t0
             if dt < self.period:
