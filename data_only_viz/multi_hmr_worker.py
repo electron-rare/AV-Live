@@ -1,0 +1,214 @@
+"""Worker Multi-HMR : capture webcam Mac, inference forward unique
+SMPL-X (multi-personne natif), extraction vertices v3d, ecriture State.
+
+Le repo Multi-HMR n'est pas pip-installable — on injecte le clone dans
+sys.path au runtime. Chaque humain renvoye contient deja les vertices
+SMPL-X decodes (cle `v3d`, shape (10475, 3)) ; pas besoin du decoder
+SMPL-X separe en hot path (il reste utile pour les tests).
+
+Cadence cible : 8-12 fps sur M5 (ViT-L). Lissage One Euro sur les
+shapes/expression pour limiter le jitter trame-a-trame.
+"""
+from __future__ import annotations
+
+import logging
+import sys
+import threading
+import time
+from pathlib import Path
+
+import numpy as np
+
+from .euro_filter import OneEuroFilter
+from .state import PoseKp, SMPLXPerson, State
+from .tracker import IoUTracker
+
+LOG = logging.getLogger("multi_hmr")
+
+CACHE = Path.home() / ".cache" / "av-live-multihmr"
+CKPT = CACHE / "checkpoints" / "multiHMR_896_L.pt"
+SMPLX_PATH = CACHE / "models" / "smplx" / "SMPLX_NEUTRAL.npz"
+MULTIHMR_REPO = CACHE / "multi-hmr"
+
+IMG_SIZE = 896
+N_VERTS = 10475
+
+
+class MultiHMRWorker:
+    def __init__(self, state: State, num_persons: int = 4,
+                 target_fps: float = 10.0, device: str = "mps",
+                 det_thresh: float = 0.3) -> None:
+        self.state = state
+        self.num_persons = num_persons
+        self.period = 1.0 / max(1.0, target_fps)
+        self.device = device
+        self.det_thresh = det_thresh
+        self._stop = threading.Event()
+        self._thread: threading.Thread | None = None
+        self._smooth_shape = [
+            [OneEuroFilter(0.8, 0.05) for _ in range(10)]
+            for _ in range(num_persons)
+        ]
+        self._smooth_expr = [
+            [OneEuroFilter(1.0, 0.08) for _ in range(10)]
+            for _ in range(num_persons)
+        ]
+        self._tracker = IoUTracker(iou_threshold=0.20, max_miss=8)
+
+    @staticmethod
+    def is_available() -> bool:
+        return CKPT.exists() and SMPLX_PATH.exists() and MULTIHMR_REPO.exists()
+
+    def start(self) -> None:
+        self._thread = threading.Thread(
+            target=self._run, name="multi_hmr", daemon=True)
+        self._thread.start()
+
+    def stop(self) -> None:
+        self._stop.set()
+
+    def _run(self) -> None:
+        if str(MULTIHMR_REPO) not in sys.path:
+            sys.path.insert(0, str(MULTIHMR_REPO))
+        try:
+            import torch
+            import cv2
+            # `demo` est un module de niveau racine dans le repo Multi-HMR.
+            from demo import load_model
+        except ImportError as e:
+            LOG.error("deps manquantes : %s — uv sync --extra multihmr "
+                      "et bash scripts/setup_multihmr.sh", e)
+            return
+
+        if self.device == "mps" and not torch.backends.mps.is_available():
+            LOG.warning("MPS unavailable, falling back to cpu")
+            device = "cpu"
+        else:
+            device = self.device
+
+        ckpt_name = CKPT.stem  # ex 'multiHMR_896_L'
+        try:
+            torch_device = torch.device(device)
+            model = load_model(ckpt_name, device=torch_device)
+            model.eval()
+        except Exception as e:
+            LOG.error("Multi-HMR load failed: %s", e)
+            return
+        LOG.info("Multi-HMR loaded (%s) on %s", ckpt_name, device)
+
+        # Camera intrinsics (focale = img_size par defaut). batch dim 1.
+        focal = float(IMG_SIZE)
+        K = torch.tensor([[[focal, 0.0, IMG_SIZE / 2.0],
+                           [0.0, focal, IMG_SIZE / 2.0],
+                           [0.0, 0.0, 1.0]]], device=device)
+
+        cap = cv2.VideoCapture(0)
+        cap.set(cv2.CAP_PROP_FRAME_WIDTH, IMG_SIZE)
+        cap.set(cv2.CAP_PROP_FRAME_HEIGHT, IMG_SIZE)
+        if not cap.isOpened():
+            LOG.error("camera index 0 indisponible")
+            return
+        LOG.info("camera ouverte %dx%d", IMG_SIZE, IMG_SIZE)
+
+        while not self._stop.is_set():
+            t0 = time.monotonic()
+            ok, frame_bgr = cap.read()
+            if not ok:
+                time.sleep(self.period)
+                continue
+
+            # Crop/resize au carre 896 pour matcher Multi-HMR
+            h, w = frame_bgr.shape[:2]
+            if (h, w) != (IMG_SIZE, IMG_SIZE):
+                # Center-crop + resize
+                side = min(h, w)
+                y0 = (h - side) // 2
+                x0 = (w - side) // 2
+                frame_bgr = frame_bgr[y0:y0 + side, x0:x0 + side]
+                frame_bgr = cv2.resize(frame_bgr, (IMG_SIZE, IMG_SIZE))
+
+            frame_rgb = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2RGB)
+            tensor = torch.from_numpy(frame_rgb).permute(2, 0, 1).float()
+            tensor = (tensor / 255.0).unsqueeze(0).to(device)
+
+            try:
+                with torch.no_grad():
+                    humans = model(
+                        tensor,
+                        is_training=False,
+                        nms_kernel_size=1,
+                        det_thresh=self.det_thresh,
+                        K=K,
+                    )
+            except Exception as e:
+                LOG.warning("inference failed: %s", e)
+                time.sleep(self.period)
+                continue
+
+            if not humans:
+                with self.state.lock():
+                    self.state.persons_smplx = []
+                time.sleep(self.period)
+                continue
+
+            t_now = time.monotonic()
+
+            # Tracking via bbox approximee depuis verts projetes (xy)
+            bboxes = []
+            n_keep = min(len(humans), self.num_persons)
+            for h in humans[:n_keep]:
+                v = h["v3d"].detach().cpu().numpy()  # (10475, 3)
+                xmin, ymin = float(v[:, 0].min()), float(v[:, 1].min())
+                xmax, ymax = float(v[:, 0].max()), float(v[:, 1].max())
+                bboxes.append([PoseKp(x=xmin, y=ymin, c=1.0),
+                               PoseKp(x=xmax, y=ymax, c=1.0)])
+            ids = self._tracker.update(bboxes)
+
+            persons: list[SMPLXPerson] = []
+            for i, hh in enumerate(humans[:n_keep]):
+                pid = ids[i] if i < len(ids) else i
+                if pid < 0:
+                    continue
+
+                v3d = hh["v3d"].detach().cpu().numpy()
+                j3d = hh["j3d"].detach().cpu().numpy()
+                transl = hh.get("transl_pelvis", hh.get("transl"))
+                transl_np = transl.detach().cpu().numpy().flatten()
+
+                shape_raw = hh["shape"].detach().cpu().numpy().flatten()
+                expr_raw = hh["expression"].detach().cpu().numpy().flatten()
+
+                pid_c = pid % self.num_persons
+                shape_n = min(10, len(shape_raw))
+                expr_n = min(10, len(expr_raw))
+                shape_smooth = np.zeros(10, dtype=np.float32)
+                expr_smooth = np.zeros(10, dtype=np.float32)
+                for k in range(shape_n):
+                    shape_smooth[k] = self._smooth_shape[pid_c][k](
+                        float(shape_raw[k]), t_now)
+                for k in range(expr_n):
+                    expr_smooth[k] = self._smooth_expr[pid_c][k](
+                        float(expr_raw[k]), t_now)
+
+                persons.append(SMPLXPerson(
+                    pid=int(pid),
+                    vertices_3d=tuple(map(tuple, v3d)),
+                    joints_3d=tuple(map(tuple, j3d)),
+                    translation=tuple(float(x) for x in transl_np[:3]),
+                    confidence=float(hh.get("scores", 1.0)) if not hasattr(
+                        hh.get("scores", None), "item") else float(
+                        hh["scores"].item()),
+                    betas=tuple(float(x) for x in shape_smooth),
+                    expression=tuple(float(x) for x in expr_smooth),
+                ))
+
+            with self.state.lock():
+                self.state.persons_smplx = persons
+                self.state.smplx_last_t = t_now
+
+            dt = time.monotonic() - t0
+            if dt < self.period:
+                time.sleep(self.period - dt)
+
+        cap.release()
+        LOG.info("multi_hmr worker stopped")
