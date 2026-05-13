@@ -426,6 +426,25 @@ float3 mode_hands3d(float2 p, constant SceneUniforms& U) {
     return col;
 }
 
+// ---- 9 openpos : fond minimal radial pour faire ressortir le squelette ----
+// Le rendu des joints + bones se fait par le skel_pipeline rendu PAR-DESSUS
+// (cf renderer.py). On laisse juste un degrade radial sombre pour le contraste.
+float3 mode_openpos(float2 p, constant SceneUniforms& U) {
+    float r = length(p);
+    // Centre legerement plus clair, bords sombres. Touche de couleur
+    // chaude au centre selon rms pour reagir a la musique.
+    float3 inner = float3(0.05, 0.05, 0.10) + float3(0.30, 0.12, 0.18) * U.rms;
+    float3 outer = float3(0.01, 0.01, 0.02);
+    float3 col = mix(inner, outer, smoothstep(0.0, 1.4, r));
+    // Grille de points discrete pour donner une ref de profondeur
+    float2 g = fmod(p * 12.0, 2.0) - 1.0;
+    float dot_grid = exp(-dot(g, g) * 6.0) * 0.04;
+    col += float3(dot_grid);
+    // Pulsation legere sur le kick / drop
+    col *= 1.0 + U.rms * 0.4;
+    return col;
+}
+
 // ===== Fragment dispatcher =========================================
 
 fragment float4 bg_fragment(VsOut in [[stage_in]],
@@ -444,6 +463,7 @@ fragment float4 bg_fragment(VsOut in [[stage_in]],
     else if (mode == 6) color = mode_starfield(p, U);
     else if (mode == 7) color = mode_bars(p, U);
     else if (mode == 8) color = mode_hands3d(p, U);
+    else if (mode == 9) color = mode_openpos(p, U);
     else                color = mode_storm(p, U);
 
     // Flash global + vignette

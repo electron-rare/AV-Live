@@ -116,6 +116,7 @@ class State:
         "storm", "tunnel", "plasma", "kaleido",
         "voronoi", "metaballs", "starfield", "bars",
         "hands3d",   # mode 8 : voyage 3D pilote par les mains
+        "openpos",   # mode 9 : skeleton multi-personne sur fond minimal
     )
     # Preset open-data actif (USGS, Blitz, Wind, Kp/Bz, X-ray, OpenSky,
     # Bsky, Pose, Cosmos) — affiche dans le HUD.
@@ -153,7 +154,7 @@ KEYMAP_VIDEO: tuple[tuple[str, str], ...] = (
     ("u", "starfield"),
     ("i", "bars"),
     ("o", "hands3d"),   # voyage 3D pilote par les mains MediaPipe
-    # p : libre
+    ("p", "openpos"),   # skeleton multi-personne 3D-stylise
 )
 
 KEYMAP_AUDIO: tuple[tuple[str, str], ...] = (
