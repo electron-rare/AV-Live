@@ -77,6 +77,16 @@ class SMPLXTCPSender:
             self._sock = None
 
     @staticmethod
+    def _pad10(arr: "np.ndarray") -> "np.ndarray":
+        """Return a contiguous float32 array of length 10, zero-padded if shorter."""
+        flat = np.ascontiguousarray(arr, dtype="<f4").ravel()
+        if len(flat) >= 10:
+            return flat[:10]
+        out = np.zeros(10, dtype="<f4")
+        out[:len(flat)] = flat
+        return out
+
+    @staticmethod
     def _serialize_persons(persons: Sequence[SMPLXPerson]) -> bytes:
         buf = bytearray()
         buf += MAGIC
@@ -84,16 +94,15 @@ class SMPLXTCPSender:
         for p in persons:
             buf += struct.pack("<i", p.pid)
             buf += struct.pack("<f", float(p.confidence))
-            tx, ty, tz = (p.translation + (0.0, 0.0, 0.0))[:3]
-            buf += struct.pack("<fff", float(tx), float(ty), float(tz))
-            betas = list(p.betas[:10]) + [0.0] * max(0, 10 - len(p.betas))
-            for b in betas[:10]:
-                buf += struct.pack("<f", float(b))
-            expr = list(p.expression[:10]) + [0.0] * max(0, 10 - len(p.expression))
-            for e in expr[:10]:
-                buf += struct.pack("<f", float(e))
-            for vx, vy, vz in p.vertices_3d:
-                buf += struct.pack("<fff", float(vx), float(vy), float(vz))
+            trans = np.ascontiguousarray(p.translation, dtype="<f4").ravel()
+            if len(trans) < 3:
+                t3 = np.zeros(3, dtype="<f4")
+                t3[:len(trans)] = trans
+                trans = t3
+            buf += trans[:3].tobytes()
+            buf += SMPLXTCPSender._pad10(p.betas).tobytes()
+            buf += SMPLXTCPSender._pad10(p.expression).tobytes()
+            buf += np.ascontiguousarray(p.vertices_3d, dtype="<f4").tobytes()
         return bytes(buf)
 
     def _run(self) -> None:
