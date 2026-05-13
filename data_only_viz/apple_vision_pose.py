@@ -552,29 +552,12 @@ class AppleVisionPoseWorker:
             if not hasattr(self, "_logged_face_ok_" + region_name):
                 LOG.info("face: region %s count=%d", region_name, count)
                 setattr(self, "_logged_face_ok_" + region_name, True)
-            # API stable : pointAtIndex_(k) retourne un CGPoint struct.
-            n = min(count, end - start)
-            n_written = 0
-            for k in range(n):
-                try:
-                    pt = region.pointAtIndex_(k)
-                    # CGPoint en pyobjc : tuple (x, y) ou struct
-                    try:
-                        nx_bb = float(pt.x); ny_bb = float(pt.y)
-                    except (AttributeError, TypeError):
-                        nx_bb = float(pt[0]); ny_bb = float(pt[1])
-                    fx = bx + nx_bb * bw
-                    fy_bl = by + ny_bb * bh
-                    kps[start + k] = PoseKp(
-                        x=fx, y=1.0 - fy_bl, z=0.0, c=1.0)
-                    n_written += 1
-                except Exception as e:
-                    if not hasattr(self, "_logged_face_pt_err"):
-                        LOG.info("face: pt %s[%d] err: %s (pt=%r)",
-                                 region_name, k, e, type(pt).__name__
-                                 if 'pt' in dir() else "??")
-                        self._logged_face_pt_err = True
-                    continue
+            # pyobjc 11 ne sait pas que pointAtIndex_ prend 1 arg, et
+            # pointsInImageOfSize_ retourne un PyObjCPointer C-array sans
+            # API d'acces simple. Face parsing depuis Apple Vision est
+            # actuellement bloque ; on garde MediaPipe (CPU XNNPACK) pour
+            # face/hand fin tandis que Vision sert body 2D sur ANE.
+            n = 0; n_written = 0
             if n_written > 0 and not hasattr(self, "_logged_face_write_" + region_name):
                 LOG.info("face: %s wrote %d points", region_name, n_written)
                 setattr(self, "_logged_face_write_" + region_name, True)
@@ -590,13 +573,19 @@ class AppleVisionPoseWorker:
         fill("nose",        *FACE_OFFSETS["nose"])
         fill("medianLine",  *FACE_OFFSETS["median"])
 
-        # Pupilles : VNFaceLandmarkRegion2D simple (1 point chacune).
+        # Pupilles : single-point regions ; meme workaround pyobjc.
         for region_name, idx in (("leftPupil", 81), ("rightPupil", 82)):
             try:
                 region = getattr(landmarks, region_name)()
                 if region is None or region.pointCount() < 1:
                     continue
-                pt = region.pointAtIndex_(0)
+                try:
+                    pts = region.pointsInImageOfSize_((1.0, 1.0))
+                except Exception:
+                    pts = region.normalizedPoints()
+                if not pts:
+                    continue
+                pt = pts[0]
                 try:
                     px, py = float(pt.x), float(pt.y)
                 except (AttributeError, TypeError):
