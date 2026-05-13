@@ -37,7 +37,7 @@ thisProcess.openUDPPort(~webBridgeIn);
     ~webBridgeRelays.do { |addr| addr.sendMsg(path, *args) };
 };
 
-~webBase = ~base ?? { "/Users/electron/Documents/Projets_Creatifs/sound_algo-refonte-v2/" };
+~webBase = ~base ?? { thisProcess.nowExecutingPath !? { |p| p.dirname ++ "/" } };
 ~webHttpUrl = "http://localhost:3000";
 
 // ---------- Auto-lancement serveur Node + ouverture pages -----------

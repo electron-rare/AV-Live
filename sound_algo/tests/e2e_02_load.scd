@@ -9,7 +9,7 @@
 
 "=== e2e_02_load ===".postln;
 
-~base = "/Users/electron/Documents/Projets_Creatifs/sound_algo-refonte-v2/";
+~base = thisProcess.nowExecutingPath !? { |p| p.dirname.dirname ++ "/" };
 ~testCount = 0;
 ~testFailed = 0;
 
