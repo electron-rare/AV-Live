@@ -68,6 +68,23 @@ class SMPLXTCPSender:
         except (socket.error, ConnectionRefusedError):
             return False
 
+    def _send_or_close(self, payload: bytes) -> bool:
+        """Send *payload* (already length-prefixed) over _sock.
+
+        Returns True on success, False on any socket error (socket is closed).
+        """
+        try:
+            self._sock.sendall(payload)
+            return True
+        except socket.timeout:
+            LOG.warning("smplx_tcp: send timeout — receiver stalled, dropping connection")
+            self._close()
+            return False
+        except (BrokenPipeError, ConnectionResetError, OSError) as e:
+            LOG.warning("smplx_tcp: send failed (%s) — reconnecting", e)
+            self._close()
+            return False
+
     def _close(self) -> None:
         if self._sock is not None:
             try:
@@ -124,16 +141,8 @@ class SMPLXTCPSender:
                 t_ser_start = time.monotonic()
                 payload = self._serialize_persons(persons)
                 t_send_start = time.monotonic()
-                try:
-                    self._sock.sendall(
-                        struct.pack("<I", len(payload)) + payload)
-                except socket.timeout:
-                    LOG.warning("smplx_tcp: send timeout — receiver stalled, dropping connection")
-                    self._close()
-                    continue
-                except (BrokenPipeError, ConnectionResetError, OSError) as e:
-                    LOG.warning("smplx_tcp: send failed (%s) — reconnecting", e)
-                    self._close()
+                if not self._send_or_close(
+                        struct.pack("<I", len(payload)) + payload):
                     continue
                 t_send_end = time.monotonic()
                 dt_tcp = (t_send_end - t_ser_start) * 1e3
