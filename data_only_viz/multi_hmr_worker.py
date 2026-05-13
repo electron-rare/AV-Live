@@ -40,6 +40,7 @@ class MultiHMRWorker:
                  target_fps: float = 10.0, device: str = "mps",
                  det_thresh: float = 0.3,
                  nms_kernel_size: int = 5,
+                 motion_gate: float = 5.0,
                  camera_index: int = -1) -> None:
         self.state = state
         self.num_persons = num_persons
@@ -47,6 +48,11 @@ class MultiHMRWorker:
         self.device = device
         self.det_thresh = det_thresh
         self.nms_kernel_size = nms_kernel_size
+        # Motion gate : si la diff moyenne par pixel (sur frame 672x672
+        # downsamplee a 112x112 pour speed) est < motion_gate, on skip
+        # l'inference et on reutilise les v3d precedents. Seuil en
+        # unites 0-255. Mettre <=0 pour desactiver.
+        self.motion_gate = motion_gate
         # -1 = auto-select Mac BuiltInWideAngleCamera (cf _camera_select)
         self.camera_index = camera_index
         self._stop = threading.Event()
@@ -119,6 +125,10 @@ class MultiHMRWorker:
             model = Model(**kwargs).to(torch_device)
             model.load_state_dict(ckpt["model_state_dict"], strict=False)
             model.eval()
+            # torch.compile teste 2026-05-13 : plante en runtime avec
+            # `TypeError: torch.Size() takes an iterable of 'int' (item
+            # is 'FakeTensor')`. Multi-HMR a du shape-arithmetic non
+            # traceable, on garde le eager.
         except Exception as e:
             LOG.error("Multi-HMR load failed: %s", e)
             os.chdir(prev_cwd)
@@ -156,7 +166,10 @@ class MultiHMRWorker:
         LOG.info("camera ouverte %s (%s)", info["name"], info["type"])
         frame_count = 0
         persons_count = 0
+        skipped_static = 0
         next_heartbeat = time.monotonic() + 5.0
+        # Frame thumbnail precedent pour motion gate (112x112 gray).
+        prev_thumb: np.ndarray | None = None
 
         while not self._stop.is_set():
             t_cap_start = time.monotonic()
@@ -175,6 +188,23 @@ class MultiHMRWorker:
                 x0 = (w - side) // 2
                 frame_bgr = frame_bgr[y0:y0 + side, x0:x0 + side]
                 frame_bgr = cv2.resize(frame_bgr, (IMG_SIZE, IMG_SIZE))
+
+            # Motion gate : downsample en 112x112 gris, diff vs frame
+            # precedente. Si bouge peu, skip l'inference (re-utilise
+            # les v3d deja en state).
+            if self.motion_gate > 0:
+                thumb = cv2.cvtColor(
+                    cv2.resize(frame_bgr, (112, 112)),
+                    cv2.COLOR_BGR2GRAY)
+                if prev_thumb is not None:
+                    diff_mean = float(np.mean(
+                        cv2.absdiff(thumb, prev_thumb)))
+                    if diff_mean < self.motion_gate:
+                        prev_thumb = thumb
+                        skipped_static += 1
+                        time.sleep(self.period)
+                        continue
+                prev_thumb = thumb
 
             frame_rgb = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2RGB)
             tensor = torch.from_numpy(frame_rgb).permute(2, 0, 1).float()
@@ -205,10 +235,11 @@ class MultiHMRWorker:
                 fps = frame_count / 5.0
                 avg = persons_count / max(1, frame_count)
                 LOG.info(
-                    "hb: %.1f fps, %.2f persons/frame (%d frames)",
-                    fps, avg, frame_count)
+                    "hb: %.1f fps, %.2f persons/frame, %d skipped (static)",
+                    fps, avg, skipped_static)
                 frame_count = 0
                 persons_count = 0
+                skipped_static = 0
                 next_heartbeat = t_now + 5.0
             if not humans:
                 with self.state.lock():

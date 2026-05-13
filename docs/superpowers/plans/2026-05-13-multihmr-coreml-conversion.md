@@ -39,6 +39,38 @@ filtering can be done on the Swift side.
 - `torch.export` (PyTorch 2.5+) + `coremltools.convert` is the modern
   path, but inherits the same data-dependent restrictions.
 
+## Probe result 2026-05-13 (Task 1 Step 3)
+
+Ran `/tmp/coreml_probe.py` on a fresh coreml-probe-venv (torch 2.12,
+coremltools 9.0, M5). **Conversion FAILED at MIL op 17/670** :
+
+```
+ERROR - converting 'int' op (located at: '50'):
+only 0-dimensional arrays can be converted to Python scalars
+```
+
+Source : DINOv2's `interpolate_pos_encoding` in
+`vision_transformer.py:186-212` uses `int(math.sqrt(N))`,
+`float(w0+offset)/M` etc on tensor scalars — coremltools rejects
+these as untraceable.
+
+**Surgery required** (revised effort estimate):
+
+1. Fork DINOv2's `vision_transformer.py`, hardcode `npatch=48*48=2304`
+   for 672x672 input (no dynamic interpolation needed since input is
+   fixed). Replace tensor-to-scalar conversions with Python constants
+   computed once at module init.
+2. Then re-attempt trace + convert.
+3. Then surgery on Multi-HMR head (`torch.where` → `topk(K=4)`).
+
+**Revised effort**: 2-3 days minimum (was estimated 1 day). The
+single-day estimate was optimistic — backbone alone needs ~½ day of
+surgery before head can even be touched.
+
+**Recommendation**: pursue only if thermal/ANE residency is the goal.
+For pure speedup, Mac Studio M3 Ultra offload (separate plan) gives
+5-10× faster than Multi-HMR MPS with ~½ day work and no model surgery.
+
 ## Risk register
 
 | Risk | Likelihood | Impact | Mitigation |

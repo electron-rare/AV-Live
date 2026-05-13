@@ -260,6 +260,8 @@ class AppDelegate(NSObject):
                         det_thresh=getattr(self._opts, "det_thresh", 0.15),
                         nms_kernel_size=getattr(
                             self._opts, "nms_kernel_size", 5),
+                        motion_gate=getattr(
+                            self._opts, "motion_gate", 5.0),
                         camera_index=getattr(self._opts, "camera_index", -1))
                     self._pose_worker.start()
                     self._smplx_tcp = SMPLXTCPSender(self._state)
@@ -512,6 +514,10 @@ def main() -> int:
     p.add_argument("--nms-kernel-size", dest="nms_kernel_size", type=int,
                    default=5,
                    help="Multi-HMR NMS kernel (odd, >=3; default 5)")
+    p.add_argument("--motion-gate", dest="motion_gate", type=float,
+                   default=5.0,
+                   help="Skip Multi-HMR si diff caméra <X (0-255 ; "
+                        "0=desactive ; default 5.0)")
     p.add_argument("--detrpose-model-size",
                    choices=["n", "s", "l"],
                    default="n",
