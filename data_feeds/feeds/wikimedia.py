@@ -27,12 +27,16 @@ async def run(ctx) -> None:
     cfg = ctx.cfg
     sample = float(cfg.get("sample_rate", 0.05))   # emit 5% des edits
     window = float(cfg.get("rate_window_s", 5.0))
+    # WMF EventStreams refuse l'User-Agent par defaut httpx (403). Il
+    # faut une string descriptive + URL/email pour les abuse reports.
+    headers = {
+        "Accept": "text/event-stream",
+        "User-Agent": "av-live-data-feeds/1.0 (https://github.com/electron-rare/AV-Live)",
+    }
     while True:
         try:
             async with httpx.AsyncClient(timeout=None) as cli:
-                async with cli.stream("GET", URL,
-                                       headers={"Accept": "text/event-stream"}
-                                       ) as r:
+                async with cli.stream("GET", URL, headers=headers) as r:
                     r.raise_for_status()
                     bucket = 0
                     bucket_start = time.monotonic()

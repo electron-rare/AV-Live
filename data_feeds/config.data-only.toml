@@ -65,9 +65,10 @@ ws_url   = "wss://ws1.blitzortung.org:443/"
 [feeds.opensky]
 enabled  = true
 url      = "https://opensky-network.org/api/states/all"
-# API anonyme limitee a 1 req/15s. On laisse 20s de marge pour eviter
-# les 429 sous drift d'horloge.
-poll_seconds = 20
+# API anonyme : 10 req / 1 min credit-based. On reste a 60s pour ne
+# jamais epuiser le credit en cas de fork de process / restart rapide.
+# Les 429 vus en 2026-05 etaient dus au poll 15s/20s precedent.
+poll_seconds = 60
 bbox     = [45.5, 4.6, 46.0, 5.2]
 
 # -- Pouls numérique -------------------------------------------------------
