@@ -1,8 +1,5 @@
 {
   "scope": {
-    "sample_rate": 48000000,
-    "gain_ch1": 0.5,
-    "gain_ch2": 0.5,
     "buffer_size": 4096
   },
   "osc": {
@@ -11,9 +8,6 @@
     "send_port": 57121
   },
   "display": {
-    "fullscreen": false,
-    "width": 1920,
-    "height": 1080,
     "default_mode": "scope4"
   }
 }
