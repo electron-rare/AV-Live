@@ -38,7 +38,21 @@ final class MeshRenderer: ObservableObject {
             arr[tri + 2] = tmp
         }
         self.faces = arr
-        NSLog("AV-Live-Body: loaded %d face indices (%d triangles)", n, n / 3)
+        // Pre-compute les indices d'aretes pour le wireframe :
+        // chaque triangle (a,b,c) -> 3 lignes (a,b)(b,c)(c,a).
+        var lines = [UInt32]()
+        lines.reserveCapacity(n * 2)
+        var i = 0
+        while i + 2 < n {
+            let a = arr[i], b = arr[i + 1], c = arr[i + 2]
+            lines.append(a); lines.append(b)
+            lines.append(b); lines.append(c)
+            lines.append(c); lines.append(a)
+            i += 3
+        }
+        self.wireframeIndices = lines
+        NSLog("AV-Live-Body: loaded %d face indices (%d triangles, %d wireframe edges)",
+              n, n / 3, lines.count / 2)
     }
 
     func startOSCServer() {
@@ -56,6 +70,8 @@ final class MeshRenderer: ObservableObject {
         for (pid, _) in personEntities where !receivedPids.contains(pid) {
             personEntities.removeValue(forKey: pid)
             lowLevelMeshes.removeValue(forKey: pid)
+            wireframeMeshes.removeValue(forKey: pid)
+            wireframeEntities.removeValue(forKey: pid)
         }
         for p in persons {
             let entity: ModelEntity
@@ -89,8 +105,12 @@ final class MeshRenderer: ObservableObject {
     }
 
     private var lowLevelMeshes: [Int: LowLevelMesh] = [:]
+    private var wireframeMeshes: [Int: LowLevelMesh] = [:]
+    private var wireframeEntities: [Int: ModelEntity] = [:]
+    private var wireframeIndices: [UInt32] = []
     private var currentMetallic: Bool = false
     private var currentRoughness: Float = 0.6
+    private var currentShowWireframe: Bool = false
 
     /// Pousse les nouveaux parametres de materiau a chaque entity vivant.
     /// Appelle par BodyView a chaque updateNSView pour permettre des
@@ -103,6 +123,14 @@ final class MeshRenderer: ObservableObject {
                 color: colorForPid(pid),
                 roughness: .init(floatLiteral: roughness),
                 isMetallic: metallic)]
+        }
+    }
+
+    /// Active/desactive le rendu fil de fer pour toutes les personnes.
+    func applyWireframeSetting(_ enabled: Bool) {
+        currentShowWireframe = enabled
+        for (_, wf) in wireframeEntities {
+            wf.isEnabled = enabled
         }
     }
 
@@ -125,7 +153,61 @@ final class MeshRenderer: ObservableObject {
                 materials: [material]
             )
         }
+        // Cree l'entity wireframe sibling (cache jusqu'a toggle ON)
+        if let wfMesh = createWireframeMesh(vertices: initial) {
+            wireframeMeshes[pid] = wfMesh
+            if let wfResource = try? MeshResource(from: wfMesh) {
+                let wfMaterial = UnlitMaterial(color: NSColor.white)
+                let wfEntity = ModelEntity(
+                    mesh: wfResource, materials: [wfMaterial])
+                wfEntity.isEnabled = currentShowWireframe
+                entity.addChild(wfEntity)
+                wireframeEntities[pid] = wfEntity
+            }
+        }
         return entity
+    }
+
+    /// Cree un LowLevelMesh en topologie .line avec les aretes de la
+    /// topologie SMPL-X. Vertex buffer initial = positions zero ;
+    /// updateMeshVertices se charge de la mise a jour live.
+    private func createWireframeMesh(vertices: [SIMD3<Float>]) -> LowLevelMesh? {
+        let posAttr = LowLevelMesh.Attribute(
+            semantic: .position, format: .float3, offset: 0)
+        let stride = MemoryLayout<SIMD3<Float>>.stride
+        let posLayout = LowLevelMesh.Layout(
+            bufferIndex: 0, bufferStride: stride)
+        let desc = LowLevelMesh.Descriptor(
+            vertexCapacity: vertices.count,
+            vertexAttributes: [posAttr],
+            vertexLayouts: [posLayout],
+            indexCapacity: wireframeIndices.count,
+            indexType: .uint32
+        )
+        guard let mesh = try? LowLevelMesh(descriptor: desc) else {
+            return nil
+        }
+        mesh.withUnsafeMutableBytes(bufferIndex: 0) { ptr in
+            let dst = ptr.bindMemory(to: SIMD3<Float>.self)
+            for (i, v) in vertices.enumerated() where i < dst.count {
+                dst[i] = v
+            }
+        }
+        mesh.withUnsafeMutableIndices { ptr in
+            let dst = ptr.bindMemory(to: UInt32.self)
+            for (i, idx) in wireframeIndices.enumerated() where i < dst.count {
+                dst[i] = idx
+            }
+        }
+        let bounds = BoundingBox(min: SIMD3(-2, -2, -2),
+                                 max: SIMD3(2, 2, 2))
+        mesh.parts.replaceAll([
+            .init(indexCount: wireframeIndices.count,
+                  topology: .line,
+                  materialIndex: 0,
+                  bounds: bounds)
+        ])
+        return mesh
     }
 
     private func fallbackMesh(vertices: [SIMD3<Float>]) -> MeshResource {
@@ -150,6 +232,14 @@ final class MeshRenderer: ObservableObject {
                 let dst = rawPtr.bindMemory(to: SIMD3<Float>.self)
                 let n = min(dst.count, vertices.count)
                 for i in 0..<n { dst[i] = vertices[i] }
+            }
+            // Wireframe sibling : meme positions, indices line stockes
+            if let wf = wireframeMeshes[pid], currentShowWireframe {
+                wf.withUnsafeMutableBytes(bufferIndex: 0) { rawPtr in
+                    let dst = rawPtr.bindMemory(to: SIMD3<Float>.self)
+                    let n = min(dst.count, vertices.count)
+                    for i in 0..<n { dst[i] = vertices[i] }
+                }
             }
             // Buffer 1 : normales (calculees a partir des triangles).
             // Necessaire pour que SimpleMaterial (lit) calcule un

@@ -102,6 +102,7 @@ struct BodyView: NSViewRepresentable {
             renderer.applyMaterialSettings(
                 metallic: settings.meshMetallic,
                 roughness: Float(settings.meshRoughness))
+            renderer.applyWireframeSetting(settings.showWireframe)
             for entity in renderer.personEntities.values {
                 anchor.addChild(entity)
             }
