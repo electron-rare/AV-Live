@@ -19,7 +19,7 @@
 ~feeds[\__t0] = SystemClock.seconds;
 
 // ---- helper de pose : ferme + recree -----------------------------
-~_feedDef = { |key, path, fn|
+~feedDefPriv = { |key, path, fn|
     OSCdef(key).free;
     OSCdef(key, fn, path);
 };
@@ -37,23 +37,23 @@
     var arr = ~feedListeners[key];
     if(arr.notNil) { ~feedListeners[key] = arr.reject(_ == action) };
 };
-~_feedNotify = { |key, val|
+~feedNotifyPriv = { |key, val|
     (~feedListeners[key] ? #[]).do { |fn| fn.value(val) };
 };
-~feedSet = { |key, val| ~feeds[key] = val; ~_feedNotify.(key, val) };
+~feedSet = { |key, val| ~feeds[key] = val; ~feedNotifyPriv.(key, val) };
 
 // =====================================================================
 //  USGS  -- seismicite
 // =====================================================================
 // /data/usgs/event <mag> <lon> <lat> <depth> <age_sec>
-~_feedDef.(\d_usgs_event, '/data/usgs/event', { |msg|
+~feedDefPriv.(\d_usgs_event, '/data/usgs/event', { |msg|
     var mag = msg[1], lon = msg[2], lat = msg[3], depth = msg[4], age = msg[5];
     ~feedSet.(\usgs_last_mag, mag);
     ~feedSet.(\usgs_last_pos, [lon, lat]);
     ~feedSet.(\usgs_last_age, age);
     ~feedSet.(\usgs_last_depth, depth);
 });
-~_feedDef.(\d_usgs_rate, '/data/usgs/rate', { |msg|
+~feedDefPriv.(\d_usgs_rate, '/data/usgs/rate', { |msg|
     ~feedSet.(\usgs_rate_h, msg[1]);
 });
 
@@ -61,20 +61,20 @@
 //  SWPC  -- vent solaire, IMF, Kp, X-ray
 // =====================================================================
 // /data/swpc/wind  <speed_kms> <density_pcm3> <temp_K>
-~_feedDef.(\d_swpc_wind, '/data/swpc/wind', { |msg|
+~feedDefPriv.(\d_swpc_wind, '/data/swpc/wind', { |msg|
     ~feedSet.(\swpc_wind_speed, msg[1]);
     ~feedSet.(\swpc_wind_dens,  msg[2]);
     ~feedSet.(\swpc_wind_temp,  msg[3]);
 });
-~_feedDef.(\d_swpc_bz, '/data/swpc/bz', { |msg|
+~feedDefPriv.(\d_swpc_bz, '/data/swpc/bz', { |msg|
     ~feedSet.(\swpc_bz, msg[1]);
     ~feedSet.(\swpc_bt, msg[2]);
 });
-~_feedDef.(\d_swpc_kp, '/data/swpc/kp', { |msg|
+~feedDefPriv.(\d_swpc_kp, '/data/swpc/kp', { |msg|
     ~feedSet.(\swpc_kp, msg[1]);
     ~feedSet.(\swpc_a,  msg[2]);
 });
-~_feedDef.(\d_swpc_xray, '/data/swpc/xray', { |msg|
+~feedDefPriv.(\d_swpc_xray, '/data/swpc/xray', { |msg|
     ~feedSet.(\swpc_xray_short, msg[1]);
     ~feedSet.(\swpc_xray_long,  msg[2]);
     ~feedSet.(\swpc_flare_norm, msg[3]);  // 0..1 (A->X)
@@ -84,20 +84,20 @@
 //  GRID  -- frequence du reseau 50 Hz
 // =====================================================================
 // /data/netzfrequenz/freq <hz>
-~_feedDef.(\d_grid_freq, '/data/netzfrequenz/freq', { |msg|
+~feedDefPriv.(\d_grid_freq, '/data/netzfrequenz/freq', { |msg|
     ~feedSet.(\netz_freq, msg[1]);
 });
-~_feedDef.(\d_grid_dev, '/data/netzfrequenz/dev', { |msg|
+~feedDefPriv.(\d_grid_dev, '/data/netzfrequenz/dev', { |msg|
     ~feedSet.(\netz_dev, msg[1]);
 });
-~_feedDef.(\d_grid_tdev, '/data/netzfrequenz/time_dev', { |msg|
+~feedDefPriv.(\d_grid_tdev, '/data/netzfrequenz/time_dev', { |msg|
     ~feedSet.(\netz_time_dev, msg[1]);
 });
 
 // =====================================================================
 //  RTE eCO2mix  -- mix electrique France (MW par filiere)
 // =====================================================================
-~_feedDef.(\d_rte_mix, '/data/rte_eco2mix/mix', { |msg|
+~feedDefPriv.(\d_rte_mix, '/data/rte_eco2mix/mix', { |msg|
     var keys = [\nuclear, \gas, \coal, \oil, \hydro, \wind, \solar, \bio];
     var total = 0.0;
     keys.do { |k, i| var v = msg[i+1] ? 0.0; ~feeds[(\rte_ ++ k).asSymbol] = v; total = total + v };
@@ -113,21 +113,21 @@
 // =====================================================================
 //  BLITZORTUNG  -- impacts de foudre
 // =====================================================================
-~_feedDef.(\d_lightning_strike, '/data/blitzortung/strike', { |msg|
+~feedDefPriv.(\d_lightning_strike, '/data/blitzortung/strike', { |msg|
     var lat = msg[1], lon = msg[2], age = msg[3], mult = msg[4];
     ~feedSet.(\lightning_last, [lat, lon, age, mult]);
 });
-~_feedDef.(\d_lightning_rate, '/data/blitzortung/rate', { |msg|
+~feedDefPriv.(\d_lightning_rate, '/data/blitzortung/rate', { |msg|
     ~feedSet.(\lightning_rate_min, msg[1]);
 });
 
 // =====================================================================
 //  OPENSKY  -- ADS-B
 // =====================================================================
-~_feedDef.(\d_aviation_count, '/data/opensky/count', { |msg|
+~feedDefPriv.(\d_aviation_count, '/data/opensky/count', { |msg|
     ~feedSet.(\aviation_count, msg[1]);
 });
-~_feedDef.(\d_aviation_plane, '/data/opensky/plane', { |msg|
+~feedDefPriv.(\d_aviation_plane, '/data/opensky/plane', { |msg|
     var icao = msg[1], lon = msg[2], lat = msg[3], alt = msg[4], vel = msg[5], head = msg[6];
     ~feedSet.(\aviation_last, [icao, lon, lat, alt, vel, head]);
 });
@@ -135,22 +135,22 @@
 // =====================================================================
 //  BLUESKY JETSTREAM  -- pouls social
 // =====================================================================
-~_feedDef.(\d_social_post, '/data/bluesky/post', { |msg|
+~feedDefPriv.(\d_social_post, '/data/bluesky/post', { |msg|
     ~feedSet.(\social_last_len, msg[1]);
     ~feedSet.(\social_last_lang, msg[2]);
 });
-~_feedDef.(\d_social_rate, '/data/bluesky/rate', { |msg|
+~feedDefPriv.(\d_social_rate, '/data/bluesky/rate', { |msg|
     ~feedSet.(\social_rate_s, msg[1]);
 });
 
 // =====================================================================
 //  MEMPOOL  -- Bitcoin
 // =====================================================================
-~_feedDef.(\d_btc_tx, '/data/mempool/tx', { |msg|
+~feedDefPriv.(\d_btc_tx, '/data/mempool/tx', { |msg|
     ~feedSet.(\btc_last_val, msg[1]);
     ~feedSet.(\btc_last_fee, msg[2]);
 });
-~_feedDef.(\d_btc_block, '/data/mempool/block', { |msg|
+~feedDefPriv.(\d_btc_block, '/data/mempool/block', { |msg|
     ~feedSet.(\btc_height, msg[1]);
     ~feedSet.(\btc_block_tx, msg[2]);
     ~feedSet.(\btc_block_reward, msg[3]);
@@ -159,7 +159,7 @@
 // =====================================================================
 //  GITHUB
 // =====================================================================
-~_feedDef.(\d_gh_event, '/data/github/event', { |msg|
+~feedDefPriv.(\d_gh_event, '/data/github/event', { |msg|
     ~feedSet.(\gh_last_type, msg[1]);
     ~feedSet.(\gh_last_repo, msg[2]);
 });
@@ -167,7 +167,7 @@
 // =====================================================================
 //  GCN  -- alertes astrophysiques (rares)
 // =====================================================================
-~_feedDef.(\d_gcn_alert, '/data/gcn/alert', { |msg|
+~feedDefPriv.(\d_gcn_alert, '/data/gcn/alert', { |msg|
     ~feedSet.(\gcn_last,
         [msg[1], msg[2], msg[3], msg[4]]  // [mission_hash, ra, dec, err_arcmin]
     );
@@ -185,21 +185,23 @@
     \sho_l, \sho_r, \elb_l, \elb_r, \wri_l, \wri_r,
     \hip_l, \hip_r, \kne_l, \kne_r, \ank_l, \ank_r];
 
-~_feedDef.(\d_pose_count, '/data/pose/count', { |msg|
+~feedDefPriv.(\d_pose_count, '/data/pose/count', { |msg|
     ~feedSet.(\pose_count, msg[1]);
 });
-~_feedDef.(\d_pose_person, '/data/pose/person', { |msg|
+~feedDefPriv.(\d_pose_person, '/data/pose/person', { |msg|
     var idx = msg[1].asInteger;
     var persons = ~feeds[\pose_persons] ? IdentityDictionary.new;
     persons[idx] = (cx: msg[2], cy: msg[3], w: msg[4], h: msg[5], conf: msg[6]);
     ~feedSet.(\pose_persons, persons);
 });
-~_feedDef.(\d_pose_skel, '/data/pose/skel', { |msg|
+~feedDefPriv.(\d_pose_skel, '/data/pose/skel', { |msg|
+    // SC : toutes les `var` doivent etre en debut de block, AVANT
+    // tout statement (ici, avant le 17.do qui suivait).
     var idx = msg[1].asInteger;
     var avg = msg[2];
-    // msg[3..] = [x0,y0,c0, x1,y1,c1, ..., x16,y16,c16]  (51 floats)
-    var flat = msg.copyRange(3, msg.size - 1);
+    var flat = msg.copyRange(3, msg.size - 1);  // [x0,y0,c0, ..., x16,y16,c16]
     var skel = Array.new(17);
+    var all = ~feeds[\pose_skels] ? IdentityDictionary.new;
     17.do { |k|
         var off = k * 3;
         skel = skel.add((
@@ -209,19 +211,47 @@
             name: ~poseKpNames[k]
         ));
     };
-    var all = ~feeds[\pose_skels] ? IdentityDictionary.new;
     all[idx] = (avg: avg, kp: skel);
     ~feedSet.(\pose_skels, all);
     // raccourci : premier sujet
     if(idx == 0) { ~feedSet.(\pose_skel0, skel) };
 });
-~_feedDef.(\d_pose_bone, '/data/pose/bone', { |msg|
+~feedDefPriv.(\d_pose_bone, '/data/pose/bone', { |msg|
     // Annonce du squelette a la connexion. On stocke la liste des paires.
     var bones = ~feeds[\pose_bones] ? Array.new;
     var pair = [msg[1].asInteger, msg[2].asInteger];
     if(bones.indexOfEqual(pair).isNil) {
         ~feedSet.(\pose_bones, bones.add(pair));
     };
+});
+
+// =====================================================================
+//  POSE LIVE (pont sonore depuis data_only_viz, route /pose/*)
+//  Distinct des /data/pose/* (bridge data_feeds) — ce sont des messages
+//  HAUTE FREQUENCE (30 Hz) emis directement par le worker pose IA.
+// =====================================================================
+~feedDefPriv.(\d_pose_live_count, '/pose/count', { |msg|
+    ~feedSet.(\pose_count, msg[1]);
+});
+~feedDefPriv.(\d_pose_live_center, '/pose/center', { |msg|
+    ~feedSet.(\pose_center, [msg[1].asInteger, msg[2], msg[3]]);
+});
+~feedDefPriv.(\d_pose_live_head, '/pose/head', { |msg|
+    // pid, x, y, conf
+    ~feedSet.(\pose_head, [msg[1].asInteger, msg[2], msg[3], msg[4]]);
+});
+~feedDefPriv.(\d_pose_live_wrist, '/pose/wrist', { |msg|
+    // pid, side(\l|\r), x, y
+    var pid = msg[1].asInteger;
+    var side = msg[2].asString;
+    var key = if(side == "l") { \pose_wrist_l } { \pose_wrist_r };
+    ~feedSet.(key, [pid, msg[3], msg[4]]);
+});
+~feedDefPriv.(\d_pose_live_sho, '/pose/sho_span', { |msg|
+    ~feedSet.(\pose_sho_span, [msg[1].asInteger, msg[2]]);
+});
+~feedDefPriv.(\d_pose_live_span, '/pose/limb_span', { |msg|
+    ~feedSet.(\pose_limb_span, [msg[1].asInteger, msg[2]]);
 });
 
 // Helper : lit le keypoint `name` du sujet 0. Renvoie (x:, y:, c:).
@@ -234,7 +264,7 @@
 // =====================================================================
 //  Heartbeat -- detection de pont down
 // =====================================================================
-~_feedDef.(\d_heartbeat, '/data/heartbeat', { |msg|
+~feedDefPriv.(\d_heartbeat, '/data/heartbeat', { |msg|
     ~feeds[\__last_heartbeat] = SystemClock.seconds;
 });
 

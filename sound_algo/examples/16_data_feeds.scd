@@ -1,6 +1,10 @@
 // =====================================================================
 //  16_data_feeds.scd  --  Pilotage musical par flux temps reel.
 //
+//  NOTE : les SynthDefs de ce fichier sont prefixees \\ex_ pour cohabiter
+//  sans collision avec les \\dop_ definies dans live/data_only_program.scd
+//  (boot "production"). Modifier ici = pedagogie ; le live tape sur \\dop_.
+//
 //  Prerequis :
 //    [0] Bloc d'init de 01_live.scd (engine + setupAll + wrappers)
 //    [1] Pont Python lance :
@@ -30,7 +34,7 @@ fork {
 //   Trois echelles temporelles, trois ordres de grandeur en frequence.
 // ---------------------------------------------------------------------
 (
-SynthDef(\cavity_drone, { |out=0, freq=7.83, amp=0.25, fm=0, pan=0|
+SynthDef(\ex_cavity_drone, { |out=0, freq=7.83, amp=0.25, fm=0, pan=0|
     var sig, harm = freq * [1, 2, 3, 4, 5];
     var amps = [1, 0.5, 0.33, 0.25, 0.2];
     sig = SinOsc.ar(harm + fm.lag(0.05), 0, amps).sum;
@@ -40,7 +44,7 @@ SynthDef(\cavity_drone, { |out=0, freq=7.83, amp=0.25, fm=0, pan=0|
     Out.ar(out, Pan2.ar(sig, pan));
 }).add;
 
-SynthDef(\strike_grain, { |out=0, freq=400, amp=0.5, pan=0, dur=0.4|
+SynthDef(\ex_strike_grain, { |out=0, freq=400, amp=0.5, pan=0, dur=0.4|
     var env = EnvGen.kr(Env.perc(0.001, dur), doneAction: 2);
     var sig = WhiteNoise.ar * env;
     sig = BPF.ar(sig, freq, 0.05) * 6;
@@ -51,7 +55,7 @@ SynthDef(\strike_grain, { |out=0, freq=400, amp=0.5, pan=0, dur=0.4|
 // laisse le serveur compiler
 s.sync;
 
-~cavity = Synth(\cavity_drone, [\freq, 7.83, \amp, 0.22]);
+~cavity = Synth(\ex_cavity_drone, [\freq, 7.83, \amp, 0.22]);
 
 // Mod FM par derive de la frequence reseau (dev ~ +-0.05 Hz typique)
 ~cavityFm = Routine({
@@ -68,7 +72,7 @@ s.sync;
     if(age < 30) {
         var pan  = lon.linlin(-180, 180, -1, 1);
         var freq = lat.linlin(-90, 90, 200, 3000);
-        Synth(\strike_grain, [
+        Synth(\ex_strike_grain, [
             \freq, freq, \pan, pan,
             \amp, mult.linlin(1, 10, 0.4, 0.9),
             \dur, mult.linlin(1, 10, 0.2, 0.8),
@@ -93,14 +97,14 @@ s.sync;
 //   OpenSky donne des impulsions melodiques (avions au-dessus de Lyon).
 // ---------------------------------------------------------------------
 (
-SynthDef(\mix_pad, { |out=0, freq=110, amp=0.3, cutoff=800, q=0.3, pan=0|
+SynthDef(\ex_mix_pad, { |out=0, freq=110, amp=0.3, cutoff=800, q=0.3, pan=0|
     var sig = Mix(Saw.ar(freq * [1, 1.005, 0.503, 2.01]));
     sig = RLPF.ar(sig, cutoff.lag(0.5).clip(80, 8000), q);
     sig = sig * amp;
     Out.ar(out, Pan2.ar(sig, pan));
 }).add;
 
-SynthDef(\plane_blip, { |out=0, freq=600, amp=0.3, pan=0|
+SynthDef(\ex_plane_blip, { |out=0, freq=600, amp=0.3, pan=0|
     var env = EnvGen.kr(Env.perc(0.01, 0.6), doneAction: 2);
     var sig = SinOsc.ar(freq * [1, 2.01], 0, [0.7, 0.3]).sum;
     sig = sig + (Pulse.ar(freq * 0.501) * env * 0.2);
@@ -110,7 +114,7 @@ SynthDef(\plane_blip, { |out=0, freq=600, amp=0.3, pan=0|
 
 s.sync;
 
-~mixPad = Synth(\mix_pad, [\freq, 55, \amp, 0.18]);
+~mixPad = Synth(\ex_mix_pad, [\freq, 55, \amp, 0.18]);
 
 ~mixCutoffR = Routine({
     inf.do {
@@ -127,7 +131,7 @@ s.sync;
     var pan = lon.linlin(4.6, 5.2, -1, 1);
     // altitude -> note ; vitesse -> brillance
     var midinote = alt.linlin(0, 12000, 36, 84).clip(24, 96);
-    Synth(\plane_blip, [
+    Synth(\ex_plane_blip, [
         \freq, midinote.midicps,
         \pan, pan,
         \amp, vel.linlin(50, 300, 0.1, 0.35),
@@ -151,14 +155,14 @@ s.sync;
 //   USGS earthquakes -> sub-bass ponctuel proportionnel a la magnitude.
 // ---------------------------------------------------------------------
 (
-SynthDef(\geo_bus, { |out=0, freq=200, amp=0.4, bw=0.4|
+SynthDef(\ex_geo_bus, { |out=0, freq=200, amp=0.4, bw=0.4|
     var sig = Mix(Saw.ar([55, 110, 165]));
     sig = BPF.ar(sig, freq.lag(0.3).clip(80, 6000), bw.lag(0.3).clip(0.05, 1));
     sig = sig * 1.5;
     Out.ar(out, Splay.ar([sig, DelayN.ar(sig, 0.05, 0.03)]) * amp);
 }).add;
 
-SynthDef(\quake_sub, { |out=0, freq=40, amp=0.7, dur=2|
+SynthDef(\ex_quake_sub, { |out=0, freq=40, amp=0.7, dur=2|
     var env = EnvGen.kr(Env.perc(0.05, dur, 1, -2), doneAction: 2);
     var sig = SinOsc.ar(freq) * env;
     sig = sig + (LFTri.ar(freq * 0.5) * env * 0.3);
@@ -168,7 +172,7 @@ SynthDef(\quake_sub, { |out=0, freq=40, amp=0.7, dur=2|
 
 s.sync;
 
-~geo = Synth(\geo_bus, [\amp, 0.25]);
+~geo = Synth(\ex_geo_bus, [\amp, 0.25]);
 
 ~geoKpR = Routine({
     inf.do {
@@ -190,7 +194,7 @@ s.sync;
 });
 
 ~quakeSub = ~feedSub.(\usgs_last_mag, { |val|
-    Synth(\quake_sub, [
+    Synth(\ex_quake_sub, [
         \freq, val.linexp(2, 7, 30, 120),
         \dur,  val.linlin(2, 7, 1, 5),
         \amp,  val.linlin(2, 7, 0.4, 0.9),
@@ -217,14 +221,14 @@ s.sync;
 //     - confiance moyenne -> reverb wet
 // ---------------------------------------------------------------------
 (
-SynthDef(\body_drone, { |out=0, freq=80, amp=0.25, cutoff=800, q=0.4, pan=0|
+SynthDef(\ex_body_drone, { |out=0, freq=80, amp=0.25, cutoff=800, q=0.4, pan=0|
     var sig = Saw.ar(freq * [1, 1.005, 0.503]);
     sig = RLPF.ar(sig, cutoff.lag(0.05).clip(80, 8000), q);
     sig = sig.sum * amp;
     Out.ar(out, Pan2.ar(sig, pan));
 }).add;
 
-SynthDef(\body_gran, { |out=0, dens=10, rate=1.0, amp=0.3|
+SynthDef(\ex_body_gran, { |out=0, dens=10, rate=1.0, amp=0.3|
     var trig = Impulse.kr(dens);
     var grain = SinOsc.ar(
         TRand.kr(200, 1200, trig) * rate.lag(0.1),
@@ -236,8 +240,8 @@ SynthDef(\body_gran, { |out=0, dens=10, rate=1.0, amp=0.3|
 
 s.sync;
 
-~bodyDrone = Synth(\body_drone, [\amp, 0.2]);
-~bodyGran  = Synth(\body_gran,  [\amp, 0.15]);
+~bodyDrone = Synth(\ex_body_drone, [\amp, 0.2]);
+~bodyGran  = Synth(\ex_body_gran,  [\amp, 0.15]);
 
 ~bodyR = Routine({
     inf.do {
