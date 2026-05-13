@@ -26,9 +26,14 @@ class SMPLXDecoder:
     """Charge SMPL-X NEUTRAL et expose decode(params) -> (verts, joints)."""
 
     def __init__(self, model_path: str, device: str = "mps") -> None:
-        _require_torch()
-        import smplx
+        torch = _require_torch()
+        # Demote unsupported devices to CPU (mirrors MultiHMRWorker pattern)
+        if device == "mps" and not torch.backends.mps.is_available():
+            device = "cpu"
+        elif device.startswith("cuda") and not torch.cuda.is_available():
+            device = "cpu"
         self.device = device
+        import smplx
         model_path_p = Path(model_path)
         if model_path_p.is_file():
             # smplx.SMPLXLayer attend le dossier contenant SMPLX_<GENDER>.<ext>
@@ -43,8 +48,8 @@ class SMPLXDecoder:
             num_betas=10,
             num_expression_coeffs=10,
             ext=ext,
-        ).to(device).eval()
-        LOG.info("SMPL-X loaded from %s (device=%s)", model_folder, device)
+        ).to(self.device).eval()
+        LOG.info("SMPL-X loaded from %s (device=%s)", model_folder, self.device)
 
     def decode(
         self,
