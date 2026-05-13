@@ -10,6 +10,7 @@ import SwiftUI
 struct BodyView: NSViewRepresentable {
     @ObservedObject var renderer: MeshRenderer
     @ObservedObject var settings: RenderSettings
+    @ObservedObject var poseListener: PoseOSCListener
 
     func makeNSView(context: Context) -> NSView {
         let container = NSView(frame: .zero)
@@ -114,6 +115,24 @@ struct BodyView: NSViewRepresentable {
         c.previewLayer?.isHidden = !settings.showCamera
         c.mtkView?.isHidden = !settings.showScene
         c.sceneRenderer?.uniforms.viz_mode = Float(settings.vizMode)
+        // Pose -> scene uniforms : drive hands3d (mode 8) et openpos
+        // (mode 9) avec la premiere personne detectee. Les wrists pilotent
+        // hand_l/r ; pose_count alimente bg_fragment.
+        let persons = poseListener.persons
+        c.sceneRenderer?.uniforms.pose_count = Float(persons.count)
+        c.sceneRenderer?.uniforms.pose_alive = persons.isEmpty ? 0 : 1
+        if let first = persons.values.first {
+            // Convertit coords ecran (0..1) -> NDC-ish (-1..1)
+            c.sceneRenderer?.uniforms.hand_l_x = (first.wristL.x - 0.5) * 2
+            c.sceneRenderer?.uniforms.hand_l_y = (first.wristL.y - 0.5) * 2
+            c.sceneRenderer?.uniforms.hand_r_x = (first.wristR.x - 0.5) * 2
+            c.sceneRenderer?.uniforms.hand_r_y = (first.wristR.y - 0.5) * 2
+        } else {
+            c.sceneRenderer?.uniforms.hand_l_x = 0
+            c.sceneRenderer?.uniforms.hand_l_y = 0
+            c.sceneRenderer?.uniforms.hand_r_x = 0
+            c.sceneRenderer?.uniforms.hand_r_y = 0
+        }
         c.container?.layer?.backgroundColor = NSColor(
             white: CGFloat(settings.bgBrightness), alpha: 1.0).cgColor
         c.cameraEntity?.camera.fieldOfViewInDegrees =
