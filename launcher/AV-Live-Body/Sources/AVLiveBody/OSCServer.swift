@@ -6,6 +6,7 @@ import Network
 ///         [(pid i32 + conf f32 + 3 transl + 10 betas + 10 expr
 ///           + 10475*3 verts)] × N
 final class OSCServer {
+    private static let maxBufferBytes = 8 * 1024 * 1024  // 8 MiB — well above per-frame size
     private let port: NWEndpoint.Port
     private let onPersons: ([SMPLXPersonData]) -> Void
     private var listener: NWListener?
@@ -40,6 +41,12 @@ final class OSCServer {
             [weak self] data, _, isComplete, error in
             guard let self = self else { return }
             if let d = data { self.buffer.append(d) }
+            if self.buffer.count > Self.maxBufferBytes {
+                NSLog("OSCServer: buffer exceeded %d bytes (%d), dropping connection", Self.maxBufferBytes, self.buffer.count)
+                self.buffer.removeAll(keepingCapacity: false)
+                conn.cancel()
+                return
+            }
             self.parseFrames()
             if isComplete || error != nil {
                 conn.cancel()
@@ -54,6 +61,11 @@ final class OSCServer {
             guard buffer.count >= 4 else { return }
             let len = buffer.withUnsafeBytes {
                 $0.load(fromByteOffset: 0, as: UInt32.self).littleEndian
+            }
+            guard len > 0, len <= Self.maxBufferBytes else {
+                NSLog("OSCServer: invalid frame length %u, resetting", len)
+                self.buffer.removeAll(keepingCapacity: false)
+                return
             }
             guard buffer.count >= 4 + Int(len) else { return }
             let payload = buffer.subdata(in: 4..<(4 + Int(len)))
