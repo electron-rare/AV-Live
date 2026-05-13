@@ -30,6 +30,7 @@ CACHE = Path.home() / ".cache" / "av-live-multihmr"
 CKPT = CACHE / "checkpoints" / "multiHMR_672_S.pt"
 SMPLX_PATH = CACHE / "models" / "smplx" / "SMPLX_NEUTRAL.npz"
 MULTIHMR_REPO = CACHE / "multi-hmr"
+COREML_MLPACKAGE = CACHE / "multihmr_full_672_s.mlpackage"
 
 IMG_SIZE = 672
 N_VERTS = 10475
@@ -41,7 +42,8 @@ class MultiHMRWorker:
                  det_thresh: float = 0.3,
                  nms_kernel_size: int = 5,
                  motion_gate: float = 5.0,
-                 camera_index: int = -1) -> None:
+                 camera_index: int = -1,
+                 backend: str | None = None) -> None:
         self.state = state
         self.num_persons = num_persons
         self.period = 1.0 / max(1.0, target_fps)
@@ -55,6 +57,12 @@ class MultiHMRWorker:
         self.motion_gate = motion_gate
         # -1 = auto-select Mac BuiltInWideAngleCamera (cf _camera_select)
         self.camera_index = camera_index
+        # backend: 'pytorch' (default) or 'coreml'. CoreML uses the
+        # .mlpackage at COREML_MLPACKAGE, bypasses MPS torch, and runs
+        # on ANE/GPU/CPU via CoreML.framework natively (3-4x faster).
+        self.backend = (backend
+                        or os.environ.get("MULTIHMR_BACKEND", "pytorch")
+                        ).strip().lower()
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None
         self._smooth_shape = [
@@ -72,6 +80,9 @@ class MultiHMRWorker:
 
     @staticmethod
     def is_available() -> bool:
+        backend = os.environ.get("MULTIHMR_BACKEND", "pytorch").strip().lower()
+        if backend == "coreml":
+            return COREML_MLPACKAGE.exists()
         return CKPT.exists() and SMPLX_PATH.exists() and MULTIHMR_REPO.exists()
 
     def start(self) -> None:
@@ -83,6 +94,12 @@ class MultiHMRWorker:
         self._stop.set()
 
     def _run(self) -> None:
+        if self.backend == "coreml":
+            self._run_coreml()
+            return
+        self._run_pytorch()
+
+    def _run_pytorch(self) -> None:
         if str(MULTIHMR_REPO) not in sys.path:
             sys.path.insert(0, str(MULTIHMR_REPO))
         # Multi-HMR demo.py tire pyrender / pyvista (OpenGL offscreen) et
@@ -373,3 +390,223 @@ class MultiHMRWorker:
 
         cap.stop()
         LOG.info("multi_hmr worker stopped")
+
+    # ------------------------------------------------------------------
+    # CoreML backend
+    # ------------------------------------------------------------------
+    def _run_coreml(self) -> None:
+        """CoreML inference path (ANE+GPU+CPU via Apple's framework).
+
+        Mirrors _run_pytorch but loads the .mlpackage via pyobjc + the
+        CoreML.framework, bypassing torch/MPS entirely. ~3-4x faster
+        on M5 (28.8ms median vs ~100ms with MPS)."""
+        try:
+            import cv2
+        except ImportError as e:
+            LOG.error("opencv-python missing: %s", e)
+            return
+        try:
+            from .multihmr_coreml import MultiHMRCoreMLBackend
+            backend = MultiHMRCoreMLBackend(COREML_MLPACKAGE)
+        except Exception as e:  # noqa: BLE001
+            LOG.error("CoreML backend init failed: %s", e)
+            return
+
+        focal = float(IMG_SIZE)
+        K_np = np.array([[focal, 0.0, IMG_SIZE / 2.0],
+                         [0.0, focal, IMG_SIZE / 2.0],
+                         [0.0, 0.0, 1.0]], dtype=np.float32)
+
+        from ._av_capture import (
+            AVCapture, find_builtin_device, enumerate_devices)
+        if self.camera_index >= 0:
+            devs = enumerate_devices()
+            if self.camera_index >= len(devs):
+                LOG.error("camera_index %d hors de %d devices",
+                          self.camera_index, len(devs))
+                return
+            info = devs[self.camera_index]
+        else:
+            info = find_builtin_device()
+            if info is None:
+                LOG.error("aucune BuiltInWideAngleCamera trouvee")
+                return
+        cap = AVCapture(info)
+        if not cap.start():
+            LOG.error("AVCapture start failed pour %s", info["name"])
+            return
+        LOG.info("camera ouverte %s (%s) [coreml backend]",
+                 info["name"], info["type"])
+
+        frame_count = 0
+        persons_count = 0
+        skipped_static = 0
+        next_heartbeat = time.monotonic() + 5.0
+        prev_thumb: np.ndarray | None = None
+
+        while not self._stop.is_set():
+            t_cap_start = time.monotonic()
+            ok, frame_bgr = cap.read(timeout_s=0.5)
+            if not ok or frame_bgr is None:
+                time.sleep(self.period)
+                continue
+
+            t_pre_start = time.monotonic()
+            h, w = frame_bgr.shape[:2]
+            if (h, w) != (IMG_SIZE, IMG_SIZE):
+                side = min(h, w)
+                y0 = (h - side) // 2
+                x0 = (w - side) // 2
+                frame_bgr = frame_bgr[y0:y0 + side, x0:x0 + side]
+                frame_bgr = cv2.resize(frame_bgr, (IMG_SIZE, IMG_SIZE))
+
+            if self.motion_gate > 0:
+                thumb = cv2.cvtColor(
+                    cv2.resize(frame_bgr, (112, 112)),
+                    cv2.COLOR_BGR2GRAY)
+                if prev_thumb is not None:
+                    diff_mean = float(np.mean(
+                        cv2.absdiff(thumb, prev_thumb)))
+                    if diff_mean < self.motion_gate:
+                        prev_thumb = thumb
+                        skipped_static += 1
+                        time.sleep(self.period)
+                        continue
+                prev_thumb = thumb
+
+            frame_rgb = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2RGB)
+            img = frame_rgb.transpose(2, 0, 1).astype(np.float32) / 255.0
+
+            t_inf_start = time.monotonic()
+            try:
+                humans = backend.infer(img, K_np, det_thresh=self.det_thresh)
+            except Exception as e:  # noqa: BLE001
+                LOG.warning("coreml inference failed: %s", e)
+                time.sleep(self.period)
+                continue
+
+            t_post_start = time.monotonic()
+            t_now = time.monotonic()
+            frame_count += 1
+            persons_count += len(humans) if humans else 0
+            if t_now >= next_heartbeat:
+                fps = frame_count / 5.0
+                avg = persons_count / max(1, frame_count)
+                LOG.info(
+                    "hb[coreml]: %.1f fps, %.2f persons/frame, %d skipped",
+                    fps, avg, skipped_static)
+                frame_count = 0
+                persons_count = 0
+                skipped_static = 0
+                next_heartbeat = t_now + 5.0
+
+            if not humans:
+                with self.state.lock():
+                    self.state.persons_smplx = []
+                time.sleep(self.period)
+                continue
+
+            # Dedup intra-frame (same logic as pytorch path).
+            cand: list[tuple[
+                float, float, float, float, float,
+                np.ndarray, int]] = []
+            for i, hh in enumerate(humans):
+                v = hh["v3d"].detach().cpu().numpy()
+                xmin = float(v[:, 0].min()); ymin = float(v[:, 1].min())
+                xmax = float(v[:, 0].max()); ymax = float(v[:, 1].max())
+                score = float(hh["scores"].item())
+                pelv = hh["transl_pelvis"].detach().cpu().numpy(
+                    ).flatten()[:3]
+                cand.append((score, xmin, ymin, xmax, ymax, pelv, i))
+            cand.sort(key=lambda c: -c[0])
+            keep_idx: list[int] = []
+            kept: list[tuple[float, float, float, float, np.ndarray]] = []
+            for sc, x0, y0, x1, y1, pelv, src_i in cand:
+                a_area = max(0.0, x1 - x0) * max(0.0, y1 - y0)
+                drop = False
+                for (kx0, ky0, kx1, ky1, kpelv) in kept:
+                    ix0 = max(x0, kx0); iy0 = max(y0, ky0)
+                    ix1 = min(x1, kx1); iy1 = min(y1, ky1)
+                    iw = max(0.0, ix1 - ix0); ih = max(0.0, iy1 - iy0)
+                    inter = iw * ih
+                    if a_area <= 0 or inter <= 0:
+                        continue
+                    k_area = (kx1 - kx0) * (ky1 - ky0)
+                    iou = inter / (a_area + k_area - inter + 1e-9)
+                    pelv_d = float(np.linalg.norm(pelv - kpelv))
+                    if iou > 0.55 and pelv_d < 0.20:
+                        drop = True
+                        break
+                if not drop:
+                    keep_idx.append(src_i)
+                    kept.append((x0, y0, x1, y1, pelv))
+                    if len(keep_idx) >= self.num_persons:
+                        break
+            humans = [humans[i] for i in keep_idx]
+            n_keep = len(humans)
+
+            bboxes = []
+            for hh in humans:
+                v = hh["v3d"].detach().cpu().numpy()
+                xmin, ymin = float(v[:, 0].min()), float(v[:, 1].min())
+                xmax, ymax = float(v[:, 0].max()), float(v[:, 1].max())
+                bboxes.append([PoseKp(x=xmin, y=ymin, c=1.0),
+                               PoseKp(x=xmax, y=ymax, c=1.0)])
+            ids = self._tracker.update(bboxes)
+
+            persons: list[SMPLXPerson] = []
+            for i, hh in enumerate(humans[:n_keep]):
+                pid = ids[i] if i < len(ids) else i
+                if pid < 0:
+                    continue
+                v3d = hh["v3d"].detach().cpu().numpy()
+                transl_np = hh["transl_pelvis"].detach().cpu().numpy().flatten()
+                shape_raw = hh["shape"].detach().cpu().numpy().flatten()
+                expr_raw = hh["expression"].detach().cpu().numpy().flatten()
+
+                pid_c = pid % self.num_persons
+                shape_n = min(10, len(shape_raw))
+                expr_n = min(10, len(expr_raw))
+                shape_smooth = np.zeros(10, dtype=np.float32)
+                expr_smooth = np.zeros(10, dtype=np.float32)
+                for k in range(shape_n):
+                    shape_smooth[k] = self._smooth_shape[pid_c][k](
+                        float(shape_raw[k]), t_now)
+                for k in range(expr_n):
+                    expr_smooth[k] = self._smooth_expr[pid_c][k](
+                        float(expr_raw[k]), t_now)
+
+                persons.append(SMPLXPerson(
+                    pid=int(pid),
+                    vertices_3d=np.ascontiguousarray(v3d, dtype=np.float32),
+                    translation=np.ascontiguousarray(
+                        transl_np[:3], dtype=np.float32),
+                    confidence=float(hh["scores"].item()),
+                    betas=np.ascontiguousarray(shape_smooth, dtype=np.float32),
+                    expression=np.ascontiguousarray(expr_smooth, dtype=np.float32),
+                ))
+
+            with self.state.lock():
+                self.state.persons_smplx = persons
+                self.state.smplx_last_t = t_now
+
+            t_end = time.monotonic()
+            dt_total = (t_end - t_cap_start) * 1e3
+            if LOG.isEnabledFor(logging.DEBUG) or dt_total > 100.0:
+                LOG.log(
+                    logging.DEBUG if dt_total <= 100.0 else logging.WARNING,
+                    "frame[coreml]: cap=%.1f pre=%.1f inf=%.1f "
+                    "post=%.1fms total=%.1fms",
+                    (t_pre_start - t_cap_start) * 1e3,
+                    (t_inf_start - t_pre_start) * 1e3,
+                    (t_post_start - t_inf_start) * 1e3,
+                    (t_end - t_post_start) * 1e3,
+                    dt_total,
+                )
+
+            dt = time.monotonic() - t_cap_start
+            if dt < self.period:
+                time.sleep(self.period - dt)
+
+        cap.stop()
+        LOG.info("multi_hmr coreml worker stopped")
