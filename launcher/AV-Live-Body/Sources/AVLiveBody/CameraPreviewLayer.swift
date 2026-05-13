@@ -14,6 +14,11 @@ final class CameraPreviewLayer {
     init() {
         self.previewLayer = AVCaptureVideoPreviewLayer(session: session)
         self.previewLayer.videoGravity = .resizeAspectFill
+        // Mirror horizontal pour un feedback type miroir : ce qui est a
+        // gauche dans la realite apparait a gauche dans la fenetre.
+        // CATransform3D scale x=-1 ; on inverse aussi l'anchor pour
+        // garder l'image bien cadree.
+        self.previewLayer.transform = CATransform3DMakeScale(-1, 1, 1)
     }
 
     func start() -> Bool {
