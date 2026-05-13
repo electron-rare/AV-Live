@@ -27,10 +27,14 @@ import numpy as np
 
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
 from data_only_viz.action_head import EXPR_DIM, HANDS_KP_DIMS, HANDS_KP_TOTAL
 =======
 from data_only_viz.action_head import EXPR_DIM
 >>>>>>> aedcb0f (feat(data-only-viz): action-head v2 fingers+face)
+=======
+from data_only_viz.action_head import EXPR_DIM, HANDS_KP_DIMS, HANDS_KP_TOTAL
+>>>>>>> beb94d2 (feat(data-only-viz): action-head v3 hands+lips)
 from data_only_viz.action_head_pub import (
     SMPLX_JOINT_ANCHOR_VERTS,
     SMPLX_UPPER_LIP_VERT,
@@ -182,6 +186,7 @@ def extract(session: str, video: Path, out: Path,
                     "hands_kp": np.zeros(
                         (HANDS_KP_TOTAL, HANDS_KP_DIMS), dtype=np.float32
                     ).tolist(),
+<<<<<<< HEAD
 =======
                     "j3d": j3d.tolist(),
 >>>>>>> 2a732fa (fix(data-only-viz): action-head review fixes)
@@ -190,6 +195,8 @@ def extract(session: str, video: Path, out: Path,
                     "expression": expr_np.tolist(),
                     "mouth_open": mouth,
 >>>>>>> aedcb0f (feat(data-only-viz): action-head v2 fingers+face)
+=======
+>>>>>>> beb94d2 (feat(data-only-viz): action-head v3 hands+lips)
                 }) + "\n")
                 n_rows += 1
             n_frames += 1

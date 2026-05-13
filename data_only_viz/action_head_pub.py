@@ -18,11 +18,17 @@ from data_only_viz.action_head import (
     ActionHead,
     EXPR_DIM,
 <<<<<<< HEAD
+<<<<<<< HEAD
     HANDS_KP_DIMS,
     HANDS_KP_PER_HAND,
     HANDS_KP_TOTAL,
 =======
 >>>>>>> aedcb0f (feat(data-only-viz): action-head v2 fingers+face)
+=======
+    HANDS_KP_DIMS,
+    HANDS_KP_PER_HAND,
+    HANDS_KP_TOTAL,
+>>>>>>> beb94d2 (feat(data-only-viz): action-head v3 hands+lips)
     J3D_FINGERS,
     J3D_FINGERS_PER_HAND,
     LABELS,
@@ -34,6 +40,7 @@ DEFAULT_CKPT = (
     Path.home() / ".cache" / "av-live-action" / "checkpoints" / "action_head.pt"
 )
 
+<<<<<<< HEAD
 <<<<<<< HEAD
 # Canonical SMPL-X fingertip vertex IDs from smplx.vertex_ids.SMPLX_VERTEX_IDS.
 # Order : L thumb, L index, L middle, L ring, L pinky,
@@ -49,6 +56,14 @@ SMPLX_FINGERTIP_VERTS: tuple[int, ...] = (
     7174, 7397, 7670, 7942, 8214,   # L
     4631, 4854, 5127, 5399, 5671,   # R
 >>>>>>> aedcb0f (feat(data-only-viz): action-head v2 fingers+face)
+=======
+# Canonical SMPL-X fingertip vertex IDs from smplx.vertex_ids.SMPLX_VERTEX_IDS.
+# Order : L thumb, L index, L middle, L ring, L pinky,
+#         R thumb, R index, R middle, R ring, R pinky.
+SMPLX_FINGERTIP_VERTS: tuple[int, ...] = (
+    5361, 4933, 5058, 5169, 5286,   # L : lthumb, lindex, lmiddle, lring, lpinky
+    8079, 7669, 7794, 7905, 8022,   # R : rthumb, rindex, rmiddle, rring, rpinky
+>>>>>>> beb94d2 (feat(data-only-viz): action-head v3 hands+lips)
 )
 
 # 32 vertex indices on the 10475-vertex SMPL-X mesh:
@@ -72,13 +87,19 @@ SMPLX_UPPER_LIP_VERT: int = 8970
 SMPLX_LOWER_LIP_VERT: int = 8855
 
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+>>>>>>> beb94d2 (feat(data-only-viz): action-head v3 hands+lips)
 # MediaPipe FaceMesh inner-mouth landmark indices.
 # 13 = upper inner mid, 14 = lower inner mid.
 MEDIAPIPE_LIP_UPPER_INNER: int = 13
 MEDIAPIPE_LIP_LOWER_INNER: int = 14
 
+<<<<<<< HEAD
 =======
 >>>>>>> aedcb0f (feat(data-only-viz): action-head v2 fingers+face)
+=======
+>>>>>>> beb94d2 (feat(data-only-viz): action-head v3 hands+lips)
 # MediaPipe HAND fingertip indices (21-kp hand model).
 MEDIAPIPE_HAND_FINGERTIPS: tuple[int, ...] = (4, 8, 12, 16, 20)
 
@@ -144,6 +165,7 @@ class ActionHeadPublisher(threading.Thread):
         current_pids: set[int] = set()
         if persons32:
 <<<<<<< HEAD
+<<<<<<< HEAD
             for pid, j3d, expr_np, mouth, hands_kp42 in persons32:
                 current_pids.add(pid)
                 label, probs, kin = self.head.step(pid, j3d, expr=expr_np,
@@ -156,6 +178,13 @@ class ActionHeadPublisher(threading.Thread):
                                                    expr=expr,
                                                    mouth_open=mouth)
 >>>>>>> aedcb0f (feat(data-only-viz): action-head v2 fingers+face)
+=======
+            for pid, j3d, expr_np, mouth, hands_kp42 in persons32:
+                current_pids.add(pid)
+                label, probs, kin = self.head.step(pid, j3d, expr=expr_np,
+                                                    mouth_open=mouth,
+                                                    hands_kp=hands_kp42)
+>>>>>>> beb94d2 (feat(data-only-viz): action-head v3 hands+lips)
                 idx = LABELS.index(label)
                 self.bridge.send_action(pid, idx, probs, t_now, force=True)
                 self.bridge.send_kin(pid, kin, t_now, force=True)
@@ -167,10 +196,14 @@ class ActionHeadPublisher(threading.Thread):
         self._last_pids = current_pids
 
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+>>>>>>> beb94d2 (feat(data-only-viz): action-head v3 hands+lips)
     def _read_sources(self) -> tuple[
         list[tuple[int, np.ndarray, np.ndarray, float, np.ndarray]] | None,
         float, str, bool,
     ]:
+<<<<<<< HEAD
         """Return (persons32, source_t, source_tag, is_new).
 
         Each person entry is (pid, j3d32, expr10, mouth_open, hands_kp42x3).
@@ -183,6 +216,11 @@ class ActionHeadPublisher(threading.Thread):
 
         Each person entry is (pid, j3d32, expr10, mouth_open).
 >>>>>>> aedcb0f (feat(data-only-viz): action-head v2 fingers+face)
+=======
+        """Return (persons32, source_t, source_tag, is_new).
+
+        Each person entry is (pid, j3d32, expr10, mouth_open, hands_kp42x3).
+>>>>>>> beb94d2 (feat(data-only-viz): action-head v3 hands+lips)
         is_new is True when the timestamp advanced (even if person list
         is empty), so _tick can still run the purge loop.
         """
@@ -197,6 +235,9 @@ class ActionHeadPublisher(threading.Thread):
             ids_hands = getattr(self.state, "persons_hands_ids", None)
             t_body = getattr(self.state, "pose_last_t", 0.0)
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+>>>>>>> beb94d2 (feat(data-only-viz): action-head v3 hands+lips)
 
         # Build pid -> hands_kp(42, 3) map from MediaPipe persons_hands.
         hands_by_pid: dict[int, np.ndarray] = self._build_hands_map(
@@ -208,6 +249,7 @@ class ActionHeadPublisher(threading.Thread):
         )
 
         # SMPL-X path (preferred)
+<<<<<<< HEAD
         if t_smplx > self._last_smplx_t:
             out: list[tuple[int, np.ndarray, np.ndarray, float, np.ndarray]] = []
 =======
@@ -217,6 +259,10 @@ class ActionHeadPublisher(threading.Thread):
         if t_smplx > self._last_smplx_t:
             out: list[tuple[int, np.ndarray, np.ndarray, float]] = []
 >>>>>>> aedcb0f (feat(data-only-viz): action-head v2 fingers+face)
+=======
+        if t_smplx > self._last_smplx_t:
+            out: list[tuple[int, np.ndarray, np.ndarray, float, np.ndarray]] = []
+>>>>>>> beb94d2 (feat(data-only-viz): action-head v3 hands+lips)
             for i, p in enumerate(persons_smplx or []):
                 pid = int(p.get("pid", i))
                 v3d = p.get("v3d")
@@ -239,38 +285,44 @@ class ActionHeadPublisher(threading.Thread):
                 else:
                     expr_np = np.zeros(EXPR_DIM, dtype=np.float32)
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+>>>>>>> beb94d2 (feat(data-only-viz): action-head v3 hands+lips)
                 # mouth_open: prefer MediaPipe face lips, fallback SMPL-X v3d.
                 if pid in face_mouth_by_pid:
                     mouth = face_mouth_by_pid[pid]
                 elif v3d_np.shape[0] > max(SMPLX_UPPER_LIP_VERT, SMPLX_LOWER_LIP_VERT):
+<<<<<<< HEAD
 =======
                 # mouth_open
                 if v3d_np.shape[0] > max(SMPLX_UPPER_LIP_VERT, SMPLX_LOWER_LIP_VERT):
 >>>>>>> aedcb0f (feat(data-only-viz): action-head v2 fingers+face)
+=======
+>>>>>>> beb94d2 (feat(data-only-viz): action-head v3 hands+lips)
                     mouth = float(np.linalg.norm(
                         v3d_np[SMPLX_UPPER_LIP_VERT] - v3d_np[SMPLX_LOWER_LIP_VERT]
                     ))
                 else:
                     mouth = 0.0
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+>>>>>>> beb94d2 (feat(data-only-viz): action-head v3 hands+lips)
                 hands_kp42 = hands_by_pid.get(
                     pid, np.zeros((HANDS_KP_TOTAL, HANDS_KP_DIMS), dtype=np.float32)
                 )
                 out.append((pid, j3d32, expr_np, mouth, hands_kp42))
+<<<<<<< HEAD
 =======
                 out.append((pid, j3d32, expr_np, mouth))
 >>>>>>> aedcb0f (feat(data-only-viz): action-head v2 fingers+face)
+=======
+>>>>>>> beb94d2 (feat(data-only-viz): action-head v3 hands+lips)
             return out or None, t_smplx, "smplx", True
 
         # MediaPipe body3d fallback
         if t_body > self._last_body_t:
             ids = ids_b3d or list(range(len(persons_b3d or [])))
-            # Build hands lookup by pid
-            hands_by_pid: dict[int, dict[str, Any]] = {}
-            for hi, hkp in enumerate(hands_lists):
-                hpid = int(hands_ids[hi]) if hi < len(hands_ids) else hi
-                side = "L" if hi % 2 == 0 else "R"
-                hands_by_pid.setdefault(hpid, {})[side] = hkp
             out = []
             for i, body in enumerate(persons_b3d or []):
                 pid = int(ids[i]) if i < len(ids) else i
@@ -278,6 +330,7 @@ class ActionHeadPublisher(threading.Thread):
                 if arr is None or arr.shape[0] < 33:
                     continue
                 body22 = arr[list(MEDIAPIPE_TO_22)].astype(np.float32)
+<<<<<<< HEAD
 <<<<<<< HEAD
                 # fingertips from persons_hands if available
                 tips = np.zeros((J3D_FINGERS, 3), dtype=np.float32)
@@ -297,22 +350,30 @@ class ActionHeadPublisher(threading.Thread):
                 out.append((pid, j3d32, expr_np, mouth, hands_kp42))
 =======
                 # fingertips from hands if available
+=======
+                # fingertips from persons_hands if available
+>>>>>>> beb94d2 (feat(data-only-viz): action-head v3 hands+lips)
                 tips = np.zeros((J3D_FINGERS, 3), dtype=np.float32)
-                hpair = hands_by_pid.get(pid, {})
-                for side_idx, side in enumerate(("L", "R")):
-                    hkp = hpair.get(side)
-                    if hkp is None:
-                        continue
-                    hkp_arr = self._kp_list_to_array(hkp)
-                    if hkp_arr is None or hkp_arr.shape[0] < 21:
-                        continue
-                    for k, mp_idx in enumerate(MEDIAPIPE_HAND_FINGERTIPS):
-                        tips[side_idx * J3D_FINGERS_PER_HAND + k] = hkp_arr[mp_idx]
+                hands_kp42 = hands_by_pid.get(
+                    pid, np.zeros((HANDS_KP_TOTAL, HANDS_KP_DIMS), dtype=np.float32)
+                )
+                # extract fingertips from hands_kp42 (idx 4,8,12,16,20 each side)
+                for side_idx in (0, 1):
+                    base = side_idx * HANDS_KP_PER_HAND
+                    for k, mp_tip in enumerate(MEDIAPIPE_HAND_FINGERTIPS):
+                        if base + mp_tip < hands_kp42.shape[0]:
+                            tips[side_idx * J3D_FINGERS_PER_HAND + k] = \
+                                hands_kp42[base + mp_tip]
                 j3d32 = np.concatenate([body22, tips], axis=0)
+                mouth = face_mouth_by_pid.get(pid, 0.0)
                 expr_np = np.zeros(EXPR_DIM, dtype=np.float32)
+<<<<<<< HEAD
                 mouth = 0.0
                 out.append((pid, j3d32, expr_np, mouth))
 >>>>>>> aedcb0f (feat(data-only-viz): action-head v2 fingers+face)
+=======
+                out.append((pid, j3d32, expr_np, mouth, hands_kp42))
+>>>>>>> beb94d2 (feat(data-only-viz): action-head v3 hands+lips)
             return out or None, t_body, "body3d", True
         return None, 0.0, "", False
 
