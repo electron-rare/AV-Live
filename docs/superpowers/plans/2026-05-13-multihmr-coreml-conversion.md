@@ -67,9 +67,22 @@ these as untraceable.
 single-day estimate was optimistic — backbone alone needs ~½ day of
 surgery before head can even be touched.
 
+### Probe v2 (with pos_embed pre-computed as buffer)
+
+Patched `interpolate_pos_encoding` to return a frozen pre-computed
+buffer. **Trace OK, but convert still FAILS at op 17/610** with same
+error. Removing pos-embed surgery reduced ops 670 → 610 (~60 ops
+gone), but a DEEPER tensor-to-Python-scalar conversion remains —
+likely in DINOv2's attention or MLP block. Would need coremltools
+verbose logging or per-op instrumentation to localize. Not done.
+
 **Recommendation**: pursue only if thermal/ANE residency is the goal.
-For pure speedup, Mac Studio M3 Ultra offload (separate plan) gives
-5-10× faster than Multi-HMR MPS with ~½ day work and no model surgery.
+For pure speedup, Mac Studio M3 Ultra offload (separate plan
+`2026-05-13-studio-offload.md`) gives 5-10× faster than Multi-HMR MPS
+with ~½ day work and no model surgery. SOTA alternative survey
+(`2026-05-13-modern-body-mesh-survey.md`) identifies Fast-SAM-3D-Body
+(DINOv3 + MIT, Apr 2026) as a possible drop-in replacement worth
+evaluating before sinking more time into CoreML surgery.
 
 ## Risk register
 
