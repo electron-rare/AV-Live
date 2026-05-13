@@ -80,6 +80,13 @@ class AppDelegate(NSObject):
         if getattr(self._opts, "multi_hmr", False):
             LOG.info("multi-hmr mode: headless (no NSWindow)")
             self._headless = True
+            from .multi_hmr_worker import MultiHMRWorker
+            if not MultiHMRWorker.is_available():
+                LOG.error(
+                    "Multi-HMR requested via --multi-hmr but checkpoint is missing. "
+                    "Run scripts/setup_multihmr.sh first, or omit --multi-hmr to use MediaPipe."
+                )
+                sys.exit(2)
             self._listener.start()
             self._start_pose_worker()
             LOG.info("headless ready — OSC :%d, TCP sender :57130",
