@@ -42,12 +42,7 @@ void OscClient::update() {
             melody_ = m.getArgAsString(0);
         } else if (a == "/sync/synthdef" && m.getNumArgs() >= 1) {
             synthdef_ = m.getArgAsString(0);
-        } else if (a.rfind("/oscope/fx/", 0) == 0 && m.getNumArgs() >= 1) {
-            // /oscope/fx/<name> <float>
-            fx_[a.substr(11)] = m.getArgAsFloat(0);
-        } else if (a == "/oscope/glitch" && m.getNumArgs() >= 1) {
-            pendingGlitchPulse_ = m.getArgAsFloat(0);
-            hasGlitchPulse_ = true;
+        // /oscope/fx/* and /oscope/glitch listeners removed 2026-05-13 — no emitter exists in the project.
         } else if (a.rfind(kDataPrefix, 0) == 0) {
             // /data/heartbeat ou /data/<source>/<sub>
             if (a == "/data/heartbeat") {
