@@ -87,12 +87,9 @@ struct ContentView: View {
                     if let n = note.object as? Int { settings.vizMode = n }
                 }
 
-            // Face + hand overlay 2D Canvas (68 dlib landmarks dont
-            // bouche slots 48-67 outerLips + 60-67 innerLips, plus 21
-            // landmarks par main, gauche=cyan droite=magenta). Source :
-            // /face/kp et /hand/kp depuis MediaPipe Holistic.
-            FaceHandOverlay(poseListener: poseListener)
-                .allowsHitTesting(false)
+            // Face + hand overlay 2D Canvas retire : les landmarks sont
+            // maintenant integres au squelette 3D RealityKit (cf.
+            // Skeleton3DRenderer.applyFace/applyHands).
 
             // HUD coin haut-gauche : mode + touches + pose
             HUDOverlay(settings: settings, poseListener: poseListener)

@@ -30,7 +30,9 @@ CACHE = Path.home() / ".cache" / "av-live-multihmr"
 CKPT = CACHE / "checkpoints" / "multiHMR_672_S.pt"
 SMPLX_PATH = CACHE / "models" / "smplx" / "SMPLX_NEUTRAL.npz"
 MULTIHMR_REPO = CACHE / "multi-hmr"
-COREML_MLPACKAGE = CACHE / "multihmr_full_672_s.mlpackage"
+COREML_MLPACKAGE = Path(
+    os.environ.get("COREML_MLPACKAGE")
+    or str(CACHE / "multihmr_full_672_s.mlpackage"))
 
 IMG_SIZE = 672
 N_VERTS = 10475

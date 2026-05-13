@@ -20,6 +20,7 @@ Public API:
 from __future__ import annotations
 
 import logging
+import os
 from pathlib import Path
 from typing import Any
 
@@ -161,12 +162,22 @@ class MultiHMRCoreMLBackend:
         MLModel = ns["MLModel"]
         MLModelConfiguration = ns["MLModelConfiguration"]
         cfg = MLModelConfiguration.alloc().init()
+        # MLComputeUnits: 0=CPUOnly, 1=CPUAndGPU, 2=All (ANE+GPU+CPU),
+        # 3=CPUAndNeuralEngine. Bench M5 2026-05-14 (under live-worker
+        # contention, 30 iter median, full Multi-HMR predict+copy):
+        #   CPU_AND_GPU = 252 ms  (baseline)
+        #   ALL         = 246 ms  (within noise, ANE doesn't help)
+        #   CPU_AND_NE  = 1301 ms (ANE solo catastrophic)
+        #   CPU_ONLY    = 1152 ms
+        # Standalone (no contention) FP32 = 139 ms = 7.2 fps. Default
+        # stays CPU+GPU. Override with COREML_COMPUTE_UNITS env var
+        # (`all`, `cpu_and_gpu`, `cpu_and_ne`, `cpu_only`) for A/B testing.
+        cu_env = os.environ.get("COREML_COMPUTE_UNITS", "").strip().lower()
+        cu_map = {"cpu_only": 0, "cpu_and_gpu": 1, "all": 2,
+                  "cpu_and_ne": 3}
+        cu = cu_map.get(cu_env, 1)
         try:
-            # MLComputeUnits: 0=CPUOnly, 1=CPUAndGPU, 2=All (ANE+GPU+CPU),
-            # 3=CPUAndNeuralEngine. Multi-HMR's ANEF compile fails
-            # (validated 2026-05-13 on M5), and 'All' falls back to a
-            # slow path (~146ms). CPU+GPU = 28ms = ~35fps on M5.
-            cfg.setComputeUnits_(1)
+            cfg.setComputeUnits_(cu)
         except Exception:  # noqa: BLE001
             pass
         url = NSURL.fileURLWithPath_(str(self.path))
@@ -182,8 +193,10 @@ class MultiHMRCoreMLBackend:
             raise RuntimeError(f"MLModel load failed for {compiled_url}")
         self._model = model
         self._ns = ns
-        LOG.info("Multi-HMR CoreML model loaded (%s, computeUnits=CPU+GPU)",
-                 self.path.name)
+        cu_name = {0: "CPU_ONLY", 1: "CPU+GPU", 2: "ALL", 3: "CPU+NE"}.get(
+            cu, str(cu))
+        LOG.info("Multi-HMR CoreML model loaded (%s, computeUnits=%s)",
+                 self.path.name, cu_name)
 
     @staticmethod
     def is_available(mlpackage_path: Path | None = None) -> bool:

@@ -520,3 +520,211 @@ class PoseFilterChain:
 
         self.last_apply_ms = (time.perf_counter() - t0) * 1000.0
         return out
+
+    # ---- Face / hand smoothing entry points ---------------------------
+    def apply_face(self, faces: list[list], ids: list[int],
+                   t_now: float) -> list[list]:
+        if not hasattr(self, "_face_chain"):
+            self._face_chain = FaceFilterChain()
+        return self._face_chain.apply(faces, ids, t_now)
+
+    def apply_hand(self, hands: list[list], ids: list[int],
+                   handedness: list[str] | None,
+                   t_now: float) -> list[list]:
+        if not hasattr(self, "_hand_chain"):
+            self._hand_chain = HandFilterChain()
+        return self._hand_chain.apply(hands, ids, handedness, t_now)
+
+
+# ============================ face / hand =================================
+
+# Face and hand filtering operate on PoseKp lists (normalized x,y in [0,1]
+# + z relative depth + confidence). We only apply temporal smoothing
+# (median + Kalman 2D + lookahead) — no IK, no spring.
+
+def _parse_env_face_stages() -> tuple[str, ...]:
+    raw = os.environ.get("POSE_FILTER_FACE")
+    if raw is None:
+        return ("median", "kalman", "lookahead")
+    raw = raw.strip().lower()
+    if raw in ("off", "none", "0", "false"):
+        return ()
+    parts = tuple(p.strip() for p in raw.replace(",", "+").split("+") if p.strip())
+    return tuple(p for p in parts if p in ("median", "kalman", "lookahead"))
+
+
+def _parse_env_hand_stages() -> tuple[str, ...]:
+    raw = os.environ.get("POSE_FILTER_HAND")
+    if raw is None:
+        return ("median", "kalman", "lookahead")
+    raw = raw.strip().lower()
+    if raw in ("off", "none", "0", "false"):
+        return ()
+    parts = tuple(p.strip() for p in raw.replace(",", "+").split("+") if p.strip())
+    return tuple(p for p in parts if p in ("median", "kalman", "lookahead"))
+
+
+class AlphaBetaCV:
+    """Lightweight alpha-beta filter (scalar Kalman approximation).
+
+    Far cheaper than the 6x6 KalmanCV : O(1) per joint per axis with no
+    matrix algebra. Suited to face/hand smoothing where the full CV
+    Kalman is overkill.
+    """
+
+    def __init__(self, alpha: float = 0.55, beta: float = 0.15) -> None:
+        self.alpha = alpha
+        self.beta = beta
+        # state[key] = [x, y, z, vx, vy, vz, last_t]
+        self._st: dict[tuple[int, int], list[float]] = {}
+
+    def reset(self) -> None:
+        self._st.clear()
+
+    def get_velocity(self, pid: int, joint_idx: int
+                     ) -> tuple[float, float, float]:
+        s = self._st.get((pid, joint_idx))
+        if s is None:
+            return (0.0, 0.0, 0.0)
+        return (s[3], s[4], s[5])
+
+    def step(self, pid: int, joint_idx: int, mx: float, my: float,
+             mz: float, t_now: float) -> tuple[float, float, float]:
+        key = (pid, joint_idx)
+        s = self._st.get(key)
+        if s is None:
+            self._st[key] = [mx, my, mz, 0.0, 0.0, 0.0, t_now]
+            return (mx, my, mz)
+        dt = max(1e-3, min(0.2, t_now - s[6]))
+        s[6] = t_now
+        # Predict
+        x_pred = s[0] + s[3] * dt
+        y_pred = s[1] + s[4] * dt
+        z_pred = s[2] + s[5] * dt
+        # Residual
+        rx = mx - x_pred
+        ry = my - y_pred
+        rz = mz - z_pred
+        # Update
+        s[0] = x_pred + self.alpha * rx
+        s[1] = y_pred + self.alpha * ry
+        s[2] = z_pred + self.alpha * rz
+        s[3] += (self.beta / dt) * rx
+        s[4] += (self.beta / dt) * ry
+        s[5] += (self.beta / dt) * rz
+        return (s[0], s[1], s[2])
+
+
+class FaceFilterChain:
+    """Per-pid temporal smoothing for face landmarks (median + Kalman + lookahead).
+
+    Lookahead 30 ms ; max velocity in normalized units/s.
+    """
+
+    def __init__(self, lookahead_ms: float = 30.0,
+                 enabled_stages: Iterable[str] | None = None) -> None:
+        if enabled_stages is None:
+            stages = _parse_env_face_stages()
+        else:
+            stages = tuple(s for s in enabled_stages
+                           if s in ("median", "kalman", "lookahead"))
+        self.enabled = stages
+        self.median = MedianFilter(window=3)
+        self.kalman = AlphaBetaCV(alpha=0.55, beta=0.15)
+        self.lookahead = LookaheadPredictor(
+            lookahead_ms=lookahead_ms, max_velocity=2.0)
+        self.last_apply_ms: float = 0.0
+
+    def reset(self) -> None:
+        self.median.reset()
+        self.kalman.reset()
+
+    def apply(self, faces: list[list], ids: list[int],
+              t_now: float) -> list[list]:
+        if not faces or not self.enabled:
+            self.last_apply_ms = 0.0
+            return faces
+        t0 = time.perf_counter()
+        use_median = "median" in self.enabled
+        use_kalman = "kalman" in self.enabled
+        use_lookahead = "lookahead" in self.enabled
+        out: list[list] = []
+        for f_i, kps in enumerate(faces):
+            pid = ids[f_i] if f_i < len(ids) else -1
+            # Encode pid with a face-side namespace to avoid colliding with
+            # body and hand kalman/median caches.
+            key_pid = pid * 13 + 1 if pid >= 0 else pid
+            new_kps = []
+            for j_idx, kp in enumerate(kps):
+                x, y, z, c = kp.x, kp.y, kp.z, kp.c
+                if use_median:
+                    x, y, z = self.median.apply(key_pid, j_idx, x, y, z)
+                if use_kalman:
+                    x, y, z = self.kalman.step(key_pid, j_idx, x, y, z, t_now)
+                if use_lookahead and use_kalman:
+                    vx, vy, vz = self.kalman.get_velocity(key_pid, j_idx)
+                    x, y, z = self.lookahead.step(x, y, z, vx, vy, vz)
+                new_kps.append(type(kp)(x=x, y=y, z=z, c=c))
+            out.append(new_kps)
+        self.last_apply_ms = (time.perf_counter() - t0) * 1000.0
+        return out
+
+
+class HandFilterChain:
+    """Per-pid+side temporal smoothing for hand landmarks.
+
+    Left and right hands keep independent filter state via a namespaced
+    pid (pid*2 for left, pid*2+1 for right). When handedness is not
+    provided, hands fall back to a side-agnostic namespace.
+    """
+
+    def __init__(self, lookahead_ms: float = 30.0,
+                 enabled_stages: Iterable[str] | None = None) -> None:
+        if enabled_stages is None:
+            stages = _parse_env_hand_stages()
+        else:
+            stages = tuple(s for s in enabled_stages
+                           if s in ("median", "kalman", "lookahead"))
+        self.enabled = stages
+        self.median = MedianFilter(window=3)
+        self.kalman = AlphaBetaCV(alpha=0.6, beta=0.2)
+        self.lookahead = LookaheadPredictor(
+            lookahead_ms=lookahead_ms, max_velocity=4.0)
+        self.last_apply_ms: float = 0.0
+
+    def reset(self) -> None:
+        self.median.reset()
+        self.kalman.reset()
+
+    def apply(self, hands: list[list], ids: list[int],
+              handedness: list[str] | None,
+              t_now: float) -> list[list]:
+        if not hands or not self.enabled:
+            self.last_apply_ms = 0.0
+            return hands
+        t0 = time.perf_counter()
+        use_median = "median" in self.enabled
+        use_kalman = "kalman" in self.enabled
+        use_lookahead = "lookahead" in self.enabled
+        out: list[list] = []
+        for h_i, kps in enumerate(hands):
+            pid = ids[h_i] if h_i < len(ids) else -1
+            side = (handedness[h_i] if handedness and h_i < len(handedness)
+                    else "u").lower()
+            side_bit = 0 if side.startswith("l") else (1 if side.startswith("r") else 2)
+            # Namespace : (pid << 2) | side_bit  — keeps L/R independent.
+            key_pid = (pid * 4 + side_bit + 7) if pid >= 0 else pid
+            new_kps = []
+            for j_idx, kp in enumerate(kps):
+                x, y, z, c = kp.x, kp.y, kp.z, kp.c
+                if use_median:
+                    x, y, z = self.median.apply(key_pid, j_idx, x, y, z)
+                if use_kalman:
+                    x, y, z = self.kalman.step(key_pid, j_idx, x, y, z, t_now)
+                if use_lookahead and use_kalman:
+                    vx, vy, vz = self.kalman.get_velocity(key_pid, j_idx)
+                    x, y, z = self.lookahead.step(x, y, z, vx, vy, vz)
+                new_kps.append(type(kp)(x=x, y=y, z=z, c=c))
+            out.append(new_kps)
+        self.last_apply_ms = (time.perf_counter() - t0) * 1000.0
+        return out
