@@ -9,10 +9,11 @@ Pourquoi YOLOv8-pose plutot qu'OpenPose proper ?
     keypoints (x_norm, y_norm, conf) emis sur OSC.
 
 Sortie OSC :
-  /data/pose/count <n>
+  /data/pose/count  <n>
   /data/pose/person <idx> <cx> <cy> <w> <h> <conf>
   /data/pose/skel   <idx> <conf_avg> <x0 y0 c0 ... x16 y16 c16>
   /data/pose/bone   <idx> <kp_a> <kp_b>           (a la connexion, statique)
+  /data/pose/stats  <avg_conf> <avg_size> <cx_bar> <cy_bar>   (par batch)
 
 Toutes les coordonnees sont normalisees 0..1 (origine top-left).
 """
@@ -137,12 +138,24 @@ async def run(ctx) -> None:
             n = 0 if kp_xy is None else int(len(kp_xy))
             ctx.send("count", float(n))
 
+            # Agregats pour le dashboard : confiance moyenne globale,
+            # taille moyenne (proxy distance cam), centre du barycentre
+            # des personnes, fraction de l'image occupee.
+            global_conf_sum = 0.0
+            global_conf_n = 0
+            size_sum = 0.0
+            cx_sum = 0.0
+            cy_sum = 0.0
+
             for i in range(n):
                 # bbox normalisee
                 if boxes is not None and i < len(boxes):
                     b = boxes.xywhn[i].cpu().numpy().tolist()  # cx, cy, w, h
                     conf_b = float(boxes.conf[i].item())
                     ctx.send("person", float(i), *b, conf_b)
+                    cx_sum += float(b[0])
+                    cy_sum += float(b[1])
+                    size_sum += float(b[2]) * float(b[3])
                 if not emit_kp or kp_xy is None:
                     continue
                 pts  = kp_xy[i].cpu().numpy()              # (17, 2) px
@@ -158,6 +171,19 @@ async def run(ctx) -> None:
                     conf_sum += cc
                 avg = conf_sum / max(1, len(pts))
                 ctx.send("skel", float(i), avg, *flat)
+                global_conf_sum += avg
+                global_conf_n += 1
+
+            # /data/pose/stats avg_conf avg_size cx cy
+            if n > 0:
+                avg_conf = global_conf_sum / max(1, global_conf_n)
+                avg_size = size_sum / n
+                cx_bar = cx_sum / n
+                cy_bar = cy_sum / n
+                ctx.send("stats", float(avg_conf), float(avg_size),
+                         float(cx_bar), float(cy_bar))
+            else:
+                ctx.send("stats", 0.0, 0.0, 0.5, 0.5)
 
             # cadence
             dt = time.monotonic() - t0

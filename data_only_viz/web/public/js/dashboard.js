@@ -295,10 +295,32 @@ const handlers = {
   },
   pose: (m) => {
     if (m.sub === "count") {
-      const c = ensureCard("pose", { title: "Pose YOLO · personnes", order: 3 });
-      c.valueEl.textContent = String(m.args[0] | 0);
+      const c = ensureCard("pose", { title: "Pose YOLO · personnes",
+        order: 3, wide: true });
+      c._lastCount = m.args[0] | 0;
+      c.valueEl.textContent = String(c._lastCount);
       pushHistory(c, m.args[0]);
       drawSpark(c, "#ff8838");
+    } else if (m.sub === "stats") {
+      const [avgConf, avgSize, cxBar, cyBar] = m.args;
+      const c = ensureCard("pose", { title: "Pose YOLO · personnes",
+        order: 3, wide: true });
+      const occup = (avgSize * 100).toFixed(1);
+      const conf = (avgConf * 100).toFixed(0);
+      c.subEl.textContent =
+        `conf ${conf}% · occup. ${occup}% cadre · centre (${cxBar.toFixed(2)}, ${cyBar.toFixed(2)})`;
+      if (avgConf < 0.4) c.el.classList.add("warn");
+      else c.el.classList.remove("warn");
+    } else if (m.sub === "person") {
+      const c = ensureCard("pose", { title: "Pose YOLO · personnes",
+        order: 3, wide: true });
+      // Stocke la liste des bboxes pour overlay potentiel
+      c._persons = c._persons || [];
+      const idx = m.args[0] | 0;
+      c._persons[idx] = {
+        cx: m.args[1], cy: m.args[2],
+        w: m.args[3], h: m.args[4], conf: m.args[5],
+      };
     }
   },
   mempool: (m) => {
