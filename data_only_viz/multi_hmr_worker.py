@@ -128,24 +128,35 @@ class MultiHMRWorker:
                            [0.0, focal, IMG_SIZE / 2.0],
                            [0.0, 0.0, 1.0]]], device=device)
 
-        from ._camera_select import resolve_camera_index
-        cam_idx = resolve_camera_index(self.camera_index)
-        cap = cv2.VideoCapture(cam_idx)
-        cap.set(cv2.CAP_PROP_FRAME_WIDTH, IMG_SIZE)
-        cap.set(cv2.CAP_PROP_FRAME_HEIGHT, IMG_SIZE)
-        if not cap.isOpened():
-            LOG.error("camera index %d indisponible (TCC ?)", cam_idx)
+        # Capture AVFoundation native — selection par device-type, pas
+        # par index cv2 (qui ne suit pas l'ordre AVFoundation et finit
+        # parfois sur l'iPhone Continuity).
+        from ._av_capture import AVCapture, find_builtin_device, enumerate_devices
+        if self.camera_index >= 0:
+            devs = enumerate_devices()
+            if self.camera_index >= len(devs):
+                LOG.error("camera_index %d hors de %d devices",
+                          self.camera_index, len(devs))
+                return
+            info = devs[self.camera_index]
+        else:
+            info = find_builtin_device()
+            if info is None:
+                LOG.error("aucune BuiltInWideAngleCamera trouvee")
+                return
+        cap = AVCapture(info)
+        if not cap.start():
+            LOG.error("AVCapture start failed pour %s", info["name"])
             return
-        LOG.info("camera ouverte index=%d %dx%d",
-                 cam_idx, IMG_SIZE, IMG_SIZE)
+        LOG.info("camera ouverte %s (%s)", info["name"], info["type"])
         frame_count = 0
         persons_count = 0
         next_heartbeat = time.monotonic() + 5.0
 
         while not self._stop.is_set():
             t0 = time.monotonic()
-            ok, frame_bgr = cap.read()
-            if not ok:
+            ok, frame_bgr = cap.read(timeout_s=0.5)
+            if not ok or frame_bgr is None:
                 time.sleep(self.period)
                 continue
 
@@ -254,5 +265,5 @@ class MultiHMRWorker:
             if dt < self.period:
                 time.sleep(self.period - dt)
 
-        cap.release()
+        cap.stop()
         LOG.info("multi_hmr worker stopped")
