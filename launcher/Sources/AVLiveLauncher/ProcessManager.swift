@@ -42,6 +42,7 @@ final class ProcessManager: ObservableObject {
     @Published var autoStart: Bool { didSet { defaults.set(autoStart, forKey: "autoStart") } }
     @Published var autoOpenBrowser: Bool { didSet { defaults.set(autoOpenBrowser, forKey: "autoOpenBrowser") } }
     @Published var autoStartDataFeeds: Bool { didSet { defaults.set(autoStartDataFeeds, forKey: "autoStartDataFeeds") } }
+    @Published var useMultiHMR: Bool { didSet { defaults.set(useMultiHMR, forKey: "useMultiHMR") } }
     /// Process distinct du visualizer oF : en data-only on lance le
     /// visualizer Python+Metal (data_only_viz) au lieu de oscope-of.
     private var metalVizProc: Process?
@@ -177,6 +178,7 @@ final class ProcessManager: ObservableObject {
         metalVizDir = defaults.string(forKey: "metalVizDir")
             ?? "\(avLive)/data_only_viz"
         autoStartDataFeeds = (defaults.object(forKey: "autoStartDataFeeds") as? Bool) ?? false
+        useMultiHMR = defaults.bool(forKey: "useMultiHMR")
         mode = LaunchMode(rawValue: defaults.string(forKey: "mode") ?? "")
             ?? .full
     }
@@ -619,9 +621,13 @@ final class ProcessManager: ObservableObject {
         // imports relatifs `from .osc_listener import ...`.
         // `--pose` active la captation webcam + YOLOv8-pose dans le meme
         // process (le bundle launcher fournit le contexte TCC camera).
-        p.arguments = ["--project", metalVizDir,
-                       "run", "python", "-m", "data_only_viz.main",
-                       "-v", "--pose", "--fullscreen"]
+        var args = ["--project", metalVizDir,
+                    "run", "python", "-m", "data_only_viz.main",
+                    "-v", "--pose", "--fullscreen"]
+        if useMultiHMR {
+            args.append("--multi-hmr")
+        }
+        p.arguments = args
         p.currentDirectoryURL = URL(fileURLWithPath: metalVizDir).deletingLastPathComponent()
         var env = ProcessInfo.processInfo.environment
         env["PATH"] = (env["PATH"] ?? "/usr/bin:/bin")
@@ -649,6 +655,11 @@ final class ProcessManager: ObservableObject {
                 }
             }
             append(source: "launcher", text: "started metal viz (\(metalVizDir))")
+            if useMultiHMR {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
+                    [weak self] in self?.startBodyApp()
+                }
+            }
         } catch {
             append(source: "launcher", text: "failed to start metal viz: \(error)")
         }
@@ -667,6 +678,50 @@ final class ProcessManager: ObservableObject {
         metalVizWantsRestart = true
     }
 
+    // MARK: - AV-Live-Body (Multi-HMR mesh renderer)
+
+    private var bodyAppProc: Process?
+    @Published var bodyAppRunning = false
+
+    /// Lance l'app SwiftPM AV-Live-Body (RealityKit) qui ecoute les
+    /// vertices SMPL-X sur :57130. Necessite useMultiHMR=true.
+    func startBodyApp() {
+        guard useMultiHMR else { return }
+        guard bodyAppProc == nil else { return }
+        let pkgDir = URL(fileURLWithPath: metalVizDir)
+            .deletingLastPathComponent()
+            .appendingPathComponent("launcher/AV-Live-Body")
+        guard FileManager.default.fileExists(
+            atPath: pkgDir.appendingPathComponent("Package.swift").path) else {
+            append(source: "launcher",
+                   text: "AV-Live-Body missing at \(pkgDir.path)")
+            return
+        }
+        let p = Process()
+        p.executableURL = URL(fileURLWithPath: "/usr/bin/env")
+        p.arguments = ["swift", "run", "-c", "release", "AVLiveBody"]
+        p.currentDirectoryURL = pkgDir
+        attach(process: p, label: "body")
+        do {
+            try p.run()
+            bodyAppProc = p
+            DispatchQueue.main.async { self.bodyAppRunning = true }
+            append(source: "launcher", text: "started AV-Live-Body")
+            p.terminationHandler = { [weak self] _ in
+                DispatchQueue.main.async {
+                    self?.bodyAppProc = nil
+                    self?.bodyAppRunning = false
+                }
+            }
+        } catch {
+            append(source: "launcher", text: "startBodyApp failed: \(error)")
+        }
+    }
+
+    func stopBodyApp() {
+        bodyAppProc?.terminate()
+    }
+
     // MARK: - utilities
 
     func stopAll() {
@@ -675,6 +730,7 @@ final class ProcessManager: ObservableObject {
         webProc?.terminate()
         dataFeedsProc?.terminate()
         metalVizProc?.terminate()
+        bodyAppProc?.terminate()
     }
 
     func clearLogs() {

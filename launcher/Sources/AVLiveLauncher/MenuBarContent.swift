@@ -46,6 +46,20 @@ struct MenuBarContent: View {
                     start: processManager.startMetalViz,
                     stop: processManager.stopMetalViz
                 )
+                Toggle("Multi-HMR (mesh SMPL-X dense via :57130)",
+                       isOn: $processManager.useMultiHMR)
+                    .toggleStyle(.switch)
+                    .font(.caption)
+                    .padding(.horizontal, 4)
+                if processManager.bodyAppRunning {
+                    ProcessRow(
+                        title: "AV-Live-Body",
+                        subtitle: "RealityKit SMPL-X mesh renderer",
+                        isRunning: true,
+                        start: processManager.startBodyApp,
+                        stop: processManager.stopBodyApp
+                    )
+                }
             } else {
                 ProcessRow(
                     title: "Oscilloscope",
