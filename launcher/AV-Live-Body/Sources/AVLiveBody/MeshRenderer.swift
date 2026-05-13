@@ -20,13 +20,18 @@ final class MeshRenderer: ObservableObject {
         var target: [SIMD3<Float>]
     }
     private var interpStates: [Int: InterpState] = [:]
+    private var lastSeenAt: [Int: TimeInterval] = [:]
     private var sceneSub: (any Cancellable)?
     private var interpTickCounter: Int = 0
     // SceneEvents.Update fires ~60 fps ; on lerp 1 tick sur 2 = 30 fps.
-    // Alpha re-ajuste pour atteindre ~90% du gap en ~115 ms a 30 Hz
-    // (au lieu de 60 Hz precedemment) -> alpha plus eleve.
-    private static let interpAlpha: Float = 0.5
+    // alpha=0.25 : 94% du gap parcouru en ~330 ms (~1 frame Python a
+    // 3 fps), donc le mesh bouge en continu plutot que de figer 200 ms
+    // entre deux frames Python.
+    private static let interpAlpha: Float = 0.25
     private static let interpStride: Int = 2
+    // Persistance des entites : ne pas retirer un pid manquant pendant
+    // 500 ms (Multi-HMR peut sauter une frame de detection).
+    private static let entityRetainSec: TimeInterval = 0.5
 
     init() {
         loadFaces()
@@ -109,13 +114,23 @@ final class MeshRenderer: ObservableObject {
     }
 
     func updatePersons(_ persons: [SMPLXPersonData]) {
+        let now = CACurrentMediaTime()
         let receivedPids = Set(persons.map { $0.pid })
-        for (pid, _) in personEntities where !receivedPids.contains(pid) {
-            personEntities.removeValue(forKey: pid)
-            lowLevelMeshes.removeValue(forKey: pid)
-            wireframeMeshes.removeValue(forKey: pid)
-            wireframeEntities.removeValue(forKey: pid)
-            interpStates.removeValue(forKey: pid)
+        for pid in receivedPids { lastSeenAt[pid] = now }
+        let cutoff = now - Self.entityRetainSec
+        // Retirer seulement les pids non vus depuis plus de retainSec.
+        // Une absence transitoire (1 frame Multi-HMR ratee) n'efface
+        // donc plus le mesh.
+        for (pid, _) in personEntities {
+            let seen = lastSeenAt[pid] ?? 0
+            if seen < cutoff {
+                personEntities.removeValue(forKey: pid)
+                lowLevelMeshes.removeValue(forKey: pid)
+                wireframeMeshes.removeValue(forKey: pid)
+                wireframeEntities.removeValue(forKey: pid)
+                interpStates.removeValue(forKey: pid)
+                lastSeenAt.removeValue(forKey: pid)
+            }
         }
         for p in persons {
             let entity: ModelEntity
