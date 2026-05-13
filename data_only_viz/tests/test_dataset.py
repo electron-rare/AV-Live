@@ -72,6 +72,53 @@ def test_write_and_load_dataset_jsonl(tmp_path: Path) -> None:
     assert np.allclose(loaded[0].j3d_stack, rows[0].j3d_stack, atol=1e-6)
 
 
+def test_write_and_load_dataset_jsonl_with_hands_kp(tmp_path: Path) -> None:
+    from data_only_viz.training.dataset import (
+        DatasetRow,
+        load_dataset_jsonl,
+        write_dataset_jsonl,
+    )
+    rng = np.random.default_rng(1)
+    hands_kp = rng.normal(size=(16, 42, 3)).astype(np.float32)
+    row = DatasetRow(
+        window_id="sess01_pid1_w0000",
+        label="danse",
+        j3d_stack=rng.normal(size=(16, 32, 3)).astype(np.float32),
+        session="sess01",
+        pid_local=1,
+        auto_label_confidence=0.9,
+        manually_validated=True,
+        hands_kp_stack=hands_kp,
+    )
+    out = tmp_path / "with_hands.jsonl"
+    write_dataset_jsonl([row], out)
+    loaded = load_dataset_jsonl(out)
+    assert loaded[0].hands_kp_stack is not None
+    assert loaded[0].hands_kp_stack.shape == (16, 42, 3)
+    assert np.allclose(loaded[0].hands_kp_stack, hands_kp, atol=1e-6)
+
+
+def test_load_dataset_jsonl_without_hands_kp_is_ok(tmp_path: Path) -> None:
+    """Legacy v2 rows without hands_kp field should load with hands_kp_stack=None."""
+    import json
+    from data_only_viz.training.dataset import load_dataset_jsonl
+    rng = np.random.default_rng(2)
+    row = {
+        "window_id": "sess01_pid1_w0000",
+        "label": "debout",
+        "j3d": rng.normal(size=(16, 32, 3)).tolist(),
+        "session": "sess01",
+        "pid_local": 1,
+        "auto_label_confidence": 0.8,
+        "manually_validated": False,
+    }
+    out = tmp_path / "legacy.jsonl"
+    out.write_text(json.dumps(row) + "\n")
+    loaded = load_dataset_jsonl(out)
+    assert len(loaded) == 1
+    assert loaded[0].hands_kp_stack is None
+
+
 def test_split_by_session(tmp_path: Path) -> None:
     from data_only_viz.training.dataset import DatasetRow, split_by_session
     rng = np.random.default_rng(0)

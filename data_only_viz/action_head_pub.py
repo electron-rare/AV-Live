@@ -17,6 +17,9 @@ import numpy as np
 from data_only_viz.action_head import (
     ActionHead,
     EXPR_DIM,
+    HANDS_KP_DIMS,
+    HANDS_KP_PER_HAND,
+    HANDS_KP_TOTAL,
     J3D_FINGERS,
     J3D_FINGERS_PER_HAND,
     LABELS,
@@ -28,12 +31,12 @@ DEFAULT_CKPT = (
     Path.home() / ".cache" / "av-live-action" / "checkpoints" / "action_head.pt"
 )
 
-# Approximate fingertip vertex indices on SMPL-X 10475-vert mesh.
-# Order: L thumb, L index, L middle, L ring, L pinky,
-#        R thumb, R index, R middle, R ring, R pinky.
+# Canonical SMPL-X fingertip vertex IDs from smplx.vertex_ids.SMPLX_VERTEX_IDS.
+# Order : L thumb, L index, L middle, L ring, L pinky,
+#         R thumb, R index, R middle, R ring, R pinky.
 SMPLX_FINGERTIP_VERTS: tuple[int, ...] = (
-    7174, 7397, 7670, 7942, 8214,   # L
-    4631, 4854, 5127, 5399, 5671,   # R
+    5361, 4933, 5058, 5169, 5286,   # L : lthumb, lindex, lmiddle, lring, lpinky
+    8079, 7669, 7794, 7905, 8022,   # R : rthumb, rindex, rmiddle, rring, rpinky
 )
 
 # 32 vertex indices on the 10475-vertex SMPL-X mesh:
@@ -55,6 +58,11 @@ assert len(SMPLX_JOINT_ANCHOR_VERTS) == 32
 # vert 8970 (upper outer lip), 8855 (lower outer lip) -- approximate.
 SMPLX_UPPER_LIP_VERT: int = 8970
 SMPLX_LOWER_LIP_VERT: int = 8855
+
+# MediaPipe FaceMesh inner-mouth landmark indices.
+# 13 = upper inner mid, 14 = lower inner mid.
+MEDIAPIPE_LIP_UPPER_INNER: int = 13
+MEDIAPIPE_LIP_LOWER_INNER: int = 14
 
 # MediaPipe HAND fingertip indices (21-kp hand model).
 MEDIAPIPE_HAND_FINGERTIPS: tuple[int, ...] = (4, 8, 12, 16, 20)
@@ -120,11 +128,11 @@ class ActionHeadPublisher(threading.Thread):
             self._last_body_t = source_t
         current_pids: set[int] = set()
         if persons32:
-            for pid, j3d, expr, mouth in persons32:
+            for pid, j3d, expr_np, mouth, hands_kp42 in persons32:
                 current_pids.add(pid)
-                label, probs, kin = self.head.step(pid, j3d,
-                                                   expr=expr,
-                                                   mouth_open=mouth)
+                label, probs, kin = self.head.step(pid, j3d, expr=expr_np,
+                                                    mouth_open=mouth,
+                                                    hands_kp=hands_kp42)
                 idx = LABELS.index(label)
                 self.bridge.send_action(pid, idx, probs, t_now, force=True)
                 self.bridge.send_kin(pid, kin, t_now, force=True)
@@ -135,13 +143,13 @@ class ActionHeadPublisher(threading.Thread):
             self.bridge.send_leave(pid=gone)
         self._last_pids = current_pids
 
-    def _read_sources(
-        self,
-    ) -> tuple[list[tuple[int, np.ndarray, np.ndarray, float]] | None,
-               float, str, bool]:
+    def _read_sources(self) -> tuple[
+        list[tuple[int, np.ndarray, np.ndarray, float, np.ndarray]] | None,
+        float, str, bool,
+    ]:
         """Return (persons32, source_t, source_tag, is_new).
 
-        Each person entry is (pid, j3d32, expr10, mouth_open).
+        Each person entry is (pid, j3d32, expr10, mouth_open, hands_kp42x3).
         is_new is True when the timestamp advanced (even if person list
         is empty), so _tick can still run the purge loop.
         """
@@ -150,12 +158,24 @@ class ActionHeadPublisher(threading.Thread):
             t_smplx = getattr(self.state, "smplx_last_t", 0.0)
             persons_b3d = getattr(self.state, "persons_body3d", None)
             ids_b3d = getattr(self.state, "persons_body_ids", None)
+            persons_face = getattr(self.state, "persons_face", None)
+            ids_face = getattr(self.state, "persons_face_ids", None)
+            persons_hands = getattr(self.state, "persons_hands", None)
+            ids_hands = getattr(self.state, "persons_hands_ids", None)
             t_body = getattr(self.state, "pose_last_t", 0.0)
-            hands_ids = list(getattr(self.state, "persons_hands_ids", None) or [])
-            hands_lists = list(getattr(self.state, "persons_hands", None) or [])
-        # Prefer smplx when its timestamp advanced.
+
+        # Build pid -> hands_kp(42, 3) map from MediaPipe persons_hands.
+        hands_by_pid: dict[int, np.ndarray] = self._build_hands_map(
+            persons_hands or [], ids_hands or [],
+        )
+        # Build pid -> mouth_open scalar from MediaPipe persons_face lips.
+        face_mouth_by_pid: dict[int, float] = self._build_face_mouth_map(
+            persons_face or [], ids_face or [],
+        )
+
+        # SMPL-X path (preferred)
         if t_smplx > self._last_smplx_t:
-            out: list[tuple[int, np.ndarray, np.ndarray, float]] = []
+            out: list[tuple[int, np.ndarray, np.ndarray, float, np.ndarray]] = []
             for i, p in enumerate(persons_smplx or []):
                 pid = int(p.get("pid", i))
                 v3d = p.get("v3d")
@@ -177,23 +197,24 @@ class ActionHeadPublisher(threading.Thread):
                     expr_np = np.asarray(expr, dtype=np.float32).flatten()
                 else:
                     expr_np = np.zeros(EXPR_DIM, dtype=np.float32)
-                # mouth_open
-                if v3d_np.shape[0] > max(SMPLX_UPPER_LIP_VERT, SMPLX_LOWER_LIP_VERT):
+                # mouth_open: prefer MediaPipe face lips, fallback SMPL-X v3d.
+                if pid in face_mouth_by_pid:
+                    mouth = face_mouth_by_pid[pid]
+                elif v3d_np.shape[0] > max(SMPLX_UPPER_LIP_VERT, SMPLX_LOWER_LIP_VERT):
                     mouth = float(np.linalg.norm(
                         v3d_np[SMPLX_UPPER_LIP_VERT] - v3d_np[SMPLX_LOWER_LIP_VERT]
                     ))
                 else:
                     mouth = 0.0
-                out.append((pid, j3d32, expr_np, mouth))
+                hands_kp42 = hands_by_pid.get(
+                    pid, np.zeros((HANDS_KP_TOTAL, HANDS_KP_DIMS), dtype=np.float32)
+                )
+                out.append((pid, j3d32, expr_np, mouth, hands_kp42))
             return out or None, t_smplx, "smplx", True
+
+        # MediaPipe body3d fallback
         if t_body > self._last_body_t:
             ids = ids_b3d or list(range(len(persons_b3d or [])))
-            # Build hands lookup by pid
-            hands_by_pid: dict[int, dict[str, Any]] = {}
-            for hi, hkp in enumerate(hands_lists):
-                hpid = int(hands_ids[hi]) if hi < len(hands_ids) else hi
-                side = "L" if hi % 2 == 0 else "R"
-                hands_by_pid.setdefault(hpid, {})[side] = hkp
             out = []
             for i, body in enumerate(persons_b3d or []):
                 pid = int(ids[i]) if i < len(ids) else i
@@ -201,24 +222,73 @@ class ActionHeadPublisher(threading.Thread):
                 if arr is None or arr.shape[0] < 33:
                     continue
                 body22 = arr[list(MEDIAPIPE_TO_22)].astype(np.float32)
-                # fingertips from hands if available
+                # fingertips from persons_hands if available
                 tips = np.zeros((J3D_FINGERS, 3), dtype=np.float32)
-                hpair = hands_by_pid.get(pid, {})
-                for side_idx, side in enumerate(("L", "R")):
-                    hkp = hpair.get(side)
-                    if hkp is None:
-                        continue
-                    hkp_arr = self._kp_list_to_array(hkp)
-                    if hkp_arr is None or hkp_arr.shape[0] < 21:
-                        continue
-                    for k, mp_idx in enumerate(MEDIAPIPE_HAND_FINGERTIPS):
-                        tips[side_idx * J3D_FINGERS_PER_HAND + k] = hkp_arr[mp_idx]
+                hands_kp42 = hands_by_pid.get(
+                    pid, np.zeros((HANDS_KP_TOTAL, HANDS_KP_DIMS), dtype=np.float32)
+                )
+                # extract fingertips from hands_kp42 (idx 4,8,12,16,20 each side)
+                for side_idx in (0, 1):
+                    base = side_idx * HANDS_KP_PER_HAND
+                    for k, mp_tip in enumerate(MEDIAPIPE_HAND_FINGERTIPS):
+                        if base + mp_tip < hands_kp42.shape[0]:
+                            tips[side_idx * J3D_FINGERS_PER_HAND + k] = \
+                                hands_kp42[base + mp_tip]
                 j3d32 = np.concatenate([body22, tips], axis=0)
+                mouth = face_mouth_by_pid.get(pid, 0.0)
                 expr_np = np.zeros(EXPR_DIM, dtype=np.float32)
-                mouth = 0.0
-                out.append((pid, j3d32, expr_np, mouth))
+                out.append((pid, j3d32, expr_np, mouth, hands_kp42))
             return out or None, t_body, "body3d", True
         return None, 0.0, "", False
+
+    def _build_hands_map(self, persons_hands: list,
+                          ids_hands: list) -> dict[int, np.ndarray]:
+        """Combine left+right hand kp arrays per pid into a single (42, 3) array.
+
+        persons_hands is a flat list ; ids_hands maps each hand-list entry to a
+        pid (and odd/even index indicates which side). When the user's pipeline
+        keeps a different convention, this helper makes the best effort and
+        pads zeros for missing sides.
+        """
+        out: dict[int, np.ndarray] = {}
+        for hi, hkp in enumerate(persons_hands):
+            if hkp is None:
+                continue
+            pid_raw = ids_hands[hi] if hi < len(ids_hands) else hi
+            try:
+                pid = int(pid_raw)
+            except (TypeError, ValueError):
+                pid = hi
+            side = hi % 2  # 0 = L, 1 = R
+            arr = self._kp_list_to_array(hkp)
+            if arr is None or arr.shape[0] < HANDS_KP_PER_HAND:
+                continue
+            slot = out.setdefault(
+                pid, np.zeros((HANDS_KP_TOTAL, HANDS_KP_DIMS), dtype=np.float32)
+            )
+            base = side * HANDS_KP_PER_HAND
+            slot[base:base + HANDS_KP_PER_HAND] = arr[:HANDS_KP_PER_HAND]
+        return out
+
+    def _build_face_mouth_map(self, persons_face: list,
+                               ids_face: list) -> dict[int, float]:
+        """Compute mouth_open = norm(upper_inner_lip - lower_inner_lip) per pid."""
+        out: dict[int, float] = {}
+        for fi, fkp in enumerate(persons_face):
+            if fkp is None:
+                continue
+            arr = self._kp_list_to_array(fkp)
+            if arr is None or arr.shape[0] <= MEDIAPIPE_LIP_LOWER_INNER:
+                continue
+            upper = arr[MEDIAPIPE_LIP_UPPER_INNER]
+            lower = arr[MEDIAPIPE_LIP_LOWER_INNER]
+            mouth = float(np.linalg.norm(upper - lower))
+            try:
+                pid = int(ids_face[fi]) if fi < len(ids_face) else fi
+            except (TypeError, ValueError):
+                pid = fi
+            out[pid] = mouth
+        return out
 
     @staticmethod
     def _kp_list_to_array(body: Any) -> np.ndarray | None:

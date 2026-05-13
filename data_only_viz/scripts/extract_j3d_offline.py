@@ -17,7 +17,7 @@ from pathlib import Path
 import cv2
 import numpy as np
 
-from data_only_viz.action_head import EXPR_DIM
+from data_only_viz.action_head import EXPR_DIM, HANDS_KP_DIMS, HANDS_KP_TOTAL
 from data_only_viz.action_head_pub import (
     SMPLX_JOINT_ANCHOR_VERTS,
     SMPLX_UPPER_LIP_VERT,
@@ -125,6 +125,9 @@ def extract(session: str, video: Path, out: Path,
                     "j3d": j3d32.tolist(),
                     "expression": expr_np.tolist(),
                     "mouth_open": mouth,
+                    "hands_kp": np.zeros(
+                        (HANDS_KP_TOTAL, HANDS_KP_DIMS), dtype=np.float32
+                    ).tolist(),
                 }) + "\n")
                 n_rows += 1
             n_frames += 1

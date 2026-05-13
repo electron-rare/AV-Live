@@ -23,6 +23,7 @@ from data_only_viz.action_head import (
     ActionHeadModel,
     EXPR_DIM,
     FeatureExtractor,
+    HANDS_KP_FLAT,
     HIP_LEFT,
     HIP_RIGHT,
     LABELS,
@@ -78,8 +79,15 @@ class WindowDataset(Dataset[tuple[torch.Tensor, int]]):
             n = min(EXPR_DIM, len(expr_t))
             expr_vec[:n] = expr_t[:n]
             mouth_t = float(mouth_s[t]) if t < len(mouth_s) else 0.0
+            # hands_kp at frame t (42, 3); zeros if row has none
+            if row.hands_kp_stack is not None:
+                hands_t = row.hands_kp_stack[t]
+                hands_flat = hands_t.reshape(-1).astype(np.float32, copy=False)
+            else:
+                hands_flat = np.zeros(HANDS_KP_FLAT, dtype=np.float32)
             feat = np.concatenate([
                 cur.reshape(-1), vel.reshape(-1), accel.reshape(-1),
+                hands_flat,
                 expr_vec,
                 np.array([hip_y, knee_angle, sym, mouth_t], dtype=np.float32),
             ]).astype(np.float32, copy=False)

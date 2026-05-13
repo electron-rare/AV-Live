@@ -24,11 +24,11 @@ def test_model_forward_shape() -> None:
     assert h_new.shape == h.shape
 
 
-def test_model_param_count_under_80k() -> None:
+def test_model_param_count_under_100k() -> None:
     from data_only_viz.action_head import ActionHeadModel
     model = ActionHeadModel()
     n = sum(p.numel() for p in model.parameters())
-    assert n < 80_000, f"too many params: {n}"
+    assert n < 100_000, f"too many params: {n}"
 
 
 def test_action_head_step_warmup_returns_debout() -> None:
