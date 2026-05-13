@@ -1,0 +1,127 @@
+"""Dataset IO + sliding-window extraction + by-session split."""
+from __future__ import annotations
+
+import json
+import random
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Iterable, Iterator
+
+import numpy as np
+
+
+@dataclass(frozen=True)
+class RawFrame:
+    ts: float
+    session: str
+    pid: int
+    j3d: np.ndarray  # (22, 3) float32
+
+
+@dataclass
+class WindowRow:
+    j3d_stack: np.ndarray  # (window_len, 22, 3) float32
+    session: str
+    pid_local: int
+    first_ts: float
+
+
+@dataclass
+class DatasetRow:
+    window_id: str
+    label: str
+    j3d_stack: np.ndarray  # (window_len, 22, 3) float32
+    session: str
+    pid_local: int
+    auto_label_confidence: float
+    manually_validated: bool
+
+
+def load_frames_jsonl(path: Path) -> list[RawFrame]:
+    rows: list[RawFrame] = []
+    with path.open() as f:
+        for line in f:
+            line = line.strip()
+            if not line:
+                continue
+            d = json.loads(line)
+            rows.append(RawFrame(
+                ts=float(d["ts"]),
+                session=str(d["session"]),
+                pid=int(d["pid"]),
+                j3d=np.asarray(d["j3d"], dtype=np.float32),
+            ))
+    return rows
+
+
+def sliding_windows(frames: list[RawFrame],
+                    window_len: int = 16,
+                    stride: int = 4) -> Iterator[WindowRow]:
+    """Yield (session, pid)-grouped windows."""
+    by_key: dict[tuple[str, int], list[RawFrame]] = {}
+    for fr in frames:
+        by_key.setdefault((fr.session, fr.pid), []).append(fr)
+    for (sess, pid), grp in by_key.items():
+        grp.sort(key=lambda r: r.ts)
+        if len(grp) < window_len:
+            continue
+        for start in range(0, len(grp) - window_len + 1, stride):
+            chunk = grp[start:start + window_len]
+            stack = np.stack([c.j3d for c in chunk]).astype(np.float32)
+            yield WindowRow(j3d_stack=stack, session=sess,
+                            pid_local=pid, first_ts=chunk[0].ts)
+
+
+def write_dataset_jsonl(rows: Iterable[DatasetRow], path: Path) -> None:
+    with path.open("w") as f:
+        for r in rows:
+            f.write(json.dumps({
+                "window_id": r.window_id,
+                "label": r.label,
+                "j3d": r.j3d_stack.astype(np.float32).tolist(),
+                "session": r.session,
+                "pid_local": r.pid_local,
+                "auto_label_confidence": float(r.auto_label_confidence),
+                "manually_validated": bool(r.manually_validated),
+            }) + "\n")
+
+
+def load_dataset_jsonl(path: Path) -> list[DatasetRow]:
+    out: list[DatasetRow] = []
+    with path.open() as f:
+        for line in f:
+            line = line.strip()
+            if not line:
+                continue
+            d = json.loads(line)
+            out.append(DatasetRow(
+                window_id=d["window_id"],
+                label=d["label"],
+                j3d_stack=np.asarray(d["j3d"], dtype=np.float32),
+                session=d["session"],
+                pid_local=int(d["pid_local"]),
+                auto_label_confidence=float(d["auto_label_confidence"]),
+                manually_validated=bool(d["manually_validated"]),
+            ))
+    return out
+
+
+def split_by_session(rows: list[DatasetRow],
+                     ratios: tuple[float, float, float] = (0.7, 0.15, 0.15),
+                     seed: int = 0,
+                     ) -> tuple[list[DatasetRow], list[DatasetRow], list[DatasetRow]]:
+    sessions = sorted({r.session for r in rows})
+    rng = random.Random(seed)
+    rng.shuffle(sessions)
+    n = len(sessions)
+    n_train = max(1, int(round(n * ratios[0])))
+    n_val = max(1, int(round(n * ratios[1])))
+    if n_train + n_val >= n:
+        n_val = max(1, n - n_train - 1)
+    train_s = set(sessions[:n_train])
+    val_s = set(sessions[n_train:n_train + n_val])
+    test_s = set(sessions[n_train + n_val:])
+    train = [r for r in rows if r.session in train_s]
+    val = [r for r in rows if r.session in val_s]
+    test = [r for r in rows if r.session in test_s]
+    return train, val, test
