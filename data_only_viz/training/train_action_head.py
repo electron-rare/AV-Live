@@ -79,10 +79,6 @@ class WindowDataset(Dataset[tuple[torch.Tensor, int]]):
             n = min(EXPR_DIM, len(expr_t))
             expr_vec[:n] = expr_t[:n]
             mouth_t = float(mouth_s[t]) if t < len(mouth_s) else 0.0
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
->>>>>>> beb94d2 (feat(data-only-viz): action-head v3 hands+lips)
             # hands_kp at frame t (42, 3); zeros if row has none
             if row.hands_kp_stack is not None:
                 hands_t = row.hands_kp_stack[t]
@@ -92,13 +88,6 @@ class WindowDataset(Dataset[tuple[torch.Tensor, int]]):
             feat = np.concatenate([
                 cur.reshape(-1), vel.reshape(-1), accel.reshape(-1),
                 hands_flat,
-<<<<<<< HEAD
-=======
-            feat = np.concatenate([
-                cur.reshape(-1), vel.reshape(-1), accel.reshape(-1),
->>>>>>> aedcb0f (feat(data-only-viz): action-head v2 fingers+face)
-=======
->>>>>>> beb94d2 (feat(data-only-viz): action-head v3 hands+lips)
                 expr_vec,
                 np.array([hip_y, knee_angle, sym, mouth_t], dtype=np.float32),
             ]).astype(np.float32, copy=False)

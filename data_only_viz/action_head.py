@@ -32,10 +32,6 @@ LABELS: tuple[str, str, str] = ("debout", "assise", "danse")
 EXPR_DIM: int = 10
 EXTRA_SCALARS: int = 4   # hip_y, knee_angle, sym_score, mouth_open
 
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
->>>>>>> beb94d2 (feat(data-only-viz): action-head v3 hands+lips)
 # NEW v3 : MediaPipe Hands keypoints block.
 HANDS_KP_PER_HAND: int = 21
 HANDS_KP_TOTAL: int = 2 * HANDS_KP_PER_HAND       # 42
@@ -44,30 +40,12 @@ HANDS_KP_FLAT: int = HANDS_KP_TOTAL * HANDS_KP_DIMS  # 126
 
 # Layout per step (v3) :
 #   [0      :  96]  j3d   (32, 3)
-<<<<<<< HEAD
 #   [96     : 192]  vel   (32, 3)
 #   [192    : 288]  accel (32, 3)
 #   [288    : 414]  hands_kp (42, 3) zero-padded if absent
 #   [414    : 424]  expression (10,)
 #   [424    : 428]  scalars (hip_y, knee_angle, sym, mouth_open)
 FEATURE_DIM: int = J3D_JOINTS * J3D_DIMS * 3 + HANDS_KP_FLAT + EXPR_DIM + EXTRA_SCALARS  # 428
-=======
-# Layout per step:
-#   [0      : 96 ]  j3d   (32, 3)
-#   [96     : 192]  vel   (32, 3)
-#   [192    : 288]  accel (32, 3)
-#   [288    : 298]  expression (10,)
-#   [298    : 302]  scalars (hip_y, knee_angle, sym, mouth_open)
-FEATURE_DIM: int = J3D_JOINTS * J3D_DIMS * 3 + EXPR_DIM + EXTRA_SCALARS  # 302
->>>>>>> aedcb0f (feat(data-only-viz): action-head v2 fingers+face)
-=======
-#   [96     : 192]  vel   (32, 3)
-#   [192    : 288]  accel (32, 3)
-#   [288    : 414]  hands_kp (42, 3) zero-padded if absent
-#   [414    : 424]  expression (10,)
-#   [424    : 428]  scalars (hip_y, knee_angle, sym, mouth_open)
-FEATURE_DIM: int = J3D_JOINTS * J3D_DIMS * 3 + HANDS_KP_FLAT + EXPR_DIM + EXTRA_SCALARS  # 428
->>>>>>> beb94d2 (feat(data-only-viz): action-head v3 hands+lips)
 
 # Body joint indices (unchanged from v1, indices 0..21).
 HIP_LEFT: int = 1
@@ -89,8 +67,6 @@ FINGERTIP_RIGHT_BASE: int = 27
 class FeatureExtractor:
     """Stateless feature builder over a list of recent j3d frames.
 
-<<<<<<< HEAD
-<<<<<<< HEAD
     Vector layout (FEATURE_DIM = 428, v3):
       [0   :  96]  j3d current frame, flattened (32 joints x 3 dims)
       [96  : 192]  velocity j3d[t] - j3d[t-1] (32 x 3)
@@ -98,39 +74,13 @@ class FeatureExtractor:
       [288 : 414]  hands_kp (42, 3) MediaPipe Hands, zero-padded if absent
       [414 : 424]  expression PCA coefficients (10,)
       [424 : 428]  kinetics scalars (hip_y, knee_angle, symmetry_score, mouth_open)
-=======
-    Vector layout (FEATURE_DIM = 302):
-      [0   : 96 ]  j3d current frame, flattened (32 joints x 3 dims)
-      [96  : 192]  velocity j3d[t] - j3d[t-1] (32 x 3)
-      [192 : 288]  acceleration vel[t] - vel[t-1] (32 x 3)
-      [288 : 298]  expression PCA coefficients (10,)
-      [298 : 302]  kinetics scalars (hip_y, knee_angle, symmetry_score, mouth_open)
->>>>>>> aedcb0f (feat(data-only-viz): action-head v2 fingers+face)
-=======
-    Vector layout (FEATURE_DIM = 428, v3):
-      [0   :  96]  j3d current frame, flattened (32 joints x 3 dims)
-      [96  : 192]  velocity j3d[t] - j3d[t-1] (32 x 3)
-      [192 : 288]  acceleration vel[t] - vel[t-1] (32 x 3)
-      [288 : 414]  hands_kp (42, 3) MediaPipe Hands, zero-padded if absent
-      [414 : 424]  expression PCA coefficients (10,)
-      [424 : 428]  kinetics scalars (hip_y, knee_angle, symmetry_score, mouth_open)
->>>>>>> beb94d2 (feat(data-only-viz): action-head v3 hands+lips)
     """
 
     @staticmethod
     def from_buffer(frames: list[np.ndarray],
                     expr: np.ndarray | None = None,
-<<<<<<< HEAD
-<<<<<<< HEAD
                     mouth_open: float = 0.0,
                     hands_kp: np.ndarray | None = None) -> np.ndarray:
-=======
-                    mouth_open: float = 0.0) -> np.ndarray:
->>>>>>> aedcb0f (feat(data-only-viz): action-head v2 fingers+face)
-=======
-                    mouth_open: float = 0.0,
-                    hands_kp: np.ndarray | None = None) -> np.ndarray:
->>>>>>> beb94d2 (feat(data-only-viz): action-head v3 hands+lips)
         if not frames:
             return np.zeros(FEATURE_DIM, dtype=np.float32)
         cur = frames[-1]
@@ -142,10 +92,6 @@ class FeatureExtractor:
         hip_y = float((cur[HIP_LEFT, 1] + cur[HIP_RIGHT, 1]) * 0.5)
         knee_angle = FeatureExtractor._mean_knee_angle(cur)
         sym = FeatureExtractor._symmetry_score(vel)
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
->>>>>>> beb94d2 (feat(data-only-viz): action-head v3 hands+lips)
         # hands block (42, 3) -> 126
         hands_flat = np.zeros(HANDS_KP_FLAT, dtype=np.float32)
         if hands_kp is not None:
@@ -153,11 +99,6 @@ class FeatureExtractor:
             if hk.shape == (HANDS_KP_TOTAL, HANDS_KP_DIMS):
                 hands_flat = hk.reshape(-1).astype(np.float32, copy=False)
         # expression
-<<<<<<< HEAD
-=======
->>>>>>> aedcb0f (feat(data-only-viz): action-head v2 fingers+face)
-=======
->>>>>>> beb94d2 (feat(data-only-viz): action-head v3 hands+lips)
         if expr is None:
             expr_vec = np.zeros(EXPR_DIM, dtype=np.float32)
         else:
@@ -168,14 +109,7 @@ class FeatureExtractor:
             cur.reshape(-1),
             vel.reshape(-1),
             accel.reshape(-1),
-<<<<<<< HEAD
-<<<<<<< HEAD
             hands_flat,
-=======
->>>>>>> aedcb0f (feat(data-only-viz): action-head v2 fingers+face)
-=======
-            hands_flat,
->>>>>>> beb94d2 (feat(data-only-viz): action-head v3 hands+lips)
             expr_vec,
             np.array([hip_y, knee_angle, sym, float(mouth_open)], dtype=np.float32),
         ]).astype(np.float32, copy=False)
@@ -310,17 +244,8 @@ class ActionHead:
 
     def step(self, pid: int, j3d: np.ndarray,
              expr: np.ndarray | None = None,
-<<<<<<< HEAD
-<<<<<<< HEAD
              mouth_open: float = 0.0,
              hands_kp: np.ndarray | None = None) -> tuple[str, np.ndarray, np.ndarray]:
-=======
-             mouth_open: float = 0.0) -> tuple[str, np.ndarray, np.ndarray]:
->>>>>>> aedcb0f (feat(data-only-viz): action-head v2 fingers+face)
-=======
-             mouth_open: float = 0.0,
-             hands_kp: np.ndarray | None = None) -> tuple[str, np.ndarray, np.ndarray]:
->>>>>>> beb94d2 (feat(data-only-viz): action-head v3 hands+lips)
         if np.isnan(j3d).any():
             streak = self._nan_streak.get(pid, 0) + 1
             self._nan_streak[pid] = streak
@@ -334,17 +259,8 @@ class ActionHead:
         if len(frames) < WARMUP_FRAMES:
             probs = np.array([1.0, 0.0, 0.0], dtype=np.float32)
             return LABELS[0], probs, np.zeros(3, dtype=np.float32)
-<<<<<<< HEAD
-<<<<<<< HEAD
         feat = FeatureExtractor.from_buffer(frames, expr=expr, mouth_open=mouth_open,
                                              hands_kp=hands_kp)
-=======
-        feat = FeatureExtractor.from_buffer(frames, expr=expr, mouth_open=mouth_open)
->>>>>>> aedcb0f (feat(data-only-viz): action-head v2 fingers+face)
-=======
-        feat = FeatureExtractor.from_buffer(frames, expr=expr, mouth_open=mouth_open,
-                                             hands_kp=hands_kp)
->>>>>>> beb94d2 (feat(data-only-viz): action-head v3 hands+lips)
         kin = FeatureExtractor.kinetics(frames)
         h = self._hidden.get(pid)
         if h is None:

@@ -24,27 +24,11 @@ def test_model_forward_shape() -> None:
     assert h_new.shape == h.shape
 
 
-<<<<<<< HEAD
-<<<<<<< HEAD
 def test_model_param_count_under_100k() -> None:
     from data_only_viz.action_head import ActionHeadModel
     model = ActionHeadModel()
     n = sum(p.numel() for p in model.parameters())
     assert n < 100_000, f"too many params: {n}"
-=======
-def test_model_param_count_under_80k() -> None:
-    from data_only_viz.action_head import ActionHeadModel
-    model = ActionHeadModel()
-    n = sum(p.numel() for p in model.parameters())
-    assert n < 80_000, f"too many params: {n}"
->>>>>>> aedcb0f (feat(data-only-viz): action-head v2 fingers+face)
-=======
-def test_model_param_count_under_100k() -> None:
-    from data_only_viz.action_head import ActionHeadModel
-    model = ActionHeadModel()
-    n = sum(p.numel() for p in model.parameters())
-    assert n < 100_000, f"too many params: {n}"
->>>>>>> beb94d2 (feat(data-only-viz): action-head v3 hands+lips)
 
 
 def test_action_head_step_warmup_returns_debout() -> None:

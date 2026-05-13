@@ -12,19 +12,9 @@ def test_module_imports() -> None:
     assert hasattr(action_head, "ActionHead")
     assert action_head.WINDOW_LEN == 16
     assert action_head.J3D_JOINTS == 32
-<<<<<<< HEAD
-<<<<<<< HEAD
     assert action_head.FEATURE_DIM == 428
     assert action_head.HANDS_KP_TOTAL == 42
     assert action_head.HANDS_KP_FLAT == 126
-=======
-    assert action_head.FEATURE_DIM == 302
->>>>>>> aedcb0f (feat(data-only-viz): action-head v2 fingers+face)
-=======
-    assert action_head.FEATURE_DIM == 428
-    assert action_head.HANDS_KP_TOTAL == 42
-    assert action_head.HANDS_KP_FLAT == 126
->>>>>>> beb94d2 (feat(data-only-viz): action-head v3 hands+lips)
     assert action_head.NUM_CLASSES == 3
     assert action_head.LABELS == ("debout", "assise", "danse")
 
@@ -79,15 +69,7 @@ def test_feature_extractor_shape_full_buffer() -> None:
     from data_only_viz.action_head import FeatureExtractor, WINDOW_LEN, FEATURE_DIM
     frames = [_rand_j3d(i) for i in range(WINDOW_LEN)]
     feat = FeatureExtractor.from_buffer(frames)
-<<<<<<< HEAD
-<<<<<<< HEAD
     assert feat.shape == (428,)
-=======
-    assert feat.shape == (302,)
->>>>>>> aedcb0f (feat(data-only-viz): action-head v2 fingers+face)
-=======
-    assert feat.shape == (428,)
->>>>>>> beb94d2 (feat(data-only-viz): action-head v3 hands+lips)
     assert feat.dtype == np.float32
     assert not np.isnan(feat).any()
 

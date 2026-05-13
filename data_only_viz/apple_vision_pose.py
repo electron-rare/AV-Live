@@ -557,20 +557,8 @@ class AppleVisionPoseWorker:
             # API d'acces simple. Face parsing depuis Apple Vision est
             # actuellement bloque ; on garde MediaPipe (CPU XNNPACK) pour
             # face/hand fin tandis que Vision sert body 2D sur ANE.
-<<<<<<< HEAD
-<<<<<<< HEAD
             # Skip pour eviter le spam ObjCPointerWarning a 30 fps.
             return
-=======
-            n = 0; n_written = 0
-            if n_written > 0 and not hasattr(self, "_logged_face_write_" + region_name):
-                LOG.info("face: %s wrote %d points", region_name, n_written)
-                setattr(self, "_logged_face_write_" + region_name, True)
->>>>>>> 28d562b (feat(av-live): wire Apple Vision body pose on ANE)
-=======
-            # Skip pour eviter le spam ObjCPointerWarning a 30 fps.
-            return
->>>>>>> 623c479 (perf(multi-hmr): autocast opt-in)
 
         # faceContour
         fill("faceContour", *FACE_OFFSETS["contour"])

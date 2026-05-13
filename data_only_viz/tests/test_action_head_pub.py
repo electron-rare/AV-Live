@@ -19,16 +19,8 @@ class _FakeState:
         self.pose_last_t = 0.0
         self.persons_hands = []
         self.persons_hands_ids = []
-<<<<<<< HEAD
-<<<<<<< HEAD
         self.persons_face = []
         self.persons_face_ids = []
-=======
->>>>>>> aedcb0f (feat(data-only-viz): action-head v2 fingers+face)
-=======
-        self.persons_face = []
-        self.persons_face_ids = []
->>>>>>> beb94d2 (feat(data-only-viz): action-head v3 hands+lips)
         self._lock = threading.RLock()
 
     def lock(self):
