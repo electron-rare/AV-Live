@@ -65,6 +65,16 @@ class PoseSoundBridge:
         for i, body in enumerate(persons_body):
             pid = persons_body_ids[i] if i < len(persons_body_ids) else i
             self._emit_person(int(pid), body)
+            # Skeleton complet pour AV-Live-Body overlay : 33 kp body.
+            # On envoie en flat list pour minimiser le surcout OSC.
+            flat = []
+            for kp in body:
+                flat.extend([float(kp.x), float(kp.y), float(kp.c)])
+            try:
+                self._avbody.send_message(
+                    "/pose/skel", [int(pid)] + flat)
+            except OSError:
+                pass
 
     # ------------------------------------------------------------------
     def _emit_person(self, pid: int, body: list) -> None:

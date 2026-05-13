@@ -1,3 +1,4 @@
+import AppKit
 import AVFoundation
 import MetalKit
 import RealityKit
@@ -99,12 +100,53 @@ struct BodyView: NSViewRepresentable {
         context.coordinator.cameraEntity = camEntity
         context.coordinator.sceneRenderer = scene
         context.coordinator.mtkView = mtkView
+        context.coordinator.skeletonOverlay = SkeletonOverlay(parent: bodyAnchor)
         context.coordinator.keyLight = key
         context.coordinator.fillLight = fill
         context.coordinator.rimLight = rim
         context.coordinator.previewLayer = preview
         context.coordinator.container = container
         context.coordinator.renderer = renderer
+
+        // Hook clavier global : capture les touches au niveau NSEvent
+        // pour eviter les beeps systeme quand un .keyboardShortcut SwiftUI
+        // ne trouve pas de cible. Touches : S / 0-9 / C V M W.
+        if context.coordinator.kbMonitor == nil {
+            context.coordinator.kbMonitor =
+                NSEvent.addLocalMonitorForEvents(matching: .keyDown) {
+                ev in
+                guard let chars = ev.charactersIgnoringModifiers else {
+                    return ev
+                }
+                let k = chars.lowercased()
+                switch k {
+                case "s":
+                    NotificationCenter.default.post(
+                        name: .toggleSettings, object: nil); return nil
+                case "c":
+                    NotificationCenter.default.post(
+                        name: .toggleLayer, object: "camera"); return nil
+                case "v":
+                    NotificationCenter.default.post(
+                        name: .toggleLayer, object: "scene"); return nil
+                case "m":
+                    NotificationCenter.default.post(
+                        name: .toggleLayer, object: "mesh"); return nil
+                case "w":
+                    NotificationCenter.default.post(
+                        name: .toggleLayer, object: "wireframe"); return nil
+                case "0", "1", "2", "3", "4",
+                     "5", "6", "7", "8", "9":
+                    if let n = Int(k) {
+                        NotificationCenter.default.post(
+                            name: .setVizMode, object: n)
+                    }
+                    return nil
+                default:
+                    return ev
+                }
+            }
+        }
         return container
     }
 
@@ -115,6 +157,11 @@ struct BodyView: NSViewRepresentable {
         c.previewLayer?.isHidden = !settings.showCamera
         c.mtkView?.isHidden = !settings.showScene
         c.sceneRenderer?.uniforms.viz_mode = Float(settings.vizMode)
+        // Skeleton overlay openpos : visible si mode openpos (#9) OU
+        // si toggle showSkeleton actif (option manuel).
+        let skelVisible = settings.vizMode == 9 || settings.showSkeleton
+        c.skeletonOverlay?.update(persons: poseListener.persons,
+                                  visible: skelVisible)
         // Pose -> scene uniforms : drive hands3d (mode 8) et openpos
         // (mode 9) avec la premiere personne detectee. Les wrists pilotent
         // hand_l/r ; pose_count alimente bg_fragment.
@@ -163,6 +210,14 @@ struct BodyView: NSViewRepresentable {
         var cameraEntity: PerspectiveCamera?
         var sceneRenderer: SceneRenderer?
         var mtkView: MTKView?
+        var skeletonOverlay: SkeletonOverlay?
+        var kbMonitor: Any?
+
+        deinit {
+            if let m = kbMonitor {
+                NSEvent.removeMonitor(m)
+            }
+        }
         var keyLight: DirectionalLight?
         var fillLight: DirectionalLight?
         var rimLight: DirectionalLight?

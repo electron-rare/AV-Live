@@ -20,6 +20,9 @@ final class PoseOSCListener: ObservableObject {
         var shoSpan: Float = 0
         var torsoYaw: Float = 0
         var bodyPitch: Float = 0
+        /// 33 MediaPipe BODY keypoints flat (x, y, confidence).
+        /// Empty si pas encore recu /pose/skel.
+        var skeleton: [SIMD3<Float>] = []
         var seenAt: TimeInterval = 0
     }
 
@@ -126,6 +129,24 @@ final class PoseOSCListener: ObservableObject {
                   let v = args[1] as? Float else { return }
             var p = persons[Int(pid)] ?? PoseFrame()
             p.bodyPitch = v
+            persons[Int(pid)] = p
+        case "/pose/skel":
+            // [pid] + flat 33 * (x, y, conf)
+            guard args.count >= 1,
+                  let pid = args[0] as? Int32 else { return }
+            var skel: [SIMD3<Float>] = []
+            var i = 1
+            while i + 2 < args.count {
+                if let x = args[i] as? Float,
+                   let y = args[i + 1] as? Float,
+                   let c = args[i + 2] as? Float {
+                    skel.append(SIMD3(x, y, c))
+                }
+                i += 3
+            }
+            var p = persons[Int(pid)] ?? PoseFrame()
+            p.skeleton = skel
+            p.seenAt = CFAbsoluteTimeGetCurrent()
             persons[Int(pid)] = p
         default:
             break

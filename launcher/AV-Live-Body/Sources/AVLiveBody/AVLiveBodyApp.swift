@@ -9,42 +9,46 @@ struct AVLiveBodyApp: App {
                 .frame(minWidth: 800, minHeight: 600)
         }
         .commands {
+            // Pas de keyboardShortcut sans modifier : ca beep si NSWindow
+            // n'a pas la cible. On utilise un NSEvent.addLocalMonitor
+            // dans BodyView pour capter S/C/V/M/W/0-9 et consommer
+            // l'event proprement. Les menu items restent dispo via le
+            // menu superieur, avec Cmd-modified shortcuts conventionnels.
             CommandGroup(replacing: .appSettings) {
                 Button("Toggle Settings") {
                     NotificationCenter.default.post(
                         name: .toggleSettings, object: nil)
-                }
-                .keyboardShortcut("s", modifiers: [])
+                }.keyboardShortcut("s", modifiers: [.command])
             }
             CommandMenu("Calques") {
                 Button("Toggle Webcam") {
                     NotificationCenter.default.post(
                         name: .toggleLayer, object: "camera")
-                }.keyboardShortcut("c", modifiers: [])
+                }.keyboardShortcut("c", modifiers: [.command])
                 Button("Toggle Scene Metal") {
                     NotificationCenter.default.post(
                         name: .toggleLayer, object: "scene")
-                }.keyboardShortcut("v", modifiers: [])
+                }.keyboardShortcut("v", modifiers: [.command])
                 Button("Toggle Maillage SMPL-X") {
                     NotificationCenter.default.post(
                         name: .toggleLayer, object: "mesh")
-                }.keyboardShortcut("m", modifiers: [])
+                }.keyboardShortcut("m", modifiers: [.command])
                 Button("Toggle Fil de fer") {
                     NotificationCenter.default.post(
                         name: .toggleLayer, object: "wireframe")
-                }.keyboardShortcut("w", modifiers: [])
+                }.keyboardShortcut("w", modifiers: [.command])
             }
             CommandMenu("Modes visuels") {
+                let names = ["storm", "tunnel", "plasma", "kaleido",
+                             "voronoi", "metaballs", "starfield",
+                             "bars", "hands3d", "openpos"]
                 ForEach(0..<10) { i in
-                    let names = ["storm", "tunnel", "plasma", "kaleido",
-                                 "voronoi", "metaballs", "starfield",
-                                 "bars", "hands3d", "openpos"]
                     Button("\(i) — \(names[i])") {
                         NotificationCenter.default.post(
                             name: .setVizMode, object: i)
                     }.keyboardShortcut(
                         KeyEquivalent(Character(String(i))),
-                        modifiers: [])
+                        modifiers: [.command])
                 }
             }
         }
