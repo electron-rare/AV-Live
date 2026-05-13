@@ -30,6 +30,11 @@ sound_algo/*.log
 
 # ML model weights downloaded at runtime
 *.pt
+*.ckpt
+*.safetensors
+*.mlpackage
+*.onnx
+*.gguf
 
 # Claude MCP artifacts
 .playwright-mcp/

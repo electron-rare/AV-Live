@@ -775,4 +775,9 @@ final class ProcessManager: ObservableObject {
             }
         }
     }
+
+    deinit {
+        sentinelTimer?.invalidate()
+        sentinelTimer = nil
+    }
 }
