@@ -138,6 +138,9 @@ class MultiHMRWorker:
             return
         LOG.info("camera ouverte index=%d %dx%d",
                  cam_idx, IMG_SIZE, IMG_SIZE)
+        frame_count = 0
+        persons_count = 0
+        next_heartbeat = time.monotonic() + 5.0
 
         while not self._stop.is_set():
             t0 = time.monotonic()
@@ -234,6 +237,18 @@ class MultiHMRWorker:
             with self.state.lock():
                 self.state.persons_smplx = persons
                 self.state.smplx_last_t = t_now
+
+            frame_count += 1
+            persons_count += len(persons)
+            if t_now >= next_heartbeat:
+                fps = frame_count / 5.0
+                avg = persons_count / max(1, frame_count)
+                LOG.info(
+                    "hb: %.1f fps, %.2f persons/frame (%d frames)",
+                    fps, avg, frame_count)
+                frame_count = 0
+                persons_count = 0
+                next_heartbeat = t_now + 5.0
 
             dt = time.monotonic() - t0
             if dt < self.period:
