@@ -257,6 +257,135 @@ from coremltools.converters.mil.frontend.torch import ops as _ops
 _ops._cast = _patched_cast
 _install_auto_val_patch()
 
+# Instrument convert_single_node pour logger le node responsable
+# de l'erreur (cascade-debug helper).
+_orig_csn = _ops.convert_single_node
+
+
+def _csn_logged(context, node):
+    try:
+        _orig_csn(context, node)
+    except Exception:
+        try:
+            k = node.kind() if callable(node.kind) else str(node.kind)
+            print(f"  >>> FAIL on torch node kind={k}")
+        except Exception:
+            pass
+        raise
+
+
+_ops.convert_single_node = _csn_logged
+
+# Patch tile op pour gerer reps=[] (no-op = return input unchanged).
+# Le pattern apparait quand torch.repeat(*[]) ou expand sur dim ratée.
+from coremltools.converters.mil.mil.ops.defs.iOS15 import tensor_operation as _tens_op
+_orig_tile_type_inf = _tens_op.tile.type_inference
+
+
+def _tile_type_inf_safe(self):
+    reps = self.reps.val if self.reps.val is not None else self.reps
+    try:
+        return _orig_tile_type_inf(self)
+    except ValueError as e:
+        if "reps" in str(e) and "0" in str(e):
+            print(f"  >>> tile no-op : reps empty, returning input shape")
+            # No-op : return type of input x unchanged
+            return self.x.sym_type
+        raise
+
+
+_tens_op.tile.type_inference = _tile_type_inf_safe
+
+# Register `new_ones` converter (aten::new_ones).
+# Signature: new_ones(self, size, dtype=None, layout=None, ...)
+# Equivalent : fill(shape=size, value=1.0) cast vers self.dtype.
+from coremltools.converters.mil import Builder as _mb
+from coremltools.converters.mil.frontend.torch.ops import (
+    _get_inputs, register_torch_op as _reg)
+
+
+from coremltools.converters.mil.frontend.torch.torch_op_registry import (
+    _TORCH_OPS_REGISTRY)
+
+
+def _maybe_register(name, fn):
+    """Register fn under torch op name only if not already registered."""
+    try:
+        if name not in _TORCH_OPS_REGISTRY.name_to_func_mapping:
+            _TORCH_OPS_REGISTRY.register_func(fn, [name], override=False)
+    except (ValueError, AttributeError):
+        pass
+
+
+def _new_ones(context, node):
+    inputs = _get_inputs(context, node, min_expected=2)
+    size = inputs[1]
+    if isinstance(size, (list, tuple)):
+        from coremltools.converters.mil import Builder as mb
+        # Reshape chaque element a rank 1 avant concat (sinon mix 0d/1d
+        # plante avec "Input has rank 0 != other inputs rank 1").
+        size_1d = []
+        for v in size:
+            r = v.rank if hasattr(v, "rank") else None
+            if r == 0:
+                v = mb.expand_dims(x=v, axes=[0])
+            size_1d.append(v)
+        size = mb.concat(values=size_1d, axis=0)
+    res = _mb.fill(shape=size, value=1.0, name=node.name)
+    context.add(res, node.name)
+
+
+_maybe_register("new_ones", _new_ones)
+
+
+# Patch global concat type_inference : auto-promote 0d → 1d.
+_orig_concat_ti = _tens_op.concat.type_inference
+
+
+def _concat_ti_auto_promote(self):
+    try:
+        return _orig_concat_ti(self)
+    except ValueError as e:
+        if "rank 0" in str(e) and "rank 1" in str(e):
+            # Find 0d inputs and replace via expand_dims
+            from coremltools.converters.mil import Builder as mb
+            promoted = []
+            for v in self.values:
+                if v.rank == 0:
+                    v = mb.expand_dims(x=v, axes=[0])
+                promoted.append(v)
+            self.values = promoted
+            return _orig_concat_ti(self)
+        raise
+
+
+_tens_op.concat.type_inference = _concat_ti_auto_promote
+
+
+# Override clamp_min : promote dtypes (original assert sans promotion).
+from coremltools.converters.mil.frontend.torch.ops import (
+    promote_input_dtypes)
+
+
+def _clamp_min_promote(context, node):
+    inputs = _get_inputs(context, node, expected=2)
+    x, y = promote_input_dtypes([inputs[0], inputs[1]])
+    out = _mb.maximum(x=x, y=y, name=node.name)
+    context.add(out)
+
+
+_TORCH_OPS_REGISTRY.name_to_func_mapping["clamp_min"] = _clamp_min_promote
+
+
+def _clamp_max_promote(context, node):
+    inputs = _get_inputs(context, node, expected=2)
+    x, y = promote_input_dtypes([inputs[0], inputs[1]])
+    out = _mb.minimum(x=x, y=y, name=node.name)
+    context.add(out)
+
+
+_TORCH_OPS_REGISTRY.name_to_func_mapping["clamp_max"] = _clamp_max_promote
+
 try:
     mlmodel = ct.convert(
         traced,
