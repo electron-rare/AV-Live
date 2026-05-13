@@ -20,6 +20,18 @@ class PoseKp:
 
 
 @dataclass
+class NLFPerson:
+    """Resultats NLF pour une personne : vertices 3D SMPL (6890) en metres,
+    coordonnees camera (z > 0 devant). Le path nonparametrique fournit les
+    vertices directement sans decodage SMPL explicite."""
+    pid: int = -1
+    vertices_3d: tuple = field(default_factory=tuple)   # ((x,y,z),) x 6890
+    joints_3d: tuple = field(default_factory=tuple)      # ((x,y,z),) x 24 (SMPL)
+    translation: tuple = (0.0, 0.0, 0.0)
+    confidence: float = 0.0
+
+
+@dataclass
 class State:
     # Audio sync
     bpm: float = 120.0
@@ -71,6 +83,10 @@ class State:
     persons_body_ids:  list[int] = field(default_factory=list)
     persons_face_ids:  list[int] = field(default_factory=list)
     persons_hands_ids: list[int] = field(default_factory=list)
+
+    # NLF (SMPL 6890 verts x N personnes, path nonparametrique)
+    persons_nlf: list = field(default_factory=list)   # list[NLFPerson]
+    nlf_last_t: float = 0.0
 
     # Renderer
     width: int = 1280
