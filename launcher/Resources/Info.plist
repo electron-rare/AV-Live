@@ -32,5 +32,13 @@
     <string>GPL-3.0-or-later © L'Electron Rare</string>
     <key>NSPrincipalClass</key>
     <string>NSApplication</string>
+    <!-- TCC : autorise les sous-processus (data_feeds Python) a ouvrir la
+         webcam pour la detection de pose YOLO. Sans cette cle, macOS
+         refuse silencieusement l'acces depuis cv2.VideoCapture. -->
+    <key>NSCameraUsageDescription</key>
+    <string>AV-Live utilise la webcam pour la detection de pose temps reel (YOLOv8) en mode data-only.</string>
+    <!-- Necessaire si une dependance audio est ajoutee (whisper, etc.). -->
+    <key>NSMicrophoneUsageDescription</key>
+    <string>AV-Live peut utiliser le micro pour des sources audio temps reel.</string>
 </dict>
 </plist>

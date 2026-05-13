@@ -9,6 +9,18 @@ struct LogLine: Identifiable, Equatable {
     let text: String
 }
 
+enum LaunchMode: String, CaseIterable, Identifiable {
+    case full       // sclang + oscope + web + data_feeds
+    case dataOnly   // uniquement data_feeds (open data + pose YOLO)
+    var id: String { rawValue }
+    var displayName: String {
+        switch self {
+        case .full:     return "Full AV-Live"
+        case .dataOnly: return "Data-only (SC + oF + feeds, no web)"
+        }
+    }
+}
+
 final class ProcessManager: ObservableObject {
     // Observable state
     @Published var sclangRunning = false
@@ -26,9 +38,51 @@ final class ProcessManager: ObservableObject {
     @Published var webPort: Int { didSet { defaults.set(webPort, forKey: "webPort") } }
     @Published var uvPath: String { didSet { defaults.set(uvPath, forKey: "uvPath") } }
     @Published var dataFeedsDir: String { didSet { defaults.set(dataFeedsDir, forKey: "dataFeedsDir") } }
+    @Published var metalVizDir: String { didSet { defaults.set(metalVizDir, forKey: "metalVizDir") } }
     @Published var autoStart: Bool { didSet { defaults.set(autoStart, forKey: "autoStart") } }
     @Published var autoOpenBrowser: Bool { didSet { defaults.set(autoOpenBrowser, forKey: "autoOpenBrowser") } }
     @Published var autoStartDataFeeds: Bool { didSet { defaults.set(autoStartDataFeeds, forKey: "autoStartDataFeeds") } }
+    /// Process distinct du visualizer oF : en data-only on lance le
+    /// visualizer Python+Metal (data_only_viz) au lieu de oscope-of.
+    private var metalVizProc: Process?
+    @Published var metalVizRunning = false
+    /// Nom de la source open-data du preset actif (USGS, Blitz, Wind,
+    /// Kp/Bz, X-ray, OpenSky, Bsky, Pose, Cosmos). Affiche en surbrillance
+    /// le bouton correspondant dans le panel data-only.
+    @Published var activePreset: String = ""
+    private var metalVizWantsRestart = false
+
+    /// "full" (sclang + oscope + web + data_feeds) ou "data-only"
+    /// (uniquement data_feeds avec config.data-only.toml). Persiste sur disque.
+    /// Au changement de mode, on coupe les process incompatibles pour
+    /// eviter qu'ils restent zombies hors UI (ex: web tournant en .dataOnly).
+    @Published var mode: LaunchMode {
+        didSet {
+            defaults.set(mode.rawValue, forKey: "mode")
+            if oldValue != mode {
+                applyModeTransition(from: oldValue, to: mode)
+            }
+        }
+    }
+
+    private func applyModeTransition(from old: LaunchMode, to new: LaunchMode) {
+        append(source: "launcher",
+               text: "mode switched: \(old.rawValue) → \(new.rawValue)")
+        switch new {
+        case .dataOnly:
+            // En data-only : web UI n'a plus de sens (l'UI Hydra/control
+            // dialogue avec sclang, qu'on garde, mais le serveur Node ajoute
+            // une dependance inutile et peut tourner en zombie).
+            if webRunning { stopWeb() }
+            // data_feeds doit tourner avec config.data-only.toml : on
+            // relance s'il etait deja up pour qu'il prenne le bon profil.
+            if dataFeedsRunning { restartDataFeeds() }
+        case .full:
+            // Rien a couper : tout est compatible. data_feeds reste sur
+            // son config (l'utilisateur peut le restart manuellement).
+            break
+        }
+    }
 
     private let defaults = UserDefaults.standard
     private var sclangProc: Process?
@@ -38,6 +92,9 @@ final class ProcessManager: ObservableObject {
     private var dataFeedsWantsRestart = false
     private var sclangWantsRestart = false
     let osc = OSCSender(host: "127.0.0.1", port: 57121)
+    /// OSC sender dedie au visualizer Metal (data_only_viz) sur 57123,
+    /// pour les /control/vizMode et autres commandes visuelles directes.
+    let oscViz = OSCSender(host: "127.0.0.1", port: 57123)
     private let logQueue = DispatchQueue(label: "cc.saillant.avlive.log")
     private let maxLogLines = 2000
 
@@ -117,12 +174,32 @@ final class ProcessManager: ObservableObject {
                 ?? "/opt/homebrew/bin/uv")
         dataFeedsDir = defaults.string(forKey: "dataFeedsDir")
             ?? "\(avLive)/data_feeds"
+        metalVizDir = defaults.string(forKey: "metalVizDir")
+            ?? "\(avLive)/data_only_viz"
         autoStartDataFeeds = (defaults.object(forKey: "autoStartDataFeeds") as? Bool) ?? false
+        mode = LaunchMode(rawValue: defaults.string(forKey: "mode") ?? "")
+            ?? .full
     }
 
     /// Start everything that's currently stopped. Used by AppDelegate on
     /// launch when autoStart is enabled.
+    /// - .full     : sclang + oscope + web + (optionnel) data_feeds
+    /// - .dataOnly : sclang + oscope + data_feeds (pas de web/album)
     func startAll() {
+        if mode == .dataOnly {
+            // Data-only : SC + Python Metal viz + data_feeds bridge.
+            // PAS de oscope-of (oF) — remplace par data_only_viz Python.
+            if !sclangRunning { startSclang() }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { [weak self] in
+                guard let self = self else { return }
+                if !self.metalVizRunning { self.startMetalViz() }
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) { [weak self] in
+                guard let self = self else { return }
+                if !self.dataFeedsRunning { self.startDataFeeds() }
+            }
+            return
+        }
         if !sclangRunning { startSclang() }
         // Stagger so sclang has a head start booting scsynth before
         // oscope-of opens its OSC listener
@@ -179,14 +256,18 @@ final class ProcessManager: ObservableObject {
             webProc = p
             DispatchQueue.main.async { self.webRunning = true }
             p.terminationHandler = { [weak self] proc in
-                self?.append(source: "web", text: "exited with status \(proc.terminationStatus)")
+                let status = proc.terminationStatus
+                // Toutes les lectures/ecritures des flags d'etat passent par
+                // le main thread : pas de data race avec restartWeb().
                 DispatchQueue.main.async {
-                    self?.webProc = nil
-                    self?.webRunning = false
-                    if self?.webWantsRestart == true {
-                        self?.webWantsRestart = false
+                    guard let self = self else { return }
+                    self.append(source: "web", text: "exited with status \(status)")
+                    self.webProc = nil
+                    self.webRunning = false
+                    if self.webWantsRestart {
+                        self.webWantsRestart = false
                         DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
-                            self?.startWeb()
+                            self.startWeb()
                         }
                     }
                 }
@@ -286,29 +367,52 @@ final class ProcessManager: ObservableObject {
             append(source: "launcher", text: "sclang not found at \(sclangPath)")
             return
         }
-        guard FileManager.default.fileExists(atPath: soundAlgoLoadFile) else {
-            append(source: "launcher", text: "load file not found at \(soundAlgoLoadFile)")
+        // En mode data-only on lance le patch dedie data_only/boot.scd :
+        // engine minimaliste (FX rack), 10 SynthDefs \\do_*, 9 scenes, et
+        // demarrage automatique de oscope-of. AUCUNE dependance vers la
+        // palette live principale.
+        var loadFile = soundAlgoLoadFile
+        if mode == .dataOnly {
+            let dataOnlyBoot = URL(fileURLWithPath: soundAlgoLoadFile)
+                .deletingLastPathComponent()
+                .appendingPathComponent("data_only/boot.scd").path
+            if FileManager.default.fileExists(atPath: dataOnlyBoot) {
+                loadFile = dataOnlyBoot
+            } else {
+                // Fallback : ancien boot.data-only.scd si encore present
+                let legacy = URL(fileURLWithPath: soundAlgoLoadFile)
+                    .deletingLastPathComponent()
+                    .appendingPathComponent("boot.data-only.scd").path
+                if FileManager.default.fileExists(atPath: legacy) {
+                    loadFile = legacy
+                }
+            }
+        }
+        guard FileManager.default.fileExists(atPath: loadFile) else {
+            append(source: "launcher", text: "load file not found at \(loadFile)")
             return
         }
         let p = Process()
         p.executableURL = URL(fileURLWithPath: sclangPath)
-        p.arguments = [soundAlgoLoadFile]
+        p.arguments = [loadFile]
         // sclang resolves relative paths from the current working dir; cd to the load file's dir
-        p.currentDirectoryURL = URL(fileURLWithPath: soundAlgoLoadFile).deletingLastPathComponent()
+        p.currentDirectoryURL = URL(fileURLWithPath: loadFile).deletingLastPathComponent()
         attach(process: p, label: "sclang")
         do {
             try p.run()
             sclangProc = p
             DispatchQueue.main.async { self.sclangRunning = true }
             p.terminationHandler = { [weak self] proc in
-                self?.append(source: "sclang", text: "exited with status \(proc.terminationStatus)")
+                let status = proc.terminationStatus
                 DispatchQueue.main.async {
-                    self?.sclangProc = nil
-                    self?.sclangRunning = false
-                    self?.maybeRestartSclang()
+                    guard let self = self else { return }
+                    self.append(source: "sclang", text: "exited with status \(status)")
+                    self.sclangProc = nil
+                    self.sclangRunning = false
+                    self.maybeRestartSclang()
                 }
             }
-            append(source: "launcher", text: "started sclang \(sclangPath) \(soundAlgoLoadFile)")
+            append(source: "launcher", text: "started sclang \(sclangPath) \(loadFile)")
         } catch {
             append(source: "launcher", text: "failed to start sclang: \(error)")
         }
@@ -385,10 +489,12 @@ final class ProcessManager: ObservableObject {
             oscopeProc = p
             DispatchQueue.main.async { self.oscopeRunning = true }
             p.terminationHandler = { [weak self] proc in
-                self?.append(source: "oscope", text: "exited with status \(proc.terminationStatus)")
+                let status = proc.terminationStatus
                 DispatchQueue.main.async {
-                    self?.oscopeProc = nil
-                    self?.oscopeRunning = false
+                    guard let self = self else { return }
+                    self.append(source: "oscope", text: "exited with status \(status)")
+                    self.oscopeProc = nil
+                    self.oscopeRunning = false
                 }
             }
             append(source: "launcher", text: "started oscope-of \(oscopePath)")
@@ -433,9 +539,17 @@ final class ProcessManager: ObservableObject {
             append(source: "launcher", text: "bridge.py not found at \(bridgePy)")
             return
         }
+        // Selectionne le profil de config : data-only utilise un toml dedie
+        // qui n'active QUE les flux opendata + pose YOLO. Si le fichier
+        // n'existe pas, fallback silencieux sur config.toml standard.
+        let dataOnlyCfg = dataFeedsDir + "/config.data-only.toml"
+        let useDataOnly = (mode == .dataOnly)
+            && FileManager.default.fileExists(atPath: dataOnlyCfg)
+        var args = ["run", "python", "bridge.py", "-v"]
+        if useDataOnly { args.append(contentsOf: ["-c", "config.data-only.toml"]) }
         let p = Process()
         p.executableURL = URL(fileURLWithPath: uvPath)
-        p.arguments = ["run", "python", "bridge.py", "-v"]
+        p.arguments = args
         p.currentDirectoryURL = URL(fileURLWithPath: dataFeedsDir)
         // uv resout les binaries depuis ~/.local/bin et /opt/homebrew/bin
         var env = ProcessInfo.processInfo.environment
@@ -450,14 +564,16 @@ final class ProcessManager: ObservableObject {
             dataFeedsProc = p
             DispatchQueue.main.async { self.dataFeedsRunning = true }
             p.terminationHandler = { [weak self] proc in
-                self?.append(source: "feeds", text: "exited with status \(proc.terminationStatus)")
+                let status = proc.terminationStatus
                 DispatchQueue.main.async {
-                    self?.dataFeedsProc = nil
-                    self?.dataFeedsRunning = false
-                    if self?.dataFeedsWantsRestart == true {
-                        self?.dataFeedsWantsRestart = false
+                    guard let self = self else { return }
+                    self.append(source: "feeds", text: "exited with status \(status)")
+                    self.dataFeedsProc = nil
+                    self.dataFeedsRunning = false
+                    if self.dataFeedsWantsRestart {
+                        self.dataFeedsWantsRestart = false
                         DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
-                            self?.startDataFeeds()
+                            self.startDataFeeds()
                         }
                     }
                 }
@@ -481,6 +597,76 @@ final class ProcessManager: ObservableObject {
         dataFeedsWantsRestart = true
     }
 
+    // MARK: - Metal viz (Python+pyobjc, mode data-only)
+
+    /// Lance `uv run python -m data_only_viz.main` dans data_only_viz/.
+    /// uv synchronise le venv (pyobjc-* + python-osc) au premier run.
+    func startMetalViz() {
+        guard metalVizProc == nil else { return }
+        guard FileManager.default.isExecutableFile(atPath: uvPath) else {
+            append(source: "launcher", text: "uv not found at \(uvPath)")
+            return
+        }
+        let main = metalVizDir + "/main.py"
+        guard FileManager.default.fileExists(atPath: main) else {
+            append(source: "launcher", text: "data_only_viz/main.py not found at \(main)")
+            return
+        }
+        let p = Process()
+        p.executableURL = URL(fileURLWithPath: uvPath)
+        // `--project` pointe uv sur le pyproject.toml de data_only_viz/.
+        // cwd au parent pour que `-m data_only_viz.main` resolve les
+        // imports relatifs `from .osc_listener import ...`.
+        // `--pose` active la captation webcam + YOLOv8-pose dans le meme
+        // process (le bundle launcher fournit le contexte TCC camera).
+        p.arguments = ["--project", metalVizDir,
+                       "run", "python", "-m", "data_only_viz.main",
+                       "-v", "--pose", "--fullscreen"]
+        p.currentDirectoryURL = URL(fileURLWithPath: metalVizDir).deletingLastPathComponent()
+        var env = ProcessInfo.processInfo.environment
+        env["PATH"] = (env["PATH"] ?? "/usr/bin:/bin")
+            + ":/usr/local/bin:/opt/homebrew/bin:\(env["HOME"] ?? "")/.local/bin"
+        env["NO_COLOR"] = "1"
+        p.environment = env
+        attach(process: p, label: "metalviz")
+        do {
+            try p.run()
+            metalVizProc = p
+            DispatchQueue.main.async { self.metalVizRunning = true }
+            p.terminationHandler = { [weak self] proc in
+                let status = proc.terminationStatus
+                DispatchQueue.main.async {
+                    guard let self = self else { return }
+                    self.append(source: "metalviz", text: "exited with status \(status)")
+                    self.metalVizProc = nil
+                    self.metalVizRunning = false
+                    if self.metalVizWantsRestart {
+                        self.metalVizWantsRestart = false
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+                            self.startMetalViz()
+                        }
+                    }
+                }
+            }
+            append(source: "launcher", text: "started metal viz (\(metalVizDir))")
+        } catch {
+            append(source: "launcher", text: "failed to start metal viz: \(error)")
+        }
+    }
+
+    func stopMetalViz() {
+        metalVizWantsRestart = false
+        metalVizProc?.terminate()
+    }
+
+    func restartMetalViz() {
+        guard metalVizProc != nil else { startMetalViz(); return }
+        append(source: "launcher", text: "restarting metal viz…")
+        metalVizWantsRestart = true
+        metalVizProc?.terminate()
+        metalVizWantsRestart = true
+    }
+
     // MARK: - utilities
 
     func stopAll() {
@@ -488,6 +674,7 @@ final class ProcessManager: ObservableObject {
         oscopeProc?.terminate()
         webProc?.terminate()
         dataFeedsProc?.terminate()
+        metalVizProc?.terminate()
     }
 
     func clearLogs() {

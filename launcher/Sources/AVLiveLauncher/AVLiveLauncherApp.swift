@@ -18,6 +18,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem!
     private var popover: NSPopover!
     private var logWindow: NSWindow?
+    private var modePickerWindow: NSWindow?
     private let processManager = ProcessManager()
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -47,18 +48,52 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             )
         )
 
-        // Auto-start everything if enabled (default true). Slight delay so
-        // the menubar UI has time to appear before any subprocess output
-        // floods the log buffer.
-        if processManager.autoStart {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
-                self?.processManager.startAll()
+        // Mode picker au boot : si skipModePicker est faux, on demande a
+        // l'utilisateur. Sinon on enchaine direct avec le mode persiste.
+        let skipPicker = UserDefaults.standard.bool(forKey: "skipModePicker")
+        if skipPicker {
+            if processManager.autoStart {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
+                    self?.processManager.startAll()
+                }
             }
+        } else {
+            showModePicker()
         }
 
         // Watch the sentinel file written by the web bridge's
         // /control/rebootSclang handler — restarts sclang when touched.
         processManager.startSentinelWatcher()
+    }
+
+    private func showModePicker() {
+        let w = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 520, height: 300),
+            styleMask: [.titled, .closable],
+            backing: .buffered,
+            defer: false
+        )
+        w.title = "AV-Live — choisir le mode"
+        w.center()
+        w.isReleasedWhenClosed = false
+        w.level = .floating
+        w.contentViewController = NSHostingController(
+            rootView: ModePickerView(
+                processManager: processManager,
+                onChoice: { [weak self, weak w] _ in
+                    w?.close()
+                    self?.modePickerWindow = nil
+                    if let pm = self?.processManager, pm.autoStart {
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                            pm.startAll()
+                        }
+                    }
+                }
+            )
+        )
+        modePickerWindow = w
+        w.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
     }
 
     func applicationWillTerminate(_ notification: Notification) {
