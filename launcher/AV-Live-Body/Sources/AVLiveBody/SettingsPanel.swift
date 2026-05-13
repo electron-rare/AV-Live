@@ -64,7 +64,7 @@ struct SettingsPanel: View {
                      label: "Fil de fer",
                      isOn: $settings.showWireframe)
             layerRow(icon: "figure.stand",
-                     label: "Squelette (articulations)",
+                     label: "Squelette (à venir)",
                      isOn: $settings.showSkeleton)
         }
     }

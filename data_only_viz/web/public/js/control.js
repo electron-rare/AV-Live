@@ -48,12 +48,22 @@ document.querySelectorAll(".slider-row").forEach((row) => {
 });
 
 // ---------- Scene buttons ----------
-document.querySelectorAll(".scene-btn").forEach((btn) => {
+document.querySelectorAll("#scenes .scene-btn").forEach((btn) => {
   btn.addEventListener("click", () => {
-    document.querySelectorAll(".scene-btn")
+    document.querySelectorAll("#scenes .scene-btn")
       .forEach((b) => b.classList.remove("active"));
     btn.classList.add("active");
     send("/scene/play", [btn.dataset.scene]);
+  });
+});
+
+// ---------- Visual mode buttons ----------
+document.querySelectorAll("#vizmodes .scene-btn").forEach((btn) => {
+  btn.addEventListener("click", () => {
+    document.querySelectorAll("#vizmodes .scene-btn")
+      .forEach((b) => b.classList.remove("active"));
+    btn.classList.add("active");
+    send("/control/vizMode", [parseInt(btn.dataset.viz, 10)]);
   });
 });
 

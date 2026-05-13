@@ -25,6 +25,7 @@ const OSC_DATA_IN = parseInt(process.env.OSC_DATA_IN ?? "57124", 10);
 const OSC_SYNC_IN = parseInt(process.env.OSC_SYNC_IN ?? "57125", 10);
 const SC_HOST = process.env.SC_HOST ?? "127.0.0.1";
 const SC_PORT_OUT = parseInt(process.env.SC_PORT_OUT ?? "57121", 10);
+const OF_PORT_OUT = parseInt(process.env.OF_PORT_OUT ?? "57123", 10);
 
 const app = express();
 app.use(express.static(join(__dirname, "public")));
@@ -69,7 +70,12 @@ wss.on("connection", (ws) => {
       if (typeof v === "number") return { type: "f", value: v };
       return { type: "s", value: String(v) };
     });
-    udpOut.send({ address: msg.path, args }, SC_HOST, SC_PORT_OUT);
+    // Routing par path :
+    //   /control/viz* -> oscope-of (:57123) — Metal viz + skeleton renderer
+    //   tout le reste -> SC (:57121)
+    const port = msg.path.startsWith("/control/viz")
+      ? OF_PORT_OUT : SC_PORT_OUT;
+    udpOut.send({ address: msg.path, args }, SC_HOST, port);
   });
 });
 

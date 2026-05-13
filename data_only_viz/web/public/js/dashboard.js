@@ -235,6 +235,107 @@ const handlers = {
       drawSpark(c);
     }
   },
+  // ---- Nouveaux feeds (gdelt, wikimedia, tides, atc, pose, mempool,
+  //      github, rte_eco2mix) -------------------------------------
+  gdelt: (m) => {
+    if (m.sub === "batch") {
+      const [n, countries, tone] = m.args;
+      const c = ensureCard("gdelt", { title: "GDELT · evenements 15min",
+        order: 19, wide: true,
+        alert: tone < -5, warn: tone < -2, green: tone > 2 });
+      c.valueEl.textContent = String(n | 0);
+      c.subEl.textContent = `${countries | 0} pays · tone ${fmt(tone, 2)}`;
+      pushHistory(c, n);
+      drawSpark(c);
+    }
+  },
+  wikimedia: (m) => {
+    if (m.sub === "rate") {
+      const c = ensureCard("wiki", { title: "Wikipedia firehose", order: 20 });
+      c.valueEl.textContent = `${fmt(m.args[0], 1)} /s`;
+      pushHistory(c, m.args[0]);
+      drawSpark(c, "#6fa6ff");
+    } else if (m.sub === "edit") {
+      const c = ensureCard("wiki", { title: "Wikipedia firehose", order: 20 });
+      c.subEl.textContent = `${m.args[0]}: ${m.args[1]}`;
+    }
+  },
+  tides: (m) => {
+    if (m.sub === "level") {
+      const [obs, pred, residual] = m.args;
+      const c = ensureCard("tides", { title: "Marees NOAA", order: 21, wide: true });
+      c.valueEl.textContent = `${fmt(obs, 2)} m`;
+      c.subEl.textContent = `predit ${fmt(pred, 2)} m · residual ${fmt(residual, 2)} m`;
+      pushHistory(c, obs);
+      drawSpark(c, "#6fa6ff");
+    } else if (m.sub === "moon") {
+      const [phase, illum] = m.args;
+      const c = ensureCard("moon", { title: "Phase lunaire", order: 22 });
+      const phaseName = phase < 0.05 || phase > 0.95 ? "nouvelle"
+        : phase < 0.25 ? "premier croissant"
+        : phase < 0.30 ? "premier quartier"
+        : phase < 0.45 ? "gibbeuse croissante"
+        : phase < 0.55 ? "pleine"
+        : phase < 0.70 ? "gibbeuse decroissante"
+        : phase < 0.80 ? "dernier quartier"
+        : "dernier croissant";
+      c.valueEl.textContent = `${fmt(illum * 100, 0)}%`;
+      c.subEl.textContent = phaseName;
+    }
+  },
+  atc: (m) => {
+    if (m.sub === "total") {
+      const [total, hubs] = m.args;
+      const c = ensureCard("atc", { title: "ATC · auditeurs", order: 23 });
+      c.valueEl.textContent = String(total | 0);
+      c.subEl.textContent = `${hubs | 0} hubs actifs`;
+      pushHistory(c, total);
+      drawSpark(c, "#6fe9b3");
+    }
+  },
+  pose: (m) => {
+    if (m.sub === "count") {
+      const c = ensureCard("pose", { title: "Pose YOLO · personnes", order: 3 });
+      c.valueEl.textContent = String(m.args[0] | 0);
+      pushHistory(c, m.args[0]);
+      drawSpark(c, "#ff8838");
+    }
+  },
+  mempool: (m) => {
+    if (m.sub === "fee") {
+      const c = ensureCard("btc", { title: "Bitcoin · fee sat/vB", order: 24 });
+      c.valueEl.textContent = String(m.args[0] | 0);
+      pushHistory(c, m.args[0]);
+      drawSpark(c, "#ff8838");
+    } else if (m.sub === "tx") {
+      const c = ensureCard("btc", { title: "Bitcoin · fee sat/vB", order: 24 });
+      c.subEl.textContent = `${m.args[0] | 0} tx en attente`;
+    }
+  },
+  github: (m) => {
+    if (m.sub === "rate") {
+      const c = ensureCard("gh", { title: "GitHub events", order: 25 });
+      c.valueEl.textContent = `${fmt(m.args[0], 1)} /s`;
+      pushHistory(c, m.args[0]);
+      drawSpark(c, "#6fa6ff");
+    }
+  },
+  rte_eco2mix: (m) => {
+    if (m.sub === "mix") {
+      const [nuclear, solar, wind, gas] = m.args;
+      const c = ensureCard("rte", { title: "RTE eCO2mix · GW", order: 26, wide: true });
+      c.valueEl.textContent = `${fmt((nuclear + solar + wind + gas) / 1000, 1)} GW`;
+      c.subEl.textContent = `nuc ${fmt(nuclear / 1000, 1)} · sol ${fmt(solar / 1000, 1)} · eol ${fmt(wind / 1000, 1)} · gaz ${fmt(gas / 1000, 1)}`;
+      pushHistory(c, (nuclear + solar + wind + gas) / 1000);
+      drawSpark(c, "#6fe9b3");
+    } else if (m.sub === "co2") {
+      const c = ensureCard("co2", { title: "Intensite CO2 · g/kWh", order: 27,
+        alert: m.args[0] > 200, warn: m.args[0] > 100, green: m.args[0] < 50 });
+      c.valueEl.textContent = String(m.args[0] | 0);
+      pushHistory(c, m.args[0]);
+      drawSpark(c);
+    }
+  },
 };
 
 function handleMessage(msg) {

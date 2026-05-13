@@ -87,6 +87,13 @@ const handlers = {
     ephemeralMarker(lat, lon, "volcano",
                     `volcan ${region} (VEI ${vei})`);
   },
+  gdelt: (m) => {
+    if (m.sub !== "event") return;
+    const [lat, lon, tone, country] = m.args;
+    if (!lat && !lon) return;
+    const tip = `GDELT ${country || "?"} (tone ${(+tone).toFixed(1)})`;
+    ephemeralMarker(lat, lon, "gdelt", tip);
+  },
 };
 
 function handleMessage(msg) {

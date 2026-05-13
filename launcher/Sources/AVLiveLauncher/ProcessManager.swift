@@ -17,7 +17,7 @@ enum LaunchMode: String, CaseIterable, Identifiable {
     var displayName: String {
         switch self {
         case .full:     return "Full AV-Live"
-        case .dataOnly: return "Data-only (SC + oF + feeds, no web)"
+        case .dataOnly: return "Data-only (SC + Metal viz + feeds + web)"
         case .bodyMesh: return "Body Mesh (Multi-HMR + RealityKit)"
         }
     }
