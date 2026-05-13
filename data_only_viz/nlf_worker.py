@@ -27,6 +27,8 @@ CKPT_S = CACHE / "nlf_s_multi.torchscript"
 N_VERTS = 6890
 N_JOINTS = 24
 
+FAIL_THRESHOLD = 30  # ~1 s at 30 fps before giving up
+
 
 class NLFWorker:
     def __init__(self, state: State, num_persons: int = 4,
@@ -40,6 +42,7 @@ class NLFWorker:
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None
         self._smooth_pos: list[list] = []
+        self.failure_count = 0
 
     @staticmethod
     def is_available() -> bool:
@@ -52,6 +55,9 @@ class NLFWorker:
 
     def stop(self) -> None:
         self._stop.set()
+
+    def _record_success(self) -> None:
+        self.failure_count = 0
 
     def _run(self) -> None:
         try:
@@ -116,10 +122,28 @@ class NLFWorker:
             try:
                 with torch.inference_mode():
                     pred = model.detect_smpl_batched(frame_batch)
+            except NotImplementedError as e:
+                self.failure_count += 1
+                if self.failure_count >= FAIL_THRESHOLD:
+                    LOG.error(
+                        "NLF inference unsupported on device=%s after %d frames: %s. "
+                        "TorchScript checkpoint is CUDA-only; install CUDA or switch backend.",
+                        device, self.failure_count, e,
+                    )
+                    return
+                time.sleep(self.period)
+                continue
             except Exception as e:
+                self.failure_count += 1
+                if self.failure_count >= FAIL_THRESHOLD:
+                    LOG.error("NLF inference failed %d frames in a row, stopping: %s",
+                              self.failure_count, e)
+                    return
                 LOG.warning("inference failed: %s", e)
                 time.sleep(self.period)
                 continue
+
+            self._record_success()
 
             verts_all = pred.get("vertices3d_nonparam")
             joints_all = pred.get("joints3d_nonparam")
