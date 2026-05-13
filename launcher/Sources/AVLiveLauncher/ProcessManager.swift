@@ -690,7 +690,9 @@ final class ProcessManager: ObservableObject {
     /// Lance l'app SwiftPM AV-Live-Body (RealityKit) qui ecoute les
     /// vertices SMPL-X sur :57130. Necessite useMultiHMR=true.
     func startBodyApp() {
-        guard useMultiHMR else { return }
+        // Lancable a la demande depuis n'importe quel mode. Si Multi-HMR
+        // n'est pas actif, la fenetre affichera juste la cam (pas de mesh)
+        // mais le panel S et les reglages restent fonctionnels.
         guard bodyAppProc == nil else { return }
         let pkgDir = URL(fileURLWithPath: metalVizDir)
             .deletingLastPathComponent()

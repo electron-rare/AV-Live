@@ -74,15 +74,6 @@ struct MenuBarContent: View {
                         .toggleStyle(.switch)
                         .font(.caption)
                         .padding(.horizontal, 4)
-                    if processManager.bodyAppRunning {
-                        ProcessRow(
-                            title: "AV-Live-Body",
-                            subtitle: "RealityKit SMPL-X mesh renderer",
-                            isRunning: true,
-                            start: processManager.startBodyApp,
-                            stop: processManager.stopBodyApp
-                        )
-                    }
                 } else {
                     ProcessRow(
                         title: "Oscilloscope",
@@ -113,6 +104,19 @@ struct MenuBarContent: View {
                 start: processManager.startDataFeeds,
                 stop: processManager.stopDataFeeds
             )
+
+            // AV-Live-Body — toujours disponible, lancable a la demande
+            // depuis n'importe quel mode (le worker Multi-HMR doit tourner
+            // pour qu'il recoive des vertices, sinon fenetre vide).
+            if processManager.mode != .bodyMesh {
+                ProcessRow(
+                    title: "AV-Live-Body",
+                    subtitle: "RealityKit mesh + cam (touche S = panel)",
+                    isRunning: processManager.bodyAppRunning,
+                    start: processManager.startBodyApp,
+                    stop: processManager.stopBodyApp
+                )
+            }
 
             if processManager.mode == .full {
                 HStack {
