@@ -1,4 +1,8 @@
+<<<<<<< HEAD
 """Extract j3d (32 SMPL-X joint anchors) from a recorded MP4 using the
+=======
+"""Extract j3d (22 SMPL-X joint anchors) from a recorded MP4 using the
+>>>>>>> 2a732fa (fix(data-only-viz): action-head review fixes)
 Multi-HMR CoreML backend, write per-frame per-person jsonl rows.
 
 Usage:
@@ -17,12 +21,16 @@ from pathlib import Path
 import cv2
 import numpy as np
 
+<<<<<<< HEAD
 from data_only_viz.action_head import EXPR_DIM, HANDS_KP_DIMS, HANDS_KP_TOTAL
 from data_only_viz.action_head_pub import (
     SMPLX_JOINT_ANCHOR_VERTS,
     SMPLX_UPPER_LIP_VERT,
     SMPLX_LOWER_LIP_VERT,
 )
+=======
+from data_only_viz.action_head_pub import SMPLX_JOINT_ANCHOR_VERTS
+>>>>>>> 2a732fa (fix(data-only-viz): action-head review fixes)
 from data_only_viz.multihmr_coreml import MultiHMRCoreMLBackend
 
 LOG = logging.getLogger("extract_j3d_offline")
@@ -52,11 +60,15 @@ def _frame_to_chw(frame_bgr: np.ndarray, size: int = IMG_SIZE) -> np.ndarray:
     return rgb.transpose(2, 0, 1)  # CHW
 
 
+<<<<<<< HEAD
 def _person_to_j3d32(
     person: dict,
     anchors: tuple[int, ...],
 ) -> tuple[np.ndarray, np.ndarray, float] | None:
     """Return (j3d32, expression, mouth_open) or None if v3d absent/too small."""
+=======
+def _person_to_j3d22(person: dict, anchors: tuple[int, ...]) -> np.ndarray | None:
+>>>>>>> 2a732fa (fix(data-only-viz): action-head review fixes)
     v3d = person.get("v3d")
     if v3d is None:
         return None
@@ -66,6 +78,7 @@ def _person_to_j3d32(
     v3d_np = np.asarray(v3d, dtype=np.float32)
     if v3d_np.shape[0] < max(anchors) + 1:
         return None
+<<<<<<< HEAD
     j3d32 = v3d_np[list(anchors)].astype(np.float32)
     # expression
     expr = person.get("expression")
@@ -83,6 +96,9 @@ def _person_to_j3d32(
     else:
         mouth = 0.0
     return j3d32, expr_np, mouth
+=======
+    return v3d_np[list(anchors)].astype(np.float32)
+>>>>>>> 2a732fa (fix(data-only-viz): action-head review fixes)
 
 
 def extract(session: str, video: Path, out: Path,
@@ -114,20 +130,30 @@ def extract(session: str, video: Path, out: Path,
                 continue
             ts = n_frames / fps
             for i, person in enumerate(persons):
+<<<<<<< HEAD
                 result = _person_to_j3d32(person, anchors)
                 if result is None:
                     continue
                 j3d32, expr_np, mouth = result
+=======
+                j3d = _person_to_j3d22(person, anchors)
+                if j3d is None:
+                    continue
+>>>>>>> 2a732fa (fix(data-only-viz): action-head review fixes)
                 f.write(json.dumps({
                     "ts": ts,
                     "session": session,
                     "pid": int(person.get("pid", i)),
+<<<<<<< HEAD
                     "j3d": j3d32.tolist(),
                     "expression": expr_np.tolist(),
                     "mouth_open": mouth,
                     "hands_kp": np.zeros(
                         (HANDS_KP_TOTAL, HANDS_KP_DIMS), dtype=np.float32
                     ).tolist(),
+=======
+                    "j3d": j3d.tolist(),
+>>>>>>> 2a732fa (fix(data-only-viz): action-head review fixes)
                 }) + "\n")
                 n_rows += 1
             n_frames += 1
