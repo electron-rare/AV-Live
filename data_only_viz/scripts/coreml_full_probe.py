@@ -157,6 +157,32 @@ if hasattr(model.backbone, "encoder") and hasattr(model.backbone.encoder,
 # torch.inverse(K) plante coremltools (op non implementee). Comme K est
 # fixe (camera intrinsics avec focal=IMG_SIZE), on pre-calcule K_inv
 # en closed-form et on l'utilise comme buffer module-level.
+print("==> Patching roma.rotmat_to_rotvec (branchless atan2)")
+# roma.rotmat_to_rotvec utilise torch.empty + 8 index_put_ qui se
+# traduisent en CoreML par scatter_nd successifs sur un buffer
+# garbage-initialise. Resultat : cellules non touchees restent NaN,
+# propagees via quat normalization -> v3d/transl all-NaN.
+# Remplacement branchless via atan2 : pas de torch.empty, pas
+# d'index_put_, juste des stack/clamp/norm/atan2 stables CoreML.
+# Precision vs roma original : 2.26e-6 L_inf sur batch random.
+import roma as _roma
+
+def _rotmat_to_rotvec_branchless(R, eps=1e-6):
+    w = torch.stack([
+        R[..., 2, 1] - R[..., 1, 2],
+        R[..., 0, 2] - R[..., 2, 0],
+        R[..., 1, 0] - R[..., 0, 1],
+    ], dim=-1) * 0.5
+    trace = R[..., 0, 0] + R[..., 1, 1] + R[..., 2, 2]
+    cos_theta = ((trace - 1.0) * 0.5).clamp(-1.0, 1.0)
+    sin_theta = torch.norm(w, dim=-1)
+    theta = torch.atan2(sin_theta, cos_theta)
+    sin_theta_safe = sin_theta.clamp(min=eps)
+    return w * (theta / sin_theta_safe).unsqueeze(-1)
+
+_roma.rotmat_to_rotvec = _rotmat_to_rotvec_branchless
+
+
 print("==> Patching utils.camera.inverse_perspective_projection")
 import utils.camera as _camera
 
@@ -498,9 +524,10 @@ try:
         compute_units=ct.ComputeUnit.CPU_AND_GPU,
         minimum_deployment_target=ct.target.macOS15,
         convert_to="mlprogram",
-        # FP16 default causes NaN in inverse projection / SMPL-X decoder
-        # (Multi-HMR has values that overflow the FP16 range). Force FP32.
-        compute_precision=ct.precision.FLOAT32,
+        # FP16 OK depuis le patch roma branchless (cf rapport bisection
+        # 2026-05-13) : la source du NaN etait torch.empty + index_put_
+        # dans roma.rotmat_to_rotvec, pas la precision.
+        compute_precision=ct.precision.FLOAT16,
     )
     out_path = "/tmp/multihmr_full_672_s.mlpackage"
     mlmodel.save(out_path)

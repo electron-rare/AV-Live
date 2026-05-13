@@ -39,11 +39,11 @@ N_PERSONS_FIXED = 4
 N_VERTS = 10475
 
 # CoreML output names from the exported .mlpackage.
-OUT_V3D = "var_2541"          # (4, 10475, 3) f16
-OUT_TRANSL = "var_2544"       # (4, 1, 3) f16
-OUT_SCORES = "var_2557"       # (4,) f16
-OUT_BETAS = "var_2560"        # (4, 10) f16
-OUT_EXPR = "var_2563"         # (4, 10) f16
+OUT_V3D = "var_2412"          # (4, 10475, 3)
+OUT_TRANSL = "var_2415"       # (4, 1, 3)
+OUT_SCORES = "var_2428"       # (4,)
+OUT_BETAS = "var_2431"        # (4, 10)
+OUT_EXPR = "var_2434"         # (4, 10)
 
 # MLMultiArrayDataType raw values (from CoreML headers).
 ML_DTYPE_FLOAT32 = 65568
