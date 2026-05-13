@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import argparse
 import logging
+import os
 import signal
 import sys
 
@@ -265,7 +266,13 @@ class AppDelegate(NSObject):
                             self._opts, "motion_gate", 5.0),
                         camera_index=getattr(self._opts, "camera_index", -1))
                     self._pose_worker.start()
-                    self._smplx_tcp = SMPLXTCPSender(self._state)
+                    # MESH_RIG=0 disables the 30 fps rigid translation
+                    # rigger from mesh_rigger.py (used to debug deformation
+                    # issues introduced by the hybrid rigging path).
+                    self._smplx_tcp = SMPLXTCPSender(
+                        self._state,
+                        enable_rigging=os.environ.get("MESH_RIG", "1") != "0",
+                    )
                     self._smplx_tcp.start()
                     LOG.info("worker: Multi-HMR + SMPL-X (mesh dense)")
                     # Secondary body-pose worker in parallel: AVLiveBody
