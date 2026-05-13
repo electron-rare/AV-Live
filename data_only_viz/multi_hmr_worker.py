@@ -238,6 +238,10 @@ class MultiHMRWorker:
                 prev_thumb = thumb
 
             frame_rgb = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2RGB)
+            # Publish to state for DINOv2 reid in MeshRigger.
+            with self.state.lock():
+                self.state.last_frame_rgb = frame_rgb
+                self.state.last_frame_rgb_t = time.monotonic()
             tensor = torch.from_numpy(frame_rgb).permute(2, 0, 1).float()
             tensor = (tensor / 255.0).unsqueeze(0).to(device)
 
@@ -517,6 +521,9 @@ class MultiHMRWorker:
                 prev_thumb = thumb
 
             frame_rgb = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2RGB)
+            with self.state.lock():
+                self.state.last_frame_rgb = frame_rgb
+                self.state.last_frame_rgb_t = time.monotonic()
             img = frame_rgb.transpose(2, 0, 1).astype(np.float32) / 255.0
 
             t_inf_start = time.monotonic()

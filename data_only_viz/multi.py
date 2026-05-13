@@ -22,6 +22,7 @@ from pathlib import Path
 from .action_head_pub import ActionHeadPublisher
 from .euro_filter import SkeletonFilter
 from .pose_bridge import PoseSoundBridge
+from .pose_filter import PoseFilterChain
 from .state import Kp3D, PoseKp, State
 from .tracker import IoUTracker
 
@@ -96,6 +97,8 @@ class MultiWorker:
         self._sound_bridge = PoseSoundBridge(throttle_hz=30.0)
         self._action_pub = ActionHeadPublisher(state=self.state, bridge=self._sound_bridge)
         self._action_pub.start()
+        # 3D pose filter chain : median, Kalman CV, lookahead, IK clamps.
+        self._filter_chain = PoseFilterChain(state=self.state)
 
     def start(self) -> None:
         self._thread = threading.Thread(
@@ -251,6 +254,13 @@ class MultiWorker:
             # 3D world landmarks share ids with bodies (same MediaPipe
             # detection, just a different coordinate space).
             ids_body3d = ids_body[:len(bodies3d)] if bodies3d else []
+            if bodies3d:
+                bodies3d = self._filter_chain.apply(bodies3d, ids_body3d, t_now)
+            # Debug : log body3d count once / 5 s so we know MediaPipe
+            # actually populates pose_world_landmarks.
+            if not hasattr(self, "_dbg_b3d_t") or t_now - self._dbg_b3d_t > 5.0:
+                LOG.info("body3d: n=%d (pose_world_landmarks)", len(bodies3d))
+                self._dbg_b3d_t = t_now
             self._sound_bridge.send(
                 bodies, ids_body, t_now,
                 persons_face=faces, persons_face_ids=ids_face,

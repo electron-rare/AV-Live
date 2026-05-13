@@ -25,8 +25,15 @@ from typing import Sequence
 
 import numpy as np
 
+import os
+
 from .mesh_rigger import MeshRigger
 from .state import SMPLXPerson, State
+
+try:
+    from .dino_reid import DinoReid
+except Exception:  # noqa: BLE001
+    DinoReid = None  # type: ignore[assignment]
 
 LOG = logging.getLogger("smplx_tcp")
 
@@ -47,7 +54,25 @@ class SMPLXTCPSender:
         self._sock: socket.socket | None = None
         # Hybrid keyframe rigging : entre deux keyframes Multi-HMR (~3 fps),
         # on translate le mesh via le delta pelvis Apple Vision (30 fps).
-        self._rigger = MeshRigger(state) if enable_rigging else None
+        # MULTIHMR_REID: 'dino' (try DINOv2 + IoU fusion, fallback IoU) /
+        # 'iou' (pure IoU). Default: 'dino' if mlpackage exists.
+        reid_mode = os.environ.get("MULTIHMR_REID", "dino").lower()
+        dino = None
+        if enable_rigging and reid_mode == "dino" and DinoReid is not None:
+            try:
+                if DinoReid.is_available():
+                    dino = DinoReid()
+                    LOG.info("MeshRigger: DINOv2 reid enabled")
+                else:
+                    LOG.info(
+                        "MeshRigger: dino mlpackage absent, IoU only")
+            except Exception as e:  # noqa: BLE001
+                LOG.warning("MeshRigger: dino load failed (%s), IoU only", e)
+                dino = None
+        dino_weight = float(os.environ.get("MULTIHMR_REID_ALPHA", "0.5"))
+        self._rigger = MeshRigger(
+            state, dino_weight=dino_weight,
+            dino_reid=dino) if enable_rigging else None
 
     def start(self) -> None:
         self._thread = threading.Thread(

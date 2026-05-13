@@ -101,6 +101,15 @@ struct BodyView: NSViewRepresentable {
         context.coordinator.sceneRenderer = scene
         context.coordinator.mtkView = mtkView
         context.coordinator.skeletonOverlay = SkeletonOverlay(parent: bodyAnchor)
+        // Skeleton 3D RealityKit armature (33 spheres + 32 cylinders bones)
+        // driven by /pose3d/* OSC from MediaPipe pose_world_landmarks.
+        // Visible quand toggle showSkeleton ou vizMode==9 (openpos).
+        let skel3dAnchor = AnchorEntity(world: SIMD3<Float>(0, 0, -2.5))
+        arView.scene.addAnchor(skel3dAnchor)
+        let skel3d = Skeleton3DRenderer()
+        skel3d.attach(to: skel3dAnchor, listener: poseListener)
+        context.coordinator.skel3dAnchor = skel3dAnchor
+        context.coordinator.skel3d = skel3d
         context.coordinator.keyLight = key
         context.coordinator.fillLight = fill
         context.coordinator.rimLight = rim
@@ -162,6 +171,9 @@ struct BodyView: NSViewRepresentable {
         let skelVisible = settings.vizMode == 9 || settings.showSkeleton
         c.skeletonOverlay?.update(persons: poseListener.persons,
                                   visible: skelVisible)
+        // 3D RealityKit armature : show/hide root anchor in sync with
+        // the same skelVisible signal as the 2D overlay.
+        c.skel3dAnchor?.isEnabled = skelVisible
         // Pose -> scene uniforms : drive hands3d (mode 8) et openpos
         // (mode 9) avec la premiere personne detectee. Les wrists pilotent
         // hand_l/r ; pose_count alimente bg_fragment.
@@ -211,6 +223,8 @@ struct BodyView: NSViewRepresentable {
         var sceneRenderer: SceneRenderer?
         var mtkView: MTKView?
         var skeletonOverlay: SkeletonOverlay?
+        var skel3dAnchor: AnchorEntity?
+        var skel3d: Skeleton3DRenderer?
         var kbMonitor: Any?
 
         deinit {

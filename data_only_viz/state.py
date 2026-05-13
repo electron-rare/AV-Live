@@ -140,6 +140,11 @@ class State:
     # Derniere frame webcam au format JPEG bytes (pour NSImageView overlay).
     # Le pose worker la met a jour ; le HUD timer lit et l'affiche.
     last_webcam_jpeg: bytes | None = None
+    # Last full RGB frame fed to Multi-HMR (uint8 HxWx3, typ. 672x672).
+    # Updated by multi_hmr_worker right before inference. Read by
+    # MeshRigger for DINOv2-based person re-id. None when absent.
+    last_frame_rgb: np.ndarray | None = None
+    last_frame_rgb_t: float = 0.0
 
     _lock: threading.RLock = field(default_factory=threading.RLock, repr=False)
 
