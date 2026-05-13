@@ -100,6 +100,8 @@ def _build(state: State) -> dispatcher.Dispatcher:
             with state.lock(): state.social_rate = float(args[0])
     d.map("/data/bluesky/rate", _social)
 
+    # NOTE: sound_algo/control/data_feeds.scd also listens to /data/pose/{count,skel}
+    # for sonification. Both consumers are intentional. Do NOT consolidate.
     def _pose_count(addr, *args):
         if args:
             with state.lock():

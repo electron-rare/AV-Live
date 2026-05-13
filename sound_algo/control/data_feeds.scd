@@ -185,6 +185,10 @@
     \sho_l, \sho_r, \elb_l, \elb_r, \wri_l, \wri_r,
     \hip_l, \hip_r, \kne_l, \kne_r, \ank_l, \ank_r];
 
+// NOTE: /data/pose/count and /data/pose/skel are ALSO consumed by
+// data_only_viz/osc_listener.py for Metal rendering. This is intentional —
+// both subsystems update their own state. Do NOT consolidate; they live
+// in different processes.
 ~feedDefPriv.(\d_pose_count, '/data/pose/count', { |msg|
     ~feedSet.(\pose_count, msg[1]);
 });
