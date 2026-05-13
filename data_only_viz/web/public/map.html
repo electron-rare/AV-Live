@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <title>AV-Live · Carte monde</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <style>
+    html, body { margin: 0; height: 100%; background: #000; }
+    #map { width: 100vw; height: 100vh; background: #050516; }
+    .hud {
+      position: fixed; top: 14px; left: 14px;
+      background: rgba(0,0,0,0.6);
+      color: #fff;
+      font-family: -apple-system, system-ui, sans-serif;
+      font-size: 12px;
+      padding: 8px 12px;
+      border-radius: 8px;
+      border: 1px solid rgba(255,255,255,0.15);
+      z-index: 999;
+    }
+    .hud b { color: #ff5e95; }
+    .hud a { color: #aaa; margin-left: 12px; text-decoration: none; }
+    .leaflet-container { background: #050516 !important; }
+    /* Custom marker styles */
+    .quake { background: #ff5e95; border-radius: 50%; }
+    .strike { background: #ffd84a; border-radius: 50%; }
+    .plane { background: #6fe9b3; border-radius: 50%; }
+    .iss { background: #6fa6ff; border-radius: 50%; border: 2px solid #fff; }
+    .volcano { background: #ff8838; border-radius: 50%; }
+  </style>
+</head>
+<body>
+  <div id="map"></div>
+  <div class="hud">
+    <b id="conn">connexion…</b>
+    · <span id="counts">0 events</span>
+    <a href="/dashboard.html">Dashboard</a>
+  </div>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script type="module" src="js/map.js"></script>
+</body>
+</html>

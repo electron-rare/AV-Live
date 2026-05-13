@@ -291,6 +291,73 @@ final class ProcessManager: ObservableObject {
 
     private var webWantsRestart = false
 
+    // ----------------- Web data-only dashboard ------------------------
+
+    private var dataWebProc: Process?
+    @Published var dataWebRunning = false
+    let dataWebPort: Int = 3211
+
+    /// Lance le dashboard web data-only (Express + WS bridge sur :3211,
+    /// ecoute OSC UDP :57124). Necessite node + le dossier
+    /// `data_only_viz/web/`.
+    func startDataWeb() {
+        guard dataWebProc == nil else { return }
+        guard FileManager.default.isExecutableFile(atPath: nodePath) else {
+            append(source: "launcher", text: "node not found at \(nodePath)")
+            return
+        }
+        let script = URL(fileURLWithPath: metalVizDir)
+            .appendingPathComponent("web/server.js").path
+        guard FileManager.default.fileExists(atPath: script) else {
+            append(source: "launcher",
+                   text: "data-only web server.js manquant a \(script)")
+            return
+        }
+        let p = Process()
+        p.executableURL = URL(fileURLWithPath: nodePath)
+        p.arguments = [script]
+        p.currentDirectoryURL = URL(fileURLWithPath: script)
+            .deletingLastPathComponent()
+        var env = ProcessInfo.processInfo.environment
+        env["PATH"] = (env["PATH"] ?? "/usr/bin:/bin")
+            + ":/usr/local/bin:/opt/homebrew/bin"
+        env["HTTP_PORT"] = String(dataWebPort)
+        p.environment = env
+        attach(process: p, label: "dataweb")
+        do {
+            try p.run()
+            dataWebProc = p
+            DispatchQueue.main.async { self.dataWebRunning = true }
+            p.terminationHandler = { [weak self] _ in
+                DispatchQueue.main.async {
+                    self?.dataWebProc = nil
+                    self?.dataWebRunning = false
+                }
+            }
+            append(source: "launcher",
+                   text: "started data-only web on :\(dataWebPort)")
+        } catch {
+            append(source: "launcher",
+                   text: "data-only web start failed: \(error)")
+        }
+    }
+
+    func stopDataWeb() {
+        dataWebProc?.terminate()
+    }
+
+    func openDataDashboard() {
+        if let url = URL(string: "http://127.0.0.1:\(dataWebPort)/dashboard.html") {
+            NSWorkspace.shared.open(url)
+        }
+    }
+
+    func openDataMap() {
+        if let url = URL(string: "http://127.0.0.1:\(dataWebPort)/map.html") {
+            NSWorkspace.shared.open(url)
+        }
+    }
+
     func restartWeb() {
         guard webProc != nil else { startWeb(); return }
         append(source: "launcher", text: "restarting web server…")
@@ -737,6 +804,7 @@ final class ProcessManager: ObservableObject {
         dataFeedsProc?.terminate()
         metalVizProc?.terminate()
         bodyAppProc?.terminate()
+        dataWebProc?.terminate()
     }
 
     func clearLogs() {

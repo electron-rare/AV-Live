@@ -118,6 +118,31 @@ struct MenuBarContent: View {
                 )
             }
 
+            // Dashboard web data-only (Express :3211, dashboard + carte
+            // monde live OSC). Visible en dataOnly + bodyMesh.
+            if processManager.mode == .dataOnly
+                || processManager.mode == .bodyMesh {
+                ProcessRow(
+                    title: "Dashboard data-only",
+                    subtitle: "Express :\(processManager.dataWebPort) — dashboard + carte monde",
+                    isRunning: processManager.dataWebRunning,
+                    start: processManager.startDataWeb,
+                    stop: processManager.stopDataWeb
+                )
+                if processManager.dataWebRunning {
+                    HStack {
+                        Button(action: processManager.openDataDashboard) {
+                            Label("Dashboard", systemImage: "gauge")
+                        }
+                        Button(action: processManager.openDataMap) {
+                            Label("Carte monde", systemImage: "globe")
+                        }
+                        Spacer()
+                    }
+                    .padding(.horizontal, 4)
+                }
+            }
+
             if processManager.mode == .full {
                 HStack {
                     Button(action: processManager.openBrowser) {

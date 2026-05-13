@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <title>AV-Live · Data-only Dashboard</title>
+  <link rel="stylesheet" href="css/dashboard.css" />
+</head>
+<body>
+  <header>
+    <h1>AV-Live · Data-only</h1>
+    <span class="pill" id="conn">connexion…</span>
+    <span class="pill" id="rate" style="background:rgba(110,233,179,.15);color:#6fe9b3;border-color:rgba(110,233,179,.4);">0 msg/s</span>
+    <nav>
+      <a href="/dashboard.html">Dashboard</a>
+      <a href="/map.html">Carte monde</a>
+    </nav>
+  </header>
+  <main id="grid"></main>
+  <footer id="log">en attente du bridge OSC :57124…</footer>
+  <script type="module" src="js/dashboard.js"></script>
+</body>
+</html>

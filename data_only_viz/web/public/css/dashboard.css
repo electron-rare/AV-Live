@@ -1,0 +1,107 @@
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  background: #0a0a14;
+  color: #d7d7e0;
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro", system-ui,
+    sans-serif;
+  overflow: hidden;
+}
+header {
+  padding: 16px 24px;
+  background: linear-gradient(180deg, #15152a 0%, #0e0e1f 100%);
+  border-bottom: 1px solid #2a2a4a;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+header h1 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: #fff;
+}
+header .pill {
+  font-size: 11px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(255, 60, 130, 0.18);
+  color: #ff5e95;
+  border: 1px solid rgba(255, 60, 130, 0.4);
+}
+header nav { margin-left: auto; }
+header nav a {
+  color: #aaa;
+  text-decoration: none;
+  margin-left: 16px;
+  font-size: 13px;
+}
+header nav a:hover { color: #fff; }
+main {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  padding: 16px;
+  height: calc(100vh - 65px);
+  overflow: auto;
+}
+.card {
+  background: #14142a;
+  border: 1px solid #25254a;
+  border-radius: 10px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-height: 120px;
+}
+.card h2 {
+  margin: 0;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: #8a8aa8;
+}
+.card .value {
+  font-size: 28px;
+  font-weight: 700;
+  color: #fff;
+  font-variant-numeric: tabular-nums;
+}
+.card .sub {
+  font-size: 12px;
+  color: #aaa;
+  font-variant-numeric: tabular-nums;
+}
+.card.alert { border-color: #ff5e95; }
+.card.alert .value { color: #ff5e95; }
+.card.warn .value { color: #ffd84a; }
+.card.green .value { color: #6fe9b3; }
+.card .spark {
+  flex: 1;
+  width: 100%;
+  min-height: 30px;
+}
+.card.wide { grid-column: span 2; }
+.card.tall { grid-row: span 2; }
+.feed-pill {
+  display: inline-block;
+  font-size: 10px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: #1e1e3a;
+  color: #8a8aa8;
+  margin-right: 4px;
+}
+footer {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: 6px 16px;
+  background: rgba(10, 10, 20, 0.9);
+  border-top: 1px solid #25254a;
+  font-size: 11px;
+  color: #6a6a8a;
+}
