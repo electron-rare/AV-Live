@@ -235,11 +235,11 @@ class MetalRenderer(NSObject):
     def _init_skel_cpu_buffer(self) -> None:
         """Preallocate the CPU staging buffer for skeleton segments.
 
-        SKEL_MAX_SEGS * 10 floats : each segment = 2 verts × 5 floats
+        SKEL_MAX_SEGS * 2 * SKEL_VERT_FLOATS floats : each segment = 2 verts × 5 floats
         (x, y, z, conf, pid).  Idempotent — no-op if already allocated.
         """
         if getattr(self, "_skel_cpu_buf", None) is None:
-            self._skel_cpu_buf = np.zeros(SKEL_MAX_SEGS * 10, dtype=np.float32)
+            self._skel_cpu_buf = np.zeros(SKEL_MAX_SEGS * 2 * SKEL_VERT_FLOATS, dtype=np.float32)
 
     def _init_mesh_cpu_buffer(self) -> None:
         if getattr(self, "_mesh_cpu_buf", None) is None:
@@ -380,7 +380,7 @@ class MetalRenderer(NSObject):
 
         if segs == 0:
             return 0
-        data = self._skel_cpu_buf[: segs * 10].tobytes()
+        data = self._skel_cpu_buf[: segs * 2 * SKEL_VERT_FLOATS].tobytes()
         mv = self._skel_buf.contents().as_buffer(len(data))
         mv[:] = data
         return segs
@@ -444,6 +444,8 @@ class MetalRenderer(NSObject):
             for a, b, c in BODY_TRIANGLES:
                 if not push_tri(body_kp, a, b, c, pid):
                     break
+            if n_verts >= MESH_MAX_VERTS:
+                break
 
         # Face — utilise triangulation Delaunay dynamique sur les XY,
         # fallback sur FACE_TRIANGLES statique si Delaunay echoue.
@@ -454,7 +456,7 @@ class MetalRenderer(NSObject):
             for a, b, c in tri_list:
                 if not push_tri(face_kp, a, b, c, pid):
                     break
-            if n_verts // 3 >= MESH_MAX_TRIS:
+            if n_verts >= MESH_MAX_VERTS:
                 break
 
         # Hands — decalage palette +5 comme dans le skel
@@ -463,6 +465,8 @@ class MetalRenderer(NSObject):
             for a, b, c in HAND_TRIANGLES:
                 if not push_tri(hand_kp, a, b, c, pid):
                     break
+            if n_verts >= MESH_MAX_VERTS:
+                break
 
         if n_verts == 0:
             return 0
