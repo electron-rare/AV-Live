@@ -369,6 +369,23 @@ class MultiHMRWorker:
                 shape_raw = hh["shape"].detach().cpu().numpy().flatten()
                 expr_raw = hh["expression"].detach().cpu().numpy().flatten()
 
+                # Skip persons with NaN/Inf vertices or transl : MPS can
+                # occasionally emit garbage that propagates to AVLiveBody
+                # as spikes / holes. We drop the frame for that pid and
+                # let the receiver's retain window keep the last good mesh.
+                if (not np.isfinite(v3d).all()
+                        or not np.isfinite(transl_np).all()):
+                    LOG.warning("Multi-HMR NaN/Inf at pid=%d, skipping", pid)
+                    continue
+                # Sanity clamp on extreme vertex magnitudes (humans are
+                # ~2 m ; vertices outside [-5, 5] m are model glitches).
+                if float(np.abs(v3d).max()) > 5.0:
+                    LOG.warning(
+                        "Multi-HMR v3d extreme |max|=%.1f at pid=%d, skipping",
+                        float(np.abs(v3d).max()), pid,
+                    )
+                    continue
+
                 pid_c = pid % self.num_persons
                 shape_n = min(10, len(shape_raw))
                 expr_n = min(10, len(expr_raw))
