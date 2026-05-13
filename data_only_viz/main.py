@@ -257,6 +257,9 @@ class AppDelegate(NSObject):
                         self._state, num_persons=4,
                         target_fps=10.0,
                         device=getattr(self._opts, "pose_device", "mps"),
+                        det_thresh=getattr(self._opts, "det_thresh", 0.15),
+                        nms_kernel_size=getattr(
+                            self._opts, "nms_kernel_size", 5),
                         camera_index=getattr(self._opts, "camera_index", -1))
                     self._pose_worker.start()
                     self._smplx_tcp = SMPLXTCPSender(self._state)
@@ -503,6 +506,12 @@ def main() -> int:
     p.add_argument("--pose-device", default="mps",
                    choices=("cpu", "mps", "cuda:0"),
                    help="Device YOLO inference (default mps)")
+    p.add_argument("--det-thresh", dest="det_thresh", type=float,
+                   default=0.15,
+                   help="Multi-HMR detection threshold (default 0.15)")
+    p.add_argument("--nms-kernel-size", dest="nms_kernel_size", type=int,
+                   default=5,
+                   help="Multi-HMR NMS kernel (odd, >=3; default 5)")
     p.add_argument("--detrpose-model-size",
                    choices=["n", "s", "l"],
                    default="n",

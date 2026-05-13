@@ -22,8 +22,24 @@ except ImportError:
 class _Track:
     track_id: int
     bbox: tuple[float, float, float, float]   # xmin, ymin, xmax, ymax (normalises)
+    velocity: tuple[float, float] = (0.0, 0.0)   # center vx/vy par frame
     miss_count: int = 0
     last_seen: int = 0
+
+    def predicted_bbox(self) -> tuple[float, float, float, float]:
+        """Extrapole la bbox `miss_count+1` frames apres last_seen via
+        modele a vitesse constante. Permet de matcher contre une cible
+        en mouvement meme si Multi-HMR a saute des frames."""
+        if self.velocity == (0.0, 0.0) or self.miss_count == 0:
+            return self.bbox
+        # Cap a 5 frames d'extrapolation : au-dela on suppose que la
+        # personne s'est arretee plutot que de la projeter a l'infini.
+        steps = float(min(self.miss_count, 5))
+        cx = (self.bbox[0] + self.bbox[2]) * 0.5 + self.velocity[0] * steps
+        cy = (self.bbox[1] + self.bbox[3]) * 0.5 + self.velocity[1] * steps
+        hw = (self.bbox[2] - self.bbox[0]) * 0.5
+        hh = (self.bbox[3] - self.bbox[1]) * 0.5
+        return (cx - hw, cy - hh, cx + hw, cy + hh)
 
 
 def _bbox_from_kps(kps) -> tuple[float, float, float, float]:
@@ -57,10 +73,15 @@ def _center_dist(a: tuple, b: tuple) -> float:
 class IoUTracker:
     """Tracker multi-personne avec assignation Hungarian et survie limitee."""
 
-    def __init__(self, iou_threshold: float = 0.25,
-                 max_miss: int = 8) -> None:
+    def __init__(self, iou_threshold: float = 0.15,
+                 max_miss: int = 30,
+                 velocity_ema: float = 0.5) -> None:
         self.iou_threshold = iou_threshold
         self.max_miss = max_miss
+        # EMA pour la vitesse : nouvelle vitesse = (1-alpha)*ancienne +
+        # alpha*observee. Alpha eleve = adaptation rapide aux changements
+        # de direction, basse = lisse mais lag.
+        self.velocity_ema = velocity_ema
         self._tracks: list[_Track] = []
         self._next_id = 0
         self._frame_idx = 0
@@ -96,12 +117,16 @@ class IoUTracker:
                 self._next_id += 1
             return ids
 
-        # Cost matrix : 1 - IoU + 0.5 * center_dist (pour briser les egalites)
+        # Cost matrix : 1 - IoU + 0.5 * center_dist. On matche contre
+        # la bbox PREDITE (constant-velocity) plutot que la derniere
+        # vue, ce qui permet de retrouver une personne en mouvement
+        # apres un trou de detection de quelques frames.
         cost = [[1.0] * n_trk for _ in range(n_det)]
+        predicted = [t.predicted_bbox() for t in self._tracks]
         for i, db in enumerate(det_bboxes):
-            for j, t in enumerate(self._tracks):
-                iou = _iou(db, t.bbox)
-                cd = _center_dist(db, t.bbox)
+            for j, pb in enumerate(predicted):
+                iou = _iou(db, pb)
+                cd = _center_dist(db, pb)
                 cost[i][j] = (1.0 - iou) + 0.5 * cd
 
         # Hungarian (scipy) ou greedy fallback
@@ -119,15 +144,30 @@ class IoUTracker:
 
         used_dets: set[int] = set()
         used_trks: set[int] = set()
+        alpha_v = self.velocity_ema
         for i, j in pairs:
-            # rejette si IoU < seuil
-            iou_ij = _iou(det_bboxes[i], self._tracks[j].bbox)
+            t = self._tracks[j]
+            # Evalue IoU contre la bbox PREDITE pour le seuil de
+            # rejet (coherent avec la cost matrix).
+            iou_ij = _iou(det_bboxes[i], t.predicted_bbox())
             if iou_ij < self.iou_threshold:
                 continue
-            self._tracks[j].bbox = det_bboxes[i]
-            self._tracks[j].miss_count = 0
-            self._tracks[j].last_seen = self._frame_idx
-            ids[i] = self._tracks[j].track_id
+            # Update velocite (EMA) avant d'ecraser la bbox.
+            steps = float(max(1, t.miss_count + 1))
+            old_cx = (t.bbox[0] + t.bbox[2]) * 0.5
+            old_cy = (t.bbox[1] + t.bbox[3]) * 0.5
+            new_cx = (det_bboxes[i][0] + det_bboxes[i][2]) * 0.5
+            new_cy = (det_bboxes[i][1] + det_bboxes[i][3]) * 0.5
+            vx_new = (new_cx - old_cx) / steps
+            vy_new = (new_cy - old_cy) / steps
+            t.velocity = (
+                (1.0 - alpha_v) * t.velocity[0] + alpha_v * vx_new,
+                (1.0 - alpha_v) * t.velocity[1] + alpha_v * vy_new,
+            )
+            t.bbox = det_bboxes[i]
+            t.miss_count = 0
+            t.last_seen = self._frame_idx
+            ids[i] = t.track_id
             used_dets.add(i); used_trks.add(j)
 
         # Nouvelles detections non matchees -> nouveaux tracks

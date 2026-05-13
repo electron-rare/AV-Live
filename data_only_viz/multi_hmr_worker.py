@@ -39,12 +39,14 @@ class MultiHMRWorker:
     def __init__(self, state: State, num_persons: int = 4,
                  target_fps: float = 10.0, device: str = "mps",
                  det_thresh: float = 0.3,
+                 nms_kernel_size: int = 5,
                  camera_index: int = -1) -> None:
         self.state = state
         self.num_persons = num_persons
         self.period = 1.0 / max(1.0, target_fps)
         self.device = device
         self.det_thresh = det_thresh
+        self.nms_kernel_size = nms_kernel_size
         # -1 = auto-select Mac BuiltInWideAngleCamera (cf _camera_select)
         self.camera_index = camera_index
         self._stop = threading.Event()
@@ -57,7 +59,10 @@ class MultiHMRWorker:
             [OneEuroFilter(1.0, 0.08) for _ in range(10)]
             for _ in range(num_persons)
         ]
-        self._tracker = IoUTracker(iou_threshold=0.20, max_miss=8)
+        # iou_threshold bas + max_miss eleve + prediction velocity
+        # (cf tracker.py) pour resister aux occlusions et au mouvement
+        # rapide. Multi-HMR a 3 fps -> 30 frames = 10s de survie.
+        self._tracker = IoUTracker(iou_threshold=0.15, max_miss=30)
 
     @staticmethod
     def is_available() -> bool:
@@ -181,7 +186,7 @@ class MultiHMRWorker:
                     humans = model(
                         tensor,
                         is_training=False,
-                        nms_kernel_size=1,
+                        nms_kernel_size=self.nms_kernel_size,
                         det_thresh=self.det_thresh,
                         K=K,
                     )
@@ -213,10 +218,64 @@ class MultiHMRWorker:
                 time.sleep(self.period)
                 continue
 
+            # Dedup intra-frame : Multi-HMR peut retourner plusieurs
+            # detections pour la meme personne. On combine bbox 2D IoU
+            # ET distance pelvis 3D : drop ssi IoU > 0.4 ET dist < 30 cm.
+            # Comme ca deux personnes qui se chevauchent en 2D (une
+            # devant l'autre) restent distinctes grace au z.
+            cand: list[tuple[
+                float, float, float, float, float,
+                np.ndarray, int]] = []
+            for i, h in enumerate(humans):
+                v = h["v3d"].detach().cpu().numpy()
+                xmin = float(v[:, 0].min())
+                ymin = float(v[:, 1].min())
+                xmax = float(v[:, 0].max())
+                ymax = float(v[:, 1].max())
+                sc_raw = h.get("scores", 1.0)
+                score = float(sc_raw.item()) if hasattr(
+                    sc_raw, "item") else float(sc_raw)
+                transl = h.get("transl_pelvis", h.get("transl"))
+                pelv = transl.detach().cpu().numpy().flatten()[:3]
+                cand.append((score, xmin, ymin, xmax, ymax, pelv, i))
+            cand.sort(key=lambda c: -c[0])
+            keep_idx: list[int] = []
+            kept: list[tuple[
+                float, float, float, float, np.ndarray]] = []
+            for sc, x0, y0, x1, y1, pelv, src_i in cand:
+                a_area = max(0.0, x1 - x0) * max(0.0, y1 - y0)
+                drop = False
+                for (kx0, ky0, kx1, ky1, kpelv) in kept:
+                    ix0 = max(x0, kx0); iy0 = max(y0, ky0)
+                    ix1 = min(x1, kx1); iy1 = min(y1, ky1)
+                    iw = max(0.0, ix1 - ix0); ih = max(0.0, iy1 - iy0)
+                    inter = iw * ih
+                    if a_area <= 0 or inter <= 0:
+                        continue
+                    k_area = (kx1 - kx0) * (ky1 - ky0)
+                    iou = inter / (a_area + k_area - inter + 1e-9)
+                    pelv_d = float(np.linalg.norm(pelv - kpelv))
+                    # Drop seulement si TRES proches en 3D ET grand
+                    # overlap 2D. Seuils volontairement conservateurs
+                    # pour ne pas fusionner deux personnes serrees.
+                    if iou > 0.55 and pelv_d < 0.20:
+                        drop = True
+                        break
+                if not drop:
+                    keep_idx.append(src_i)
+                    kept.append((x0, y0, x1, y1, pelv))
+                    if len(keep_idx) >= self.num_persons:
+                        break
+            n_raw = len(humans)
+            humans = [humans[i] for i in keep_idx]
+            n_keep = len(humans)
+            if n_raw != n_keep:
+                LOG.debug("dedup: %d -> %d (raw det_thresh=%.2f)",
+                          n_raw, n_keep, self.det_thresh)
+
             # Tracking via bbox approximee depuis verts projetes (xy)
             bboxes = []
-            n_keep = min(len(humans), self.num_persons)
-            for h in humans[:n_keep]:
+            for h in humans:
                 v = h["v3d"].detach().cpu().numpy()  # (10475, 3)
                 xmin, ymin = float(v[:, 0].min()), float(v[:, 1].min())
                 xmax, ymax = float(v[:, 0].max()), float(v[:, 1].max())
