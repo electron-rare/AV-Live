@@ -70,7 +70,78 @@ plus rapide par crop. Net escompté : 30 ms YOLO + 64 ms SMPLer-X-S ≈
 | Mauvaise inférence due à preprocessing différent (mean/std/crop algo) | medium | high | reproduire exactement `transforms.py` du repo ; Step 4 valide |
 | Le claim 64 ms est mesuré sur quelle MPS PyTorch version ? | medium | medium | Step 5 bench réel ; si > 100 ms, recheck si claim hors-detecteur |
 
-## Tasks
+## T1 Execution result (2026-05-13) — UPDATE after user "fais le"
+
+Première lecture : 86 imports `from mmcv*`, 20+ symboles. Tentative
+de shim approfondie post-"fais le" :
+
+| Shim niveau | Status | Trouvé manquant ensuite |
+|---|---|---|
+| `mmcv.Config` ← mmengine | ✅ shim OK | deprecated_api_warning |
+| `mmcv.deprecated_api_warning` no-op | ✅ shim OK | mmcv.cnn.constant_init etc |
+| `mmcv.cnn.{init_funcs, Linear, Conv2d, MODELS, build_model_from_cfg}` | ✅ shim OK | mmcv.cnn.bricks.registry |
+| `mmcv.cnn.bricks.registry` (12 sub-reg) | ✅ shim OK | **mmcv.runner** |
+| `mmcv.runner` (50+ classes : BaseModule, hooks, ...) | ❌ STOP | (cascade continue) |
+
+`mmcv.runner` était un module entier ; mmcv 2.x l'a migré dans
+`mmengine.runner` avec une API différente. Le shim demanderait de
+recréer 50+ classes ou rediriger l'import via `sys.modules`. Ça
+exposerait la couche suivante (probablement `mmcv.parallel`, puis
+`mmcv.utils`, puis encore plus profond).
+
+**Reality check** : on est en train de refaire la migration mmcv
+1.x → 2.x complète à la main. C'est ~1-2 semaines de travail
+engineering proprement budgétisé, pas "5-6 h".
+
+**Abandon final T1**. Le shim partiel
+`data_only_viz/_smplerx_shims.py` reste committé comme socle
+si reprise future.
+
+## Original T1 Gate Fail summary
+
+ Comptage des `from mmcv*` imports uniques dans
+`third_party/SMPLer-X/main/transformer_utils/mmpose/` = **86
+distincts**, avec **20+ symboles** spécifiques à shim (Config, Timer,
+deprecated_api_warning, is_seq_of, 17 symboles de mmcv.cnn :
+constant_init, normal_init, kaiming_init, build_norm_layer, ConvModule,
+DepthwiseSeparableConvModule, etc).
+
+Le SMPLer-X vendored mmpose est écrit pour **mmcv-full 1.x** ;
+mmcv-lite 2.x a migré presque toute l'API vers `mmengine` (constant_init
+etc. sont dans `mmengine.model`). Shims partiels validés :
+- `mmcv.Config = mmengine.config.Config` ✅ fonctionne
+- `mmcv.deprecated_api_warning = no_op` ✅ fonctionne
+- Mais 18+ autres symboles à shim avant `from mmpose.models import
+  build_posenet` aboutisse, et c'est sans compter les patches que la
+  vendored mmpose elle-même fait sur d'autres signatures internes.
+
+**Abandon criterion** du plan : « si 3+ patches mmpose nécessaires →
+abandon, escalade vers chirurgie backbone custom timm (multi-jour) ».
+Déclenchée : 20+ patches > 3.
+
+**Vraie estimation révisée** : 2-4 jours focused work pour porter
+proprement (soit en shim massif au load, soit en éditant la vendored
+mmpose dans le fork pour utiliser mmengine 2.x).
+
+## Recommandation post-T1
+
+1. **Garder Multi-HMR ViT-S actuel** : 3.4 fps natif + motion gate
+   (~95% économie compute scène statique) + interp 30 fps + tracker
+   velocity + dédup 2D+3D. État acceptable produit-ready pour usage
+   non-commercial AV-Live.
+2. **Si plus de speedup nécessaire** : reprendre le plan CoreML/ANE
+   surgery (probe v2 a localisé un blocker mais c'est borné, ~2-3 j).
+3. **Si SMPLer-X reste absolument l'objectif** : prévoir 3-4 jours
+   dédiés et soit (a) refactor la vendored mmpose vers mmengine 2.x,
+   soit (b) extraire et ré-implémenter le backbone ViT + 6 heads
+   (PositionNet/RotationNet/BoxNet/HandRoI/HandRotation/FaceRegressor)
+   en pur PyTorch.
+
+Le fork `electron-rare/SMPLer-X` + submodule `third_party/SMPLer-X`
+restent en place dans le repo. Reprise facile quand le temps sera
+budgété.
+
+## Tasks (planifié — non exécuté après gate fail T1)
 
 ### Task 1 — Verify dependency story (½ h)
 
