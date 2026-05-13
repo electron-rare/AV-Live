@@ -113,3 +113,35 @@ class PoseSoundBridge:
             cli.send_message("/pose/limb_span", [pid, float(span)])
             try: self._avbody.send_message("/pose/limb_span", [pid, float(span)])
             except OSError: pass
+
+    def send_action(self, pid: int, label_idx: int,
+                    probs, t_now: float, force: bool = False) -> None:
+        """Send action classification result via /pose/action OSC route.
+
+        Sends: [pid (int), label_idx (int), prob_0 (float), prob_1 (float), prob_2 (float)]
+        """
+        if not force and (t_now - self._last_t) < self._period:
+            return
+        p = [float(probs[0]), float(probs[1]), float(probs[2])]
+        self._client.send_message("/pose/action", [int(pid), int(label_idx), *p])
+
+    def send_kin(self, pid: int, kin,
+                 t_now: float, force: bool = False) -> None:
+        """Send kinematic angles via /pose/kin OSC route.
+
+        Sends: [pid (int), kin_0 (float), kin_1 (float), kin_2 (float)]
+        """
+        if not force and (t_now - self._last_t) < self._period:
+            return
+        self._client.send_message(
+            "/pose/kin",
+            [int(pid), float(kin[0]), float(kin[1]), float(kin[2])],
+        )
+
+    def send_enter(self, pid: int) -> None:
+        """Send lifecycle event when person enters frame."""
+        self._client.send_message("/pose/enter", [int(pid)])
+
+    def send_leave(self, pid: int) -> None:
+        """Send lifecycle event when person leaves frame."""
+        self._client.send_message("/pose/leave", [int(pid)])
