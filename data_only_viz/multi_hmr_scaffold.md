@@ -1,5 +1,9 @@
 # Multi-HMR + RealityKit — pipeline temps réel multi-personne
 
+> **IMPLÉMENTÉ 2026-05-13** — voir `MULTIHMR_README.md` pour l'utilisation.
+> Le pipeline complet (Multi-HMR worker + SMPL-X decoder + TCP sender +
+> Swift RealityKit app) est en place. Ce document garde l'analyse initiale.
+
 **Pipeline cible** (post-Apple Vision, post-SMPLer-X) :
 
 ```
