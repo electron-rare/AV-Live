@@ -40,6 +40,10 @@ Routine({
     (~base ++ "control/data_feeds.scd").load;
     1.0.wait;
 
+    "[boot.data-only] loading web_bridge OSCdef + sync push...".postln;
+    (~base ++ "control/web_bridge.scd").load;
+    0.5.wait;
+
     "[boot.data-only] loading data-only program...".postln;
     (~base ++ "live/data_only_program.scd").load;
     1.5.wait;
