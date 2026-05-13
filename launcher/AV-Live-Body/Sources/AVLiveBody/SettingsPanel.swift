@@ -57,6 +57,9 @@ struct SettingsPanel: View {
             layerRow(icon: "video.fill",
                      label: "Webcam",
                      isOn: $settings.showCamera)
+            layerRow(icon: "sparkles",
+                     label: "Scene Metal (\(settings.vizModeName))",
+                     isOn: $settings.showScene)
             layerRow(icon: "person.fill",
                      label: "Maillage SMPL-X",
                      isOn: $settings.showMesh)
@@ -66,6 +69,22 @@ struct SettingsPanel: View {
             layerRow(icon: "figure.stand",
                      label: "Squelette (à venir)",
                      isOn: $settings.showSkeleton)
+            // Picker viz mode 0..9
+            HStack(spacing: 4) {
+                ForEach(0..<10) { i in
+                    Button(action: { settings.vizMode = i }) {
+                        Text(String(i))
+                            .font(.caption2.monospacedDigit())
+                            .frame(width: 22, height: 22)
+                            .background(
+                                Circle().fill(settings.vizMode == i
+                                              ? Color.pink
+                                              : Color.white.opacity(0.1)))
+                            .foregroundColor(.white)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
         }
     }
 

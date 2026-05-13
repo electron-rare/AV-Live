@@ -10,6 +10,7 @@ let package = Package(
             path: "Sources/AVLiveBody",
             resources: [
                 .copy("Resources/smplx_faces.bin"),
+                .copy("Resources/scene.metal"),
             ],
             swiftSettings: [
                 .swiftLanguageMode(.v5),

@@ -13,6 +13,15 @@ final class RenderSettings: ObservableObject {
     // Background
     @Published var bgBrightness: Double = 0.08
 
+    // Metal scene background (10 viz modes : storm/tunnel/.../openpos)
+    @Published var showScene: Bool = true
+    @Published var vizMode: Int = 0   // 0..9
+    var vizModeName: String {
+        let names = ["storm", "tunnel", "plasma", "kaleido", "voronoi",
+                     "metaballs", "starfield", "bars", "hands3d", "openpos"]
+        return names.indices.contains(vizMode) ? names[vizMode] : "?"
+    }
+
     // Mesh visibility / style
     @Published var showMesh: Bool = true
     @Published var showWireframe: Bool = false

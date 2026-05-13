@@ -27,11 +27,15 @@ extension Notification.Name {
 struct ContentView: View {
     @StateObject private var renderer = MeshRenderer()
     @StateObject private var settings = RenderSettings()
+    @StateObject private var poseListener = PoseOSCListener()
 
     var body: some View {
         ZStack(alignment: .topTrailing) {
             BodyView(renderer: renderer, settings: settings)
-                .onAppear { renderer.startOSCServer() }
+                .onAppear {
+                    renderer.startOSCServer()
+                    poseListener.start()
+                }
                 .onReceive(NotificationCenter.default.publisher(
                     for: .toggleSettings)) { _ in
                     settings.showPanel.toggle()
