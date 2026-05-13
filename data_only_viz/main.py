@@ -228,6 +228,25 @@ class AppDelegate(NSObject):
         # 4. Fallback Holistic (single-person, plus rapide mais 1 sujet seul)
         # 5. Fallback YOLO COCO 17 keypoints
         import os as _os
+        # 0. Multi-HMR (SMPL-X 10475 verts mesh dense) — opt-in via flag
+        if getattr(self._opts, "multi_hmr", False):
+            try:
+                from .multi_hmr_worker import MultiHMRWorker
+                from .smplx_osc_sender import SMPLXTCPSender
+                if MultiHMRWorker.is_available():
+                    self._pose_worker = MultiHMRWorker(
+                        self._state, num_persons=4,
+                        target_fps=10.0,
+                        device=getattr(self._opts, "pose_device", "mps"))
+                    self._pose_worker.start()
+                    self._smplx_tcp = SMPLXTCPSender(self._state)
+                    self._smplx_tcp.start()
+                    LOG.info("worker: Multi-HMR + SMPL-X (mesh dense)")
+                    return
+                LOG.info("Multi-HMR indisponible (checkpoints manquants) "
+                         "— voir scripts/setup_multihmr.sh")
+            except Exception as e:  # noqa: BLE001
+                LOG.warning("Multi-HMR failed (%s) — fallback", e)
         # Apple Vision body pose : v2 utilise cv2 + Vision via JPEG, plus
         # de delegate AVCaptureSession (crash dispatch_queue ctypes evite).
         # Active par defaut. Set AV_LIVE_APPLE_VISION=0 pour fallback MP.
@@ -454,6 +473,9 @@ def main() -> int:
     p.add_argument("--fullscreen", action="store_true")
     p.add_argument("--pose", action="store_true",
                    help="Active la captation pose YOLO (cv2 + ultralytics)")
+    p.add_argument("--multi-hmr", dest="multi_hmr", action="store_true",
+                   help="Active Multi-HMR worker pour mesh SMPL-X dense "
+                        "(necessite setup_multihmr.sh + SMPLX_NEUTRAL.npz)")
     p.add_argument("--pose-device", default="mps",
                    choices=("cpu", "mps", "cuda:0"),
                    help="Device YOLO inference (default mps)")
