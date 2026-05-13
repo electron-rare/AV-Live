@@ -20,45 +20,14 @@ final class PoseOSCListener: ObservableObject {
         var shoSpan: Float = 0
         var torsoYaw: Float = 0
         var bodyPitch: Float = 0
-        var seenAt: TimeInterval = 0
-    }
-
-    /// 68-point dlib-style facial landmarks (x,y normalises 0..1).
-    /// Slot mapping comes from FACE_68_FROM_MP cote Python.
-    struct FaceFrame: Equatable {
-        var points: [SIMD2<Float>] = Array(repeating: .zero, count: 68)
-        var hasPoint: [Bool] = Array(repeating: false, count: 68)
-        var seenAt: TimeInterval = 0
-    }
-
-    /// 21 MediaPipe hand landmarks per detected hand.
-    struct HandFrame: Equatable {
-        var side: Int = 0  // 0 = left, 1 = right
-        var points: [SIMD2<Float>] = Array(repeating: .zero, count: 21)
-        var hasPoint: [Bool] = Array(repeating: false, count: 21)
-        var seenAt: TimeInterval = 0
-    }
-
-    /// MediaPipe pose_world_landmarks : 33 keypoints in meters, relative
-    /// to the hip-center. Conventions on the wire (MediaPipe):
-    /// x = right, y = down, z = forward (away from camera).
-    struct Pose3DFrame: Equatable {
-        var pid: Int = -1
-        // SIMD4 = (x, y, z, confidence). All zeros = slot not yet filled.
-        var kps: [SIMD4<Float>] = Array(repeating: .zero, count: 33)
-        var hasPoint: [Bool] = Array(repeating: false, count: 33)
+        /// 33 MediaPipe BODY keypoints flat (x, y, confidence).
+        /// Empty si pas encore recu /pose/skel.
+        var skeleton: [SIMD3<Float>] = []
         var seenAt: TimeInterval = 0
     }
 
     @Published var persons: [Int: PoseFrame] = [:]
-    @Published var faces: [Int: FaceFrame] = [:]
-    @Published var hands: [Int: HandFrame] = [:]
-    @Published var body3d: [Int: Pose3DFrame] = [:]
     @Published var count: Int = 0
-    @Published var faceCount: Int = 0
-    @Published var body3dCount: Int = 0
-    @Published var handCountLeft: Int = 0
-    @Published var handCountRight: Int = 0
 
     private var listener: NWListener?
 
@@ -161,69 +130,24 @@ final class PoseOSCListener: ObservableObject {
             var p = persons[Int(pid)] ?? PoseFrame()
             p.bodyPitch = v
             persons[Int(pid)] = p
-        case "/face/count":
-            if let n = args.first as? Int32 { faceCount = Int(n) }
-            if faceCount == 0 { faces.removeAll(keepingCapacity: true) }
-        case "/face/kp":
-            guard args.count >= 6,
-                  let pid = args[0] as? Int32,
-                  let slot = args[1] as? Int32,
-                  let x = args[2] as? Float,
-                  let y = args[3] as? Float else { return }
-            let slotI = Int(slot)
-            guard slotI >= 0 && slotI < 68 else { return }
-            var f = faces[Int(pid)] ?? FaceFrame()
-            f.points[slotI] = SIMD2(x, y)
-            f.hasPoint[slotI] = true
-            f.seenAt = CFAbsoluteTimeGetCurrent()
-            faces[Int(pid)] = f
-        case "/hand/count":
-            if args.count >= 2,
-               let l = args[0] as? Int32, let r = args[1] as? Int32 {
-                handCountLeft = Int(l)
-                handCountRight = Int(r)
-                if handCountLeft + handCountRight == 0 {
-                    hands.removeAll(keepingCapacity: true)
+        case "/pose/skel":
+            // [pid] + flat 33 * (x, y, conf)
+            guard args.count >= 1,
+                  let pid = args[0] as? Int32 else { return }
+            var skel: [SIMD3<Float>] = []
+            var i = 1
+            while i + 2 < args.count {
+                if let x = args[i] as? Float,
+                   let y = args[i + 1] as? Float,
+                   let c = args[i + 2] as? Float {
+                    skel.append(SIMD3(x, y, c))
                 }
+                i += 3
             }
-        case "/pose3d/count":
-            if let n = args.first as? Int32 {
-                body3dCount = Int(n)
-                if body3dCount == 0 {
-                    body3d.removeAll(keepingCapacity: true)
-                }
-            }
-        case "/pose3d/kp":
-            guard args.count >= 6,
-                  let pid = args[0] as? Int32,
-                  let idx = args[1] as? Int32,
-                  let x = args[2] as? Float,
-                  let y = args[3] as? Float,
-                  let z = args[4] as? Float,
-                  let c = args[5] as? Float else { return }
-            let i = Int(idx)
-            guard i >= 0 && i < 33 else { return }
-            var p = body3d[Int(pid)] ?? Pose3DFrame(pid: Int(pid))
-            p.pid = Int(pid)
-            p.kps[i] = SIMD4<Float>(x, y, z, c)
-            p.hasPoint[i] = true
+            var p = persons[Int(pid)] ?? PoseFrame()
+            p.skeleton = skel
             p.seenAt = CFAbsoluteTimeGetCurrent()
-            body3d[Int(pid)] = p
-        case "/hand/kp":
-            guard args.count >= 7,
-                  let pid = args[0] as? Int32,
-                  let side = args[1] as? Int32,
-                  let idx = args[2] as? Int32,
-                  let x = args[3] as? Float,
-                  let y = args[4] as? Float else { return }
-            let i = Int(idx)
-            guard i >= 0 && i < 21 else { return }
-            var h = hands[Int(pid)] ?? HandFrame()
-            h.side = Int(side)
-            h.points[i] = SIMD2(x, y)
-            h.hasPoint[i] = true
-            h.seenAt = CFAbsoluteTimeGetCurrent()
-            hands[Int(pid)] = h
+            persons[Int(pid)] = p
         default:
             break
         }
@@ -231,12 +155,6 @@ final class PoseOSCListener: ObservableObject {
         let now = CFAbsoluteTimeGetCurrent()
         persons = persons.filter { $0.value.seenAt == 0
                                    || now - $0.value.seenAt < 2.0 }
-        faces = faces.filter { $0.value.seenAt == 0
-                               || now - $0.value.seenAt < 2.0 }
-        hands = hands.filter { $0.value.seenAt == 0
-                               || now - $0.value.seenAt < 2.0 }
-        body3d = body3d.filter { $0.value.seenAt == 0
-                                 || now - $0.value.seenAt < 2.0 }
     }
 
     // MARK: - Minimal OSC parser
