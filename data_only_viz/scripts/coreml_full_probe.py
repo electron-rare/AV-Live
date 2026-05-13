@@ -44,6 +44,49 @@ def apply_topk(K, _scores):
 
 
 # === Patch coremltools _cast (validated probe v4) ===
+# Patch _auto_val pour coercer values 1-d size-1 -> 0-d
+def _install_auto_val_patch():
+    from coremltools.converters.mil.mil import operation as _opmod
+    from coremltools.converters.mil.mil.operation import mil_list
+
+    _orig_auto_val = _opmod.Operation._auto_val
+
+    def _patched_auto_val(self, output_types):
+        try:
+            return _orig_auto_val(self, output_types)
+        except ValueError as e:
+            if "zero-rank" not in str(e):
+                raise
+            # Retry avec coercion 1-d size-1 -> 0-d
+            try:
+                vals = self.value_inference()
+            except NotImplementedError:
+                return tuple(None for _ in output_types)
+            if not isinstance(vals, (tuple, list)):
+                vals = (vals,)
+            for val in vals:
+                if val is None:
+                    return tuple(None for _ in output_types)
+            auto = []
+            for t, v in zip(output_types, vals):
+                bv = t()
+                if isinstance(v, mil_list):
+                    bv.val = v.ls
+                else:
+                    if isinstance(v, np.ndarray) and v.ndim > 0 and v.size == 1:
+                        # Coerce 1-d size-1 -> 0-d ndarray (val setter
+                        # accepte np.generic ou ndarray ndim==0).
+                        v = np.asarray(v.reshape(()))
+                    elif isinstance(v, (int, float)) and not isinstance(
+                            v, (np.generic,)):
+                        v = np.asarray(v)
+                    bv.val = v
+                auto.append(bv)
+            return auto
+
+    _opmod.Operation._auto_val = _patched_auto_val
+
+
 def _patched_cast(context, node, dtype, dtype_str):
     from coremltools.converters.mil import Builder as mb
     from coremltools.converters.mil.frontend.torch import ops as _ops
@@ -212,6 +255,7 @@ print("==> coremltools.convert")
 import coremltools as ct
 from coremltools.converters.mil.frontend.torch import ops as _ops
 _ops._cast = _patched_cast
+_install_auto_val_patch()
 
 try:
     mlmodel = ct.convert(
