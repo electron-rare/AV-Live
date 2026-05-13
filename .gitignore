@@ -28,6 +28,12 @@ oscope-of/Project.xcconfig
 sound_algo/synthdefs/*.scsyndef
 sound_algo/*.log
 
+# ML model weights downloaded at runtime
+*.pt
+
+# Claude MCP artifacts
+.playwright-mcp/
+
 # Editors
 .idea/
 .vscode/
