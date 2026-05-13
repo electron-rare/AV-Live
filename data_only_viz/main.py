@@ -74,6 +74,18 @@ class AppDelegate(NSObject):
 
     def applicationDidFinishLaunching_(self, notification):  # noqa: N802
         LOG.info("applicationDidFinishLaunching: start")
+        # Mode headless : --multi-hmr cede l'affichage a AV-Live-Body
+        # (Swift RealityKit). On garde seulement le worker pose + le
+        # sender TCP, donc pas de NSWindow / Metal renderer / HUD.
+        if getattr(self._opts, "multi_hmr", False):
+            LOG.info("multi-hmr mode: headless (no NSWindow)")
+            self._headless = True
+            self._listener.start()
+            self._start_pose_worker()
+            LOG.info("headless ready — OSC :%d, TCP sender :57130",
+                     self._opts.port)
+            return
+        self._headless = False
         # 1) Fenetre
         screen = NSScreen.mainScreen().frame()
         w, h = self._opts.width, self._opts.height
