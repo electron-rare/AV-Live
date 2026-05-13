@@ -9,6 +9,7 @@
 targets = [
     { host = "127.0.0.1", port = 57121 },  # SuperCollider (si lance)
     { host = "127.0.0.1", port = 57123 },  # openFrameworks
+    { host = "127.0.0.1", port = 57124 },  # Web dashboard data-only
 ]
 prefix = "/data"
 
@@ -16,7 +17,7 @@ prefix = "/data"
 [feeds.pose]
 # Active uniquement quand le pont tourne dans le bundle launcher (TCC OK).
 # En CLI le prompt webcam ne peut pas apparaitre -> camera silently refused.
-enabled  = false
+enabled  = true
 model       = "yolov8n-pose.pt"
 device      = "mps"
 camera      = 0
@@ -46,11 +47,11 @@ poll_seconds = 60
 # WARN : mainsfrequenz.de a ferme son WS public (NXDOMAIN 2026-05).
 # Garde a false jusqu'a trouver une source alternative (gridradar ?
 # swissgrid open data ?).
-enabled  = false
+enabled  = true
 ws_url   = "wss://www.mainsfrequenz.de/frequenz.socket"
 
 [feeds.rte_eco2mix]
-enabled  = false
+enabled  = true
 client_id     = ""
 client_secret = ""
 poll_seconds  = 900
@@ -76,11 +77,11 @@ ws_url   = "wss://jetstream2.us-east.bsky.network/subscribe?wantedCollections=ap
 sample_rate = 0.02
 
 [feeds.mempool]
-enabled  = false
+enabled  = true
 ws_url   = "wss://mempool.space/api/v1/ws"
 
 [feeds.github]
-enabled  = false
+enabled  = true
 url      = "https://api.github.com/events"
 poll_seconds = 30
 
