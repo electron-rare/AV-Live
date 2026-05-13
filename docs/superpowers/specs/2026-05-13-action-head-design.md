@@ -1,11 +1,17 @@
 # action-head — Classifier d'action temps réel au-dessus de Multi-HMR
 
 > **Date** : 2026-05-13
-> **Status** : design approuvé, prêt pour implementation plan
+> **Status** : design approuvé — **implémenté 2026-05-13 22:50**, 16/17 tasks, 39 tests verts. Task 16 (E2E gate) reste manuel (requiert capture + train réel).
 > **Authors** : L'Electron Rare + Claude
 > **Companion plans** :
 > - `2026-05-13-multihmr-coreml-hybrid-backbone.md`
 > - `2026-05-13-studio-train-deploy-m5.md`
+>
+> **Déviations notables vs design original** (cf. plan `2026-05-13-action-head.md` pour le détail) :
+> - **Wiring worker** : standalone publisher thread `data_only_viz/action_head_pub.py` + 3 lignes dans `multi.py`, au lieu de modifier directement `multi_hmr_worker.py` (qui était en cours d'évolution par l'utilisateur en parallèle). Backend Multi-HMR sélectionné par env `MULTIHMR_BACKEND=pytorch|coreml`, pas par flag CLI.
+> - **Source j3d** : approximée via 22 vertex anchors (`SMPLX_JOINT_ANCHOR_VERTS`) sur le mesh SMPL-X 10475-vert, partagés entre serve live (`action_head_pub.py`) et extraction offline (`scripts/extract_j3d_offline.py`) pour éviter le train/serve skew. Fallback MediaPipe 33→22 (`MEDIAPIPE_TO_22`) quand `persons_smplx` est vide. **Limitation** : ces 22 indices sont approximatifs ; pour des j3d SMPL-X corrects, brancher `J_regressor @ v3d` quand le module SMPL-X est dispo.
+> - **Extract offline** : pas de refactor de `MultiHMRWorker`, on utilise `MultiHMRCoreMLBackend.infer()` directement (commit user `9e7a9f8`).
+> - **Studio launch** : wrapper bash `data_only_viz/scripts/train_on_studio.sh` (Task 8.5) qui rsync + ssh + uv sync + train MPS + ckpt back. Validé end-to-end sur dataset smoke 160 windows × 3 epochs en ~4 s wallclock.
 
 ## TL;DR
 
@@ -94,7 +100,9 @@ class ActionHead:
     def forget(self, pid: int) -> None: ...
 ```
 
-Aucune modification de l'API publique de `multi_hmr_worker_coreml.py` autre que :
+**Note d'implémentation 2026-05-13** : la section ci-dessous décrit l'intention originale. L'implémentation réelle est dans `data_only_viz/action_head_pub.py` (publisher thread) — pas de modification de `multi_hmr_worker.py`. Voir l'en-tête du document pour les déviations.
+
+Aucune modification de l'API publique de `multi_hmr_worker.py` n'est requise au-delà de :
 - Construction d'une `ActionHead` au startup.
 - Appel `.step()` après chaque détection.
 - Appel `.forget()` synchronisé avec `tracker.purge()`.

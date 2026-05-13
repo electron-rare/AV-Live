@@ -1,12 +1,18 @@
 # action-head Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+>
+> **STATUS 2026-05-13 22:50** — Implementation **complete** (16/17 tasks, Task 16 is a manual gate). 39 tests green. Key deviations from this document, captured in the "Post-impl deviations" section below:
+> - Task 14 pivoted from "modify `multi_hmr_worker_coreml.py` + CLI flag" to **standalone publisher thread `data_only_viz/action_head_pub.py`** + 3-line wire-in in `multi.py` (avoids collision with the user's parallel iteration on `multi_hmr_worker.py`). The MultiHMR backend is selected via env var `MULTIHMR_BACKEND=pytorch|coreml`, not a CLI flag.
+> - Task 11 pivoted from "refactor `MultiHMRWorker` with `create_for_offline()`" to **standalone script using `MultiHMRCoreMLBackend.infer()` directly** — no worker refactor.
+> - j3d is approximated from SMPL-X v3d via a fixed 22-vertex anchor set (`SMPLX_JOINT_ANCHOR_VERTS`), with a MediaPipe 33→22 fallback. The same anchor set is shared between live serve (`action_head_pub.py`) and offline extract (`scripts/extract_j3d_offline.py`) to avoid train/serve skew.
+> - Studio train wrapper added as Task 8.5 (`data_only_viz/scripts/train_on_studio.sh`), validated end-to-end smoke 160 windows × 3 epochs MPS in ~4 s.
 
 **Goal:** Implement a real-time per-person action classifier (debout/assise/danse) on top of Multi-HMR `j3d`, with OSC output enriched by softmax probabilities and kinetics scalars (speed/accel/symmetry).
 
 **Architecture:** GRU-1-layer + MLP head streaming inference, fed by a 16-frame ring buffer per person. Trained windowed on Studio M3 Ultra (PyTorch MPS), inferred streaming on M5. Hybrid auto-labeler (rules on j3d) + manual review for dataset. Inference ≤ 2 ms/person M5 in eager PyTorch — no CoreML conversion needed.
 
-**Tech Stack:** Python 3.11 + uv, PyTorch (MPS for train, CPU for M5 inference), numpy, python-osc, pytest. Reuses existing `data_only_viz` infrastructure (`multi_hmr_worker_coreml.py`, `pose_bridge.py`, `tracker.py`, `state.py`).
+**Tech Stack:** Python 3.11 + uv, PyTorch (MPS for train, CPU for M5 inference), numpy, python-osc, pytest. Reuses existing `data_only_viz` infrastructure (`multi_hmr_worker.py`, `multihmr_coreml.py`, `pose_bridge.py`, `tracker.py`, `state.py`).
 
 **Reference spec:** `docs/superpowers/specs/2026-05-13-action-head-design.md`
 
@@ -1839,6 +1845,8 @@ git commit -m "feat(data-only-viz): action capture script"
 
 ## Task 11 — Extract j3d offline
 
+> **SUPERSEDED 2026-05-13.** The implemented script does NOT refactor `multi_hmr_worker.py`. Instead it uses the standalone `MultiHMRCoreMLBackend.infer()` from `data_only_viz/multihmr_coreml.py` directly. Output jsonl rows contain a (22, 3) `j3d` extracted via `SMPLX_JOINT_ANCHOR_VERTS` (shared with `action_head_pub.py` to avoid train/serve skew), not the raw v3d. See actual file at `data_only_viz/scripts/extract_j3d_offline.py`. The body below documents the original intent — keep as historical context.
+
 **Files:**
 - Create: `data_only_viz/scripts/extract_j3d_offline.py`
 
@@ -2195,6 +2203,8 @@ git commit -m "feat(data-only-viz): pose_bridge /pose/action + /pose/kin"
 ---
 
 ## Task 14 — Wire ActionHead into multi_hmr_worker_coreml
+
+> **SUPERSEDED 2026-05-13.** No `multi_hmr_worker_coreml.py` file exists in the current repo — the user pivoted to `multihmr_coreml.py` (standalone backend) selected via env `MULTIHMR_BACKEND=pytorch|coreml` inside `multi_hmr_worker.py`. To avoid colliding with that file under active iteration, ActionHead wiring was implemented as a standalone publisher thread in `data_only_viz/action_head_pub.py` plus a 3-line wire-in inside `data_only_viz/multi.py` (`__init__` instantiates and `.start()`s the publisher). The publisher polls `state.persons_smplx` (preferred) and `state.persons_body3d` (MediaPipe fallback) at 30 Hz, deduplicates by timestamp, extracts j3d22 via shared `SMPLX_JOINT_ANCHOR_VERTS` / `MEDIAPIPE_TO_22` index maps, runs `ActionHead.step()` per pid, and emits OSC via the existing `PoseSoundBridge`. No CLI flag was added. See `data_only_viz/action_head_pub.py` and `data_only_viz/multi.py:22,97-98`. The body below documents the original intent — keep as historical context.
 
 **Files:**
 - Modify: `data_only_viz/multi_hmr_worker_coreml.py`
