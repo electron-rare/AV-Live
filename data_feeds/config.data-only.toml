@@ -84,6 +84,40 @@ enabled  = false
 url      = "https://api.github.com/events"
 poll_seconds = 30
 
+# -- Meteo locale (Open-Meteo, sans cle) ----------------------------------
+[feeds.openmeteo]
+enabled  = true
+lat      = 48.8566    # Paris par defaut
+lon      = 2.3522
+poll_seconds = 600
+
+# -- Qualite de l'air (OpenAQ v3, sans cle) -------------------------------
+[feeds.openaq]
+enabled  = true
+lat      = 48.8566
+lon      = 2.3522
+radius_m = 25000
+poll_seconds = 900
+
+# -- Station spatiale (ISS / wheretheiss.at) ------------------------------
+[feeds.iss]
+enabled  = true
+lat      = 48.8566
+lon      = 2.3522
+pass_radius_km = 1500
+poll_seconds = 5
+
+# -- Volcans actifs (Smithsonian GVP 7-jours JSON) ------------------------
+[feeds.volcano]
+enabled  = true
+url      = "https://volcano.si.edu/feeds/eruptions7days.json"
+poll_seconds = 3600
+
+# -- Pouls social (Reddit hot + HackerNews top) ---------------------------
+[feeds.social_buzz]
+enabled  = true
+poll_seconds = 60
+
 [feeds.gcn]
 enabled  = false
 client_id     = ""
