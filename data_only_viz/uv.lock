@@ -87,6 +87,12 @@ detrpose = [
     { name = "transformers" },
     { name = "xtcocotools" },
 ]
+nlf = [
+    { name = "numpy" },
+    { name = "opencv-python" },
+    { name = "torch" },
+    { name = "torchvision" },
+]
 pose = [
     { name = "coremltools" },
     { name = "mediapipe" },
@@ -101,8 +107,10 @@ requires-dist = [
     { name = "iopath", marker = "extra == 'detrpose'", specifier = ">=0.1.10" },
     { name = "mediapipe", marker = "extra == 'pose'", specifier = ">=0.10.35" },
     { name = "numpy", specifier = ">=1.26,<2" },
+    { name = "numpy", marker = "extra == 'nlf'", specifier = ">=1.26" },
     { name = "omegaconf", marker = "extra == 'detrpose'", specifier = ">=2.3" },
     { name = "opencv-python", marker = "extra == 'detrpose'", specifier = ">=4.10" },
+    { name = "opencv-python", marker = "extra == 'nlf'", specifier = ">=4.10" },
     { name = "opencv-python", marker = "extra == 'pose'", specifier = ">=4.10" },
     { name = "pycocotools", marker = "extra == 'detrpose'", specifier = ">=2.0" },
     { name = "pyobjc-core", specifier = ">=10.3" },
@@ -115,12 +123,14 @@ requires-dist = [
     { name = "scipy", specifier = ">=1.13" },
     { name = "scipy", marker = "extra == 'detrpose'", specifier = ">=1.13" },
     { name = "torch", marker = "extra == 'detrpose'", specifier = ">=2.4" },
+    { name = "torch", marker = "extra == 'nlf'", specifier = ">=2.4" },
     { name = "torchvision", marker = "extra == 'detrpose'", specifier = ">=0.19" },
+    { name = "torchvision", marker = "extra == 'nlf'", specifier = ">=0.19" },
     { name = "transformers", marker = "extra == 'detrpose'", specifier = ">=4.40" },
     { name = "ultralytics", marker = "extra == 'pose'", specifier = ">=8.3" },
     { name = "xtcocotools", marker = "extra == 'detrpose'", specifier = ">=1.14" },
 ]
-provides-extras = ["pose", "detrpose"]
+provides-extras = ["pose", "detrpose", "nlf"]
 
 [[package]]
 name = "cattrs"

@@ -38,6 +38,12 @@ detrpose = [
     "iopath>=0.1.10",
     "opencv-python>=4.10",
 ]
+nlf = [
+    "torch>=2.4",
+    "torchvision>=0.19",
+    "opencv-python>=4.10",
+    "numpy>=1.26",
+]
 
 [tool.uv]
 package = false
