@@ -2,7 +2,7 @@
 
 > **Live coding audio-visual performance system** built around a SuperCollider sound engine, an openFrameworks oscilloscope visualizer driven by a real Hantek 6022BL USB scope, a macOS menubar launcher, and a Metal-native pose / body-mesh visualizer that listens to the same audio bus.
 >
-> 15 scripted demoparties · ~47 fullscreen visuals (26 3D parametric meshes + 18 procedural shaders + 3 dedicated C++ scenes) · 5 OS pixel-art shaders · 14 retro OS logos · 33 GLSL shader pairs (~65 files) · 1099 SynthDefs across 368 tracks (23 albums × 16) · 11 real-world data feeds · 7 pose-estimation backends — all reactive to the audio physically passing through the scope probes.
+> 15 scripted demoparties · ~47 fullscreen visuals (26 3D parametric meshes + 18 procedural shaders + 3 dedicated C++ scenes) · 5 OS pixel-art shaders · 14 retro OS logos · 33 GLSL shader pairs (~65 files) · 1099 SynthDefs across 368 tracks (23 albums × 16) · **20 real-world data feeds** · 7 pose-estimation backends · **SMPL-X body mesh** (10 475 vertices via Multi-HMR + RealityKit) · **3 launch modes** (Full / Data-only / Body Mesh) — all reactive to the audio physically passing through the scope probes.
 
 ## Top-level architecture
 
@@ -136,15 +136,27 @@ Each act lasts 12–55 s, transitions between acts trigger flash + glitch postfx
 - `Espace` — manual glitch pulse
 - `F1`–`F5` — fullscreen / GUI / postFx / autoglitch / reload shaders
 
-### 🌐 Real-world data feeds — `data_feeds/` + `web_realart/`
-- **11 feed modules** in `data_feeds/feeds/` ingested by `bridge.py` and broadcast as OSC `/data/<source>/<sub>` to SC (`:57121`), oF (`:57123`) and the web bridge (`:57124`) :
-  USGS quakes · NOAA SWPC (solar wind, Bz IMF, Kp, X-ray flares) · Mainsfrequenz.de · RTE eCO2mix · Blitzortung lightning · OpenSky ADS-B · Bluesky firehose · Bitcoin mempool · GitHub events · GCN astrophysics · YOLOv8 webcam pose
+### 🌐 Real-world data feeds — `data_feeds/` + `web_realart/` + `data_only_viz/web/`
+- **20 feed modules** in `data_feeds/feeds/` ingested by `bridge.py` and broadcast as OSC `/data/<source>/<sub>` to SC (`:57121`), oF (`:57123`) and the web bridge (`:57124`) :
+  - **Geophysique** : USGS quakes · Smithsonian GVP volcanoes · Blitzortung lightning
+  - **Meteo / Air** : Open-Meteo (temp/wind/rain) · OpenAQ (PM2.5/PM10/NO2/O3)
+  - **Espace** : NOAA SWPC (solar wind, Bz IMF, Kp, X-ray) · ISS position (wheretheiss.at) · GCN astrophysics
+  - **Mobilite** : OpenSky ADS-B · LiveATC listeners
+  - **Energie / reseau** : Mainsfrequenz.de · RTE eCO2mix · NOAA tides + moon phase
+  - **Social / numerique** : Bluesky firehose · Reddit /r/all + HackerNews top · Wikipedia EventStream · GDELT 2.0 events · GitHub · Bitcoin mempool
+  - **Pose / webcam** : YOLOv8-pose
 - **SC presets** `sound_algo/examples/16_data_feeds.scd` and `17_data_feeds_more.scd` map each source to synthesis : Schumann cavity drone (foudre), aurora additive pad (Bz/wind/Kp), Netzfrequenz pulse kick, RTE 8-op carbon FM, OpenSky granular swarm
 - **Web standalone** `web_realart/` ports the visualizers and synths to the browser for `real.art.saillant.cc` :
   - **WebGPU + three.js TSL** (r171) globe with quake/strike/flight particles (auto-fallback WebGL2)
   - **Web Audio** ports of 5 SC SynthDef presets (cavity, mix, geo, aurora, pulse)
   - **Hydra** with 7 data-driven patches (aurora, quake, lightning, flightmap, gridpulse, solarwind, bskyrain)
   - All three layers share `feeds_client.js` (`window.feeds`) over one WebSocket
+
+- **Web data-only** `data_only_viz/web/` (port `:3211`, Express + WebSocket) — **bidirectional** OSC bridge for the Data-only mode :
+  - **`/dashboard.html`** — live cards + SVG sparklines for all 19 active feeds (USGS, GDELT, Wiki, ISS, tides + moon, ATC, ...) with severity classes (alert / warn / green)
+  - **`/map.html`** — Leaflet dark fullscreen with markers ephemeres for geocoded feeds (quakes, lightning, planes, volcanoes, GDELT events) + persistent ISS marker
+  - **`/control.html`** — 3-pane control surface : 7 synth/mix sliders (master, cutoff, reso, reverb, delay, tempo), 10 audio scene buttons (`/scene/play`), 9 visual mode buttons routed to oF (`/control/vizMode` → `:57123`), XY pad (`/xy/{x,y}`)
+  - **SC retour** : `sound_algo/control/web_bridge.scd` listens on `:57121` for `/control/*` `/scene/*` `/xy/*` and pushes `/sync/bpm|beat|rms|voices` to web on `:57125` at 4 Hz
 
 ### 📡 Audio reactivity pipeline
 
@@ -231,7 +243,13 @@ uv run python -m data_only_viz.main
 open AV-Live/launcher/build/AVLiveLauncher.app
 ```
 
-The launcher autostarts `sclang` + `oscope-of` + `node` (web UI) and can spawn `data_only_viz` from the menubar mode picker. Open the menubar icon for status, logs, restart controls.
+The launcher autostarts `sclang` + the relevant visualizers + the web bridges depending on the **3 launch modes** offered by the picker at startup :
+
+- **Full AV-Live** — sclang + oscope-of + sound_algo web UI (`:3000`) + data_feeds (full profile)
+- **Data-only** — sclang + `data_only_viz` Metal viz + data_feeds (data-only profile) + sound_algo web UI + **data-only dashboard** (`:3211` with `/dashboard.html`, `/map.html`, `/control.html`)
+- **Body Mesh** — sclang + `data_only_viz` (headless, Multi-HMR worker only) + **`AVLiveBody`** Swift app (RealityKit, SMPL-X mesh + webcam overlay + live `RenderSettings` panel `S`) + data_feeds + dashboard data-only
+
+Open the menubar icon for per-process Start/Stop, logs, and the "AV-Live-Body" launch button available from any mode.
 
 ### Without Hantek hardware
 
@@ -252,7 +270,10 @@ The `0` GREETINGS demo cycles through 18 acts including Boing Ball, plasma C64, 
 | Visualizer | `oscope-of/` | openFrameworks 0.12, GLSL 150 GL 3.2 core, ~6k LOC C++ |
 | Pose / body mesh | `data_only_viz/` | Python 3.11+ / `uv`, Metal natif via pyobjc, 7 pose backends |
 | Launcher | `launcher/` | SwiftUI universal app, sentinel-based restart, ProcessManager `@MainActor` |
-| Real-world feeds | `data_feeds/` | Python `uv`, 11 async feed modules, `bridge.py` OSC fan-out |
+| Real-world feeds | `data_feeds/` | Python `uv`, 20 async feed modules, `bridge.py` OSC fan-out (3 targets) |
+| Data-only web | `data_only_viz/web/` | Node Express `:3211` + WS bidir bridge OSC, dashboard / map / control |
+| Body mesh app | `launcher/AV-Live-Body/` | Swift 6 + RealityKit, SMPL-X 10 475 verts, LowLevelMesh + wireframe |
+| Multi-HMR worker | `data_only_viz/multi_hmr_worker.py` | PyTorch MPS, AVCaptureSession native, TCP sender :57130 |
 | Web standalone | `web_realart/` | Node Express + ws, WebGPU three.js r171 + Web Audio + Hydra |
 | Audio FFT | `oscope-of/src/AudioAnalyzer.{h,cpp}` | downsample + Hann + FFT 2048 |
 | 3D models | `oscope-of/bin/data/models/` | 27 PLY parametric meshes |

@@ -1,10 +1,12 @@
 # data_feeds — Pont flux temps réel → OSC
 
-Worker Python asynchrone qui aspire des sources publiques (sismique,
-géophysique, réseau électrique, foudre, aviation, social, blockchain…)
-et les rebalance en OSC vers SuperCollider (`:57121`) et openFrameworks
-(`:57123`). Le but : nourrir l'engine audio et le visualizer avec des
-**signaux du monde réel**, sans bricoler du networking dans `sclang`.
+Worker Python asynchrone qui aspire **20 sources publiques** (sismique,
+geophysique, meteo, qualite de l'air, espace, energie, foudre, aviation,
+social, blockchain, evenements monde…) et les rebalance en OSC vers
+SuperCollider (`:57121`), openFrameworks (`:57123`) et le dashboard web
+data-only (`:57124`). Le but : nourrir l'engine audio et le visualizer
+avec des **signaux du monde reel**, sans bricoler du networking dans
+`sclang`.
 
 ## Architecture
 
@@ -72,16 +74,26 @@ complet.
 | `opensky`      | `count`, `plane`                            | 15 s        |
 | `bluesky`      | `post`, `rate`                              | event-based |
 | `mempool`      | `tx`, `block`                               | event-based |
-| `rte_eco2mix`  | `mix`                                       | 15 min      |
-| `github`       | `event`                                     | 30 s        |
+| `rte_eco2mix`  | `mix`, `co2`                                | 15 min      |
+| `github`       | `event`, `rate`                             | 30 s        |
 | `gcn`          | `alert`                                     | rare        |
 | `pose`         | `count`, `person`, `skel`, `bone`           | ~20 fps     |
+| `openmeteo`    | `now` (temp, hum, wind, press, rain)        | 10 min      |
+| `openaq`       | `now` (PM2.5, PM10, NO2, O3)                | 15 min      |
+| `iss`          | `pos` (lat, lon, alt, vel), `pass`          | 5 s         |
+| `volcano`      | `active`, `eruption`                        | 1 h         |
+| `social_buzz`  | `reddit`, `hn`, `pulse`                     | 1 min       |
+| `gdelt`        | `batch`, `event` (lat, lon, tone, country)  | 15 min      |
+| `wikimedia`    | `edit`, `rate`                              | streaming   |
+| `tides`        | `level` (obs/pred/residual), `moon`         | 6 min       |
+| `atc`          | `hub` (icao, listeners), `total`            | 5 min       |
 
 ## Configuration
 
 Éditer `config.toml` :
 
-- `osc.targets` : liste `{host, port}` à arroser (par défaut SC + oF).
+- `osc.targets` : liste `{host, port}` à arroser. Profil data-only
+  par défaut : SC `:57121` + oF `:57123` + web data-only `:57124`.
 - `feeds.<name>.enabled` : booléen.
 - `feeds.<name>.poll_seconds` : période pour les feeds HTTP.
 - `feeds.opensky.bbox` : `[lamin, lomin, lamax, lomax]` (Lyon par défaut).
