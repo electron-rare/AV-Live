@@ -1,5 +1,13 @@
 # Multi-HMR + RealityKit Body Mesh Implementation Plan
 
+> **IMPLEMENTE 2026-05-13** — Tasks 1-15 livrees. Voir
+> `data_only_viz/MULTIHMR_README.md` pour l'utilisation.
+>
+> Note historique : ce plan a d'abord ete obsolete au profit du plan NLF
+> (voir `2026-05-13-nlf-realitykit-body-mesh.md`), puis re-active apres
+> decouverte que le checkpoint TorchScript NLF a le device CUDA hardcode
+> dans son detecteur YOLO interne (incompatible Mac CPU/MPS).
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Remplacer le mesh body "cartoon" Apple Vision (8 triangles, 13 joints) par un **vrai mesh humain dense SMPL-X** (10475 vertices, 20908 triangles, skinné) via Multi-HMR (Naver CVPR 2024) pour l'inférence et RealityKit pour le rendu natif.
