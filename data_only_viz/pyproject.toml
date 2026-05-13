@@ -58,6 +58,11 @@ multihmr = [
     "numpy>=1.26,<2",
     "scipy>=1.13",
     "torchgeometry>=0.1.2",
+    # Multi-HMR utils (utils/humans.py, utils/render.py)
+    "roma>=1.5",
+    "trimesh>=4.4",
+    "pillow>=10.0",
+    "tqdm>=4.65",
 ]
 
 [tool.uv]

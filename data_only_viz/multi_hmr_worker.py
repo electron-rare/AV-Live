@@ -12,6 +12,7 @@ shapes/expression pour limiter le jitter trame-a-trame.
 from __future__ import annotations
 
 import logging
+import os
 import sys
 import threading
 import time
@@ -70,11 +71,19 @@ class MultiHMRWorker:
     def _run(self) -> None:
         if str(MULTIHMR_REPO) not in sys.path:
             sys.path.insert(0, str(MULTIHMR_REPO))
+        # Multi-HMR demo.py tire pyrender / pyvista (OpenGL offscreen) et
+        # multi_hmr_anny (anny package non public). Aucun n'est necessaire
+        # pour l'inference brute : on stubbe.
+        import types as _t
+        for mod in ("pyrender", "pyvista", "anny"):
+            if mod not in sys.modules:
+                sys.modules[mod] = _t.ModuleType(mod)
         try:
             import torch
             import cv2
-            # `demo` est un module de niveau racine dans le repo Multi-HMR.
-            from demo import load_model
+            # Import direct du Model (sans passer par demo.load_model qui
+            # depend de multi_hmr_anny).
+            from model import Model  # type: ignore
         except ImportError as e:
             LOG.error("deps manquantes : %s — uv sync --extra multihmr "
                       "et bash scripts/setup_multihmr.sh", e)
@@ -86,14 +95,28 @@ class MultiHMRWorker:
         else:
             device = self.device
 
-        ckpt_name = CKPT.stem  # ex 'multiHMR_896_L'
+        ckpt_name = CKPT.stem
+        # SMPLX_DIR='models' et MEAN_PARAMS='models/smpl_mean_params.npz'
+        # sont relatifs au cwd. On bascule dans le repo Multi-HMR pour la
+        # construction du modele puis on revient.
+        prev_cwd = os.getcwd()
         try:
+            os.chdir(MULTIHMR_REPO)
             torch_device = torch.device(device)
-            model = load_model(ckpt_name, device=torch_device)
+            ckpt = torch.load(str(CKPT), map_location=torch_device,
+                              weights_only=False)
+            kwargs = {k: v for k, v in vars(ckpt["args"]).items()}
+            kwargs["type"] = ckpt["args"].train_return_type
+            kwargs["img_size"] = ckpt["args"].img_size[0]
+            model = Model(**kwargs).to(torch_device)
+            model.load_state_dict(ckpt["model_state_dict"], strict=False)
             model.eval()
         except Exception as e:
             LOG.error("Multi-HMR load failed: %s", e)
+            os.chdir(prev_cwd)
             return
+        finally:
+            os.chdir(prev_cwd)
         LOG.info("Multi-HMR loaded (%s) on %s", ckpt_name, device)
 
         # Camera intrinsics (focale = img_size par defaut). batch dim 1.

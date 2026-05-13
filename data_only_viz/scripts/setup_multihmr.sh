@@ -34,4 +34,19 @@ if [ ! -f "$SMPLX" ]; then
     echo "  3. Extraire SMPLX_NEUTRAL.npz vers : $SMPLX"
 fi
 
+# Mean params SMPL (init parameters) — necessaire au constructeur Model
+MEAN="$CACHE/models/smpl_mean_params.npz"
+if [ ! -f "$MEAN" ]; then
+    echo "==> Telechargement smpl_mean_params (1.3 KB)"
+    curl -fL --progress-bar \
+        "https://openmmlab-share.oss-cn-hangzhou.aliyuncs.com/mmhuman3d/models/smpl_mean_params.npz?versionId=CAEQHhiBgICN6M3V6xciIDU1MzUzNjZjZGNiOTQ3OWJiZTJmNThiZmY4NmMxMTM4" \
+        -o "$MEAN"
+fi
+
+# Symlink relatif 'models' dans le repo Multi-HMR pour que SMPLX_DIR='models'
+# (utils/constants.py) trouve les .npz.
+if [ ! -e "$CACHE/multi-hmr/models" ]; then
+    ln -sfn ../models "$CACHE/multi-hmr/models"
+fi
+
 echo "Setup OK. Cache : $CACHE"

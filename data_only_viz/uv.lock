@@ -93,11 +93,15 @@ multihmr = [
     { name = "iopath" },
     { name = "numpy" },
     { name = "opencv-python" },
+    { name = "pillow" },
+    { name = "roma" },
     { name = "scipy" },
     { name = "smplx" },
     { name = "torch" },
     { name = "torchgeometry" },
     { name = "torchvision" },
+    { name = "tqdm" },
+    { name = "trimesh" },
 ]
 nlf = [
     { name = "numpy" },
@@ -129,6 +133,7 @@ requires-dist = [
     { name = "opencv-python", marker = "extra == 'multihmr'", specifier = ">=4.10" },
     { name = "opencv-python", marker = "extra == 'nlf'", specifier = ">=4.10" },
     { name = "opencv-python", marker = "extra == 'pose'", specifier = ">=4.10" },
+    { name = "pillow", marker = "extra == 'multihmr'", specifier = ">=10.0" },
     { name = "pycocotools", marker = "extra == 'detrpose'", specifier = ">=2.0" },
     { name = "pyobjc-core", specifier = ">=10.3" },
     { name = "pyobjc-framework-avfoundation", specifier = ">=10.3" },
@@ -137,6 +142,7 @@ requires-dist = [
     { name = "pyobjc-framework-metalkit", specifier = ">=10.3" },
     { name = "pyobjc-framework-quartz", specifier = ">=10.3" },
     { name = "python-osc", specifier = ">=1.8.3" },
+    { name = "roma", marker = "extra == 'multihmr'", specifier = ">=1.5" },
     { name = "scipy", specifier = ">=1.13" },
     { name = "scipy", marker = "extra == 'detrpose'", specifier = ">=1.13" },
     { name = "scipy", marker = "extra == 'multihmr'", specifier = ">=1.13" },
@@ -148,7 +154,9 @@ requires-dist = [
     { name = "torchvision", marker = "extra == 'detrpose'", specifier = ">=0.19" },
     { name = "torchvision", marker = "extra == 'multihmr'", specifier = ">=0.19" },
     { name = "torchvision", marker = "extra == 'nlf'", specifier = ">=0.19" },
+    { name = "tqdm", marker = "extra == 'multihmr'", specifier = ">=4.65" },
     { name = "transformers", marker = "extra == 'detrpose'", specifier = ">=4.40" },
+    { name = "trimesh", marker = "extra == 'multihmr'", specifier = ">=4.4" },
     { name = "ultralytics", marker = "extra == 'pose'", specifier = ">=8.3" },
     { name = "xtcocotools", marker = "extra == 'detrpose'", specifier = ">=1.14" },
 ]
@@ -1944,6 +1952,15 @@ wheels = [
 ]
 
 [[package]]
+name = "roma"
+version = "1.5.6"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/13/b2/f6560e1a105957a61d1090cf918415f354a012cef0639886e1ccd5aa9d4e/roma-1.5.6.tar.gz", hash = "sha256:986b3c1323592a50590c4566fa4dfd89f4855d6fa6f173268ec9e03bfdf553db", size = 32187, upload-time = "2026-02-11T12:55:11.869Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/55/bd/dd56edc2680df7658c7bdeeb58270ab35dfcdc0e2670899ce9771604b436/roma-1.5.6-py3-none-any.whl", hash = "sha256:ae21a4e095330428d60e1dbdcad4e550dbdc9a7b4597a0157aaf5d6fd2b46afb", size = 25327, upload-time = "2026-02-11T12:55:10.629Z" },
+]
+
+[[package]]
 name = "safetensors"
 version = "0.7.0"
 source = { registry = "https://pypi.org/simple" }
@@ -2255,6 +2272,18 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/f2/36/390075693b76d4fb4a2bea360fb6080347763bd1f1147c49ed0ed938778c/transformers-5.8.0.tar.gz", hash = "sha256:6cc9a1f0291d16b1c1b735bad775e78ebefff7722701d4e28f98aaaa2bd6fb91", size = 8528141, upload-time = "2026-05-05T16:50:04.778Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/97/7b/5621d08b34ac35deb9fa14b58d27d124d21ef125ee1c64bc724ca47dfb63/transformers-5.8.0-py3-none-any.whl", hash = "sha256:e9d2cae6d195a7e1e05164c5ebf26142a7044e4dc4267274f4809204f92827e4", size = 10630279, upload-time = "2026-05-05T16:50:01.026Z" },
+]
+
+[[package]]
+name = "trimesh"
+version = "4.12.2"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "numpy" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/79/37/5cb90f04990260d2caceb6093560c6cefafca1ec522c1e43be01ca658244/trimesh-4.12.2.tar.gz", hash = "sha256:c8ca31571ac00b112e4e160e66a2d4c3491df321f056bd33806be0485d1af9d9", size = 842220, upload-time = "2026-05-01T00:57:43.333Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/05/98/716a473cfb24750858ddd5d14e6527539dd206583a46408d08eeb2844a75/trimesh-4.12.2-py3-none-any.whl", hash = "sha256:b5b5afa63c5272345f2858f7676bc8c217dc8a89f4fadf6193fe10a81b5ff2aa", size = 741043, upload-time = "2026-05-01T00:57:40.763Z" },
 ]
 
 [[package]]
