@@ -49,11 +49,7 @@ class SMPLXTCPSender:
 
     def stop(self) -> None:
         self._stop.set()
-        try:
-            if self._sock:
-                self._sock.close()
-        except Exception:
-            pass
+        self._close()
 
     def _ensure_connected(self) -> bool:
         if self._sock is not None:
@@ -62,12 +58,21 @@ class SMPLXTCPSender:
             s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             s.settimeout(0.5)
             s.connect((self.host, self.port))
-            s.settimeout(None)
+            s.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
+            s.settimeout(1.0)  # 1 s write timeout — must be > worst-case frame transit
             self._sock = s
             LOG.info("connected to %s:%d", self.host, self.port)
             return True
         except (socket.error, ConnectionRefusedError):
             return False
+
+    def _close(self) -> None:
+        if self._sock is not None:
+            try:
+                self._sock.close()
+            except OSError:
+                pass
+            self._sock = None
 
     @staticmethod
     def _serialize_persons(persons: Sequence[SMPLXPerson]) -> bytes:
@@ -109,13 +114,13 @@ class SMPLXTCPSender:
                 try:
                     self._sock.sendall(
                         struct.pack("<I", len(payload)) + payload)
-                except (socket.error, BrokenPipeError) as e:
-                    LOG.info("connection lost: %s", e)
-                    try:
-                        self._sock.close()
-                    except Exception:
-                        pass
-                    self._sock = None
+                except socket.timeout:
+                    LOG.warning("smplx_tcp: send timeout — receiver stalled, dropping connection")
+                    self._close()
+                    continue
+                except (BrokenPipeError, ConnectionResetError, OSError) as e:
+                    LOG.warning("smplx_tcp: send failed (%s) — reconnecting", e)
+                    self._close()
                     continue
 
             dt = time.monotonic() - t0
