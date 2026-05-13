@@ -2,11 +2,21 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 >
-> **STATUS 2026-05-13 22:50** — Implementation **complete** (16/17 tasks, Task 16 is a manual gate). 39 tests green. Key deviations from this document, captured in the "Post-impl deviations" section below:
+> **STATUS 2026-05-14 00:30** — action-head shipped **v1 → v2 → v3** in one extended session. 51 tests green. **Both branches converged** (`main` == `feat/action-head` content-equivalent, pushed). v3 model trained on Studio M3 Ultra (synthetic 720 windows, 30 epochs MPS in 12 s, val_acc 100 % on cleanly-separable signal). Live app validated : python `--multi-hmr` + MESH_RIG=0 + AVLiveBody Swift = mesh propre après NaN/Inf guard sur Multi-HMR. **Remaining work** : Task 22 (full skel + hand kp into AVLiveBody scene Metal mode 8 hands3d) and Task 16 (E2E gate with real capture).
+>
+> **Post-impl deviations vs original v1 plan** :
 > - Task 14 pivoted from "modify `multi_hmr_worker_coreml.py` + CLI flag" to **standalone publisher thread `data_only_viz/action_head_pub.py`** + 3-line wire-in in `multi.py` (avoids collision with the user's parallel iteration on `multi_hmr_worker.py`). The MultiHMR backend is selected via env var `MULTIHMR_BACKEND=pytorch|coreml`, not a CLI flag.
 > - Task 11 pivoted from "refactor `MultiHMRWorker` with `create_for_offline()`" to **standalone script using `MultiHMRCoreMLBackend.infer()` directly** — no worker refactor.
 > - j3d is approximated from SMPL-X v3d via a fixed 22-vertex anchor set (`SMPLX_JOINT_ANCHOR_VERTS`), with a MediaPipe 33→22 fallback. The same anchor set is shared between live serve (`action_head_pub.py`) and offline extract (`scripts/extract_j3d_offline.py`) to avoid train/serve skew.
 > - Studio train wrapper added as Task 8.5 (`data_only_viz/scripts/train_on_studio.sh`), validated end-to-end smoke 160 windows × 3 epochs MPS in ~4 s.
+>
+> **v2 extension (Task 18, commit aedcb0f)** : added 10 fingertip joints (J3D_JOINTS 22→32, FEATURE_DIM 201→302), expression PCA (10), mouth_open scalar. ActionHeadModel param count 37 811. **v3 extension (Task 19, commit beb94d2)** : canonical smplx fingertip vertex IDs (`SMPLX_VERTEX_IDS`), MediaPipe lips for mouth_open with v3d fallback, **+126 dims hands_kp block** (MediaPipe 21×2). FEATURE_DIM 302→428, param count 70 499 (<100 k). **MediaPipe Holistic offline extractor (Task 20, commit 6af220d)** : populates real hands_kp + mouth_open in jsonl, complements the SMPL-X path which writes zeros.
+>
+> **Mesh debugging trail 2026-05-14** : user reported deformed mesh (spikes/holes). Diagnosis sequence captured in [[project-mesh-nan-guard]] memory :
+> 1. MESH_RIG=0 env toggle added (`87b76a4`) → didn't fix it, rigger not the cause.
+> 2. NaN/Inf guard on Multi-HMR `v3d` + extreme magnitude clamp (`4e7101c`) → **fixed**. The MPS path occasionally emitted garbage vertices that propagated to AVLiveBody as glitches.
+>
+> **Branch convergence 2026-05-14** : the c52271e botched merge (which had dropped action-head files from main) recovered via cherry-pick of 14 commits from feat onto main + 1 sync commit + 1 cleanup. Now `main` HEAD `82eceb8` and `feat/action-head` HEAD `06f2a55` are content-equivalent. See [[project-branch-state]] memory.
 
 **Goal:** Implement a real-time per-person action classifier (debout/assise/danse) on top of Multi-HMR `j3d`, with OSC output enriched by softmax probabilities and kinetics scalars (speed/accel/symmetry).
 
