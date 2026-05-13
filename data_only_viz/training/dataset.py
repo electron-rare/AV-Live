@@ -15,10 +15,16 @@ class RawFrame:
     ts: float
     session: str
     pid: int
+<<<<<<< HEAD
     j3d: np.ndarray          # (32, 3) float32 (v3: body22 + 10 fingertips)
     expression: np.ndarray | None = None  # (EXPR_DIM,) or None
     mouth_open: float = 0.0
     hands_kp: np.ndarray | None = None  # (42, 3) or None
+=======
+    j3d: np.ndarray          # (32, 3) float32 (v2: body22 + 10 fingertips)
+    expression: np.ndarray | None = None  # (EXPR_DIM,) or None
+    mouth_open: float = 0.0
+>>>>>>> aedcb0f (feat(data-only-viz): action-head v2 fingers+face)
 
 
 @dataclass
@@ -29,7 +35,10 @@ class WindowRow:
     first_ts: float
     expr_stack: np.ndarray | None = None   # (window_len, 10) or None
     mouth_open_stack: np.ndarray | None = None  # (window_len,) or None
+<<<<<<< HEAD
     hands_kp_stack: np.ndarray | None = None  # (window_len, 42, 3) or None
+=======
+>>>>>>> aedcb0f (feat(data-only-viz): action-head v2 fingers+face)
 
 
 @dataclass
@@ -43,7 +52,10 @@ class DatasetRow:
     manually_validated: bool
     expr_stack: np.ndarray | None = None   # (window_len, 10) or None
     mouth_open_stack: np.ndarray | None = None  # (window_len,) or None
+<<<<<<< HEAD
     hands_kp_stack: np.ndarray | None = None  # (window_len, 42, 3) or None
+=======
+>>>>>>> aedcb0f (feat(data-only-viz): action-head v2 fingers+face)
 
 
 def load_frames_jsonl(path: Path) -> list[RawFrame]:
@@ -56,8 +68,11 @@ def load_frames_jsonl(path: Path) -> list[RawFrame]:
             d = json.loads(line)
             expr_raw = d.get("expression")
             expr = np.asarray(expr_raw, dtype=np.float32) if expr_raw is not None else None
+<<<<<<< HEAD
             hands_raw = d.get("hands_kp")
             hands_kp = np.asarray(hands_raw, dtype=np.float32) if hands_raw is not None else None
+=======
+>>>>>>> aedcb0f (feat(data-only-viz): action-head v2 fingers+face)
             rows.append(RawFrame(
                 ts=float(d["ts"]),
                 session=str(d["session"]),
@@ -65,7 +80,10 @@ def load_frames_jsonl(path: Path) -> list[RawFrame]:
                 j3d=np.asarray(d["j3d"], dtype=np.float32),
                 expression=expr,
                 mouth_open=float(d.get("mouth_open", 0.0)),
+<<<<<<< HEAD
                 hands_kp=hands_kp,
+=======
+>>>>>>> aedcb0f (feat(data-only-viz): action-head v2 fingers+face)
             ))
     return rows
 
@@ -100,6 +118,7 @@ def sliding_windows(frames: list[RawFrame],
             mouth_stack = np.array(
                 [c.mouth_open for c in chunk], dtype=np.float32
             )
+<<<<<<< HEAD
             # hands_kp stack: (window_len, 42, 3) if any frame has hands_kp
             if any(c.hands_kp is not None for c in chunk):
                 hands_kp_stack = np.zeros((window_len, 42, 3), dtype=np.float32)
@@ -115,6 +134,12 @@ def sliding_windows(frames: list[RawFrame],
                             expr_stack=expr_stack,
                             mouth_open_stack=mouth_stack,
                             hands_kp_stack=hands_kp_stack)
+=======
+            yield WindowRow(j3d_stack=stack, session=sess,
+                            pid_local=pid, first_ts=chunk[0].ts,
+                            expr_stack=expr_stack,
+                            mouth_open_stack=mouth_stack)
+>>>>>>> aedcb0f (feat(data-only-viz): action-head v2 fingers+face)
 
 
 def write_dataset_jsonl(rows: Iterable[DatasetRow], path: Path) -> None:
@@ -133,8 +158,11 @@ def write_dataset_jsonl(rows: Iterable[DatasetRow], path: Path) -> None:
                 d["expr_stack"] = r.expr_stack.astype(np.float32).tolist()
             if r.mouth_open_stack is not None:
                 d["mouth_open_stack"] = r.mouth_open_stack.astype(np.float32).tolist()
+<<<<<<< HEAD
             if r.hands_kp_stack is not None:
                 d["hands_kp_stack"] = r.hands_kp_stack.astype(np.float32).tolist()
+=======
+>>>>>>> aedcb0f (feat(data-only-viz): action-head v2 fingers+face)
             f.write(json.dumps(d) + "\n")
 
 
@@ -150,8 +178,11 @@ def load_dataset_jsonl(path: Path) -> list[DatasetRow]:
             expr = np.asarray(expr_raw, dtype=np.float32) if expr_raw is not None else None
             mouth_raw = d.get("mouth_open_stack")
             mouth = np.asarray(mouth_raw, dtype=np.float32) if mouth_raw is not None else None
+<<<<<<< HEAD
             hands_raw = d.get("hands_kp_stack")
             hands_kp = np.asarray(hands_raw, dtype=np.float32) if hands_raw is not None else None
+=======
+>>>>>>> aedcb0f (feat(data-only-viz): action-head v2 fingers+face)
             out.append(DatasetRow(
                 window_id=d["window_id"],
                 label=d["label"],
@@ -162,7 +193,10 @@ def load_dataset_jsonl(path: Path) -> list[DatasetRow]:
                 manually_validated=bool(d["manually_validated"]),
                 expr_stack=expr,
                 mouth_open_stack=mouth,
+<<<<<<< HEAD
                 hands_kp_stack=hands_kp,
+=======
+>>>>>>> aedcb0f (feat(data-only-viz): action-head v2 fingers+face)
             ))
     return out
 
