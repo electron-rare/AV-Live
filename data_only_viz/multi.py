@@ -19,6 +19,7 @@ import time
 import urllib.request
 from pathlib import Path
 
+from .action_head_pub import ActionHeadPublisher
 from .euro_filter import SkeletonFilter
 from .pose_bridge import PoseSoundBridge
 from .state import Kp3D, PoseKp, State
@@ -93,6 +94,8 @@ class MultiWorker:
         self._smooth_hand = SkeletonFilter(min_cutoff=2.0, beta=0.10)
         # Pont OSC pose -> sclang
         self._sound_bridge = PoseSoundBridge(throttle_hz=30.0)
+        self._action_pub = ActionHeadPublisher(state=self.state, bridge=self._sound_bridge)
+        self._action_pub.start()
 
     def start(self) -> None:
         self._thread = threading.Thread(
