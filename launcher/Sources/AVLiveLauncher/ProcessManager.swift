@@ -73,19 +73,18 @@ final class ProcessManager: ObservableObject {
                text: "mode switched: \(old.rawValue) → \(new.rawValue)")
         switch new {
         case .dataOnly:
-            if webRunning { stopWeb() }
+            // Data-only = SC + Metal viz + feeds + web (pas d'oscope-of)
+            if oscopeRunning { stopOscope() }
             if dataFeedsRunning { restartDataFeeds() }
         case .full:
             break
         case .bodyMesh:
-            // Mode mesh-only : on coupe tout ce qui n'est pas le worker
-            // Multi-HMR + AV-Live-Body. SC, oF, web, data_feeds inutiles.
-            if sclangRunning { stopSclang() }
+            // Mode bodyMesh : Multi-HMR headless + AV-Live-Body, MAIS on
+            // garde SC + data_feeds (audio + sonification des feeds).
+            // On coupe seulement oscope-of et le web UI.
             if oscopeRunning { stopOscope() }
             if webRunning { stopWeb() }
-            if dataFeedsRunning { stopDataFeeds() }
-            // Forcer useMultiHMR=true pour que startMetalViz pousse le
-            // worker en headless et spawn AV-Live-Body.
+            if dataFeedsRunning { restartDataFeeds() }   // re-load config data-only
             useMultiHMR = true
         }
     }

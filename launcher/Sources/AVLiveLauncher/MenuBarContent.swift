@@ -28,7 +28,14 @@ struct MenuBarContent: View {
 
             // -- Process rows pilotes par le mode -----------------------
             if processManager.mode == .bodyMesh {
-                // Mode mesh-only : juste Multi-HMR worker headless + AVB
+                // Mode bodyMesh : Multi-HMR headless + AVB + SC + feeds
+                ProcessRow(
+                    title: "SuperCollider",
+                    subtitle: "sclang + scsynth (audio)",
+                    isRunning: processManager.sclangRunning,
+                    start: processManager.startSclang,
+                    stop: processManager.stopSclang
+                )
                 ProcessRow(
                     title: "Multi-HMR worker",
                     subtitle: "Python headless — SMPL-X via TCP :57130",
@@ -86,7 +93,7 @@ struct MenuBarContent: View {
                     )
                 }
             }
-            if processManager.mode == .full {
+            if processManager.mode == .full || processManager.mode == .dataOnly {
                 ProcessRow(
                     title: "Web UI",
                     subtitle: "Express :\(processManager.webPort) — control + Hydra",
@@ -95,17 +102,17 @@ struct MenuBarContent: View {
                     stop: processManager.stopWeb
                 )
             }
-            if processManager.mode != .bodyMesh {
-                ProcessRow(
-                    title: "Data Feeds",
-                    subtitle: processManager.mode == .dataOnly
-                        ? "config.data-only.toml — pose YOLO + opendata"
-                        : "USGS · SWPC · Grid · Lightning · Pose · …",
-                    isRunning: processManager.dataFeedsRunning,
-                    start: processManager.startDataFeeds,
-                    stop: processManager.stopDataFeeds
-                )
-            }
+            ProcessRow(
+                title: "Data Feeds",
+                subtitle: processManager.mode == .dataOnly
+                    ? "config.data-only.toml — pose YOLO + opendata"
+                    : (processManager.mode == .bodyMesh
+                        ? "config.data-only.toml — sonification only"
+                        : "USGS · SWPC · Grid · Lightning · Pose · …"),
+                isRunning: processManager.dataFeedsRunning,
+                start: processManager.startDataFeeds,
+                stop: processManager.stopDataFeeds
+            )
 
             if processManager.mode == .full {
                 HStack {

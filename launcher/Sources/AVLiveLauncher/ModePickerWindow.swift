@@ -28,7 +28,7 @@ struct ModePickerView: View {
                 }
                 ModeCard(
                     title: "Data-only",
-                    subtitle: "SC + oscope-of + data_feeds (pose YOLO)\nPas de web UI, pas d'album",
+                    subtitle: "SC + Metal viz + data_feeds + web UI\nPas d'oscope-of",
                     icon: "antenna.radiowaves.left.and.right",
                     color: .green
                 ) {
@@ -36,7 +36,7 @@ struct ModePickerView: View {
                 }
                 ModeCard(
                     title: "Body Mesh",
-                    subtitle: "Multi-HMR + AV-Live-Body RealityKit\nMesh SMPL-X seul, pas de SC / feeds",
+                    subtitle: "Multi-HMR + AV-Live-Body + SC + feeds\nPas de Metal viz, pas de web",
                     icon: "figure.walk",
                     color: .pink
                 ) {
