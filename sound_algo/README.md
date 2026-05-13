@@ -1,7 +1,7 @@
 # sound_algo — SuperCollider Live Coding System
 
 Generative techno/electronic live performance engine.
-90 SynthDefs, 23 playable tracks (A-W), 130+ melodies, 8-voice sequencer with sidechain, FX bus, LFO automation, mixer, loops manager.
+1099 SynthDefs (1059 synth + 40 fx), 23 albums × 16 tracks = 368 playable tracks (A–W), 130+ melodies, 8-voice sequencer with sidechain, FX bus, LFO automation, mixer, loops manager.
 
 ## Quick Start
 
