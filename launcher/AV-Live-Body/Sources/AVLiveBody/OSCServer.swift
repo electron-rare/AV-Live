@@ -56,9 +56,14 @@ final class OSCServer {
         }
     }
 
+    /// Parse all complete frames in `buffer`, keep only the most recent decoded
+    /// result, and dispatch it once to `onPersons`. If several frames have
+    /// accumulated while the MainActor was busy, the intermediate frames are
+    /// decoded and discarded so the receiver never replays a stale cascade.
     private func parseFrames() {
+        var latestPersons: [SMPLXPersonData]? = nil
         while true {
-            guard buffer.count >= 4 else { return }
+            guard buffer.count >= 4 else { break }
             let len = buffer.withUnsafeBytes {
                 $0.load(fromByteOffset: 0, as: UInt32.self).littleEndian
             }
@@ -67,17 +72,22 @@ final class OSCServer {
                 self.buffer.removeAll(keepingCapacity: false)
                 return
             }
-            guard buffer.count >= 4 + Int(len) else { return }
+            guard buffer.count >= 4 + Int(len) else { break }
             let payload = buffer.subdata(in: 4..<(4 + Int(len)))
             buffer.removeSubrange(0..<(4 + Int(len)))
-            decode(payload: payload)
+            if let persons = decode(payload: payload) {
+                latestPersons = persons  // overwrite — only the freshest wins
+            }
+        }
+        if let persons = latestPersons {
+            Task { @MainActor in self.onPersons(persons) }
         }
     }
 
-    private func decode(payload: Data) {
-        guard payload.count > 8 else { return }
+    private func decode(payload: Data) -> [SMPLXPersonData]? {
+        guard payload.count > 8 else { return nil }
         let magic = payload.subdata(in: 0..<4)
-        guard magic == "SMPX".data(using: .ascii) else { return }
+        guard magic == "SMPX".data(using: .ascii) else { return nil }
         var offset = 4
         let nPersons: Int32 = payload.withUnsafeBytes {
             $0.load(fromByteOffset: offset, as: Int32.self).littleEndian
@@ -130,6 +140,6 @@ final class OSCServer {
                 vertices: verts
             ))
         }
-        onPersons(persons)
+        return persons
     }
 }
