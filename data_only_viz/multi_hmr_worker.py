@@ -125,6 +125,20 @@ class MultiHMRWorker:
             model = Model(**kwargs).to(torch_device)
             model.load_state_dict(ckpt["model_state_dict"], strict=False)
             model.eval()
+            # MPS mixed precision via torch.autocast : ~1.3-1.7x sur
+            # ViT-S backbone, casts auto vers float16 pour les matmuls
+            # gardant l'accumulator en float32 (necessaire MPS sinon
+            # "Destination NDArray and Accumulator NDArray cannot have
+            # different datatype" sur MPSNDArrayMatrixMultiplication).
+            # Disable via env MULTIHMR_AUTOCAST=0.
+            # autocast MPS teste 2026-05-13 : plus lent (400ms vs 270ms
+            # baseline) car overhead de cast dans le forward. Defaut OFF.
+            # Opt-in via MULTIHMR_AUTOCAST=1.
+            self._use_autocast = (
+                device == "mps"
+                and os.environ.get("MULTIHMR_AUTOCAST", "0") == "1")
+            if self._use_autocast:
+                LOG.info("Multi-HMR PyTorch : MPS autocast (fp16) enabled")
             # torch.compile teste 2026-05-13 : plante en runtime avec
             # `TypeError: torch.Size() takes an iterable of 'int' (item
             # is 'FakeTensor')`. Multi-HMR a du shape-arithmetic non
@@ -213,13 +227,24 @@ class MultiHMRWorker:
             t_inf_start = time.monotonic()
             try:
                 with torch.no_grad():
-                    humans = model(
-                        tensor,
-                        is_training=False,
-                        nms_kernel_size=self.nms_kernel_size,
-                        det_thresh=self.det_thresh,
-                        K=K,
-                    )
+                    if getattr(self, "_use_autocast", False):
+                        with torch.autocast(device_type="mps",
+                                            dtype=torch.float16):
+                            humans = model(
+                                tensor,
+                                is_training=False,
+                                nms_kernel_size=self.nms_kernel_size,
+                                det_thresh=self.det_thresh,
+                                K=K,
+                            )
+                    else:
+                        humans = model(
+                            tensor,
+                            is_training=False,
+                            nms_kernel_size=self.nms_kernel_size,
+                            det_thresh=self.det_thresh,
+                            K=K,
+                        )
             except Exception as e:
                 LOG.warning("inference failed: %s", e)
                 time.sleep(self.period)
@@ -326,6 +351,23 @@ class MultiHMRWorker:
 
                 shape_raw = hh["shape"].detach().cpu().numpy().flatten()
                 expr_raw = hh["expression"].detach().cpu().numpy().flatten()
+
+                # Skip persons with NaN/Inf vertices or transl : MPS can
+                # occasionally emit garbage that propagates to AVLiveBody
+                # as spikes / holes. We drop the frame for that pid and
+                # let the receiver's retain window keep the last good mesh.
+                if (not np.isfinite(v3d).all()
+                        or not np.isfinite(transl_np).all()):
+                    LOG.warning("Multi-HMR NaN/Inf at pid=%d, skipping", pid)
+                    continue
+                # Sanity clamp on extreme vertex magnitudes (humans are
+                # ~2 m ; vertices outside [-5, 5] m are model glitches).
+                if float(np.abs(v3d).max()) > 5.0:
+                    LOG.warning(
+                        "Multi-HMR v3d extreme |max|=%.1f at pid=%d, skipping",
+                        float(np.abs(v3d).max()), pid,
+                    )
+                    continue
 
                 pid_c = pid % self.num_persons
                 shape_n = min(10, len(shape_raw))
