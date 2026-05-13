@@ -229,8 +229,11 @@ class MultiWorker:
             hands  = [_smooth_kps(self._smooth_hand, ids_hand[i], kps, t_now)
                       for i, kps in enumerate(hands)]
 
-            # Pont sonore : envoi OSC /pose/* a sclang
-            self._sound_bridge.send(bodies, ids_body, t_now)
+            # Pont sonore : envoi OSC /pose/* a sclang (body + face + hands)
+            self._sound_bridge.send(
+                bodies, ids_body, t_now,
+                persons_face=faces, persons_face_ids=ids_face,
+                persons_hands=hands, persons_hands_ids=ids_hand)
 
             with self.state.lock():
                 self.state.persons_body = bodies

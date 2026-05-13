@@ -182,6 +182,13 @@ class AppDelegate(NSObject):
         self._camTimer = NSTimer.scheduledTimerWithTimeInterval_target_selector_userInfo_repeats_(
             1.0 / 15.0, self, "refreshCam:", None, True)
 
+        # 2d) Auto-engage du mode openpos (#9) quand des personnes sont
+        # detectees. Si l'utilisateur a force un mode au clavier dans
+        # les 8 dernieres secondes, on n'override pas (lock manuel).
+        self._user_viz_lock_t = 0.0   # set par _on_key, lu par autoOpenpos
+        self._autoOpenposTimer = NSTimer.scheduledTimerWithTimeInterval_target_selector_userInfo_repeats_(
+            0.5, self, "autoOpenpos:", None, True)
+
         if self._opts.fullscreen:
             self._window.toggleFullScreen_(None)
 
@@ -232,20 +239,14 @@ class AppDelegate(NSObject):
             self._start_pose_worker()
 
     def _start_pose_worker(self):
-        # Priorite :
-        # 0. Apple Vision body pose natif (VNDetectHumanBodyPoseRequest)
-        #    — AUCUN modele a charger, ANE-accelerated, multi-personne.
-        #    Trade-off : PERD face/hands MediaPipe (conflit camera : un
-        #    seul process peut grabber la webcam). Desactive avec
-        #    AV_LIVE_APPLE_VISION=0 si on veut le mesh complet MP.
-        # 1. CoreML pose natif (AVFoundation + Vision + YOLO11n-pose sur ANE)
-        #    — actif si ~/.cache/av-live-coreml/yolo11n-pose.mlpackage existe
-        #    OU si env AV_LIVE_COREML=1 (force le check). Pipeline 100% Apple.
-        # 2. DETRPose (transformer 2025, body 17 kp COCO, multi-personne natif,
-        #    MPS) — ACTIF SEULEMENT si AV_LIVE_DETRPOSE=1 et install OK
-        # 3. MediaPipe Multi (Pose+Face+Hand × 4) — defaut, plus complet
-        # 4. Fallback Holistic (single-person, plus rapide mais 1 sujet seul)
-        # 5. Fallback YOLO COCO 17 keypoints
+        # Priorite (user feedback : on veut FACE + HANDS + BODY toujours
+        # disponibles pour le mapping sonore + viz openpos, donc MediaPipe
+        # Multi devient le default avec ses 33 body + 478 face + 42 hand
+        # par personne, plutot qu'Apple Vision body-only 13 joints) :
+        # 0. Multi-HMR (opt-in via --multi-hmr flag)
+        # 1. MediaPipe Multi (33+478+42 kp × 4 personnes) — DEFAUT
+        # 2. Apple Vision body pose (fallback si MediaPipe casse)
+        # 3. CoreML pose, DETRPose, Holistic, YOLO — fallbacks
         import os as _os
         # 0. Multi-HMR (SMPL-X 10475 verts mesh dense) — opt-in via flag
         if getattr(self._opts, "multi_hmr", False):
@@ -272,9 +273,20 @@ class AppDelegate(NSObject):
                          "— voir scripts/setup_multihmr.sh")
             except Exception as e:  # noqa: BLE001
                 LOG.warning("Multi-HMR failed (%s) — fallback", e)
-        # Apple Vision body pose : v2 utilise cv2 + Vision via JPEG, plus
-        # de delegate AVCaptureSession (crash dispatch_queue ctypes evite).
-        # Active par defaut. Set AV_LIVE_APPLE_VISION=0 pour fallback MP.
+        # 1. MediaPipe Multi : DEFAUT pour le mapping sonore + openpos
+        # (33 body + 478 face + 21x2 hands × 4 personnes). Skip via
+        # AV_LIVE_MEDIAPIPE=0 si on prefere body-only ANE-accelere.
+        if _os.environ.get("AV_LIVE_MEDIAPIPE") != "0":
+            try:
+                from .multi import MultiWorker
+                self._pose_worker = MultiWorker(self._state, num_persons=4)
+                self._pose_worker.start()
+                LOG.info("worker: MediaPipe Multi (Pose+Face+Hand × 4)")
+                return
+            except Exception as e:  # noqa: BLE001
+                LOG.warning("MediaPipe Multi unavailable (%s) — fallback", e)
+        # 2. Apple Vision body pose : fallback si MediaPipe casse.
+        # Body only, 13 joints, pas de face/hands.
         if _os.environ.get("AV_LIVE_APPLE_VISION") != "0":
             try:
                 from .apple_vision_pose import AppleVisionPoseWorker
@@ -283,7 +295,7 @@ class AppDelegate(NSObject):
                         self._state, target_fps=30.0, num_persons=4)
                     self._pose_worker.start()
                     LOG.info("worker: Apple Vision body pose "
-                             "(ANE natif, multi-personne)")
+                             "(ANE natif, body only, multi-personne)")
                     return
                 LOG.info("Apple Vision body pose indisponible "
                          "(macOS < 11 ?) — fallback")
@@ -318,14 +330,8 @@ class AppDelegate(NSObject):
                          "(voir data_only_viz/detrpose.py pour install)")
             except Exception as e:  # noqa: BLE001
                 LOG.warning("detrpose indisponible (%s) — fallback multi", e)
-        try:
-            from .multi import MultiWorker
-            self._pose_worker = MultiWorker(self._state, num_persons=4)
-            self._pose_worker.start()
-            LOG.info("worker: MediaPipe Multi (Pose+Face+Hand × 4 personnes)")
-            return
-        except Exception as e:  # noqa: BLE001
-            LOG.warning("multi unavailable (%s) — fallback holistic", e)
+        # MediaPipe Multi deja tente en priorite 1 ; on saute direct
+        # au fallback holistic puis YOLO.
         try:
             from .holistic import HolisticWorker
             self._pose_worker = HolisticWorker(self._state)
@@ -440,6 +446,29 @@ class AppDelegate(NSObject):
         )
         self._hud.setString_(txt)
 
+    def autoOpenpos_(self, _timer):  # noqa: N802
+        """Si des personnes sont detectees ET l'utilisateur n'a pas pose
+        un mode au clavier dans les 8 dernieres secondes, on passe
+        automatiquement en mode openpos (#9) pour mettre la pose en
+        valeur. Lache la main si lock recent ou si plus personne."""
+        import time as _t
+        s = self._state
+        with s.lock():
+            has_persons = bool(s.persons_body)
+            mode = s.viz_mode
+        now = _t.monotonic()
+        if (now - self._user_viz_lock_t) < 8.0:
+            return  # lock utilisateur recent
+        if has_persons and mode != 9:
+            with s.lock():
+                s.viz_mode = 9
+            LOG.info("[auto] openpos engaged (persons detectees)")
+        elif not has_persons and mode == 9:
+            # plus de personne, on revient au mode storm par defaut
+            with s.lock():
+                s.viz_mode = 0
+            LOG.info("[auto] storm engaged (plus de pose)")
+
     def _on_key_global(self, ev):
         # Global monitor : read-only, on appelle _on_key mais on ne
         # retourne pas l'event (interdit par AppKit pour les globaux).
@@ -475,7 +504,11 @@ class AppDelegate(NSObject):
                     idx = names.index(name)
                     with self._state.lock():
                         self._state.viz_mode = idx
-                    LOG.info("[video] viz -> %s (%d)", name, idx)
+                    # Lock l'auto-openpos pendant 8s : l'utilisateur a
+                    # explicitement choisi un mode, on respecte.
+                    import time as _t
+                    self._user_viz_lock_t = _t.monotonic()
+                    LOG.info("[video] viz -> %s (%d) (lock 8s)", name, idx)
                 return None
         # qsdfghjklm -> audio (scene SC)
         for kk, scene in KEYMAP_AUDIO:
