@@ -11,6 +11,7 @@ struct BodyView: NSViewRepresentable {
     @ObservedObject var renderer: MeshRenderer
     @ObservedObject var settings: RenderSettings
     @ObservedObject var poseListener: PoseOSCListener
+    @ObservedObject var skeleton3d: Skeleton3DRenderer
 
     func makeNSView(context: Context) -> NSView {
         let container = NSView(frame: .zero)
@@ -88,6 +89,14 @@ struct BodyView: NSViewRepresentable {
 
         let bodyAnchor = AnchorEntity(world: .zero)
         arView.scene.addAnchor(bodyAnchor)
+
+        // Dedicated anchor for the 3D skeleton (mode 9 / openpos).
+        // Positioned at the origin ; the perspective camera at z=0 with
+        // default FOV frames a ~3 m-deep stage centered on the hip.
+        let skelAnchor = AnchorEntity(world: SIMD3<Float>(0, 0, -3))
+        arView.scene.addAnchor(skelAnchor)
+        skeleton3d.attach(to: skelAnchor, listener: poseListener)
+
         container.addSubview(arView)
 
         // 60 fps mesh interpolation between Multi-HMR frames (Python
@@ -105,6 +114,7 @@ struct BodyView: NSViewRepresentable {
         context.coordinator.previewLayer = preview
         context.coordinator.container = container
         context.coordinator.renderer = renderer
+        context.coordinator.skelAnchor = skelAnchor
         return container
     }
 
@@ -141,6 +151,9 @@ struct BodyView: NSViewRepresentable {
         c.fillLight?.light.intensity = Float(settings.fillIntensity)
         c.rimLight?.light.intensity = Float(settings.rimIntensity)
 
+        // 3D skeleton only visible in mode 9 (openpos).
+        c.skelAnchor?.isEnabled = (settings.vizMode == 9)
+
         // Mesh visibility + material
         guard let anchor = c.bodyAnchor else { return }
         anchor.children.removeAll()
@@ -159,6 +172,7 @@ struct BodyView: NSViewRepresentable {
 
     final class Coordinator {
         var bodyAnchor: AnchorEntity?
+        var skelAnchor: AnchorEntity?
         var arView: ARView?
         var cameraEntity: PerspectiveCamera?
         var sceneRenderer: SceneRenderer?

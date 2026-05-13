@@ -22,6 +22,16 @@ class PoseKp:
 
 
 @dataclass
+class Kp3D:
+    """3D keypoint in metric coordinates relative to hip-center.
+    Used for MediaPipe pose_world_landmarks (xyz in meters)."""
+    x: float = 0.0
+    y: float = 0.0
+    z: float = 0.0
+    c: float = 0.0
+
+
+@dataclass
 class SMPLXPerson:
     """Resultats Multi-HMR pour une personne : params SMPL-X + vertices
     decodes en metres. Vertices en repere camera (z > 0 devant)."""
@@ -92,6 +102,10 @@ class State:
     persons_body:  list[list[PoseKp]] = field(default_factory=list)
     persons_face:  list[list[PoseKp]] = field(default_factory=list)
     persons_hands: list[list[PoseKp]] = field(default_factory=list)
+    # MediaPipe pose_world_landmarks per person : 33 keypoints in meters,
+    # relative to the hip-center. Optional companion of persons_body
+    # (image-space xy). Empty if no detection or backend doesn't emit it.
+    persons_body3d: list[list[Kp3D]] = field(default_factory=list)
     # IDs persistants entre frames (ByteTrack-like via Hungarian IoU).
     # Couleur du skeleton dans le shader Metal = ID % palette_size.
     persons_body_ids:  list[int] = field(default_factory=list)

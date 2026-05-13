@@ -268,6 +268,21 @@ class AppDelegate(NSObject):
                     self._smplx_tcp = SMPLXTCPSender(self._state)
                     self._smplx_tcp.start()
                     LOG.info("worker: Multi-HMR + SMPL-X (mesh dense)")
+                    # Also start MediaPipe Multi for body3d + face + hand
+                    # OSC streams to AVLiveBody (mesh and skeleton/face/
+                    # hand pipelines run in parallel, each owns its own
+                    # AVCapture session on the same builtin camera).
+                    if _os.environ.get("AV_LIVE_MEDIAPIPE") != "0":
+                        try:
+                            from .multi import MultiWorker
+                            self._mediapipe_worker = MultiWorker(
+                                self._state, num_persons=4)
+                            self._mediapipe_worker.start()
+                            LOG.info("worker: + MediaPipe Multi (3D pose "
+                                     "+ face + hand) in parallel")
+                        except Exception as e:  # noqa: BLE001
+                            LOG.warning("MediaPipe parallel start failed "
+                                        "(%s) — mesh only", e)
                     return
                 LOG.info("Multi-HMR indisponible (checkpoints manquants) "
                          "— voir scripts/setup_multihmr.sh")

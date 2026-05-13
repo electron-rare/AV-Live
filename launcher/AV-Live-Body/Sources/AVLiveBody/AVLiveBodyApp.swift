@@ -1,8 +1,19 @@
 import Cocoa
 import SwiftUI
 
+// SwiftPM binaries lack a bundle Info.plist, so macOS treats us as a
+// background CLI app and never shows the WindowGroup window. The
+// AppDelegate forces regular activation after NSApp is initialized.
+class AppDelegate: NSObject, NSApplicationDelegate {
+    func applicationDidFinishLaunching(_ notification: Notification) {
+        NSApp.setActivationPolicy(.regular)
+        NSApp.activate(ignoringOtherApps: true)
+    }
+}
+
 @main
 struct AVLiveBodyApp: App {
+    @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
     var body: some Scene {
         WindowGroup {
             ContentView()
@@ -46,6 +57,11 @@ struct AVLiveBodyApp: App {
                         KeyEquivalent(Character(String(i))),
                         modifiers: [])
                 }
+                // Alias 'p' for openpos (skeleton view).
+                Button("p — openpos (squelette)") {
+                    NotificationCenter.default.post(
+                        name: .setVizMode, object: 9)
+                }.keyboardShortcut("p", modifiers: [])
             }
         }
     }
@@ -61,11 +77,12 @@ struct ContentView: View {
     @StateObject private var renderer = MeshRenderer()
     @StateObject private var settings = RenderSettings()
     @StateObject private var poseListener = PoseOSCListener()
+    @StateObject private var skeleton3d = Skeleton3DRenderer()
 
     var body: some View {
         ZStack(alignment: .topLeading) {
             BodyView(renderer: renderer, settings: settings,
-                     poseListener: poseListener)
+                     poseListener: poseListener, skeleton3d: skeleton3d)
                 .onAppear {
                     renderer.startOSCServer()
                     poseListener.start()
@@ -82,6 +99,10 @@ struct ContentView: View {
                     for: .setVizMode)) { note in
                     if let n = note.object as? Int { settings.vizMode = n }
                 }
+
+            // Face + hand skeleton overlay (data_only_viz/pose_bridge.py)
+            FaceHandOverlay(poseListener: poseListener)
+                .allowsHitTesting(false)
 
             // HUD coin haut-gauche : mode + touches + pose
             HUDOverlay(settings: settings, poseListener: poseListener)

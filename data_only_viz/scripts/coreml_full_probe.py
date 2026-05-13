@@ -492,6 +492,9 @@ try:
         compute_units=ct.ComputeUnit.CPU_AND_GPU,
         minimum_deployment_target=ct.target.macOS15,
         convert_to="mlprogram",
+        # FP16 default causes NaN in inverse projection / SMPL-X decoder
+        # (Multi-HMR has values that overflow the FP16 range). Force FP32.
+        compute_precision=ct.precision.FLOAT32,
     )
     out_path = "/tmp/multihmr_full_672_s.mlpackage"
     mlmodel.save(out_path)

@@ -21,7 +21,7 @@ from pathlib import Path
 
 from .euro_filter import SkeletonFilter
 from .pose_bridge import PoseSoundBridge
-from .state import PoseKp, State
+from .state import Kp3D, PoseKp, State
 from .tracker import IoUTracker
 
 LOG = logging.getLogger("multi")
@@ -198,6 +198,21 @@ class MultiWorker:
                         x=float(lm.x), y=float(lm.y), z=z, c=float(v)))
                 bodies.append(kp_list)
 
+            # pose_world_landmarks : xyz metric, relative to hip-center.
+            # Aligned 1:1 with pose_landmarks order. Empty fallback if
+            # the MediaPipe build doesn't populate it.
+            bodies3d: list[list[Kp3D]] = []
+            world_list = getattr(pose_res, "pose_world_landmarks", None) or []
+            for landmarks_list in world_list:
+                kp3_list: list[Kp3D] = []
+                for lm in landmarks_list[:33]:
+                    v = lm.visibility if lm.visibility is not None else 1.0
+                    kp3_list.append(Kp3D(
+                        x=float(lm.x), y=float(lm.y),
+                        z=float(lm.z if lm.z is not None else 0.0),
+                        c=float(v)))
+                bodies3d.append(kp3_list)
+
             faces = []
             for landmarks_list in (face_res.face_landmarks or []):
                 kp_list = []
@@ -230,16 +245,21 @@ class MultiWorker:
                       for i, kps in enumerate(hands)]
 
             # Pont sonore : envoi OSC /pose/* a sclang (body + face + hands)
+            # 3D world landmarks share ids with bodies (same MediaPipe
+            # detection, just a different coordinate space).
+            ids_body3d = ids_body[:len(bodies3d)] if bodies3d else []
             self._sound_bridge.send(
                 bodies, ids_body, t_now,
                 persons_face=faces, persons_face_ids=ids_face,
-                persons_hands=hands, persons_hands_ids=ids_hand)
+                persons_hands=hands, persons_hands_ids=ids_hand,
+                persons_body3d=bodies3d, persons_body3d_ids=ids_body3d)
 
             with self.state.lock():
                 self.state.persons_body = bodies
                 self.state.persons_face = faces
                 self.state.persons_hands = hands
                 self.state.persons_body_ids  = ids_body
+                self.state.persons_body3d = bodies3d
                 self.state.persons_face_ids  = ids_face
                 self.state.persons_hands_ids = ids_hand
                 # Compat single-person (1ere personne)
