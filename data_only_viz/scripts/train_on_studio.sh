@@ -21,6 +21,7 @@ set -euo pipefail
 
 BASTION_USER_HOST="${BASTION_USER_HOST:-electron-server}"
 STUDIO_USER_HOST="${STUDIO_USER_HOST:-clems@100.116.92.12}"
+STUDIO_USER="${STUDIO_USER:-clems}"
 STUDIO_UV="${STUDIO_UV:-/opt/homebrew/bin/uv}"
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")"/../.. && pwd)"
@@ -28,7 +29,7 @@ LOCAL_CACHE="$HOME/.cache/av-live-action"
 LOCAL_DATASET="$LOCAL_CACHE/dataset"
 LOCAL_CKPT="$LOCAL_CACHE/checkpoints"
 
-REMOTE_ROOT="\$HOME/av-live-action"
+REMOTE_ROOT="/Users/${STUDIO_USER}/av-live-action"
 REMOTE_REPO="$REMOTE_ROOT/repo"
 REMOTE_DATASET="$REMOTE_ROOT/dataset"
 REMOTE_CKPT="$REMOTE_ROOT/checkpoints"
@@ -43,8 +44,13 @@ log() { printf '[train_on_studio] %s\n' "$*" >&2; }
 mkdir -p "$LOCAL_CKPT"
 
 bastion_ssh() {
+  # The remote shell on the bastion must receive the studio command
+  # as a single argument, otherwise `;` and `&&` are parsed
+  # bastion-side instead of studio-side.
+  # All paths in commands MUST be absolute (no $HOME, no ~) since
+  # we use single-quotes for the studio-side payload.
   ssh -o ConnectTimeout=5 "$BASTION_USER_HOST" \
-      "ssh -o ConnectTimeout=5 $STUDIO_USER_HOST $*"
+      "ssh -o ConnectTimeout=5 $STUDIO_USER_HOST '$*'"
 }
 
 bastion_rsync() {
