@@ -25,7 +25,6 @@ def _make_person(pid: int = 7) -> SMPLXPerson:
 
 
 def test_serialize_person_layout():
-    sender = SMPLXTCPSender.__new__(SMPLXTCPSender)
     p = _make_person()
     # _serialize_persons returns bytes starting with MAGIC + n_persons header
     payload = SMPLXTCPSender._serialize_persons([p])
@@ -56,14 +55,17 @@ def test_serialize_person_layout():
 
 def test_serialize_person_round_trip_handles_non_contiguous_input():
     """Vertex arrays that come from slicing / transpose must still serialize cleanly."""
-    sender = SMPLXTCPSender.__new__(SMPLXTCPSender)
     p = _make_person()
-    # Force a non-contiguous view:
-    p.vertices_3d = p.vertices_3d[::1, :].T.T
+    # Force a Fortran-order copy, which is NOT C-contiguous:
+    p.vertices_3d = np.asfortranarray(p.vertices_3d)
+    assert not p.vertices_3d.flags["C_CONTIGUOUS"], "test setup invariant"
+
     payload = SMPLXTCPSender._serialize_persons([p])
-    assert len(payload) == _HEADER + _PER_PERSON
-    base = _HEADER
+    # Same byte layout as the contiguous case:
+    base = 8  # MAGIC + n_persons
+    per_person_offset = base + 4 + 4 + 12 + 40 + 40  # pid + conf + trans + betas + expr
     verts = np.frombuffer(
-        payload, dtype="<f4", count=10475 * 3, offset=base + 8 + 12 + 40 + 40
+        payload, dtype="<f4", count=10475 * 3, offset=per_person_offset
     ).reshape(10475, 3)
+    # The wire bytes must match the LOGICAL vertex data, not the storage order:
     np.testing.assert_allclose(verts, p.vertices_3d, rtol=0, atol=0)
