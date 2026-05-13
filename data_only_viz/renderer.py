@@ -19,6 +19,8 @@ import struct
 import time
 from pathlib import Path
 
+import numpy as np
+
 import objc
 from Cocoa import NSObject, NSColor, NSMakeRect
 from Metal import (
@@ -142,6 +144,7 @@ class MetalRenderer(NSObject):
         self._mesh_buf = self._device.newBufferWithLength_options_(
             MESH_MAX_TRIS * 3 * MESH_VERT_FLOATS * 4, MTLResourceStorageModeShared)
         self._mp_bones = _mediapipe_bones()  # None si pas dispo
+        self._init_skel_cpu_buffer()
         self._build_pipelines()
         self._last_lightning_emit = 0.0
         return self
@@ -226,6 +229,16 @@ class MetalRenderer(NSObject):
             raise RuntimeError(f"mesh pipeline failed: {err}")
         self._mesh_pipe = p
 
+    # ---- CPU staging buffers --------------------------------------
+    def _init_skel_cpu_buffer(self) -> None:
+        """Preallocate the CPU staging buffer for skeleton segments.
+
+        SKEL_MAX_SEGS * 10 floats : each segment = 2 verts × 5 floats
+        (x, y, z, conf, pid).  Idempotent — no-op if already allocated.
+        """
+        if getattr(self, "_skel_cpu_buf", None) is None:
+            self._skel_cpu_buf = np.zeros(SKEL_MAX_SEGS * 10, dtype=np.float32)
+
     # ---- Uniforms helpers ------------------------------------------
     def _update_uniforms(self) -> int:
         s = self._state
@@ -286,19 +299,19 @@ class MetalRenderer(NSObject):
         if not s.pose_alive():
             return 0
 
-        floats: list[float] = []
+        buf = self._skel_cpu_buf
         segs = 0
 
         def push(A, B, conf, pid):
-            """Empile un segment (2 verts). Chaque vert = (x, y, z, conf, pid)."""
+            """Empile un segment (2 verts) dans le buffer CPU prealloque."""
             nonlocal segs
             if segs >= SKEL_MAX_SEGS:
                 return False
             ax = A.x * 2.0 - 1.0; ay = 1.0 - A.y * 2.0
             bx = B.x * 2.0 - 1.0; by = 1.0 - B.y * 2.0
-            az = float(A.z); bz = float(B.z)
-            floats.extend([ax, ay, az, conf, float(pid),
-                           bx, by, bz, conf, float(pid)])
+            i = segs * 10
+            buf[i+0] = ax; buf[i+1] = ay; buf[i+2] = float(A.z); buf[i+3] = conf; buf[i+4] = float(pid)
+            buf[i+5] = bx; buf[i+6] = by; buf[i+7] = float(B.z); buf[i+8] = conf; buf[i+9] = float(pid)
             segs += 1
             return True
 
@@ -359,7 +372,7 @@ class MetalRenderer(NSObject):
 
         if segs == 0:
             return 0
-        data = struct.pack(f"{len(floats)}f", *floats)
+        data = self._skel_cpu_buf[: segs * 10].tobytes()
         mv = self._skel_buf.contents().as_buffer(len(data))
         mv[:] = data
         return segs
