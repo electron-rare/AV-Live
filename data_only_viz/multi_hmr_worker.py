@@ -6,7 +6,7 @@ sys.path au runtime. Chaque humain renvoye contient deja les vertices
 SMPL-X decodes (cle `v3d`, shape (10475, 3)) ; pas besoin du decoder
 SMPL-X separe en hot path (il reste utile pour les tests).
 
-Cadence cible : 8-12 fps sur M5 (ViT-L). Lissage One Euro sur les
+Cadence cible : 8-12 fps sur M5 (ViT-S). Lissage One Euro sur les
 shapes/expression pour limiter le jitter trame-a-trame.
 """
 from __future__ import annotations
@@ -27,11 +27,11 @@ from .tracker import IoUTracker
 LOG = logging.getLogger("multi_hmr")
 
 CACHE = Path.home() / ".cache" / "av-live-multihmr"
-CKPT = CACHE / "checkpoints" / "multiHMR_896_L.pt"
+CKPT = CACHE / "checkpoints" / "multiHMR_672_S.pt"
 SMPLX_PATH = CACHE / "models" / "smplx" / "SMPLX_NEUTRAL.npz"
 MULTIHMR_REPO = CACHE / "multi-hmr"
 
-IMG_SIZE = 896
+IMG_SIZE = 672
 N_VERTS = 10475
 
 
@@ -191,13 +191,27 @@ class MultiHMRWorker:
                 continue
 
             t_post_start = time.monotonic()
+            t_now = time.monotonic()
+            # Count frame + heartbeat regardless of detection — keeps the
+            # FPS metric meaningful when nobody is in the camera view.
+            frame_count += 1
+            persons_count += len(humans) if humans else 0
+            if t_now >= next_heartbeat:
+                fps = frame_count / 5.0
+                avg = persons_count / max(1, frame_count)
+                LOG.info(
+                    "hb: %.1f fps, %.2f persons/frame (%d frames)",
+                    fps, avg, frame_count)
+                frame_count = 0
+                persons_count = 0
+                next_heartbeat = t_now + 5.0
             if not humans:
                 with self.state.lock():
                     self.state.persons_smplx = []
+                inf_ms = (t_post_start - t_inf_start) * 1e3
+                LOG.debug("frame (no detect): inf=%.1fms", inf_ms)
                 time.sleep(self.period)
                 continue
-
-            t_now = time.monotonic()
 
             # Tracking via bbox approximee depuis verts projetes (xy)
             bboxes = []
@@ -262,18 +276,6 @@ class MultiHMRWorker:
                     (t_end - t_post_start) * 1e3,
                     dt_total,
                 )
-
-            frame_count += 1
-            persons_count += len(persons)
-            if t_now >= next_heartbeat:
-                fps = frame_count / 5.0
-                avg = persons_count / max(1, frame_count)
-                LOG.info(
-                    "hb: %.1f fps, %.2f persons/frame (%d frames)",
-                    fps, avg, frame_count)
-                frame_count = 0
-                persons_count = 0
-                next_heartbeat = t_now + 5.0
 
             dt = time.monotonic() - t_cap_start
             if dt < self.period:

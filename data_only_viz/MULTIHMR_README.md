@@ -40,10 +40,10 @@ data_only_viz/.venv/bin/python -m data_only_viz.main \
 ## Architecture
 
 ```
-webcam Mac (cv2 idx 0, 896x896)
+webcam Mac (cv2 idx 0, 672x672)
     |
     v
-Multi-HMR ViT-L (PyTorch MPS, ~317M params)
+Multi-HMR ViT-S (PyTorch MPS, ~31.5M params)
     |
     v
 humans = [{v3d (10475,3), j3d, transl, shape, expression, ...}, ...]
@@ -81,9 +81,16 @@ AVLiveBody Swift
 
 ## FPS attendu
 
-- Multi-HMR ViT-L MPS : ~150-200 ms / frame = 5-7 fps
-- ViT-B (`multiHMR_672_B.pt`) : ~80 ms = 12 fps si on accepte moins
-  de precision
+- Multi-HMR ViT-S MPS mesure 2026-05-13 :
+  - bench headless (dummy 672x672, 20 iter) : 199 ms median = 5.0 fps
+  - bench camera live (30 s real capture) : 228 ms median = 3.8 fps
+    (overhead capture/pre/tensor ~30 ms)
+- Pas de speedup significatif vs ViT-L : le bottleneck n'est PAS le
+  backbone DINOv2 sur MPS — probablement la tete SMPL-X (identique
+  entre variantes S/B/L) et l'absence de SDPA fused / xFormers sur MPS.
+  La piste "ViT-S pour gagner du FPS" est invalidee par mesure.
+- Fallback ViT-L (`multiHMR_896_L.pt`) : ~150-200 ms = 5-7 fps si
+  precision insuffisante avec ViT-S
 - TCP sender throttle a 12 fps cible
 - RealityKit render : 60 fps Cocoa, interpole entre frames Multi-HMR
 
@@ -92,7 +99,7 @@ AVLiveBody Swift
 ```
 ~/.cache/av-live-multihmr/
 ├── checkpoints/
-│   └── multiHMR_896_L.pt              (1.28 GB)
+│   └── multiHMR_672_S.pt              (124 MB)
 ├── models/
 │   ├── smplx/
 │   │   ├── SMPLX_NEUTRAL.npz          (108 MB)
@@ -109,7 +116,7 @@ AVLiveBody Swift
 
 | Symptome | Verification |
 |----------|--------------|
-| Pas de mesh visible | `ls ~/.cache/av-live-multihmr/checkpoints/multiHMR_896_L.pt` |
+| Pas de mesh visible | `ls ~/.cache/av-live-multihmr/checkpoints/multiHMR_672_S.pt` |
 | `Multi-HMR load failed` | `~/.cache/av-live-multihmr/models/smplx/SMPLX_NEUTRAL.npz` present ? |
 | `TCP refused on :57130` | Lancer l'app Swift AVANT le worker Python |
 | FPS trop bas | Switcher vers ViT-B en editant `CKPT` dans `multi_hmr_worker.py` |

@@ -11,16 +11,16 @@ if [ ! -d "$CACHE/multi-hmr" ]; then
     git clone --depth=1 https://github.com/naver/multi-hmr.git "$CACHE/multi-hmr"
 fi
 
-CKPT="$CACHE/checkpoints/multiHMR_896_L.pt"
+CKPT="$CACHE/checkpoints/multiHMR_672_S.pt"
 if [ ! -f "$CKPT" ]; then
-    echo "==> Telechargement checkpoint multiHMR_896_L (ViT-L)"
+    echo "==> Telechargement checkpoint multiHMR_672_S (ViT-S)"
     # Source primaire : Naver Labs Europe ; fallback : HuggingFace mirror
     if ! curl -fL --progress-bar \
-        "https://download.europe.naverlabs.com/ComputerVision/MultiHMR/multiHMR_896_L.pt" \
+        "https://download.europe.naverlabs.com/ComputerVision/MultiHMR/multiHMR_672_S.pt" \
         -o "$CKPT"; then
         echo "==> Fallback HuggingFace"
         curl -fL --progress-bar \
-            "https://huggingface.co/naver/multiHMR_896_L/resolve/main/multiHMR_896_L.pt" \
+            "https://huggingface.co/naver/multiHMR_672_S/resolve/main/multiHMR_672_S.pt" \
             -o "$CKPT"
     fi
 fi

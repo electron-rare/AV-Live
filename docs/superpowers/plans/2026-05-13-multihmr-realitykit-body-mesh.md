@@ -1578,7 +1578,7 @@ RealityKit ARView : mesh skinné en couleur par pid
 - Pas de mesh affiché : vérifier `~/.cache/av-live-multihmr/checkpoints/multiHMR_*.pt` existe
 - Pas de SMPL-X : vérifier `~/.cache/av-live-multihmr/models/smplx/SMPLX_NEUTRAL.npz`
 - TCP refused : l'app Swift doit tourner AVANT le worker Python
-- FPS bas : passer à ViT-S (`multiHMR_896_S_*.pt`) qui est plus rapide
+- Precision insuffisante : passer à ViT-L (`multiHMR_896_L.pt`) qui est plus précis (default est ViT-S depuis 2026-05-13)
 ```
 
 - [ ] **Step 3: Commit final**
