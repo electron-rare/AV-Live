@@ -70,6 +70,10 @@ struct BodyView: NSViewRepresentable {
         arView.scene.addAnchor(bodyAnchor)
         container.addSubview(arView)
 
+        // 60 fps mesh interpolation between Multi-HMR frames (Python
+        // worker emits ~4 fps). Hook into RealityKit Update event.
+        renderer.attachToScene(arView.scene)
+
         context.coordinator.bodyAnchor = bodyAnchor
         context.coordinator.arView = arView
         context.coordinator.cameraEntity = camEntity

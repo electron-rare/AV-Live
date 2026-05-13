@@ -12,8 +12,51 @@ final class MeshRenderer: ObservableObject {
     private var faces: [UInt32] = []
     private var oscServer: OSCServer?
 
+    // Interpolation 60 fps entre frames Multi-HMR (typ. ~4 fps Python).
+    // Lerp exponentiel: displayed = lerp(displayed, target, alpha).
+    // alpha=0.3 a 60 fps -> 90% du gap parcouru en ~7 frames (~115 ms).
+    private struct InterpState {
+        var displayed: [SIMD3<Float>]
+        var target: [SIMD3<Float>]
+    }
+    private var interpStates: [Int: InterpState] = [:]
+    private var sceneSub: (any Cancellable)?
+    private var interpTickCounter: Int = 0
+    // SceneEvents.Update fires ~60 fps ; on lerp 1 tick sur 2 = 30 fps.
+    // Alpha re-ajuste pour atteindre ~90% du gap en ~115 ms a 30 Hz
+    // (au lieu de 60 Hz precedemment) -> alpha plus eleve.
+    private static let interpAlpha: Float = 0.5
+    private static let interpStride: Int = 2
+
     init() {
         loadFaces()
+    }
+
+    func attachToScene(_ scene: RealityKit.Scene) {
+        sceneSub = scene.subscribe(to: SceneEvents.Update.self) {
+            [weak self] _ in
+            Task { @MainActor in self?.tickInterp() }
+        }
+    }
+
+    private func tickInterp() {
+        interpTickCounter &+= 1
+        if interpTickCounter % Self.interpStride != 0 { return }
+        let alpha = Self.interpAlpha
+        let oneMinus: Float = 1.0 - alpha
+        for (pid, state) in interpStates {
+            guard let entity = personEntities[pid] else { continue }
+            var displayed = state.displayed
+            let n = min(displayed.count, state.target.count)
+            for i in 0..<n {
+                displayed[i] = state.displayed[i] * oneMinus
+                    + state.target[i] * alpha
+            }
+            interpStates[pid] = InterpState(
+                displayed: displayed, target: state.target)
+            updateMeshVertices(
+                entity, vertices: displayed, updateNormals: false)
+        }
     }
 
     private func loadFaces() {
@@ -72,14 +115,18 @@ final class MeshRenderer: ObservableObject {
             lowLevelMeshes.removeValue(forKey: pid)
             wireframeMeshes.removeValue(forKey: pid)
             wireframeEntities.removeValue(forKey: pid)
+            interpStates.removeValue(forKey: pid)
         }
         for p in persons {
             let entity: ModelEntity
+            let isFirstFrame: Bool
             if let existing = personEntities[p.pid] {
                 entity = existing
+                isFirstFrame = false
             } else {
                 entity = makeEntity(pid: p.pid)
                 entity.components.set(PidComponent(pid: p.pid))
+                isFirstFrame = true
             }
             // Multi-HMR v3d est en coord camera ABSOLUE (deja inclut la
             // translation). On flip y/z (MH y-down z-forward -> RK
@@ -87,7 +134,19 @@ final class MeshRenderer: ObservableObject {
             let converted = p.vertices.map { v in
                 SIMD3<Float>(v.x, -v.y, -v.z)
             }
-            updateMeshVertices(entity, vertices: converted)
+            // Update interp target; first frame pushes immediately so
+            // mesh apparait sans attendre le premier tick.
+            if isFirstFrame {
+                interpStates[p.pid] = InterpState(
+                    displayed: converted, target: converted)
+                updateMeshVertices(entity, vertices: converted)
+            } else if let prior = interpStates[p.pid] {
+                interpStates[p.pid] = InterpState(
+                    displayed: prior.displayed, target: converted)
+            } else {
+                interpStates[p.pid] = InterpState(
+                    displayed: converted, target: converted)
+            }
             entity.transform.translation = SIMD3<Float>.zero
             // Bbox debug : utile une fois par creation
             if personEntities[p.pid] == nil {
@@ -222,8 +281,12 @@ final class MeshRenderer: ObservableObject {
 
     /// Update les positions des vertices in-place via LowLevelMesh
     /// (macOS 14+) ; fallback rebuild du MeshResource si indisponible.
+    /// `updateNormals=false` saute le recalcul des normales (~24 ms sur
+    /// 10475 verts) — utile pendant l'interp 60 fps ou les normales
+    /// stockees restent valides ~150 ms (1 frame Python).
     private func updateMeshVertices(_ entity: ModelEntity,
-                                    vertices: [SIMD3<Float>]) {
+                                    vertices: [SIMD3<Float>],
+                                    updateNormals: Bool = true) {
         let t0 = CFAbsoluteTimeGetCurrent()
         let pid = entity.components[PidComponent.self]?.pid ?? -1
         if let mesh = lowLevelMeshes[pid] {
@@ -244,13 +307,16 @@ final class MeshRenderer: ObservableObject {
             // Buffer 1 : normales (calculees a partir des triangles).
             // Necessaire pour que SimpleMaterial (lit) calcule un
             // shading qui donne du relief au mesh ; sans normales le
-            // mesh apparait en aplats de couleur.
-            let normals = Self.computeVertexNormals(
-                vertices: vertices, faces: faces)
-            mesh.withUnsafeMutableBytes(bufferIndex: 1) { rawPtr in
-                let dst = rawPtr.bindMemory(to: SIMD3<Float>.self)
-                let n = min(dst.count, normals.count)
-                for i in 0..<n { dst[i] = normals[i] }
+            // mesh apparait en aplats de couleur. Skip pendant les
+            // interp ticks pour eviter de bloquer le MainActor 60x/s.
+            if updateNormals {
+                let normals = Self.computeVertexNormals(
+                    vertices: vertices, faces: faces)
+                mesh.withUnsafeMutableBytes(bufferIndex: 1) { rawPtr in
+                    let dst = rawPtr.bindMemory(to: SIMD3<Float>.self)
+                    let n = min(dst.count, normals.count)
+                    for i in 0..<n { dst[i] = normals[i] }
+                }
             }
             let dtMs = (CFAbsoluteTimeGetCurrent() - t0) * 1000
             if dtMs > 5 {
