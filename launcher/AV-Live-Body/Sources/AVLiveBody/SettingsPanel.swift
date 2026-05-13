@@ -37,7 +37,7 @@ struct SettingsPanel: View {
 
     private var header: some View {
         HStack {
-            Text("AV-Live-Body settings")
+            Text("Réglages AV-Live-Body")
                 .font(.headline)
                 .foregroundColor(.white)
             Spacer()
@@ -53,18 +53,18 @@ struct SettingsPanel: View {
 
     private var layersSection: some View {
         VStack(alignment: .leading, spacing: 8) {
-            sectionTitle("Layers")
+            sectionTitle("Couches")
             layerRow(icon: "video.fill",
                      label: "Webcam",
                      isOn: $settings.showCamera)
             layerRow(icon: "person.fill",
-                     label: "Mesh SMPL-X",
+                     label: "Maillage SMPL-X",
                      isOn: $settings.showMesh)
             layerRow(icon: "circle.dotted",
-                     label: "Wireframe",
+                     label: "Fil de fer",
                      isOn: $settings.showWireframe)
             layerRow(icon: "figure.stand",
-                     label: "Skeleton (joints)",
+                     label: "Squelette (articulations)",
                      isOn: $settings.showSkeleton)
         }
     }
@@ -72,7 +72,7 @@ struct SettingsPanel: View {
     private var cameraSection: some View {
         VStack(alignment: .leading, spacing: 8) {
             sectionTitle("Webcam")
-            slider("Opacity",
+            slider("Opacité",
                    value: $settings.camOpacity,
                    in: 0...1, format: "%.2f")
         }
@@ -80,10 +80,10 @@ struct SettingsPanel: View {
 
     private var meshSection: some View {
         VStack(alignment: .leading, spacing: 8) {
-            sectionTitle("Mesh")
-            Toggle("Metallic", isOn: $settings.meshMetallic)
+            sectionTitle("Maillage")
+            Toggle("Métallique", isOn: $settings.meshMetallic)
                 .foregroundColor(.white)
-            slider("Roughness",
+            slider("Rugosité",
                    value: $settings.meshRoughness,
                    in: 0...1, format: "%.2f")
         }
@@ -91,14 +91,14 @@ struct SettingsPanel: View {
 
     private var lightsSection: some View {
         VStack(alignment: .leading, spacing: 8) {
-            sectionTitle("Lights")
-            slider("Key (warm, front-right)",
+            sectionTitle("Lumières")
+            slider("Principale (chaude, avant-droite)",
                    value: $settings.keyIntensity,
                    in: 0...10000, format: "%.0f")
-            slider("Fill (cool, front-left)",
+            slider("Remplissage (froide, avant-gauche)",
                    value: $settings.fillIntensity,
                    in: 0...10000, format: "%.0f")
-            slider("Rim (back)",
+            slider("Contre-jour (arrière)",
                    value: $settings.rimIntensity,
                    in: 0...10000, format: "%.0f")
         }
@@ -106,11 +106,11 @@ struct SettingsPanel: View {
 
     private var viewSection: some View {
         VStack(alignment: .leading, spacing: 8) {
-            sectionTitle("View")
-            slider("Field of view",
+            sectionTitle("Vue")
+            slider("Champ de vision",
                    value: $settings.fieldOfView,
                    in: 20...120, format: "%.0f°")
-            slider("Background brightness",
+            slider("Luminosité du fond",
                    value: $settings.bgBrightness,
                    in: 0...0.5, format: "%.2f")
         }
