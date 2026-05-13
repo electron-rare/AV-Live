@@ -27,47 +27,64 @@ struct MenuBarContent: View {
             Divider()
 
             // -- Process rows pilotes par le mode -----------------------
-            // SC + oF sont communs aux deux modes. Seul le web UI est
-            // reserve au mode Full.
-            ProcessRow(
-                title: "SuperCollider",
-                subtitle: processManager.mode == .dataOnly
-                    ? "sclang + scsynth (pas de web bridge)"
-                    : "sclang + scsynth + web bridge",
-                isRunning: processManager.sclangRunning,
-                start: processManager.startSclang,
-                stop: processManager.stopSclang
-            )
-            if processManager.mode == .dataOnly {
+            if processManager.mode == .bodyMesh {
+                // Mode mesh-only : juste Multi-HMR worker headless + AVB
                 ProcessRow(
-                    title: "Metal Viz",
-                    subtitle: "Python + pyobjc + Metal (data-only)",
+                    title: "Multi-HMR worker",
+                    subtitle: "Python headless — SMPL-X via TCP :57130",
                     isRunning: processManager.metalVizRunning,
                     start: processManager.startMetalViz,
                     stop: processManager.stopMetalViz
                 )
-                Toggle("Multi-HMR (mesh SMPL-X dense via :57130)",
-                       isOn: $processManager.useMultiHMR)
-                    .toggleStyle(.switch)
-                    .font(.caption)
-                    .padding(.horizontal, 4)
-                if processManager.bodyAppRunning {
+                ProcessRow(
+                    title: "AV-Live-Body",
+                    subtitle: "RealityKit mesh renderer + cam overlay",
+                    isRunning: processManager.bodyAppRunning,
+                    start: processManager.startBodyApp,
+                    stop: processManager.stopBodyApp
+                )
+            } else {
+                // SC + oF sont communs aux modes full / dataOnly.
+                ProcessRow(
+                    title: "SuperCollider",
+                    subtitle: processManager.mode == .dataOnly
+                        ? "sclang + scsynth (pas de web bridge)"
+                        : "sclang + scsynth + web bridge",
+                    isRunning: processManager.sclangRunning,
+                    start: processManager.startSclang,
+                    stop: processManager.stopSclang
+                )
+                if processManager.mode == .dataOnly {
                     ProcessRow(
-                        title: "AV-Live-Body",
-                        subtitle: "RealityKit SMPL-X mesh renderer",
-                        isRunning: true,
-                        start: processManager.startBodyApp,
-                        stop: processManager.stopBodyApp
+                        title: "Metal Viz",
+                        subtitle: "Python + pyobjc + Metal (data-only)",
+                        isRunning: processManager.metalVizRunning,
+                        start: processManager.startMetalViz,
+                        stop: processManager.stopMetalViz
+                    )
+                    Toggle("Multi-HMR (mesh SMPL-X dense via :57130)",
+                           isOn: $processManager.useMultiHMR)
+                        .toggleStyle(.switch)
+                        .font(.caption)
+                        .padding(.horizontal, 4)
+                    if processManager.bodyAppRunning {
+                        ProcessRow(
+                            title: "AV-Live-Body",
+                            subtitle: "RealityKit SMPL-X mesh renderer",
+                            isRunning: true,
+                            start: processManager.startBodyApp,
+                            stop: processManager.stopBodyApp
+                        )
+                    }
+                } else {
+                    ProcessRow(
+                        title: "Oscilloscope",
+                        subtitle: "oscope-of visualizer",
+                        isRunning: processManager.oscopeRunning,
+                        start: processManager.startOscope,
+                        stop: processManager.stopOscope
                     )
                 }
-            } else {
-                ProcessRow(
-                    title: "Oscilloscope",
-                    subtitle: "oscope-of visualizer",
-                    isRunning: processManager.oscopeRunning,
-                    start: processManager.startOscope,
-                    stop: processManager.stopOscope
-                )
             }
             if processManager.mode == .full {
                 ProcessRow(
@@ -78,15 +95,17 @@ struct MenuBarContent: View {
                     stop: processManager.stopWeb
                 )
             }
-            ProcessRow(
-                title: "Data Feeds",
-                subtitle: processManager.mode == .dataOnly
-                    ? "config.data-only.toml — pose YOLO + opendata"
-                    : "USGS · SWPC · Grid · Lightning · Pose · …",
-                isRunning: processManager.dataFeedsRunning,
-                start: processManager.startDataFeeds,
-                stop: processManager.stopDataFeeds
-            )
+            if processManager.mode != .bodyMesh {
+                ProcessRow(
+                    title: "Data Feeds",
+                    subtitle: processManager.mode == .dataOnly
+                        ? "config.data-only.toml — pose YOLO + opendata"
+                        : "USGS · SWPC · Grid · Lightning · Pose · …",
+                    isRunning: processManager.dataFeedsRunning,
+                    start: processManager.startDataFeeds,
+                    stop: processManager.stopDataFeeds
+                )
+            }
 
             if processManager.mode == .full {
                 HStack {

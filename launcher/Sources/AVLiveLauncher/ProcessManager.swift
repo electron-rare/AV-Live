@@ -12,11 +12,13 @@ struct LogLine: Identifiable, Equatable {
 enum LaunchMode: String, CaseIterable, Identifiable {
     case full       // sclang + oscope + web + data_feeds
     case dataOnly   // uniquement data_feeds (open data + pose YOLO)
+    case bodyMesh   // Multi-HMR worker + AV-Live-Body (mesh seul)
     var id: String { rawValue }
     var displayName: String {
         switch self {
         case .full:     return "Full AV-Live"
         case .dataOnly: return "Data-only (SC + oF + feeds, no web)"
+        case .bodyMesh: return "Body Mesh (Multi-HMR + RealityKit)"
         }
     }
 }
@@ -71,17 +73,20 @@ final class ProcessManager: ObservableObject {
                text: "mode switched: \(old.rawValue) → \(new.rawValue)")
         switch new {
         case .dataOnly:
-            // En data-only : web UI n'a plus de sens (l'UI Hydra/control
-            // dialogue avec sclang, qu'on garde, mais le serveur Node ajoute
-            // une dependance inutile et peut tourner en zombie).
             if webRunning { stopWeb() }
-            // data_feeds doit tourner avec config.data-only.toml : on
-            // relance s'il etait deja up pour qu'il prenne le bon profil.
             if dataFeedsRunning { restartDataFeeds() }
         case .full:
-            // Rien a couper : tout est compatible. data_feeds reste sur
-            // son config (l'utilisateur peut le restart manuellement).
             break
+        case .bodyMesh:
+            // Mode mesh-only : on coupe tout ce qui n'est pas le worker
+            // Multi-HMR + AV-Live-Body. SC, oF, web, data_feeds inutiles.
+            if sclangRunning { stopSclang() }
+            if oscopeRunning { stopOscope() }
+            if webRunning { stopWeb() }
+            if dataFeedsRunning { stopDataFeeds() }
+            // Forcer useMultiHMR=true pour que startMetalViz pousse le
+            // worker en headless et spawn AV-Live-Body.
+            useMultiHMR = true
         }
     }
 

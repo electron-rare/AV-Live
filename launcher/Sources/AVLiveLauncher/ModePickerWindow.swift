@@ -34,6 +34,14 @@ struct ModePickerView: View {
                 ) {
                     finish(.dataOnly)
                 }
+                ModeCard(
+                    title: "Body Mesh",
+                    subtitle: "Multi-HMR + AV-Live-Body RealityKit\nMesh SMPL-X seul, pas de SC / feeds",
+                    icon: "figure.walk",
+                    color: .pink
+                ) {
+                    finish(.bodyMesh)
+                }
             }
 
             Divider()
