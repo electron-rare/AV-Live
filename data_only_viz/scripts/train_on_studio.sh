@@ -36,7 +36,17 @@ REMOTE_CKPT="$REMOTE_ROOT/checkpoints"
 
 DATASET_FILE="${DATASET_FILE:-$LOCAL_DATASET/dataset.jsonl}"
 CKPT_NAME="${CKPT_NAME:-action_head.pt}"
-TRAIN_ARGS="$*"
+
+# Quote train args defensively before forwarding through bastion ssh +
+# studio ssh (each layer reparses). Reject single quotes — they break
+# the single-quoted payload in bastion_ssh and could allow injection.
+for a in "$@"; do
+  if [[ "$a" == *"'"* ]]; then
+    printf '[train_on_studio] forbidden single quote in arg: %s\n' "$a" >&2
+    exit 3
+  fi
+done
+TRAIN_ARGS="$(printf '%q ' "$@")"
 
 log() { printf '[train_on_studio] %s\n' "$*" >&2; }
 

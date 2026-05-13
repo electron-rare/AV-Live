@@ -129,6 +129,10 @@ class ActionHeadPublisher(threading.Thread):
                 v3d = p.get("v3d")
                 if v3d is None:
                     continue
+                # CoreMLArray wraps a numpy array but has no __array__
+                # protocol; unwrap via .numpy() before np.asarray.
+                if hasattr(v3d, "numpy") and not isinstance(v3d, np.ndarray):
+                    v3d = v3d.numpy()
                 v3d_np = np.asarray(v3d, dtype=np.float32)
                 if v3d_np.shape[0] < max(SMPLX_JOINT_ANCHOR_VERTS) + 1:
                     continue
