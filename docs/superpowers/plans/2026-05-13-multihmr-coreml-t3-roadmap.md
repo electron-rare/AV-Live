@@ -24,43 +24,50 @@ Le fix vrai est probablement 8-15 patches au total, ~1-2 jours focused.
 | 3 | `utils.camera.inverse_perspective_projection` → closed-form K_inv | bypass `torch.inverse(K)` | ✅ done |
 | 4 | `coremltools.ops._cast` patch | val non-0d → `.item()` ou fallback `mb.cast` | ✅ done |
 | 5 | `Operation._auto_val` patch | coerce ndarray 1-d size-1 → 0-d | ✅ done |
+| 6 | `tile` op type_inference no-op si reps=[] | torch.repeat/expand avec arg vide | ✅ done |
+| 7 | `aten::new_ones` converter | manquait, ajoute via _maybe_register | ✅ done |
+| 8 | `concat` type_inference auto-promote 0d → 1d | mix de scalars et 1d tensors | ✅ done |
+| 9 | `clamp_min` / `clamp_max` override avec promote_input_dtypes | assert dtype original sans promotion | ✅ done |
+| 10 | `diagonal` general (offset=0 dim1=1 dim2=2 sur rank-3) | roma.rotmat_to_rotvec utilise .diagonal | ✅ done |
 
-## Blocker actif
+## Blocker actif (post-10-patches)
 
 ```
-ValueError: Length of the reps (0) must be at least 1, and equal to
-the rank of the input x (1)
+ValueError: Invalid target shape in `reshape` op ([1, 51, 3] to [204, 3, 1]).
 ```
 
-Localisation : `tensor_operation.py:677` `tile` op type_inference.
-Source torch op probable : `.repeat()` ou `.expand()` avec arg
-constant qui devient empty.
+**Pas une op manquante** — c'est une **incohérence model-side**.
+Le facteur **204/51 = 4** = `K=num_persons` post-topk. Quelque chose
+dans la forward attend N variable et est sized incorrectement quand
+N=4 fixe via topk.
+
+Tracage à faire :
+- Identifier quel module produit ce reshape (le name de l'op peut
+  pointer vers la couche)
+- Examiner ce qui passe de (1, 51, 3) à (4*51, 3, 1) — probable
+  broadcast cross-attention sur K detected persons
 
 **Investigation à faire** :
 
-- [ ] **Step A1 — Localiser le node torch problématique**
+- [ ] **Step B1 — Identifier le module source**
 
-  Patcher `convert_single_node` pour print node.kind() + node.name()
-  juste avant l'erreur. Identifier la torch op exacte (aten::repeat,
-  aten::expand, etc) et son contexte.
+  Logger node.name() avant reshape failure. Probablement quelque part
+  dans `HPH` (cross-attention head) ou `x_attention_head` cf
+  `model.py:281`.
 
-- [ ] **Step A2 — Tracer arrière au code source**
+- [ ] **Step B2 — Comprendre la shape attendue**
 
-  Une fois le node identifié, retrouver la ligne dans Multi-HMR
-  (model.py, blocks/, utils/) qui produit ce repeat/expand. Probables
-  candidats :
-  - `model.py:178` : `points.reshape(1, -1, 2).repeat(bs, 1, 1)`
-  - `model.py:447` : `.repeat(self.nrot, 1, 1)`
-  - `model.py:540` : `x.expand(bs, num_ppl, -1)`
-  - `blocks/smpl_layer.py:88-101` : multiple `.repeat(bs, 1)`
+  Lire le code à l'endroit identifié. Comprendre si :
+  - C'est un broadcast `(1, N, D) → (K, N, D)` qui devrait se faire
+    via `expand` mais le JIT a traduit en reshape
+  - Ou c'est une incompatibilité torch.cat / advanced indexing avec
+    K=4 idx vs N=51 features
 
-- [ ] **Step A3 — Patch ciblé**
+- [ ] **Step B3 — Patcher au niveau source**
 
-  Soit :
-  - Réécrire l'op avec un broadcast explicite plutôt que repeat
-  - Soit patcher `tile` type_inference pour accepter `reps=[]` (no-op)
-  - Soit pré-compute le tensor répété en buffer module-level (comme
-    pos_embed)
+  Soit (a) reformuler le forward via `.expand()` explicite, soit (b)
+  remplacer par advanced indexing avec K=4 explicite, soit (c)
+  wrapper le sub-module et pre-compute.
 
 ## Cascade probable restante (estimée)
 

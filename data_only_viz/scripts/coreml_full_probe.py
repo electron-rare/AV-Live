@@ -386,6 +386,42 @@ def _clamp_max_promote(context, node):
 
 _TORCH_OPS_REGISTRY.name_to_func_mapping["clamp_max"] = _clamp_max_promote
 
+
+# Override diagonal pour supporter dim1=1, dim2=2 sur tensor (B, N, N).
+# Multi-HMR via roma.rotmat_to_rotvec utilise .diagonal(dim1=1, dim2=2).
+def _diagonal_general(context, node):
+    inputs = _get_inputs(context, node, expected=[1, 4])
+    x = inputs[0]
+    offset = inputs[1].val if len(inputs) > 1 and inputs[1] is not None else 0
+    dim1 = inputs[2].val if len(inputs) > 2 and inputs[2] is not None else 0
+    dim2 = inputs[3].val if len(inputs) > 3 and inputs[3] is not None else 1
+
+    # Pour notre cas type (B, N, N) avec dim1=1 dim2=2 et offset=0 :
+    # reshape (B, N, N) -> (B, N*N), gather indices [0, N+1, 2N+2, ...].
+    if offset == 0 and x.rank == 3 and dim1 == 1 and dim2 == 2:
+        N = x.shape[1]
+        # Indices diagonale aplatis : i * N + i
+        diag_idx = np.array([i * N + i for i in range(N)],
+                            dtype=np.int32)
+        x_flat = _mb.reshape(x=x, shape=[x.shape[0], N * N])
+        out = _mb.gather(x=x_flat, indices=diag_idx, axis=1,
+                         name=node.name)
+        context.add(out)
+        return
+
+    # Fallback : on garde le path original (offset=0 dim1=0 dim2=1)
+    if offset == 0 and dim1 == 0 and dim2 == 1:
+        diag = _mb.band_part(x=x, lower=0, upper=0, name=node.name)
+        context.add(diag)
+        return
+
+    raise NotImplementedError(
+        f"diagonal: offset={offset} dim1={dim1} dim2={dim2} rank={x.rank} "
+        "non gere — etendre _diagonal_general")
+
+
+_TORCH_OPS_REGISTRY.name_to_func_mapping["diagonal"] = _diagonal_general
+
 try:
     mlmodel = ct.convert(
         traced,
