@@ -2,9 +2,10 @@ import AVFoundation
 import RealityKit
 import SwiftUI
 
-/// Wrapper SwiftUI : NSView container avec AVCaptureVideoPreviewLayer
-/// en backing (webcam) et ARView en surcouche pour les meshes SMPL-X.
-/// Le background de l'ARView est transparent pour laisser passer la cam.
+/// Wrapper SwiftUI : webcam en BACKGROUND LEGER (opacite ~0.35) +
+/// ARView transparent par-dessus avec mesh SMPL-X. Le mesh reste
+/// l'element visuel dominant, la cam donne du contexte sans manger
+/// l'attention.
 struct BodyView: NSViewRepresentable {
     @ObservedObject var renderer: MeshRenderer
 
@@ -12,34 +13,51 @@ struct BodyView: NSViewRepresentable {
         let container = NSView(frame: .zero)
         container.wantsLayer = true
         container.layer = CALayer()
-        container.layer?.backgroundColor = NSColor.black.cgColor
+        container.layer?.backgroundColor = NSColor(white: 0.08,
+                                                    alpha: 1.0).cgColor
 
-        // 1. Camera preview layer en backing
+        // 1. Camera preview, opacite reduite -> overlay leger
         let camera = CameraPreviewLayer()
         _ = camera.start()
         let preview = camera.previewLayer
         preview.frame = container.bounds
         preview.autoresizingMask = [.layerWidthSizable, .layerHeightSizable]
+        preview.opacity = 0.35
         container.layer?.addSublayer(preview)
         context.coordinator.camera = camera
 
-        // 2. ARView par-dessus, background clear pour voir la cam
+        // 2. ARView transparent par-dessus
         let arView = ARView(frame: container.bounds)
         arView.environment.background = .color(.clear)
         arView.autoresizingMask = [.width, .height]
         let cam = PerspectiveCamera()
-        // FOV horizontal ~60deg matche le Multi-HMR fovn=60 ; on
-        // place la cam a l'origine (RK regarde naturellement -Z).
         cam.camera.fieldOfViewInDegrees = 60
         let camAnchor = AnchorEntity(world: SIMD3<Float>(0, 0, 0))
         camAnchor.addChild(cam)
         arView.scene.addAnchor(camAnchor)
-        // Lumiere directionnelle pour que le mesh ne soit pas noir
-        let light = DirectionalLight()
-        light.light.intensity = 5000
-        let lightAnchor = AnchorEntity(world: SIMD3<Float>(0, 1, -1))
-        lightAnchor.addChild(light)
-        arView.scene.addAnchor(lightAnchor)
+
+        // 3 lumieres + ambient pour le relief du mesh
+        let key = DirectionalLight()
+        key.light.intensity = 4000
+        key.orientation = simd_quatf(angle: .pi / 6, axis: SIMD3(1, 0, 0))
+        let keyAnchor = AnchorEntity(world: SIMD3<Float>(1, 2, -1))
+        keyAnchor.addChild(key)
+        arView.scene.addAnchor(keyAnchor)
+
+        let fill = DirectionalLight()
+        fill.light.intensity = 1500
+        fill.light.color = NSColor(red: 0.7, green: 0.8, blue: 1.0,
+                                    alpha: 1.0)
+        let fillAnchor = AnchorEntity(world: SIMD3<Float>(-2, 1, -2))
+        fillAnchor.addChild(fill)
+        arView.scene.addAnchor(fillAnchor)
+
+        let rim = DirectionalLight()
+        rim.light.intensity = 2000
+        let rimAnchor = AnchorEntity(world: SIMD3<Float>(0, 1, -5))
+        rimAnchor.addChild(rim)
+        arView.scene.addAnchor(rimAnchor)
+
         let bodyAnchor = AnchorEntity(world: .zero)
         arView.scene.addAnchor(bodyAnchor)
         container.addSubview(arView)
