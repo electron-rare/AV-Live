@@ -9,6 +9,11 @@ import SwiftUI
 @MainActor
 final class MeshRenderer: ObservableObject {
     @Published var personEntities: [Int: ModelEntity] = [:]
+    /// Pelvis world position (RealityKit coords) par pid. Mis a jour
+    /// chaque frame TCP. Consume par Skeleton3DRenderer pour aligner
+    /// le squelette 3D openpos avec le mesh dense SMPL-X.
+    /// SMPL-X pelvis = vertex index 0 par convention canonique.
+    @Published var pelvisWorld: [Int: SIMD3<Float>] = [:]
     private var faces: [UInt32] = []
     private var oscServer: OSCServer?
 
@@ -130,6 +135,7 @@ final class MeshRenderer: ObservableObject {
                 wireframeEntities.removeValue(forKey: pid)
                 interpStates.removeValue(forKey: pid)
                 lastSeenAt.removeValue(forKey: pid)
+                pelvisWorld.removeValue(forKey: pid)
             }
         }
         for p in persons {
@@ -163,6 +169,11 @@ final class MeshRenderer: ObservableObject {
                     displayed: converted, target: converted)
             }
             entity.transform.translation = SIMD3<Float>.zero
+            // Track pelvis world position (vertex 0 = SMPL-X pelvis) so
+            // Skeleton3DRenderer can co-locate openpos joints with mesh.
+            if !converted.isEmpty {
+                pelvisWorld[p.pid] = converted[0]
+            }
             // Bbox debug : utile une fois par creation
             if personEntities[p.pid] == nil {
                 let xs = converted.map(\.x)

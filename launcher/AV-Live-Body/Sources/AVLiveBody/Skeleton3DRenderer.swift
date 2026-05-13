@@ -53,8 +53,8 @@ final class Skeleton3DRenderer: ObservableObject {
         }
     }
 
-    private static let jointRadius: Float = 0.02   // 2 cm
-    private static let boneRadius:  Float = 0.012  // 1.2 cm
+    private static let jointRadius: Float = 0.045  // 4.5 cm — visible 3D depth
+    private static let boneRadius:  Float = 0.022  // 2.2 cm — chunky bones
     private static let minConfidence: Float = 0.3
     private static let retainSec: TimeInterval = 1.0
 
@@ -73,6 +73,25 @@ final class Skeleton3DRenderer: ObservableObject {
     private weak var rootAnchor: Entity?
     private var poseSub: AnyCancellable?
     private var lastUpdateAt: TimeInterval = 0
+    /// Optional per-pid offset to align the skeleton with another
+    /// renderer's coordinate space (typically MeshRenderer's pelvis).
+    /// When nil for a pid, falls back to the renderer's default anchor.
+    private var pelvisOffsets: [Int: SIMD3<Float>] = [:]
+
+    /// External wiring : MeshRenderer or any other source publishes a
+    /// pelvis world position per pid. We translate each person's root
+    /// entity to that pose so the openpos skeleton co-locates with the
+    /// dense SMPL-X mesh.
+    func setPelvisOffsets(_ offsets: [Int: SIMD3<Float>]) {
+        pelvisOffsets = offsets
+        for (pid, entities) in persons {
+            if let off = offsets[pid] {
+                entities.root.transform.translation = off
+            } else {
+                entities.root.transform.translation = .zero
+            }
+        }
+    }
 
     /// Attach to a scene by giving it an AnchorEntity that owns all
     /// skeleton entities, and start observing the listener.

@@ -172,7 +172,10 @@ struct BodyView: NSViewRepresentable {
         c.skeletonOverlay?.update(persons: poseListener.persons,
                                   visible: skelVisible)
         // 3D RealityKit armature : show/hide root anchor in sync with
-        // the same skelVisible signal as the 2D overlay.
+        // the same skelVisible signal as the 2D overlay. Skeleton keeps
+        // its own hip-relative coords (z=-3 anchor), mesh keeps its own
+        // world coords — both visible together in mode openpos, no
+        // spatial fusion (original design from commit f540158).
         c.skel3dAnchor?.isEnabled = skelVisible
         // Pose -> scene uniforms : drive hands3d (mode 8) et openpos
         // (mode 9) avec la premiere personne detectee. Les wrists pilotent
