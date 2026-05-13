@@ -68,14 +68,20 @@ async def run(ctx) -> None:
                             pass
                 if urls["kp"]:
                     j = await _fetch_json(cli, urls["kp"])
-                    row = _last_row(j)
-                    if row:
-                        # ["time_tag","Kp","a_running","station_count"]
+                    # NOAA renvoie maintenant une liste de dicts pour Kp
+                    # ({"time_tag":..., "Kp":..., "a_running":...}) au lieu
+                    # de la liste-de-listes historique. On supporte les deux.
+                    if j:
+                        last = j[-1]
                         try:
-                            kp = float(row[1])
-                            a  = float(row[2])
+                            if isinstance(last, dict):
+                                kp = float(last.get("Kp", 0.0))
+                                a  = float(last.get("a_running", 0.0))
+                            else:
+                                kp = float(last[1])
+                                a  = float(last[2])
                             ctx.send("kp", kp, a)
-                        except (TypeError, ValueError):
+                        except (TypeError, ValueError, KeyError, IndexError):
                             pass
                 if urls["xray"]:
                     j = await _fetch_json(cli, urls["xray"])
@@ -86,5 +92,5 @@ async def run(ctx) -> None:
                     l = float(long_.get("flux", 0.0)) if long_ else 0.0
                     ctx.send("xray", s, l, _flare_class_norm(l))
             except Exception as e:  # noqa: BLE001
-                LOG.warning("fetch failed: %s", e)
+                LOG.warning("fetch failed: %s: %s", type(e).__name__, e)
             await asyncio.sleep(period)

@@ -12,6 +12,23 @@ LOG = logging.getLogger("feed.rte_eco2mix")
 TOKEN_URL = "https://digital.iservices.rte-france.com/token/oauth/"
 API_URL   = "https://digital.iservices.rte-france.com/open_api/actual_generation/v1/actual_generations_per_production_type"
 
+# Mapping des `production_type` RTE (verbose) vers nos categories courtes.
+# L'API agrege HYDRO_* et WIND_* pour le contexte musical : on additionne.
+_RTE_MAP = {
+    "NUCLEAR":                       "NUCLEAR",
+    "FOSSIL_GAS":                    "GAS",
+    "FOSSIL_HARD_COAL":              "COAL",
+    "FOSSIL_OIL":                    "OIL",
+    "HYDRO_WATER_RESERVOIR":         "HYDRO",
+    "HYDRO_RUN_OF_RIVER_AND_POUNDAGE":"HYDRO",
+    "HYDRO_PUMPED_STORAGE":          "HYDRO",
+    "WIND_ONSHORE":                  "WIND",
+    "WIND_OFFSHORE":                 "WIND",
+    "SOLAR":                         "SOLAR",
+    "BIOMASS":                       "BIOENERGY",
+    "WASTE":                         "BIOENERGY",
+}
+
 
 async def _get_token(cli: httpx.AsyncClient, cid: str, csec: str) -> tuple[str, float]:
     r = await cli.post(TOKEN_URL, auth=(cid, csec),
@@ -38,12 +55,18 @@ async def run(ctx) -> None:
                 r = await cli.get(API_URL, headers={"Authorization": f"Bearer {token}"})
                 r.raise_for_status()
                 j = r.json()
-                latest = {}
+                latest: dict[str, float] = {}
                 for series in (j.get("actual_generations_per_production_type") or []):
-                    typ = series.get("production_type", "?")
+                    raw = series.get("production_type", "?")
+                    typ = _RTE_MAP.get(raw)
+                    if typ is None:
+                        continue   # type non-mappe, ignore
                     vals = series.get("values") or []
                     if vals:
-                        latest[typ] = float(vals[-1].get("value", 0.0))
+                        # Aggregation : on additionne les sous-categories
+                        # (ex: WIND_ONSHORE + WIND_OFFSHORE -> WIND).
+                        latest[typ] = latest.get(typ, 0.0) \
+                            + float(vals[-1].get("value", 0.0))
                 # mapping standard RTE → ordre des args
                 ctx.send(
                     "mix",

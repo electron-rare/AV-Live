@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import asyncio
+import collections
 import logging
 import time
 
@@ -16,7 +17,11 @@ async def run(ctx) -> None:
     cfg = ctx.cfg
     url = cfg["url"]
     period = float(cfg.get("poll_seconds", 60))
-    seen: set[str] = set()
+    # OrderedDict avec eviction LRU : conserve les 4096 derniers IDs vus
+    # dans l'ORDRE d'arrivee. set() perdait l'ordre au pruning, ce qui
+    # pouvait re-emettre un evenement deja vu.
+    seen: "collections.OrderedDict[str, None]" = collections.OrderedDict()
+    SEEN_MAX = 4096
     rate = RateMeter(window=3600.0)
     async with httpx.AsyncClient(timeout=20.0) as cli:
         while True:
@@ -34,7 +39,7 @@ async def run(ctx) -> None:
                 fid = feat.get("id")
                 if not fid or fid in seen:
                     continue
-                seen.add(fid)
+                seen[fid] = None
                 props = feat.get("properties") or {}
                 coords = (feat.get("geometry") or {}).get("coordinates") or [0, 0, 0]
                 mag = float(props.get("mag") or 0.0)
@@ -45,7 +50,8 @@ async def run(ctx) -> None:
                 rate.tick()
             ctx.send("rate", rate.rate * 3600.0)
 
-            # garde la mémoire bornée
-            if len(seen) > 4096:
-                seen = set(list(seen)[-2048:])
+            # garde la mémoire bornée — evict les plus anciens en preservant
+            # l'ordre d'insertion (LRU front, head most-recent).
+            while len(seen) > SEEN_MAX:
+                seen.popitem(last=False)
             await asyncio.sleep(period)

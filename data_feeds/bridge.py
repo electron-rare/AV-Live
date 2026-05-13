@@ -12,12 +12,18 @@ import argparse
 import asyncio
 import importlib
 import logging
+import re
 import signal
 import sys
 import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
+
+# Whitelist des noms de feed : empeche l'injection de modules arbitraires
+# via un config.toml malveillant (importlib resolve sur du . ou .. ferait
+# remonter dans l'arborescence).
+_FEED_NAME_RE = re.compile(r"^[a-z][a-z0-9_]{0,30}$")
 
 try:
     import tomllib  # py311+
@@ -52,6 +58,10 @@ def load_config(path: Path) -> dict[str, Any]:
 
 async def run_feed(name: str, cfg: dict[str, Any], ctx: Context) -> None:
     """Charge `data_feeds.feeds.<name>` et appelle `run(ctx)`."""
+    if not _FEED_NAME_RE.match(name):
+        LOG.error("invalid feed name %r — must match %s",
+                  name, _FEED_NAME_RE.pattern)
+        return
     try:
         mod = importlib.import_module(f"data_feeds.feeds.{name}")
     except ModuleNotFoundError:
@@ -62,7 +72,8 @@ async def run_feed(name: str, cfg: dict[str, Any], ctx: Context) -> None:
     while True:
         try:
             await mod.run(ctx)
-            # Si run() retourne sans exception, on redémarre poliment
+            # Retour propre : on reset le backoff et on rejoue en boucle.
+            backoff = 1.0
             await asyncio.sleep(2.0)
         except asyncio.CancelledError:
             raise
@@ -108,8 +119,19 @@ async def main_async(cfg: dict[str, Any]) -> None:
 
     loop = asyncio.get_running_loop()
     stop = loop.create_future()
+    sig_count = 0
+
+    def _on_signal() -> None:
+        nonlocal sig_count
+        sig_count += 1
+        if sig_count > 1:
+            LOG.warning("second signal received — forcing exit")
+            sys.exit(1)
+        if not stop.done():
+            stop.cancel()
+
     for sig in (signal.SIGINT, signal.SIGTERM):
-        loop.add_signal_handler(sig, lambda: stop.cancel() if not stop.done() else None)
+        loop.add_signal_handler(sig, _on_signal)
     try:
         await stop
     except asyncio.CancelledError:

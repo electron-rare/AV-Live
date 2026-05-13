@@ -15,7 +15,9 @@ async def run(ctx) -> None:
     cfg = ctx.cfg
     url = cfg["url"]
     period = float(cfg.get("poll_seconds", 30))
-    last_id = ""
+    # IDs GitHub sont des strings numeriques croissants : on compare en int
+    # (la compare string casse des que le nombre de digits change).
+    last_id: int = 0
     async with httpx.AsyncClient(timeout=20.0,
                                  headers={"Accept": "application/vnd.github+json"}) as cli:
         while True:
@@ -23,7 +25,11 @@ async def run(ctx) -> None:
                 r = await cli.get(url)
                 r.raise_for_status()
                 for ev in reversed(r.json()):
-                    eid = ev.get("id", "")
+                    raw = ev.get("id", "")
+                    try:
+                        eid = int(raw)
+                    except (TypeError, ValueError):
+                        continue
                     if eid <= last_id:
                         continue
                     ctx.send(

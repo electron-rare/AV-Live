@@ -3,3 +3,12 @@ __pycache__/
 *.pyc
 .uv-cache/
 uv.lock
+
+# Config local : peut contenir des creds (RTE OAuth, GCN Kafka).
+# Le fichier de reference est config.toml.example (tracke).
+# config.toml et config.data-only.toml restent committes tant qu'ils
+# ne contiennent que des champs vides ; surveiller pre-commit hook.
+*.local.toml
+
+# Modeles YOLO telecharges au runtime
+*.pt

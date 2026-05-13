@@ -99,19 +99,28 @@ async def run(ctx) -> None:
         ok, frame = cap.read()
         return frame if ok else None
 
+    # ThreadPoolExecutor dedie : empeche l'inference longue (>20ms sur MPS)
+    # de monopoliser le pool partage et de bloquer les autres feeds.
+    import concurrent.futures
+    pool = concurrent.futures.ThreadPoolExecutor(max_workers=1,
+                                                 thread_name_prefix="pose")
+
+    def _infer(fr):
+        return model.predict(fr, device=device, conf=conf_thresh,
+                             verbose=False, max_det=max_persons)
+
     try:
         while True:
             t0 = time.monotonic()
-            frame = await loop.run_in_executor(None, _grab)
+            frame = await loop.run_in_executor(pool, _grab)
             if frame is None:
                 await asyncio.sleep(period)
                 continue
             h, w = frame.shape[:2]
             try:
-                results = model.predict(
-                    frame, device=device, conf=conf_thresh,
-                    verbose=False, max_det=max_persons,
-                )
+                # Non-bloquant : l'event loop continue de servir les autres
+                # feeds pendant les ~20-80 ms d'inference.
+                results = await loop.run_in_executor(pool, _infer, frame)
             except Exception as e:  # noqa: BLE001
                 LOG.warning("inference failed: %s", e)
                 await asyncio.sleep(period)
@@ -156,3 +165,4 @@ async def run(ctx) -> None:
                 await asyncio.sleep(period - dt)
     finally:
         cap.release()
+        pool.shutdown(wait=False, cancel_futures=True)

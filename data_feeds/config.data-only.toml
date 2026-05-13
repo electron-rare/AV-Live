@@ -1,0 +1,90 @@
+# Profil "data-only" : que les flux open-data + pose YOLO, vers SC + oF.
+#
+# Pas de sclang/oscope/web → la chaine consomatrice est libre de
+# brancher ce qu'elle veut sur les ports 57121 / 57123.
+#
+# Lancer avec :  uv run python bridge.py -c config.data-only.toml -v
+
+[osc]
+targets = [
+    { host = "127.0.0.1", port = 57121 },  # SuperCollider (si lance)
+    { host = "127.0.0.1", port = 57123 },  # openFrameworks
+]
+prefix = "/data"
+
+# -- Pose / webcam --------------------------------------------------------
+[feeds.pose]
+# Active uniquement quand le pont tourne dans le bundle launcher (TCC OK).
+# En CLI le prompt webcam ne peut pas apparaitre -> camera silently refused.
+enabled  = false
+model       = "yolov8n-pose.pt"
+device      = "mps"
+camera      = 0
+width       = 640
+height      = 480
+target_fps  = 20
+conf_thresh = 0.35
+max_persons = 4
+emit_keypoints = true
+
+# -- Sismique / géophysique ------------------------------------------------
+[feeds.usgs]
+enabled  = true
+url      = "https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/all_hour.geojson"
+poll_seconds = 60
+
+[feeds.swpc]
+enabled  = true
+url_plasma = "https://services.swpc.noaa.gov/products/solar-wind/plasma-1-day.json"
+url_mag    = "https://services.swpc.noaa.gov/products/solar-wind/mag-1-day.json"
+url_kp     = "https://services.swpc.noaa.gov/products/noaa-planetary-k-index.json"
+url_xray   = "https://services.swpc.noaa.gov/json/goes/primary/xrays-1-day.json"
+poll_seconds = 60
+
+# -- Réseau électrique -----------------------------------------------------
+[feeds.netzfrequenz]
+# WARN : mainsfrequenz.de a ferme son WS public (NXDOMAIN 2026-05).
+# Garde a false jusqu'a trouver une source alternative (gridradar ?
+# swissgrid open data ?).
+enabled  = false
+ws_url   = "wss://www.mainsfrequenz.de/frequenz.socket"
+
+[feeds.rte_eco2mix]
+enabled  = false
+client_id     = ""
+client_secret = ""
+poll_seconds  = 900
+
+# -- Foudre / atmosphère ---------------------------------------------------
+[feeds.blitzortung]
+enabled  = true
+ws_url   = "wss://ws1.blitzortung.org:443/"
+
+# -- Aviation / mouvement --------------------------------------------------
+[feeds.opensky]
+enabled  = true
+url      = "https://opensky-network.org/api/states/all"
+# API anonyme limitee a 1 req/15s. On laisse 20s de marge pour eviter
+# les 429 sous drift d'horloge.
+poll_seconds = 20
+bbox     = [45.5, 4.6, 46.0, 5.2]
+
+# -- Pouls numérique -------------------------------------------------------
+[feeds.bluesky]
+enabled  = true
+ws_url   = "wss://jetstream2.us-east.bsky.network/subscribe?wantedCollections=app.bsky.feed.post"
+sample_rate = 0.02
+
+[feeds.mempool]
+enabled  = false
+ws_url   = "wss://mempool.space/api/v1/ws"
+
+[feeds.github]
+enabled  = false
+url      = "https://api.github.com/events"
+poll_seconds = 30
+
+[feeds.gcn]
+enabled  = false
+client_id     = ""
+client_secret = ""

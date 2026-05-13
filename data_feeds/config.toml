@@ -65,7 +65,9 @@ poll_seconds = 60
 # -- Réseau électrique -----------------------------------------------------
 
 [feeds.netzfrequenz]
-enabled  = true
+# WARN : mainsfrequenz.de a ferme son WS public (NXDOMAIN 2026-05).
+# Voir alternatives : gridradar.net (auth requise), swissgrid open data.
+enabled  = false
 # Mainsfrequenz.de WebSocket (résolution ~200 ms, mesure Karlsruhe)
 ws_url   = "wss://www.mainsfrequenz.de/frequenz.socket"
 # /data/grid/freq <hz>          50.000 ± 0.200
