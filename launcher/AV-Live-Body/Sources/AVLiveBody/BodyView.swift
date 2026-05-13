@@ -1,4 +1,5 @@
 import AVFoundation
+import MetalKit
 import RealityKit
 import SwiftUI
 
@@ -27,6 +28,24 @@ struct BodyView: NSViewRepresentable {
         preview.zPosition = -100
         preview.isHidden = !settings.showCamera
         container.layer?.addSublayer(preview)
+
+        // 1b. MTKView des scenes Metal (storm/tunnel/openpos/...) en
+        // couche intermediaire entre la cam et l'ARView. Transparent
+        // par-dessus la cam (alpha blending via clearColor).
+        let scene = SceneRenderer.make()
+        let mtkView = MTKView(frame: container.bounds,
+                              device: scene?.uniforms != nil
+                                ? MTLCreateSystemDefaultDevice() : nil)
+        mtkView.delegate = scene
+        mtkView.colorPixelFormat = .bgra8Unorm
+        mtkView.framebufferOnly = false
+        mtkView.layer?.isOpaque = false
+        mtkView.clearColor = MTLClearColor(red: 0, green: 0, blue: 0,
+                                            alpha: 0)
+        mtkView.preferredFramesPerSecond = 60
+        mtkView.autoresizingMask = [.width, .height]
+        mtkView.isHidden = !settings.showScene
+        container.addSubview(mtkView)
 
         // 2. ARView transparent — isOpaque false sinon le compositeur
         //    OS reecrit l'alpha
@@ -77,6 +96,8 @@ struct BodyView: NSViewRepresentable {
         context.coordinator.bodyAnchor = bodyAnchor
         context.coordinator.arView = arView
         context.coordinator.cameraEntity = camEntity
+        context.coordinator.sceneRenderer = scene
+        context.coordinator.mtkView = mtkView
         context.coordinator.keyLight = key
         context.coordinator.fillLight = fill
         context.coordinator.rimLight = rim
@@ -91,6 +112,8 @@ struct BodyView: NSViewRepresentable {
         // Apply live settings
         c.previewLayer?.opacity = Float(settings.camOpacity)
         c.previewLayer?.isHidden = !settings.showCamera
+        c.mtkView?.isHidden = !settings.showScene
+        c.sceneRenderer?.uniforms.viz_mode = Float(settings.vizMode)
         c.container?.layer?.backgroundColor = NSColor(
             white: CGFloat(settings.bgBrightness), alpha: 1.0).cgColor
         c.cameraEntity?.camera.fieldOfViewInDegrees =
@@ -119,6 +142,8 @@ struct BodyView: NSViewRepresentable {
         var bodyAnchor: AnchorEntity?
         var arView: ARView?
         var cameraEntity: PerspectiveCamera?
+        var sceneRenderer: SceneRenderer?
+        var mtkView: MTKView?
         var keyLight: DirectionalLight?
         var fillLight: DirectionalLight?
         var rimLight: DirectionalLight?

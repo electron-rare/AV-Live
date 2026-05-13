@@ -39,6 +39,9 @@ class PoseSoundBridge:
     def __init__(self, sclang_host: str = "127.0.0.1",
                  sclang_port: int = 57121, throttle_hz: float = 30.0) -> None:
         self._client = SimpleUDPClient(sclang_host, sclang_port)
+        # Broadcast secondaire vers AV-Live-Body (Swift) pour overlay
+        # skeleton dans la fenetre RealityKit. Silent si pas connecte.
+        self._avbody = SimpleUDPClient("127.0.0.1", 57126)
         self._period = 1.0 / max(1.0, throttle_hz)
         self._last_t = 0.0
 
@@ -52,6 +55,8 @@ class PoseSoundBridge:
         n = len(persons_body)
         try:
             self._client.send_message("/pose/count", [int(n)])
+            try: self._avbody.send_message("/pose/count", [int(n)])
+            except OSError: pass
         except OSError:
             return  # SC pas la, on continue silencieusement
         if n == 0:
@@ -72,6 +77,8 @@ class PoseSoundBridge:
         cx = sum(p[0] for p in visible) / len(visible)
         cy = sum(p[1] for p in visible) / len(visible)
         cli.send_message("/pose/center", [pid, float(cx), float(cy)])
+        try: self._avbody.send_message("/pose/center", [pid, float(cx), float(cy)])
+        except OSError: pass
 
         # Nez (visage) — important pour piloter une voix
         if len(body) > NOSE and body[NOSE].c > 0.3:
@@ -95,6 +102,8 @@ class PoseSoundBridge:
                 and body[LEFT_SHO].c > 0.3 and body[RIGHT_SHO].c > 0.3):
             dx = abs(body[LEFT_SHO].x - body[RIGHT_SHO].x)
             cli.send_message("/pose/sho_span", [pid, float(dx)])
+            try: self._avbody.send_message("/pose/sho_span", [pid, float(dx)])
+            except OSError: pass
 
         # Envergure poignets (mouvement expressif)
         if (len(body) > RIGHT_WRIST
@@ -102,3 +111,5 @@ class PoseSoundBridge:
             span = ((body[LEFT_WRIST].x - body[RIGHT_WRIST].x) ** 2
                     + (body[LEFT_WRIST].y - body[RIGHT_WRIST].y) ** 2) ** 0.5
             cli.send_message("/pose/limb_span", [pid, float(span)])
+            try: self._avbody.send_message("/pose/limb_span", [pid, float(span)])
+            except OSError: pass
