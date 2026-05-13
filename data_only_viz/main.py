@@ -339,9 +339,19 @@ class AppDelegate(NSObject):
             self._state, device=self._opts.pose_device)
         self._pose_worker.start()
 
-        # 4) Hook clavier (ESC = quit, F = toggle fullscreen)
+        # 4) Hook clavier : local (app au focus) + global (app au fond).
+        # Le global monitor est read-only mais permet de garder le pilotage
+        # quand l'utilisateur a une autre app au premier plan (IDE,
+        # browser). On ignore le retour pour le global (sinon double-trigger).
         self._kb_monitor = NSEvent.addLocalMonitorForEventsMatchingMask_handler_(
             NSEventMaskKeyDown, self._on_key)
+        self._kb_global = NSEvent.addGlobalMonitorForEventsMatchingMask_handler_(
+            NSEventMaskKeyDown, self._on_key_global)
+        # Force le focus initial pour que le local monitor reçoive
+        # tout de suite les touches sans nécessiter un clic.
+        NSApp().activateIgnoringOtherApps_(True)
+        self._window.makeKeyAndOrderFront_(None)
+        self._window.makeFirstResponder_(self._container)
 
     _cam_log_count = 0
 
@@ -430,11 +440,21 @@ class AppDelegate(NSObject):
         )
         self._hud.setString_(txt)
 
+    def _on_key_global(self, ev):
+        # Global monitor : read-only, on appelle _on_key mais on ne
+        # retourne pas l'event (interdit par AppKit pour les globaux).
+        try:
+            self._on_key(ev)
+        except Exception as e:  # noqa: BLE001
+            LOG.warning("global key handler failed: %s", e)
+
     def _on_key(self, ev):
         key = ev.charactersIgnoringModifiers()
         if not key:
             return ev
         k = key.lower()
+        # Debug : log toutes les touches recues pour diagnostic
+        LOG.debug("[key] raw=%r lower=%r", key, k)
         if key == "\x1b":
             NSApp().terminate_(self); return None
         if key == " ":
