@@ -32,6 +32,19 @@ void WebcamVis::setup(int w, int h) {
 }
 
 void WebcamVis::update(const VisFrame& frame) {
+    // -- Interlock : si le pont data_feeds emet activement de la pose,
+    // on libere la webcam pour eviter que les deux process se la disputent
+    // (macOS donne des frames noires au second client). Le user peut
+    // forcer la capture locale en appelant setEnableLocalCapture(true)
+    // ET en coupant le worker pose cote Python.
+    const bool poseAlive = frame.osc.dataAlive()
+        && frame.osc.dataf("pose", "count", -1.0f) >= 0.0f;
+    if (poseAlive && cameraOk_) {
+        grabber_.close();
+        cameraOk_ = false;
+        haveFrame_ = false;
+        ofLogNotice("WebcamVis") << "pose feed detected — releasing local camera";
+    }
     // -- Capture + pipeline OpenCV (mode A) ---------------------------
     if (cameraOk_) {
         grabber_.update();

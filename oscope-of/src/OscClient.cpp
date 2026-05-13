@@ -63,6 +63,14 @@ void OscClient::storeData(const std::string& addr, const ofxOscMessage& m) {
     // strip "/data/" prefix → key = "source/sub"
     std::string key = addr.substr(6);
     if (key.empty()) return;
+    // Defense anti-DoS : un attaquant qui inonde :57123 avec des cles
+    // /data/<random>/<random> ne peut pas faire exploser la memoire.
+    // 256 cles distinctes couvrent largement le besoin (10 feeds x ~5 subs).
+    static constexpr std::size_t kMaxKeys = 256;
+    auto it = data_.find(key);
+    if (it == data_.end() && data_.size() >= kMaxKeys) {
+        return;
+    }
     auto& slot = data_[key];
     slot.last.clear();
     slot.last.reserve(m.getNumArgs());

@@ -62,6 +62,8 @@ public:
     /// ----- Flux temps reel externes (data_feeds bridge) -----
     /// Acces direct au dernier tuple recu sur /data/<source>/<sub>.
     /// Renvoie vide si rien n'a encore ete recu.
+    /// ATTENTION : la reference n'est valide QUE jusqu'au prochain
+    /// appel a update(). Ne pas la conserver d'une frame a l'autre.
     const std::vector<float>& data(const std::string& source,
                                    const std::string& sub) const;
     /// Helper : premier arg float du dernier tuple, avec fallback.
