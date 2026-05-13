@@ -69,11 +69,22 @@ def enumerate_devices() -> list[dict]:
     return out
 
 
+_BANNED_NAME_TOKENS = ("iphone", "gsm", "desk view", "continuity")
+
+
 def find_builtin_device() -> Optional[dict]:
-    """Selectionne le BuiltInWideAngleCamera (webcam Mac integree)."""
+    """Selectionne la webcam Mac integree :
+    - deviceType doit etre BuiltInWideAngleCamera
+    - le nom ne doit contenir aucun de _BANNED_NAME_TOKENS
+    Evite les pieges Continuity/iPhone/Desk View qui peuvent matcher
+    BuiltInWideAngleCamera dans certaines configs."""
     for info in enumerate_devices():
-        if "BuiltInWideAngleCamera" in info["type"]:
-            return info
+        if "BuiltInWideAngleCamera" not in info["type"]:
+            continue
+        name_l = info["name"].lower()
+        if any(tok in name_l for tok in _BANNED_NAME_TOKENS):
+            continue
+        return info
     return None
 
 
