@@ -28,10 +28,18 @@ struct BodyView: NSViewRepresentable {
         arView.environment.background = .color(.clear)
         arView.autoresizingMask = [.width, .height]
         let cam = PerspectiveCamera()
+        // FOV horizontal ~60deg matche le Multi-HMR fovn=60 ; on
+        // place la cam a l'origine (RK regarde naturellement -Z).
         cam.camera.fieldOfViewInDegrees = 60
-        let camAnchor = AnchorEntity(world: SIMD3(0, 0, 2))
+        let camAnchor = AnchorEntity(world: SIMD3<Float>(0, 0, 0))
         camAnchor.addChild(cam)
         arView.scene.addAnchor(camAnchor)
+        // Lumiere directionnelle pour que le mesh ne soit pas noir
+        let light = DirectionalLight()
+        light.light.intensity = 5000
+        let lightAnchor = AnchorEntity(world: SIMD3<Float>(0, 1, -1))
+        lightAnchor.addChild(light)
+        arView.scene.addAnchor(lightAnchor)
         let bodyAnchor = AnchorEntity(world: .zero)
         arView.scene.addAnchor(bodyAnchor)
         container.addSubview(arView)

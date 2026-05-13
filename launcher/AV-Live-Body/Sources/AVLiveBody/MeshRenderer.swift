@@ -29,8 +29,16 @@ final class MeshRenderer: ObservableObject {
             let src = raw.bindMemory(to: UInt32.self)
             for i in 0..<n { arr[i] = src[i] }
         }
+        // Le flip y/z (Multi-HMR -> RealityKit) inverse la chiralite
+        // donc on inverse aussi le winding des triangles (i0,i1,i2 ->
+        // i0,i2,i1) sinon backface cull masque tout le mesh.
+        for tri in stride(from: 0, to: n, by: 3) where tri + 2 < n {
+            let tmp = arr[tri + 1]
+            arr[tri + 1] = arr[tri + 2]
+            arr[tri + 2] = tmp
+        }
         self.faces = arr
-        print("Loaded \(n) face indices (\(n / 3) triangles)")
+        NSLog("AV-Live-Body: loaded %d face indices (%d triangles)", n, n / 3)
     }
 
     func startOSCServer() {
@@ -57,8 +65,25 @@ final class MeshRenderer: ObservableObject {
                 entity = makeEntity(pid: p.pid)
                 entity.components.set(PidComponent(pid: p.pid))
             }
-            updateMeshVertices(entity, vertices: p.vertices)
-            entity.transform.translation = p.translation
+            // Multi-HMR v3d est en coord camera ABSOLUE (deja inclut la
+            // translation). On flip y/z (MH y-down z-forward -> RK
+            // y-up z-back) et on laisse l'entity a l'origine.
+            let converted = p.vertices.map { v in
+                SIMD3<Float>(v.x, -v.y, -v.z)
+            }
+            updateMeshVertices(entity, vertices: converted)
+            entity.transform.translation = SIMD3<Float>.zero
+            // Bbox debug : utile une fois par creation
+            if personEntities[p.pid] == nil {
+                let xs = converted.map(\.x)
+                let ys = converted.map(\.y)
+                let zs = converted.map(\.z)
+                NSLog("AV-Live-Body: pid=%d bbox x[%.2f,%.2f] y[%.2f,%.2f] z[%.2f,%.2f]",
+                      p.pid,
+                      xs.min() ?? 0, xs.max() ?? 0,
+                      ys.min() ?? 0, ys.max() ?? 0,
+                      zs.min() ?? 0, zs.max() ?? 0)
+            }
             personEntities[p.pid] = entity
         }
     }
