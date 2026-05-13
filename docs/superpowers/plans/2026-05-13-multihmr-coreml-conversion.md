@@ -67,7 +67,43 @@ these as untraceable.
 single-day estimate was optimistic — backbone alone needs ~½ day of
 surgery before head can even be touched.
 
-### Probe v2 (with pos_embed pre-computed as buffer)
+### Probe v4 (2026-05-13) — BREAKTHROUGH
+
+Avec **2 patches au lieu d'1**, la conversion DINOv2 ViT-S 672x672
+**REUSSIT** et donne un **speedup massif** :
+
+| Backend | Median (50 iter, M5) |
+|---|---|
+| **CoreML CPU_AND_GPU** | **25.1 ms** |
+| CoreML ALL (avec ANE) | 157.3 ms (ANE *ralentit*) |
+| CoreML CPU_AND_NE | 157.5 ms |
+| CoreML CPU_ONLY | 120.5 ms |
+| PyTorch MPS | 274.7 ms |
+
+**Speedup CoreML GPU vs PyTorch MPS : 11.8×.**
+
+Les 2 patches requis :
+
+1. **Pre-calculer `interpolate_pos_encoding`** en buffer fige (v2).
+2. **Patcher coremltools `_cast`** pour gerer `x.val` non-0d via
+   `numpy.asarray().item()` ou fallback `mb.cast`. Le bug dans ops.py
+   ligne 3048 plante `dtype(x.val)` quand val n'est pas scalaire (vient
+   de l'arithmetique de shapes int() dans patch_embed).
+
+Code reproductible : `data_only_viz/scripts/coreml_probe.py`
+(committé). Le `.mlpackage` cible : `/tmp/dinov2_vits14_672.mlpackage`.
+
+**Lecture clé** : le bottleneck Multi-HMR n'etait pas l'architecture
+ou la precision — c'etait le **PyTorch MPS dispatch overhead**. CoreML
++ MPSGraph compile le graphe avec op fusion. L'ANE etait un **piege**
+ici (probablement re-route fp32 vers GPU avec cout transit).
+
+**Implication pour Multi-HMR full** : si le head benefice du meme
+speedup, full Multi-HMR converti = 40-60 ms = **15-25 fps**. Cible
+atteignable. Tasks 2-4 du plan restent valides ; le risque principal
+deplace vers la chirurgie head (torch.where -> topk).
+
+### Probe v2 (with pos_embed pre-computed as buffer) — historique
 
 Patched `interpolate_pos_encoding` to return a frozen pre-computed
 buffer. **Trace OK, but convert still FAILS at op 17/610** with same
