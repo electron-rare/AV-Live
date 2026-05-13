@@ -7,80 +7,138 @@ struct SettingsPanel: View {
     @ObservedObject var settings: RenderSettings
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            HStack {
-                Text("AV-Live-Body settings")
-                    .font(.headline)
-                    .foregroundColor(.white)
-                Spacer()
-                Button(action: { settings.showPanel = false }) {
-                    Image(systemName: "xmark.circle.fill")
-                        .font(.title2)
-                        .foregroundColor(.white.opacity(0.7))
-                }
-                .buttonStyle(.plain)
-                .help("Fermer (S)")
+        ScrollView {
+            VStack(alignment: .leading, spacing: 14) {
+                header
+                Divider().background(Color.white.opacity(0.2))
+                layersSection
+                Divider().background(Color.white.opacity(0.15))
+                cameraSection
+                Divider().background(Color.white.opacity(0.15))
+                meshSection
+                Divider().background(Color.white.opacity(0.15))
+                lightsSection
+                Divider().background(Color.white.opacity(0.15))
+                viewSection
             }
-            Divider().background(Color.white.opacity(0.2))
-
-            // ---------- Camera ----------
-            Group {
-                Toggle("Webcam visible", isOn: $settings.showCamera)
-                    .foregroundColor(.white)
-                slider("Cam opacity",
-                       value: $settings.camOpacity,
-                       in: 0...1, format: "%.2f")
-            }
-            Divider().background(Color.white.opacity(0.15))
-
-            // ---------- Background ----------
-            slider("Background brightness",
-                   value: $settings.bgBrightness,
-                   in: 0...0.5, format: "%.2f")
-            Divider().background(Color.white.opacity(0.15))
-
-            // ---------- Mesh ----------
-            Group {
-                Toggle("Mesh visible", isOn: $settings.showMesh)
-                    .foregroundColor(.white)
-                Toggle("Metallic", isOn: $settings.meshMetallic)
-                    .foregroundColor(.white)
-                slider("Roughness",
-                       value: $settings.meshRoughness,
-                       in: 0...1, format: "%.2f")
-            }
-            Divider().background(Color.white.opacity(0.15))
-
-            // ---------- Lights ----------
-            Group {
-                slider("Key light",
-                       value: $settings.keyIntensity,
-                       in: 0...10000, format: "%.0f")
-                slider("Fill light",
-                       value: $settings.fillIntensity,
-                       in: 0...10000, format: "%.0f")
-                slider("Rim light",
-                       value: $settings.rimIntensity,
-                       in: 0...10000, format: "%.0f")
-            }
-            Divider().background(Color.white.opacity(0.15))
-
-            // ---------- Camera ----------
-            slider("FOV (deg)",
-                   value: $settings.fieldOfView,
-                   in: 20...120, format: "%.0f")
+            .padding(16)
         }
-        .padding(16)
-        .frame(width: 320)
+        .frame(width: 320, height: 620)
         .background(
             RoundedRectangle(cornerRadius: 12)
-                .fill(Color.black.opacity(0.75))
+                .fill(Color.black.opacity(0.78))
         )
         .overlay(
             RoundedRectangle(cornerRadius: 12)
                 .stroke(Color.white.opacity(0.15), lineWidth: 1)
         )
         .padding(20)
+    }
+
+    private var header: some View {
+        HStack {
+            Text("AV-Live-Body settings")
+                .font(.headline)
+                .foregroundColor(.white)
+            Spacer()
+            Button(action: { settings.showPanel = false }) {
+                Image(systemName: "xmark.circle.fill")
+                    .font(.title2)
+                    .foregroundColor(.white.opacity(0.7))
+            }
+            .buttonStyle(.plain)
+            .help("Fermer (S)")
+        }
+    }
+
+    private var layersSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            sectionTitle("Layers")
+            layerRow(icon: "video.fill",
+                     label: "Webcam",
+                     isOn: $settings.showCamera)
+            layerRow(icon: "person.fill",
+                     label: "Mesh SMPL-X",
+                     isOn: $settings.showMesh)
+            layerRow(icon: "circle.dotted",
+                     label: "Wireframe",
+                     isOn: $settings.showWireframe)
+            layerRow(icon: "figure.stand",
+                     label: "Skeleton (joints)",
+                     isOn: $settings.showSkeleton)
+        }
+    }
+
+    private var cameraSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            sectionTitle("Webcam")
+            slider("Opacity",
+                   value: $settings.camOpacity,
+                   in: 0...1, format: "%.2f")
+        }
+    }
+
+    private var meshSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            sectionTitle("Mesh")
+            Toggle("Metallic", isOn: $settings.meshMetallic)
+                .foregroundColor(.white)
+            slider("Roughness",
+                   value: $settings.meshRoughness,
+                   in: 0...1, format: "%.2f")
+        }
+    }
+
+    private var lightsSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            sectionTitle("Lights")
+            slider("Key (warm, front-right)",
+                   value: $settings.keyIntensity,
+                   in: 0...10000, format: "%.0f")
+            slider("Fill (cool, front-left)",
+                   value: $settings.fillIntensity,
+                   in: 0...10000, format: "%.0f")
+            slider("Rim (back)",
+                   value: $settings.rimIntensity,
+                   in: 0...10000, format: "%.0f")
+        }
+    }
+
+    private var viewSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            sectionTitle("View")
+            slider("Field of view",
+                   value: $settings.fieldOfView,
+                   in: 20...120, format: "%.0f°")
+            slider("Background brightness",
+                   value: $settings.bgBrightness,
+                   in: 0...0.5, format: "%.2f")
+        }
+    }
+
+    private func sectionTitle(_ text: String) -> some View {
+        Text(text.uppercased())
+            .font(.caption2.weight(.semibold))
+            .tracking(1.2)
+            .foregroundColor(.white.opacity(0.5))
+    }
+
+    private func layerRow(icon: String, label: String,
+                          isOn: Binding<Bool>) -> some View {
+        HStack {
+            Image(systemName: icon)
+                .frame(width: 20)
+                .foregroundColor(isOn.wrappedValue
+                                 ? .pink
+                                 : .white.opacity(0.4))
+            Text(label)
+                .foregroundColor(.white)
+            Spacer()
+            Toggle("", isOn: isOn)
+                .labelsHidden()
+                .toggleStyle(.switch)
+                .controlSize(.small)
+        }
     }
 
     private func slider(_ label: String,

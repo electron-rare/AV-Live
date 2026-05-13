@@ -15,6 +15,8 @@ final class RenderSettings: ObservableObject {
 
     // Mesh visibility / style
     @Published var showMesh: Bool = true
+    @Published var showWireframe: Bool = false
+    @Published var showSkeleton: Bool = false
     @Published var meshMetallic: Bool = false
     @Published var meshRoughness: Double = 0.6
 
