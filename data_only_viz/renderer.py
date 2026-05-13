@@ -113,6 +113,7 @@ SKEL_VERT_FLOATS = 5    # x, y, z, conf, person_id
 # pour le hardcode, ou ~4×~150 face Delaunay = ~600 triangles. Marge large.
 MESH_MAX_TRIS = 8192
 MESH_VERT_FLOATS = 5    # identique au skel
+MESH_MAX_VERTS = 10475  # SMPL-X is the larger family; SMPL (6890) fits inside
 
 # struct SceneUniforms : 17 floats packs = 68 octets, padding a 80 (multiple
 # de 16, regle Metal). On y stocke (time, rms, kp_norm, netz_dev,
@@ -145,6 +146,7 @@ class MetalRenderer(NSObject):
             MESH_MAX_TRIS * 3 * MESH_VERT_FLOATS * 4, MTLResourceStorageModeShared)
         self._mp_bones = _mediapipe_bones()  # None si pas dispo
         self._init_skel_cpu_buffer()
+        self._init_mesh_cpu_buffer()
         self._build_pipelines()
         self._last_lightning_emit = 0.0
         return self
@@ -238,6 +240,10 @@ class MetalRenderer(NSObject):
         """
         if getattr(self, "_skel_cpu_buf", None) is None:
             self._skel_cpu_buf = np.zeros(SKEL_MAX_SEGS * 10, dtype=np.float32)
+
+    def _init_mesh_cpu_buffer(self) -> None:
+        if getattr(self, "_mesh_cpu_buf", None) is None:
+            self._mesh_cpu_buf = np.zeros(MESH_MAX_VERTS * 5, dtype=np.float32)
 
     # ---- Uniforms helpers ------------------------------------------
     def _update_uniforms(self) -> int:
@@ -388,13 +394,13 @@ class MetalRenderer(NSObject):
         if not (s.persons_face or s.persons_hands or s.persons_body):
             return 0
 
-        floats: list[float] = []
-        tris = 0
+        n_verts = 0
 
         def push_tri(kp_list, i, j, k, pid: int) -> bool:
             """Pousse un triangle (3 verts). Retourne False si buffer plein
             ou triangle invalide (confiance basse)."""
-            nonlocal tris
+            nonlocal n_verts
+            tris = n_verts // 3
             if tris >= MESH_MAX_TRIS:
                 return False
             if i >= len(kp_list) or j >= len(kp_list) or k >= len(kp_list):
@@ -407,12 +413,23 @@ class MetalRenderer(NSObject):
             cx = C.x * 2.0 - 1.0; cy = 1.0 - C.y * 2.0
             conf = min(A.c, B.c, C.c)
             fpid = float(pid)
-            floats.extend([
-                ax, ay, float(A.z), conf, fpid,
-                bx, by, float(B.z), conf, fpid,
-                cx, cy, float(C.z), conf, fpid,
-            ])
-            tris += 1
+            base = n_verts * 5
+            self._mesh_cpu_buf[base + 0] = ax
+            self._mesh_cpu_buf[base + 1] = ay
+            self._mesh_cpu_buf[base + 2] = float(A.z)
+            self._mesh_cpu_buf[base + 3] = conf
+            self._mesh_cpu_buf[base + 4] = fpid
+            self._mesh_cpu_buf[base + 5] = bx
+            self._mesh_cpu_buf[base + 6] = by
+            self._mesh_cpu_buf[base + 7] = float(B.z)
+            self._mesh_cpu_buf[base + 8] = conf
+            self._mesh_cpu_buf[base + 9] = fpid
+            self._mesh_cpu_buf[base + 10] = cx
+            self._mesh_cpu_buf[base + 11] = cy
+            self._mesh_cpu_buf[base + 12] = float(C.z)
+            self._mesh_cpu_buf[base + 13] = conf
+            self._mesh_cpu_buf[base + 14] = fpid
+            n_verts += 3
             return True
 
         ids_b = s.persons_body_ids or list(range(len(s.persons_body)))
@@ -435,7 +452,7 @@ class MetalRenderer(NSObject):
             for a, b, c in tri_list:
                 if not push_tri(face_kp, a, b, c, pid):
                     break
-            if tris >= MESH_MAX_TRIS:
+            if n_verts // 3 >= MESH_MAX_TRIS:
                 break
 
         # Hands — decalage palette +5 comme dans le skel
@@ -445,12 +462,12 @@ class MetalRenderer(NSObject):
                 if not push_tri(hand_kp, a, b, c, pid):
                     break
 
-        if tris == 0:
+        if n_verts == 0:
             return 0
-        data = struct.pack(f"{len(floats)}f", *floats)
+        data = self._mesh_cpu_buf[: n_verts * 5].tobytes()
         mv = self._mesh_buf.contents().as_buffer(len(data))
         mv[:] = data
-        return tris
+        return n_verts // 3
 
     # ---- MTKViewDelegate ------------------------------------------
     def mtkView_drawableSizeWillChange_(self, view, size):  # noqa: N802
