@@ -87,6 +87,18 @@ detrpose = [
     { name = "transformers" },
     { name = "xtcocotools" },
 ]
+multihmr = [
+    { name = "einops" },
+    { name = "huggingface-hub" },
+    { name = "iopath" },
+    { name = "numpy" },
+    { name = "opencv-python" },
+    { name = "scipy" },
+    { name = "smplx" },
+    { name = "torch" },
+    { name = "torchgeometry" },
+    { name = "torchvision" },
+]
 nlf = [
     { name = "numpy" },
     { name = "opencv-python" },
@@ -104,12 +116,17 @@ pose = [
 requires-dist = [
     { name = "cloudpickle", marker = "extra == 'detrpose'", specifier = ">=3.0" },
     { name = "coremltools", marker = "extra == 'pose'", specifier = ">=9.0" },
+    { name = "einops", marker = "extra == 'multihmr'", specifier = ">=0.8" },
+    { name = "huggingface-hub", marker = "extra == 'multihmr'", specifier = ">=0.24" },
     { name = "iopath", marker = "extra == 'detrpose'", specifier = ">=0.1.10" },
+    { name = "iopath", marker = "extra == 'multihmr'", specifier = ">=0.1.10" },
     { name = "mediapipe", marker = "extra == 'pose'", specifier = ">=0.10.35" },
     { name = "numpy", specifier = ">=1.26,<2" },
+    { name = "numpy", marker = "extra == 'multihmr'", specifier = ">=1.26,<2" },
     { name = "numpy", marker = "extra == 'nlf'", specifier = ">=1.26" },
     { name = "omegaconf", marker = "extra == 'detrpose'", specifier = ">=2.3" },
     { name = "opencv-python", marker = "extra == 'detrpose'", specifier = ">=4.10" },
+    { name = "opencv-python", marker = "extra == 'multihmr'", specifier = ">=4.10" },
     { name = "opencv-python", marker = "extra == 'nlf'", specifier = ">=4.10" },
     { name = "opencv-python", marker = "extra == 'pose'", specifier = ">=4.10" },
     { name = "pycocotools", marker = "extra == 'detrpose'", specifier = ">=2.0" },
@@ -122,15 +139,20 @@ requires-dist = [
     { name = "python-osc", specifier = ">=1.8.3" },
     { name = "scipy", specifier = ">=1.13" },
     { name = "scipy", marker = "extra == 'detrpose'", specifier = ">=1.13" },
+    { name = "scipy", marker = "extra == 'multihmr'", specifier = ">=1.13" },
+    { name = "smplx", marker = "extra == 'multihmr'", specifier = ">=0.1.28" },
     { name = "torch", marker = "extra == 'detrpose'", specifier = ">=2.4" },
+    { name = "torch", marker = "extra == 'multihmr'", specifier = ">=2.4" },
     { name = "torch", marker = "extra == 'nlf'", specifier = ">=2.4" },
+    { name = "torchgeometry", marker = "extra == 'multihmr'", specifier = ">=0.1.2" },
     { name = "torchvision", marker = "extra == 'detrpose'", specifier = ">=0.19" },
+    { name = "torchvision", marker = "extra == 'multihmr'", specifier = ">=0.19" },
     { name = "torchvision", marker = "extra == 'nlf'", specifier = ">=0.19" },
     { name = "transformers", marker = "extra == 'detrpose'", specifier = ">=4.40" },
     { name = "ultralytics", marker = "extra == 'pose'", specifier = ">=8.3" },
     { name = "xtcocotools", marker = "extra == 'detrpose'", specifier = ">=1.14" },
 ]
-provides-extras = ["pose", "detrpose", "nlf"]
+provides-extras = ["pose", "detrpose", "nlf", "multihmr"]
 
 [[package]]
 name = "cattrs"
@@ -564,6 +586,15 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/8f/b1/d6a353c9b147848122a0db370863601fdf56de2d983b5c4a6a11e6ee3cd7/cython-3.2.4-cp39-abi3-win32.whl", hash = "sha256:2b1f12c0e4798293d2754e73cd6f35fa5bbdf072bdc14bc6fc442c059ef2d290", size = 2437463, upload-time = "2026-01-04T14:15:53.787Z" },
     { url = "https://files.pythonhosted.org/packages/2d/d8/319a1263b9c33b71343adfd407e5daffd453daef47ebc7b642820a8b68ed/cython-3.2.4-cp39-abi3-win_arm64.whl", hash = "sha256:3b8e62049afef9da931d55de82d8f46c9a147313b69d5ff6af6e9121d545ce7a", size = 2442754, upload-time = "2026-01-04T14:15:55.382Z" },
     { url = "https://files.pythonhosted.org/packages/ff/fa/d3c15189f7c52aaefbaea76fb012119b04b9013f4bf446cb4eb4c26c4e6b/cython-3.2.4-py3-none-any.whl", hash = "sha256:732fc93bc33ae4b14f6afaca663b916c2fdd5dcbfad7114e17fb2434eeaea45c", size = 1257078, upload-time = "2026-01-04T14:14:12.373Z" },
+]
+
+[[package]]
+name = "einops"
+version = "0.8.2"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/2c/77/850bef8d72ffb9219f0b1aac23fbc1bf7d038ee6ea666f331fa273031aa2/einops-0.8.2.tar.gz", hash = "sha256:609da665570e5e265e27283aab09e7f279ade90c4f01bcfca111f3d3e13f2827", size = 56261, upload-time = "2026-01-26T04:13:17.638Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/2a/09/f8d8f8f31e4483c10a906437b4ce31bdf3d6d417b73fe33f1a8b59e34228/einops-0.8.2-py3-none-any.whl", hash = "sha256:54058201ac7087911181bfec4af6091bb59380360f069276601256a76af08193", size = 65638, upload-time = "2026-01-26T04:13:18.546Z" },
 ]
 
 [[package]]
@@ -2033,6 +2064,19 @@ wheels = [
 ]
 
 [[package]]
+name = "smplx"
+version = "0.1.28"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "numpy" },
+    { name = "torch" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/69/eb/51da17b291fb1221317a1ff65a301fb2cf9c6c0dd87a0caec4cbcd06c1da/smplx-0.1.28.tar.gz", hash = "sha256:c3a1e2c3069cdf7a4b34fd250c2484c8bb1a4fd9c14490da9359af5fbc64fbe6", size = 28500, upload-time = "2021-05-26T12:14:10.194Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/c9/33/bd37416aec828e7465652d9e2525fe52de0a29a581f1519cc51a74485091/smplx-0.1.28-py3-none-any.whl", hash = "sha256:e8ff3d278a015c097dc86d44a38475da4ac170042943c84c08eee433629406a7", size = 29903, upload-time = "2021-05-26T12:14:08.641Z" },
+]
+
+[[package]]
 name = "sounddevice"
 version = "0.5.5"
 source = { registry = "https://pypi.org/simple" }
@@ -2131,6 +2175,18 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/fd/66/54a56a4a6ceaffb567231994a9745821d3af922a854ed33b0b3a278e0a99/torch-2.11.0-cp314-cp314t-manylinux_2_28_aarch64.whl", hash = "sha256:ab9a8482f475f9ba20e12db84b0e55e2f58784bdca43a854a6ccd3fd4b9f75e6", size = 419735835, upload-time = "2026-03-23T18:07:18.974Z" },
     { url = "https://files.pythonhosted.org/packages/b1/e7/0b6665f533aa9e337662dc190425abc0af1fe3234088f4454c52393ded61/torch-2.11.0-cp314-cp314t-manylinux_2_28_x86_64.whl", hash = "sha256:563ed3d25542d7e7bbc5b235ccfacfeb97fb470c7fee257eae599adb8005c8a2", size = 530613405, upload-time = "2026-03-23T18:08:07.014Z" },
     { url = "https://files.pythonhosted.org/packages/cf/bf/c8d12a2c86dbfd7f40fb2f56fbf5a505ccf2d9ce131eb559dfc7c51e1a04/torch-2.11.0-cp314-cp314t-win_amd64.whl", hash = "sha256:b2a43985ff5ef6ddd923bbcf99943e5f58059805787c5c9a2622bf05ca2965b0", size = 114792991, upload-time = "2026-03-23T18:08:19.216Z" },
+]
+
+[[package]]
+name = "torchgeometry"
+version = "0.1.2"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "torch" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/3e/bb/5a7c43067349a2e85a3ccb249e4a2ff6518358e40be1a3062f94f34ca8e9/torchgeometry-0.1.2.tar.gz", hash = "sha256:5d9129e709baaeece5298d9d27a3a3961ac0659264846392138c785520bdb872", size = 44252, upload-time = "2019-03-14T11:59:19.286Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/a6/d6/3f6820c0589bc3876080c59b58a3bad11af746a7b46f364b1cde7972bd72/torchgeometry-0.1.2-py2.py3-none-any.whl", hash = "sha256:f4b08b19359581f76aa93206fac4b439fbe784be2f072fca7d7e720bf0e28ce0", size = 42742, upload-time = "2019-03-14T11:59:17.255Z" },
 ]
 
 [[package]]

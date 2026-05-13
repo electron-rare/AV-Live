@@ -44,6 +44,21 @@ nlf = [
     "opencv-python>=4.10",
     "numpy>=1.26",
 ]
+# Multi-HMR (Naver Labs, ECCV 2024). Pas pip-installable : on clone le repo
+# dans ~/.cache/av-live-multihmr/multi-hmr et on injecte sys.path au runtime.
+# SMPL-X NEUTRAL.npz requiert un compte academique sur smpl-x.is.tue.mpg.de.
+multihmr = [
+    "torch>=2.4",
+    "torchvision>=0.19",
+    "smplx>=0.1.28",
+    "einops>=0.8",
+    "iopath>=0.1.10",
+    "huggingface-hub>=0.24",
+    "opencv-python>=4.10",
+    "numpy>=1.26,<2",
+    "scipy>=1.13",
+    "torchgeometry>=0.1.2",
+]
 
 [tool.uv]
 package = false
