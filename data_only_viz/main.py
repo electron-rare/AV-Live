@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import argparse
 import logging
+import os
 import signal
 import sys
 
@@ -265,9 +266,55 @@ class AppDelegate(NSObject):
                             self._opts, "motion_gate", 5.0),
                         camera_index=getattr(self._opts, "camera_index", -1))
                     self._pose_worker.start()
-                    self._smplx_tcp = SMPLXTCPSender(self._state)
+                    # MESH_RIG=0 disables the 30 fps rigid translation
+                    # rigger from mesh_rigger.py (used to debug deformation
+                    # issues introduced by the hybrid rigging path).
+                    self._smplx_tcp = SMPLXTCPSender(
+                        self._state,
+                        enable_rigging=os.environ.get("MESH_RIG", "1") != "0",
+                    )
                     self._smplx_tcp.start()
                     LOG.info("worker: Multi-HMR + SMPL-X (mesh dense)")
+                    # Secondary body-pose worker in parallel: AVLiveBody
+                    # gets body keypoints on UDP :57126 alongside the mesh
+                    # on TCP :57130. Default: Apple Vision (ANE-accel,
+                    # body only 19 joints). Set AV_LIVE_PARALLEL_POSE=
+                    # mediapipe to swap to MediaPipe Holistic (CPU
+                    # XNNPACK but provides face + hand + 3D world).
+                    # Defaut: lance BOTH Apple Vision (body 19 joints sur
+                    # ANE, ~30 fps) ET MediaPipe Multi (face 468 + hands 21
+                    # + pose 3D world sur CPU XNNPACK). Set
+                    # AV_LIVE_PARALLEL_POSE=apple_vision pour ne garder que
+                    # le path ANE (face/hand fin disparait), ou =mediapipe
+                    # pour ne garder que CPU.
+                    parallel = _os.environ.get(
+                        "AV_LIVE_PARALLEL_POSE", "both")
+                    if parallel in ("apple_vision", "both"):
+                        try:
+                            from .apple_vision_pose import AppleVisionPoseWorker
+                            if AppleVisionPoseWorker.is_available():
+                                self._av_worker = AppleVisionPoseWorker(
+                                    self._state, target_fps=30.0,
+                                    num_persons=4)
+                                self._av_worker.start()
+                                LOG.info("worker: + Apple Vision body pose "
+                                         "(ANE) in parallel")
+                            else:
+                                raise RuntimeError("apple_vision unavailable")
+                        except Exception as e:  # noqa: BLE001
+                            LOG.warning("Apple Vision parallel start failed "
+                                        "(%s)", e)
+                    if parallel in ("mediapipe", "both"):
+                        try:
+                            from .multi import MultiWorker
+                            self._mp_worker = MultiWorker(
+                                self._state, num_persons=4)
+                            self._mp_worker.start()
+                            LOG.info("worker: + MediaPipe Multi (3D pose "
+                                     "+ face + hand) in parallel")
+                        except Exception as e:  # noqa: BLE001
+                            LOG.warning("MediaPipe parallel start failed "
+                                        "(%s)", e)
                     return
                 LOG.info("Multi-HMR indisponible (checkpoints manquants) "
                          "— voir scripts/setup_multihmr.sh")

@@ -35,6 +35,32 @@ Python **3.11+** requis. `pyproject.toml` est la source de vérité — ne jamai
 - Shaders Metal dans `shaders/` (`.metal`), recompilés au runtime ; topologie mesh (SMPL faces) en binaire dans `mesh_topology.py`.
 - OSC out : `osc_listener.py` / `pose_bridge.py` — destination `oscope-of` sur `:57123`.
 
+## action-head (classifier action debout/assise/danse)
+
+Tête de classification d'action streaming au-dessus des j3d SMPL-X (ou body3d MediaPipe en fallback). Implémentée 2026-05-13.
+
+| Fichier | Rôle |
+|---|---|
+| `action_head.py` | `ActionHeadModel` (GRU 1L + MLP, 37 811 params, <2 ms/step M5), `ActionHead.step(pid, j3d) → (label, probs, kin)`, `PerPersonBuffer`, `FeatureExtractor` (201-D : j3d + vel + accel + scalaires) |
+| `action_head_pub.py` | Publisher thread démarré dans `multi.py` `__init__`. Polle `state.persons_smplx` (préféré) ou `state.persons_body3d` (fallback) à 30 Hz, dédup par timestamp, extrait j3d22 via `SMPLX_JOINT_ANCHOR_VERTS` ou `MEDIAPIPE_TO_22`, émet OSC `/pose/action` + `/pose/kin` + `/pose/enter/leave` |
+| `training/{dataset,autolabel,augment,train_action_head,eval,review}.py` | Pipeline complet : jsonl IO + sliding windows + by-session split / règles auto-label + glue CLI / 4 augmentations / training MPS AdamW CE-weighted / confusion matrix + latence micro-bench / TUI textuel pour review manuel |
+| `scripts/capture_actions.py` | Webcam → MP4 + timestamps |
+| `scripts/extract_j3d_offline.py` | MP4 → jsonl j3d22 via `MultiHMRCoreMLBackend.infer()` directement (pas de refactor worker) |
+| `scripts/train_on_studio.sh` | rsync grosmac → bastion electron-server → studio M3 Ultra + uv sync `--extra multihmr` + train MPS + ckpt back |
+
+Pipeline complet de capture à live :
+```bash
+uv run python -m data_only_viz.scripts.capture_actions --session sess01 --duration 600
+uv run python -m data_only_viz.scripts.extract_j3d_offline --session sess01 --video ~/.cache/av-live-action/raw/sess01.mp4
+uv run python -m data_only_viz.training.autolabel --frames ~/.cache/av-live-action/raw/sess01.jsonl --out ~/.cache/av-live-action/dataset/auto.jsonl
+uv run python -m data_only_viz.training.review --in ~/.cache/av-live-action/dataset/auto.jsonl --out ~/.cache/av-live-action/dataset/dataset.jsonl
+./data_only_viz/scripts/train_on_studio.sh --epochs 50
+uv run python -m data_only_viz.training.eval --ckpt ~/.cache/av-live-action/checkpoints/action_head.pt --dataset ~/.cache/av-live-action/dataset/dataset.jsonl
+# Live : publisher déjà câblé dans multi.py, aucune action requise
+```
+
+Checkpoint par défaut : `~/.cache/av-live-action/checkpoints/action_head.pt`. Absent → random init (warmup retourne `debout`).
+
 ## Tests
 
 ```bash
@@ -42,6 +68,8 @@ uv run pytest tests/ -v
 ```
 
 Tests TDD-first pour `nlf_worker.py` ; valider avant chaque commit qui touche un worker.
+
+Suite action-head (8 fichiers, 39 tests) : `tests/test_action_head_*.py`, `tests/test_{dataset,autolabel,augment,training_smoke,pose_bridge_action}.py`. Tous doivent rester verts avant chaque commit qui touche `action_head*.py` ou `training/*.py`.
 
 ## Anti-patterns
 

@@ -157,6 +157,32 @@ if hasattr(model.backbone, "encoder") and hasattr(model.backbone.encoder,
 # torch.inverse(K) plante coremltools (op non implementee). Comme K est
 # fixe (camera intrinsics avec focal=IMG_SIZE), on pre-calcule K_inv
 # en closed-form et on l'utilise comme buffer module-level.
+print("==> Patching roma.rotmat_to_rotvec (branchless atan2)")
+# roma.rotmat_to_rotvec utilise torch.empty + 8 index_put_ qui se
+# traduisent en CoreML par scatter_nd successifs sur un buffer
+# garbage-initialise. Resultat : cellules non touchees restent NaN,
+# propagees via quat normalization -> v3d/transl all-NaN.
+# Remplacement branchless via atan2 : pas de torch.empty, pas
+# d'index_put_, juste des stack/clamp/norm/atan2 stables CoreML.
+# Precision vs roma original : 2.26e-6 L_inf sur batch random.
+import roma as _roma
+
+def _rotmat_to_rotvec_branchless(R, eps=1e-6):
+    w = torch.stack([
+        R[..., 2, 1] - R[..., 1, 2],
+        R[..., 0, 2] - R[..., 2, 0],
+        R[..., 1, 0] - R[..., 0, 1],
+    ], dim=-1) * 0.5
+    trace = R[..., 0, 0] + R[..., 1, 1] + R[..., 2, 2]
+    cos_theta = ((trace - 1.0) * 0.5).clamp(-1.0, 1.0)
+    sin_theta = torch.norm(w, dim=-1)
+    theta = torch.atan2(sin_theta, cos_theta)
+    sin_theta_safe = sin_theta.clamp(min=eps)
+    return w * (theta / sin_theta_safe).unsqueeze(-1)
+
+_roma.rotmat_to_rotvec = _rotmat_to_rotvec_branchless
+
+
 print("==> Patching utils.camera.inverse_perspective_projection")
 import utils.camera as _camera
 
@@ -170,11 +196,28 @@ _K_INV_PRE = torch.tensor([
 ])
 
 def inverse_perspective_projection_fixed(points, K, distance):
-    """Bypass torch.inverse : utilise K_inv pre-calcule en closed-form
-    (notre K est connu et fixe). Le K argument est ignore."""
-    K_inv = _K_INV_PRE.to(points.device).to(points.dtype)
-    points = torch.cat([points, torch.ones_like(points[..., :1])], -1)
-    points = torch.einsum('bij,bkj->bki', K_inv, points)
+    """Bypass torch.inverse + einsum + matmul pour eviter le bug
+    coremltools de broadcast batch 1->K sur ces ops. K_inv etant
+    fixe et structure (diag + translate), on ecrit les composantes
+    explicitement en ops elementaires.
+
+    K_inv = [[1/f, 0, -cx/f], [0, 1/f, -cy/f], [0, 0, 1]]
+    Pour points (b, N, 3) : out = points @ K_inv.T donne :
+      out[..., 0] = points[..., 0]/f - (cx/f) * points[..., 2]
+      out[..., 1] = points[..., 1]/f - (cy/f) * points[..., 2]
+      out[..., 2] = points[..., 2]
+    """
+    points_hom = torch.cat([points, torch.ones_like(points[..., :1])], -1)
+    inv_f = 1.0 / focal_val
+    cx_over_f = cx / focal_val
+    cy_over_f = cy / focal_val
+    x = points_hom[..., 0:1]
+    y = points_hom[..., 1:2]
+    z = points_hom[..., 2:3]
+    out0 = x * inv_f - z * cx_over_f
+    out1 = y * inv_f - z * cy_over_f
+    out2 = z
+    points = torch.cat([out0, out1, out2], dim=-1)
     if distance is None:
         return points
     points = points * distance
@@ -189,6 +232,26 @@ model_mod.inverse_perspective_projection = inverse_perspective_projection_fixed
 # Idem smpl_layer
 import blocks.smpl_layer as _smpl_layer
 _smpl_layer.inverse_perspective_projection = inverse_perspective_projection_fixed
+
+# Aussi perspective_projection (utilise dans smpl_layer.py:143-144 pour
+# j2d et v2d) -> rewrite einsum en matmul pour le meme broadcast bug.
+def perspective_projection_fixed(x, K):
+    """Element-wise rewrite de la projection perspective avec K fixe
+    (focal=IMG_SIZE, cx=cy=IMG_SIZE/2). Bypass matmul/einsum pour eviter
+    les bugs broadcast coremltools.
+    K = [[f, 0, cx], [0, f, cy], [0, 0, 1]]
+    out[..., 0] = f * x_norm + cx * z_norm (mais on veut [..., :2])
+                = f * (x/z) + cx
+    out[..., 1] = f * (y/z) + cy
+    """
+    z = x[..., 2:3]
+    px = x[..., 0:1] / z * focal_val + cx
+    py = x[..., 1:2] / z * focal_val + cy
+    return torch.cat([px, py], dim=-1)
+
+_camera.perspective_projection = perspective_projection_fixed
+_utils_pkg.perspective_projection = perspective_projection_fixed
+_smpl_layer.perspective_projection = perspective_projection_fixed
 
 
 # === Wrapper qui produit tuple fixe ===
@@ -222,6 +285,12 @@ class TracedMHMR(nn.Module):
         ]).squeeze(-1)
         shape = torch.stack([h["shape"] for h in humans])
         expr = torch.stack([h["expression"] for h in humans])
+        # NOTE: CoreML mlprogram conversion currently produces all-NaN
+        # outputs for v3d and transl while PyTorch eager produces valid
+        # finite values from the same trace. nan_to_num here masks the
+        # symptom but yields all-zero meshes (no information). Leave
+        # raw outputs and let downstream decide; investigation tracked
+        # in task #2 (op-by-op bisection needed).
         return v3d, transl, scores, shape, expr
 
 
@@ -422,6 +491,28 @@ def _diagonal_general(context, node):
 
 _TORCH_OPS_REGISTRY.name_to_func_mapping["diagonal"] = _diagonal_general
 
+
+# Instrument reshape pour logger node source au moment de l'erreur.
+from coremltools.converters.mil.mil.ops.defs.iOS15 import tensor_transformation as _tt
+_orig_reshape_ti = _tt.reshape.type_inference
+
+
+def _reshape_ti_logged(self):
+    try:
+        return _orig_reshape_ti(self)
+    except ValueError as e:
+        if "Invalid target shape" in str(e):
+            try:
+                from_shape = list(self.x.shape)
+                target = list(self.shape.val) if hasattr(self.shape, "val") else "?"
+                print(f"  >>> RESHAPE FAIL : name={self.name} from={from_shape} target={target}")
+            except Exception:
+                pass
+        raise
+
+
+_tt.reshape.type_inference = _reshape_ti_logged
+
 try:
     mlmodel = ct.convert(
         traced,
@@ -433,6 +524,10 @@ try:
         compute_units=ct.ComputeUnit.CPU_AND_GPU,
         minimum_deployment_target=ct.target.macOS15,
         convert_to="mlprogram",
+        # FP16 OK depuis le patch roma branchless (cf rapport bisection
+        # 2026-05-13) : la source du NaN etait torch.empty + index_put_
+        # dans roma.rotmat_to_rotvec, pas la precision.
+        compute_precision=ct.precision.FLOAT16,
     )
     out_path = "/tmp/multihmr_full_672_s.mlpackage"
     mlmodel.save(out_path)

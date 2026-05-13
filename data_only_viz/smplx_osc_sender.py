@@ -25,6 +25,7 @@ from typing import Sequence
 
 import numpy as np
 
+from .mesh_rigger import MeshRigger
 from .state import SMPLXPerson, State
 
 LOG = logging.getLogger("smplx_tcp")
@@ -35,7 +36,8 @@ PORT = 57130
 
 class SMPLXTCPSender:
     def __init__(self, state: State, host: str = "127.0.0.1",
-                 port: int = PORT, target_fps: float = 12.0) -> None:
+                 port: int = PORT, target_fps: float = 30.0,
+                 enable_rigging: bool = True) -> None:
         self.state = state
         self.host = host
         self.port = port
@@ -43,6 +45,9 @@ class SMPLXTCPSender:
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None
         self._sock: socket.socket | None = None
+        # Hybrid keyframe rigging : entre deux keyframes Multi-HMR (~3 fps),
+        # on translate le mesh via le delta pelvis Apple Vision (30 fps).
+        self._rigger = MeshRigger(state) if enable_rigging else None
 
     def start(self) -> None:
         self._thread = threading.Thread(
@@ -124,6 +129,9 @@ class SMPLXTCPSender:
 
     def _run(self) -> None:
         last_warn = 0.0
+        n_sent = 0
+        n_rigged = 0
+        next_hb = time.monotonic() + 5.0
         while not self._stop.is_set():
             t0 = time.monotonic()
             if not self._ensure_connected():
@@ -136,8 +144,30 @@ class SMPLXTCPSender:
 
             with self.state.lock():
                 persons = list(self.state.persons_smplx)
+                body_kp = list(self.state.persons_body) if hasattr(
+                    self.state, "persons_body") else []
+                body_ids = list(self.state.persons_body_ids) if hasattr(
+                    self.state, "persons_body_ids") else (
+                    list(range(len(body_kp))) if body_kp else [])
+
+            if persons and self._rigger is not None:
+                rigged = self._rigger.apply(
+                    persons, body_kp, body_ids, t0)
+                if rigged is not persons:
+                    n_rigged += 1
+                persons = rigged
+
+            if t0 >= next_hb:
+                fps = n_sent / 5.0
+                rig_pct = (n_rigged / n_sent * 100.0) if n_sent else 0.0
+                LOG.info("hb: %.1f fps tcp, %.0f%% rigged",
+                         fps, rig_pct)
+                n_sent = 0
+                n_rigged = 0
+                next_hb = t0 + 5.0
 
             if persons:
+                n_sent += 1
                 t_ser_start = time.monotonic()
                 payload = self._serialize_persons(persons)
                 t_send_start = time.monotonic()
