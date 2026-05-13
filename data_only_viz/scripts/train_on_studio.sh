@@ -54,10 +54,12 @@ bastion_ssh() {
 }
 
 bastion_rsync() {
-  # rsync via ssh ProxyCommand through bastion.
+  # rsync via ssh ProxyJump through bastion. Direct grosmac->studio
+  # known_hosts entry may be stale (SSH direct broken since reboot
+  # 2026-05-12). accept-new lets us add the key on first use.
   local src="$1" dst="$2"
   rsync -avz --delete \
-    -e "ssh -o ConnectTimeout=5 -A -J $BASTION_USER_HOST" \
+    -e "ssh -o ConnectTimeout=5 -o StrictHostKeyChecking=accept-new -A -J $BASTION_USER_HOST" \
     "$src" "$dst"
 }
 
@@ -66,18 +68,27 @@ bastion_ssh "echo studio OK ; $STUDIO_UV --version"
 
 log "== Push code subset =="
 bastion_ssh "mkdir -p $REMOTE_REPO/data_only_viz $REMOTE_DATASET $REMOTE_CKPT"
-bastion_rsync "$REPO_ROOT/data_only_viz/" \
-              "$STUDIO_USER_HOST:av-live-action/repo/data_only_viz/"
+rsync -avz --delete \
+  --exclude='.venv/' --exclude='__pycache__/' --exclude='.pytest_cache/' \
+  --exclude='.ruff_cache/' --exclude='*.pyc' --exclude='.DS_Store' \
+  --exclude='web/' --exclude='shaders/' \
+  -e "ssh -o ConnectTimeout=5 -o StrictHostKeyChecking=accept-new -A -J $BASTION_USER_HOST" \
+  "$REPO_ROOT/data_only_viz/" \
+  "$STUDIO_USER_HOST:av-live-action/repo/data_only_viz/"
 
 log "== Push dataset =="
 bastion_rsync "$LOCAL_DATASET/" "$STUDIO_USER_HOST:av-live-action/dataset/"
 
 log "== Remote uv sync =="
-bastion_ssh "cd $REMOTE_REPO/data_only_viz && $STUDIO_UV sync --no-progress"
+# multihmr extra pulls torch (action-head training needs torch but no pyobjc).
+# We piggy-back on the multihmr extras since torch is the main thing we need.
+bastion_ssh "cd $REMOTE_REPO && $STUDIO_UV sync --no-progress --project data_only_viz --extra multihmr"
 
 log "== Remote train (MPS) =="
-bastion_ssh "cd $REMOTE_REPO/data_only_viz && \
-             $STUDIO_UV run python -m data_only_viz.training.train_action_head \
+# cwd must be the PARENT of data_only_viz/ so the package is importable as
+# top-level. uv resolves the env via --project data_only_viz.
+bastion_ssh "cd $REMOTE_REPO && \
+             $STUDIO_UV run --project data_only_viz python -m data_only_viz.training.train_action_head \
                  --dataset $REMOTE_DATASET/$(basename "$DATASET_FILE") \
                  --ckpt-out $REMOTE_CKPT/$CKPT_NAME \
                  --device mps \
