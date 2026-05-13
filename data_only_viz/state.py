@@ -20,6 +20,19 @@ class PoseKp:
 
 
 @dataclass
+class SMPLXPerson:
+    """Resultats Multi-HMR pour une personne : params SMPL-X + vertices
+    decodes en metres. Vertices en repere camera (z > 0 devant)."""
+    pid: int = -1
+    vertices_3d: tuple = field(default_factory=tuple)   # ((x,y,z),) x 10475
+    joints_3d: tuple = field(default_factory=tuple)      # ((x,y,z),) x 127
+    translation: tuple = (0.0, 0.0, 0.0)
+    confidence: float = 0.0
+    betas: tuple = field(default_factory=tuple)           # (10,)
+    expression: tuple = field(default_factory=tuple)      # (10,)
+
+
+@dataclass
 class NLFPerson:
     """Resultats NLF pour une personne : vertices 3D SMPL (6890) en metres,
     coordonnees camera (z > 0 devant). Le path nonparametrique fournit les
@@ -87,6 +100,10 @@ class State:
     # NLF (SMPL 6890 verts x N personnes, path nonparametrique)
     persons_nlf: list = field(default_factory=list)   # list[NLFPerson]
     nlf_last_t: float = 0.0
+
+    # Multi-HMR (SMPL-X 10475 verts x N personnes)
+    persons_smplx: list = field(default_factory=list)   # list[SMPLXPerson]
+    smplx_last_t: float = 0.0
 
     # Renderer
     width: int = 1280
