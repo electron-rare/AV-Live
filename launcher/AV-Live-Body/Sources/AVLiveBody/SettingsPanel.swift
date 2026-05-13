@@ -66,9 +66,23 @@ struct SettingsPanel: View {
             layerRow(icon: "circle.dotted",
                      label: "Fil de fer",
                      isOn: $settings.showWireframe)
+            // Squelette toggle : bascule en mode openpos (#9). ON
+            // synchronise vizMode=9 et showSkeleton=true ; OFF revient
+            // au mode 0 (storm). Sync bidirectionnel pour que la touche
+            // "p" et le picker viz updatent le toggle automatiquement.
             layerRow(icon: "figure.stand",
-                     label: "Squelette (à venir)",
-                     isOn: $settings.showSkeleton)
+                     label: "Squelette (openpos)",
+                     isOn: Binding(
+                         get: { settings.vizMode == 9 },
+                         set: { on in
+                             if on {
+                                 settings.vizMode = 9
+                                 settings.showSkeleton = true
+                             } else {
+                                 settings.vizMode = 0
+                                 settings.showSkeleton = false
+                             }
+                         }))
             // Picker viz mode 0..9
             HStack(spacing: 4) {
                 ForEach(0..<10) { i in

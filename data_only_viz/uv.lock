@@ -22,6 +22,15 @@ wheels = [
 ]
 
 [[package]]
+name = "addict"
+version = "2.4.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/85/ef/fd7649da8af11d93979831e8f1f8097e85e82d5bfeabc8c68b39175d8e75/addict-2.4.0.tar.gz", hash = "sha256:b3b2210e0e067a281f5646c8c5db92e99b7231ea8b0eb5f74dbdf9e259d4e494", size = 9186, upload-time = "2020-11-21T16:21:31.416Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/6a/00/b08f23b7d7e1e14ce01419a467b583edbb93c6cdb8654e54a9cc579cd61f/addict-2.4.0-py3-none-any.whl", hash = "sha256:249bb56bbfd3cdc2a004ea0ff4c2b6ddc84d53bc2194761636eb314d5cfa5dfc", size = 3832, upload-time = "2020-11-21T16:21:29.588Z" },
+]
+
+[[package]]
 name = "annotated-doc"
 version = "0.0.4"
 source = { registry = "https://pypi.org/simple" }
@@ -115,6 +124,21 @@ pose = [
     { name = "opencv-python" },
     { name = "ultralytics" },
 ]
+smplerx = [
+    { name = "einops" },
+    { name = "mmcv-lite" },
+    { name = "numpy" },
+    { name = "opencv-python" },
+    { name = "pillow" },
+    { name = "scipy" },
+    { name = "smplx" },
+    { name = "timm" },
+    { name = "torch" },
+    { name = "torchvision" },
+    { name = "tqdm" },
+    { name = "ultralytics" },
+    { name = "yacs" },
+]
 
 [package.dev-dependencies]
 dev = [
@@ -126,19 +150,24 @@ requires-dist = [
     { name = "cloudpickle", marker = "extra == 'detrpose'", specifier = ">=3.0" },
     { name = "coremltools", marker = "extra == 'pose'", specifier = ">=9.0" },
     { name = "einops", marker = "extra == 'multihmr'", specifier = ">=0.8" },
+    { name = "einops", marker = "extra == 'smplerx'", specifier = ">=0.8" },
     { name = "huggingface-hub", marker = "extra == 'multihmr'", specifier = ">=0.24" },
     { name = "iopath", marker = "extra == 'detrpose'", specifier = ">=0.1.10" },
     { name = "iopath", marker = "extra == 'multihmr'", specifier = ">=0.1.10" },
     { name = "mediapipe", marker = "extra == 'pose'", specifier = ">=0.10.35" },
+    { name = "mmcv-lite", marker = "extra == 'smplerx'", specifier = ">=2.1" },
     { name = "numpy", specifier = ">=1.26,<2" },
     { name = "numpy", marker = "extra == 'multihmr'", specifier = ">=1.26,<2" },
     { name = "numpy", marker = "extra == 'nlf'", specifier = ">=1.26" },
+    { name = "numpy", marker = "extra == 'smplerx'", specifier = ">=1.26,<2" },
     { name = "omegaconf", marker = "extra == 'detrpose'", specifier = ">=2.3" },
     { name = "opencv-python", marker = "extra == 'detrpose'", specifier = ">=4.10" },
     { name = "opencv-python", marker = "extra == 'multihmr'", specifier = ">=4.10" },
     { name = "opencv-python", marker = "extra == 'nlf'", specifier = ">=4.10" },
     { name = "opencv-python", marker = "extra == 'pose'", specifier = ">=4.10" },
+    { name = "opencv-python", marker = "extra == 'smplerx'", specifier = ">=4.10" },
     { name = "pillow", marker = "extra == 'multihmr'", specifier = ">=10.0" },
+    { name = "pillow", marker = "extra == 'smplerx'", specifier = ">=10.0" },
     { name = "pycocotools", marker = "extra == 'detrpose'", specifier = ">=2.0" },
     { name = "pyobjc-core", specifier = ">=10.3" },
     { name = "pyobjc-framework-avfoundation", specifier = ">=10.3" },
@@ -151,21 +180,29 @@ requires-dist = [
     { name = "scipy", specifier = ">=1.13" },
     { name = "scipy", marker = "extra == 'detrpose'", specifier = ">=1.13" },
     { name = "scipy", marker = "extra == 'multihmr'", specifier = ">=1.13" },
+    { name = "scipy", marker = "extra == 'smplerx'", specifier = ">=1.13" },
     { name = "smplx", marker = "extra == 'multihmr'", specifier = ">=0.1.28" },
+    { name = "smplx", marker = "extra == 'smplerx'", specifier = ">=0.1.28" },
+    { name = "timm", marker = "extra == 'smplerx'", specifier = ">=1.0" },
     { name = "torch", marker = "extra == 'detrpose'", specifier = ">=2.4" },
     { name = "torch", marker = "extra == 'multihmr'", specifier = ">=2.4" },
     { name = "torch", marker = "extra == 'nlf'", specifier = ">=2.4" },
+    { name = "torch", marker = "extra == 'smplerx'", specifier = ">=2.4" },
     { name = "torchgeometry", marker = "extra == 'multihmr'", specifier = ">=0.1.2" },
     { name = "torchvision", marker = "extra == 'detrpose'", specifier = ">=0.19" },
     { name = "torchvision", marker = "extra == 'multihmr'", specifier = ">=0.19" },
     { name = "torchvision", marker = "extra == 'nlf'", specifier = ">=0.19" },
+    { name = "torchvision", marker = "extra == 'smplerx'", specifier = ">=0.19" },
     { name = "tqdm", marker = "extra == 'multihmr'", specifier = ">=4.65" },
+    { name = "tqdm", marker = "extra == 'smplerx'", specifier = ">=4.65" },
     { name = "transformers", marker = "extra == 'detrpose'", specifier = ">=4.40" },
     { name = "trimesh", marker = "extra == 'multihmr'", specifier = ">=4.4" },
     { name = "ultralytics", marker = "extra == 'pose'", specifier = ">=8.3" },
+    { name = "ultralytics", marker = "extra == 'smplerx'", specifier = ">=8.3" },
     { name = "xtcocotools", marker = "extra == 'detrpose'", specifier = ">=1.14" },
+    { name = "yacs", marker = "extra == 'smplerx'", specifier = ">=0.1.8" },
 ]
-provides-extras = ["pose", "detrpose", "nlf", "multihmr"]
+provides-extras = ["pose", "detrpose", "nlf", "multihmr", "smplerx"]
 
 [package.metadata.requires-dev]
 dev = [{ name = "pytest", specifier = ">=9.0.3" }]
@@ -1104,6 +1141,46 @@ wheels = [
 ]
 
 [[package]]
+name = "mmcv-lite"
+version = "2.2.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "addict" },
+    { name = "mmengine" },
+    { name = "numpy" },
+    { name = "opencv-python" },
+    { name = "packaging" },
+    { name = "pillow" },
+    { name = "pyyaml" },
+    { name = "regex", marker = "sys_platform == 'win32'" },
+    { name = "yapf" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/8c/e7/075329ead4078d77b14e195f04b03162b99c5644d4186505113f62b7ca6c/mmcv-lite-2.2.0.tar.gz", hash = "sha256:62933ea165b2d9ad32e1b72ccd5ccba3cf71b5cd812c4c13c16cb2fcfc46a064", size = 479155, upload-time = "2024-04-24T14:24:38.98Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/59/bd/5d468c171f201d6169bec848d1116e95736854eec72307299bc68939fe45/mmcv_lite-2.2.0-py2.py3-none-any.whl", hash = "sha256:a24ee8dd3df7556dfced282dbfe8c3f87df6de2d4dcaf1207e83e9a2d58455a6", size = 732333, upload-time = "2024-04-24T14:24:28.555Z" },
+]
+
+[[package]]
+name = "mmengine"
+version = "0.10.7"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "addict" },
+    { name = "matplotlib" },
+    { name = "numpy" },
+    { name = "opencv-python" },
+    { name = "pyyaml" },
+    { name = "regex", marker = "sys_platform == 'win32'" },
+    { name = "rich" },
+    { name = "termcolor" },
+    { name = "yapf" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/17/14/959360bbd8374e23fc1b720906999add16a3ac071a501636db12c5861ff5/mmengine-0.10.7.tar.gz", hash = "sha256:d20ffcc31127567e53dceff132612a87f0081de06cbb7ab2bdb7439125a69225", size = 378090, upload-time = "2025-03-04T12:23:09.568Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/98/8e/f98332248aad102511bea4ae19c0ddacd2f0a994f3ca4c82b7a369e0af8b/mmengine-0.10.7-py3-none-any.whl", hash = "sha256:262ac976a925562f78cd5fd14dd1bc9b680ed0aa81f0d85b723ef782f99c54ee", size = 452720, upload-time = "2025-03-04T12:23:06.339Z" },
+]
+
+[[package]]
 name = "mpmath"
 version = "1.3.0"
 source = { registry = "https://pypi.org/simple" }
@@ -1435,6 +1512,15 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/c3/28/ec0fc38107fc32536908034e990c47914c57cd7c5a3ece4d8d8f7ffd7e27/pillow-12.2.0-pp311-pypy311_pp73-manylinux_2_27_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:4a6c9fa44005fa37a91ebfc95d081e8079757d2e904b27103f4f5fa6f0bf78c0", size = 5355404, upload-time = "2026-04-01T14:46:06.33Z" },
     { url = "https://files.pythonhosted.org/packages/5e/8b/51b0eddcfa2180d60e41f06bd6d0a62202b20b59c68f5a132e615b75aecf/pillow-12.2.0-pp311-pypy311_pp73-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:25373b66e0dd5905ed63fa3cae13c82fbddf3079f2c8bf15c6fb6a35586324c1", size = 6002215, upload-time = "2026-04-01T14:46:08.83Z" },
     { url = "https://files.pythonhosted.org/packages/bc/60/5382c03e1970de634027cee8e1b7d39776b778b81812aaf45b694dfe9e28/pillow-12.2.0-pp311-pypy311_pp73-win_amd64.whl", hash = "sha256:bfa9c230d2fe991bed5318a5f119bd6780cda2915cca595393649fc118ab895e", size = 7080946, upload-time = "2026-04-01T14:46:11.734Z" },
+]
+
+[[package]]
+name = "platformdirs"
+version = "4.9.6"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/9f/4a/0883b8e3802965322523f0b200ecf33d31f10991d0401162f4b23c698b42/platformdirs-4.9.6.tar.gz", hash = "sha256:3bfa75b0ad0db84096ae777218481852c0ebc6c727b3168c1b9e0118e458cf0a", size = 29400, upload-time = "2026-04-09T00:04:10.812Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/75/a6/a0a304dc33b49145b21f4808d763822111e67d1c3a32b524a1baf947b6e1/platformdirs-4.9.6-py3-none-any.whl", hash = "sha256:e61adb1d5e5cb3441b4b7710bea7e4c12250ca49439228cc1021c00dcfac0917", size = 21348, upload-time = "2026-04-09T00:04:09.463Z" },
 ]
 
 [[package]]
@@ -2164,6 +2250,31 @@ wheels = [
 ]
 
 [[package]]
+name = "termcolor"
+version = "3.3.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/46/79/cf31d7a93a8fdc6aa0fbb665be84426a8c5a557d9240b6239e9e11e35fc5/termcolor-3.3.0.tar.gz", hash = "sha256:348871ca648ec6a9a983a13ab626c0acce02f515b9e1983332b17af7979521c5", size = 14434, upload-time = "2025-12-29T12:55:21.882Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/33/d1/8bb87d21e9aeb323cc03034f5eaf2c8f69841e40e4853c2627edf8111ed3/termcolor-3.3.0-py3-none-any.whl", hash = "sha256:cf642efadaf0a8ebbbf4bc7a31cec2f9b5f21a9f726f4ccbb08192c9c26f43a5", size = 7734, upload-time = "2025-12-29T12:55:20.718Z" },
+]
+
+[[package]]
+name = "timm"
+version = "1.0.27"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "huggingface-hub" },
+    { name = "pyyaml" },
+    { name = "safetensors" },
+    { name = "torch" },
+    { name = "torchvision" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/08/54/ece85b0eef3700c90db8271a43669b05a0ebbe2edb1962329c34374a297e/timm-1.0.27.tar.gz", hash = "sha256:315dfe63186ca9fb7ff941268941231fd5be259f2b4bb4afa28560ae1015cb9a", size = 2439861, upload-time = "2026-05-08T19:38:36.844Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/1f/2e/26bab7686ff4aed48f8f5f6c23e2aa37b7a37ddd9effe3aa61e908fd518f/timm-1.0.27-py3-none-any.whl", hash = "sha256:5ff07c9ddf53cbada88eab1c93ff175c64cab683b5a2fddf863bcee985926f89", size = 2589280, upload-time = "2026-05-08T19:38:35.034Z" },
+]
+
+[[package]]
 name = "tokenizers"
 version = "0.22.2"
 source = { registry = "https://pypi.org/simple" }
@@ -2431,4 +2542,28 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/bb/70/ff89ebf5c3e014467224e6b0a0647ba90c0dfb1d3309caf1228f1007f760/xtcocotools-1.14.3-cp311-cp311-macosx_10_9_universal2.whl", hash = "sha256:78b19e89c8b81887bae83d03f9221a8654afeb7c74910d85170781d8c23bc4d2", size = 172218, upload-time = "2023-10-19T07:52:39.682Z" },
     { url = "https://files.pythonhosted.org/packages/80/e0/01cf7f8b3f4229568b37de680d0eaadc651d5ee36bd483b83658f49dc6c2/xtcocotools-1.14.3-cp311-cp311-manylinux1_x86_64.whl", hash = "sha256:126ca596229b2016552bf27cad01f3a2f70a3ff7576a58305a00499cb9e0057d", size = 464351, upload-time = "2023-10-19T07:52:33.199Z" },
     { url = "https://files.pythonhosted.org/packages/a9/10/32bef0fcd29145dcda9bfaa9e11718f40acd444d6804cac870b0437fc7a8/xtcocotools-1.14.3-cp311-cp311-win_amd64.whl", hash = "sha256:47cb5433903f30589343d54530e49abd6b61d0fd119857ba4948b8ce291dbee6", size = 88741, upload-time = "2023-10-19T07:53:51.151Z" },
+]
+
+[[package]]
+name = "yacs"
+version = "0.1.8"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "pyyaml" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/44/3e/4a45cb0738da6565f134c01d82ba291c746551b5bc82e781ec876eb20909/yacs-0.1.8.tar.gz", hash = "sha256:efc4c732942b3103bea904ee89af98bcd27d01f0ac12d8d4d369f1e7a2914384", size = 11100, upload-time = "2020-08-10T16:37:47.755Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/38/4f/fe9a4d472aa867878ce3bb7efb16654c5d63672b86dc0e6e953a67018433/yacs-0.1.8-py3-none-any.whl", hash = "sha256:99f893e30497a4b66842821bac316386f7bd5c4f47ad35c9073ef089aa33af32", size = 14747, upload-time = "2020-08-10T16:37:46.4Z" },
+]
+
+[[package]]
+name = "yapf"
+version = "0.43.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "platformdirs" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/23/97/b6f296d1e9cc1ec25c7604178b48532fa5901f721bcf1b8d8148b13e5588/yapf-0.43.0.tar.gz", hash = "sha256:00d3aa24bfedff9420b2e0d5d9f5ab6d9d4268e72afbf59bb3fa542781d5218e", size = 254907, upload-time = "2024-11-14T00:11:41.584Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/37/81/6acd6601f61e31cfb8729d3da6d5df966f80f374b78eff83760714487338/yapf-0.43.0-py3-none-any.whl", hash = "sha256:224faffbc39c428cb095818cf6ef5511fdab6f7430a10783fdfb292ccf2852ca", size = 256158, upload-time = "2024-11-14T00:11:39.37Z" },
 ]
