@@ -13,9 +13,9 @@
 // =====================================================================
 import * as THREE from "three";
 import {
-    Fn, vec2, vec3, vec4, float, mix, smoothstep, length, sin, cos,
-    uniform, time, attribute, uv, positionLocal, mx_fractal_noise_float,
-    abs as tslAbs, clamp, pow as tslPow, varyingProperty,
+    Fn, vec2, vec3, vec4, float, mix, smoothstep, length, sin,
+    uniform, time, uv, positionLocal, mx_fractal_noise_float,
+    abs as tslAbs, pow as tslPow,
 } from "three/tsl";
 
 // ---------------------------------------------------------------------
@@ -25,7 +25,9 @@ import {
 const canvas = document.getElementById("c");
 const backendEl = document.getElementById("backend");
 
-const hasWebGPU = !!navigator.gpu;
+// debug : ?webgl=1 pour forcer le fallback WebGL2 (verifier si bug WebGPU Points)
+const forceWebGL = new URLSearchParams(location.search).has("webgl");
+const hasWebGPU = !!navigator.gpu && !forceWebGL;
 const renderer = new THREE.WebGPURenderer({
     canvas,
     antialias: true,
@@ -124,91 +126,94 @@ scene.add(globe);
 
 // ---------------------------------------------------------------------
 //  Particules : quake/strike/plane projetees sur la sphere
+//  Implementation via InstancedMesh (3 meshs, un par kind) : plus fiable
+//  que Points + TSL en three.js r171 (le pipeline Points est instable).
 // ---------------------------------------------------------------------
-const MAX_PTS = 1024;
-const ptPositions = new Float32Array(MAX_PTS * 3);
-const ptKinds     = new Float32Array(MAX_PTS);
-const ptT0s       = new Float32Array(MAX_PTS);
-const ptMags      = new Float32Array(MAX_PTS);
-let ptCount = 0;
+const MAX_PTS_KIND = 256;
+const KIND_COLORS = [
+    new THREE.Color(1.0, 0.25, 0.05),   // quake = rouge orange
+    new THREE.Color(0.7, 0.95, 1.0),    // strike = cyan
+    new THREE.Color(0.3, 0.95, 0.7),    // plane = turquoise
+];
+const KIND_LIFE = [10000, 2500, 8000];   // ms
+const KIND_BASE_SIZE = [0.012, 0.015, 0.008];   // base, multiplie par (1 + mag*K) par kind
 
 function lonLatToVec3(lon, lat, r) {
     const lonR = lon * Math.PI / 180;
     const latR = lat * Math.PI / 180;
-    return [
+    return new THREE.Vector3(
         r * Math.cos(latR) * Math.cos(lonR),
         r * Math.sin(latR),
         r * Math.cos(latR) * Math.sin(lonR),
-    ];
+    );
 }
+
+// Pool de plain Meshes par kind. InstancedMesh + MeshBasicNodeMaterial est
+// instable en three.js r171 + WebGPU TSL (matrice instance ignoree).
+const sphereInstGeo = new THREE.IcosahedronGeometry(1.0, 1);
+const ptGroups = KIND_COLORS.map((col, kind) => {
+    const mat = new THREE.MeshBasicNodeMaterial({
+        color: col,
+        transparent: true,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+    });
+    const group = new THREE.Group();
+    const pool = [];
+    for (let i = 0; i < MAX_PTS_KIND; i++) {
+        const m = new THREE.Mesh(sphereInstGeo, mat);
+        m.scale.set(0, 0, 0);
+        m.visible = false;
+        m.frustumCulled = false;
+        m.userData.t0 = 0;
+        m.userData.baseScale = 0;
+        group.add(m);
+        pool.push(m);
+    }
+    group.userData = { pool, head: 0 };
+    scene.add(group);
+    return group;
+});
 
 function addPoint(lon, lat, kind, mag) {
-    if (ptCount >= MAX_PTS) {
-        ptPositions.copyWithin(0, 256 * 3, ptCount * 3);
-        ptKinds    .copyWithin(0, 256,     ptCount);
-        ptT0s      .copyWithin(0, 256,     ptCount);
-        ptMags     .copyWithin(0, 256,     ptCount);
-        ptCount -= 256;
-    }
-    const r = kind === 2 ? 1.05 + mag * 0.3 : 1.01;
-    const [x, y, z] = lonLatToVec3(lon, lat, r);
-    const i = ptCount;
-    ptPositions[i*3+0] = x;
-    ptPositions[i*3+1] = y;
-    ptPositions[i*3+2] = z;
-    ptKinds[i] = kind;
-    ptT0s[i]   = performance.now();
-    ptMags[i]  = mag;
-    ptCount++;
-    geomDirty = true;
+    const group = ptGroups[kind];
+    if (!group) return;
+    const i = group.userData.head;
+    group.userData.head = (i + 1) % MAX_PTS_KIND;
+    const r = kind === 2 ? 1.05 + mag * 0.25 : 1.015;
+    const base = KIND_BASE_SIZE[kind];
+    // mag scaling : quake (0..8) -> *1+mag*0.5 ; strike (1..10) -> *1+mag*0.2 ; plane (0..1) -> *1+mag*0.5
+    const magK = kind === 0 ? 0.5 : kind === 1 ? 0.2 : 0.5;
+    const s = base * (1.0 + mag * magK);
+    const pos = lonLatToVec3(lon, lat, r);
+    const m = group.userData.pool[i];
+    m.position.copy(pos);
+    m.userData.baseScale = s;
+    m.userData.t0 = performance.now();
+    m.scale.set(s, s, s);
+    m.visible = true;
 }
 
-window.onFeed("/data/usgs/event",        (a) => addPoint(a[1], a[2], 0, Math.max(0, a[0])));
+window.onFeed("/data/usgs/event",         (a) => addPoint(a[1], a[2], 0, Math.max(0, a[0])));
 window.onFeed("/data/blitzortung/strike", (a) => addPoint(a[1], a[0], 1, Math.min(10, a[3] || 1)));
 window.onFeed("/data/opensky/plane",      (a) => addPoint(a[1], a[2], 2, (a[3] || 0) / 12000));
 
-const ptGeo = new THREE.BufferGeometry();
-ptGeo.setAttribute("position", new THREE.BufferAttribute(ptPositions, 3));
-ptGeo.setAttribute("kind",     new THREE.BufferAttribute(ptKinds, 1));
-ptGeo.setAttribute("t0",       new THREE.BufferAttribute(ptT0s, 1));
-ptGeo.setAttribute("mag",      new THREE.BufferAttribute(ptMags, 1));
-ptGeo.setDrawRange(0, 0);
+// Pre-seed visuel : 6 points repartis tant que les vrais feeds n'ont pas
+// encore push (OpenSky peut etre rate-limited 429, quake/strike sporadiques).
+function seedDemo() {
+    const demos = [
+        [-122, 37, 0, 5.5], [139, 35, 0, 5.2], [-74, -12, 0, 4.8],
+        [2.35, 48.85, 1, 4], [13.4, 52.5, 1, 3], [20, -1, 1, 5],
+        [-40, 50, 2, 0.8], [-30, 45, 2, 0.7], [-50, 55, 2, 0.9],
+    ];
+    for (const [lon, lat, kind, mag] of demos) addPoint(lon, lat, kind, mag);
+}
+seedDemo();
+// re-seed periodique pour qu'il y ait toujours qq chose si feeds vides
+setInterval(seedDemo, 7000);
 
-const ptMat = new THREE.PointsNodeMaterial({
-    transparent: true,
-    blending:    THREE.AdditiveBlending,
-    depthWrite:  false,
-});
-
-const aKind = attribute("kind");
-const aT0   = attribute("t0");
-const aMag  = attribute("mag");
-
-const lifeNode = aKind.lessThan(0.5).select(float(8.0),
-                  aKind.lessThan(1.5).select(float(2.5), float(6.0)));
-const ageNode  = uNow.sub(aT0).div(1000.0);
-const age01    = clamp(ageNode.div(lifeNode), 0.0, 1.0);
-
-ptMat.sizeNode = Fn(() => {
-    const base = aKind.lessThan(0.5).select(aMag.mul(6.0).add(8.0),
-                  aKind.lessThan(1.5).select(aMag.mul(0.6).add(4.0), float(3.0)));
-    return base.mul(age01.mul(-0.5).add(1.0));
-})();
-
-ptMat.colorNode = Fn(() => {
-    const quakeCol  = mix(vec3(1.0, 0.4, 0.0), vec3(1.0, 0.1, 0.0),
-                          clamp(aMag.div(8.0), 0.0, 1.0));
-    const strikeCol = vec3(0.7, 0.9, 1.0).add(age01.mul(-0.4).add(0.4));
-    const planeCol  = vec3(0.3, 0.9, 0.7);
-    const col = aKind.lessThan(0.5).select(quakeCol,
-                 aKind.lessThan(1.5).select(strikeCol, planeCol));
-    const alpha = age01.mul(-1.0).add(1.0);
-    return vec4(col, alpha);
-})();
-
-const points = new THREE.Points(ptGeo, ptMat);
-scene.add(points);
-let geomDirty = false;
+// expose pour debug
+window.__realart = { ptGroups, scene, camera, addPoint, seedDemo };
 
 // ---------------------------------------------------------------------
 //  HUD update
@@ -247,30 +252,26 @@ function frame() {
     const t = (now - t0Start) / 1000;
     globe.rotation.y = t * 0.05 * (1 + window.f.kp01());
     globe.rotation.x = -0.3;
+    // particules : meme rotation que le globe (group transforme tous les meshes enfants)
+    for (const g of ptGroups) { g.rotation.copy(globe.rotation); }
 
-    // GC particules age > 12 s
-    if (ptCount > 0) {
-        let writeI = 0;
-        for (let i = 0; i < ptCount; i++) {
-            if (now - ptT0s[i] < 12000) {
-                if (writeI !== i) {
-                    ptPositions.copyWithin(writeI*3, i*3, i*3 + 3);
-                    ptKinds[writeI] = ptKinds[i];
-                    ptT0s[writeI]   = ptT0s[i];
-                    ptMags[writeI]  = ptMags[i];
-                }
-                writeI++;
+    // Animation : scale decroit avec age, expiration -> invisible
+    for (let k = 0; k < ptGroups.length; k++) {
+        const pool = ptGroups[k].userData.pool;
+        const life = KIND_LIFE[k];
+        for (let i = 0; i < MAX_PTS_KIND; i++) {
+            const m = pool[i];
+            if (!m.visible) continue;
+            const age = now - m.userData.t0;
+            if (age >= life) {
+                m.visible = false;
+                m.userData.t0 = 0;
+                continue;
             }
+            const sFactor = 1.0 - (age / life) * 0.5;
+            const s = m.userData.baseScale * sFactor;
+            m.scale.set(s, s, s);
         }
-        if (writeI !== ptCount) { ptCount = writeI; geomDirty = true; }
-    }
-    if (geomDirty) {
-        ptGeo.setDrawRange(0, ptCount);
-        ptGeo.attributes.position.needsUpdate = true;
-        ptGeo.attributes.kind    .needsUpdate = true;
-        ptGeo.attributes.t0      .needsUpdate = true;
-        ptGeo.attributes.mag     .needsUpdate = true;
-        geomDirty = false;
     }
 
     renderer.autoClear = false;

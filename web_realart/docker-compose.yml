@@ -19,13 +19,17 @@ services:
     environment:
       - HTTP_PORT=4400
       - DATA_PORT_IN=57124
+    volumes:
+      # Hot reload des assets statiques sans rebuild (rsync suffit)
+      - ./public:/app/public:ro
+      - ./server.js:/app/server.js:ro
     networks:
       - traefik
       - data
     labels:
       - "traefik.enable=true"
       - "traefik.docker.network=traefik"
-      - "traefik.http.routers.realart.rule=Host(`real.art.saillant.cc`)"
+      - "traefik.http.routers.realart.rule=Host(`realart.saillant.cc`)"
       - "traefik.http.routers.realart.entrypoints=websecure"
       - "traefik.http.routers.realart.tls=true"
       - "traefik.http.routers.realart.tls.certresolver=letsencrypt"

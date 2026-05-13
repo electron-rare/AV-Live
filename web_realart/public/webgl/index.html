@@ -29,11 +29,13 @@
     {
         "imports": {
             "three":          "https://unpkg.com/three@0.171.0/build/three.webgpu.js",
+            "three/webgpu":   "https://unpkg.com/three@0.171.0/build/three.webgpu.js",
             "three/tsl":      "https://unpkg.com/three@0.171.0/build/three.tsl.js",
             "three/addons/":  "https://unpkg.com/three@0.171.0/examples/jsm/"
         }
     }
     </script>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
 </head>
 <body>
     <canvas id="c"></canvas>
@@ -52,6 +54,6 @@
     <div id="renderer">backend : <span id="backend">…</span></div>
 
     <script src="/feeds_client.js"></script>
-    <script type="module" src="./app.js"></script>
+    <script type="module">import "./app.js?v=15";</script>
 </body>
 </html>
