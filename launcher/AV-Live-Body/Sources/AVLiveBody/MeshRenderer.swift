@@ -126,26 +126,76 @@ final class MeshRenderer: ObservableObject {
                                     vertices: [SIMD3<Float>]) {
         let pid = entity.components[PidComponent.self]?.pid ?? -1
         if let mesh = lowLevelMeshes[pid] {
+            // Buffer 0 : positions (SIMD3<Float>)
             mesh.withUnsafeMutableBytes(bufferIndex: 0) { rawPtr in
                 let dst = rawPtr.bindMemory(to: SIMD3<Float>.self)
                 let n = min(dst.count, vertices.count)
                 for i in 0..<n { dst[i] = vertices[i] }
+            }
+            // Buffer 1 : normales (calculees a partir des triangles).
+            // Necessaire pour que SimpleMaterial (lit) calcule un
+            // shading qui donne du relief au mesh ; sans normales le
+            // mesh apparait en aplats de couleur.
+            let normals = Self.computeVertexNormals(
+                vertices: vertices, faces: faces)
+            mesh.withUnsafeMutableBytes(bufferIndex: 1) { rawPtr in
+                let dst = rawPtr.bindMemory(to: SIMD3<Float>.self)
+                let n = min(dst.count, normals.count)
+                for i in 0..<n { dst[i] = normals[i] }
             }
             return
         }
         entity.model?.mesh = fallbackMesh(vertices: vertices)
     }
 
+    /// Normales par sommet : somme des normales des triangles
+    /// adjacents, puis normalisation. Cout O(faces + verts).
+    static func computeVertexNormals(
+        vertices: [SIMD3<Float>], faces: [UInt32]
+    ) -> [SIMD3<Float>] {
+        var normals = [SIMD3<Float>](
+            repeating: SIMD3<Float>(0, 0, 0), count: vertices.count)
+        var i = 0
+        while i + 2 < faces.count {
+            let a = Int(faces[i])
+            let b = Int(faces[i + 1])
+            let c = Int(faces[i + 2])
+            i += 3
+            if a >= vertices.count || b >= vertices.count
+                || c >= vertices.count { continue }
+            let v0 = vertices[a]
+            let edge1 = vertices[b] - v0
+            let edge2 = vertices[c] - v0
+            let triNormal = cross(edge1, edge2)
+            normals[a] += triNormal
+            normals[b] += triNormal
+            normals[c] += triNormal
+        }
+        for j in 0..<normals.count {
+            let len = length(normals[j])
+            if len > 1e-6 {
+                normals[j] = normals[j] / len
+            } else {
+                normals[j] = SIMD3<Float>(0, 1, 0)
+            }
+        }
+        return normals
+    }
+
     private func createLowLevelMesh(vertices: [SIMD3<Float>]) -> LowLevelMesh? {
-        let vertexAttr = LowLevelMesh.Attribute(
+        let posAttr = LowLevelMesh.Attribute(
             semantic: .position, format: .float3, offset: 0)
-        let vertexLayout = LowLevelMesh.Layout(
-            bufferIndex: 0,
-            bufferStride: MemoryLayout<SIMD3<Float>>.stride)
+        let normAttr = LowLevelMesh.Attribute(
+            semantic: .normal, format: .float3, offset: 0)
+        let stride = MemoryLayout<SIMD3<Float>>.stride
+        let posLayout = LowLevelMesh.Layout(
+            bufferIndex: 0, bufferStride: stride)
+        let normLayout = LowLevelMesh.Layout(
+            bufferIndex: 1, bufferStride: stride)
         let desc = LowLevelMesh.Descriptor(
             vertexCapacity: vertices.count,
-            vertexAttributes: [vertexAttr],
-            vertexLayouts: [vertexLayout],
+            vertexAttributes: [posAttr, normAttr],
+            vertexLayouts: [posLayout, normLayout],
             indexCapacity: faces.count,
             indexType: .uint32
         )
@@ -156,6 +206,15 @@ final class MeshRenderer: ObservableObject {
             let dst = ptr.bindMemory(to: SIMD3<Float>.self)
             for (i, v) in vertices.enumerated() where i < dst.count {
                 dst[i] = v
+            }
+        }
+        // Normales initiales (T-pose-ish) — recalculees au premier frame
+        let initNormals = Self.computeVertexNormals(
+            vertices: vertices, faces: faces)
+        mesh.withUnsafeMutableBytes(bufferIndex: 1) { ptr in
+            let dst = ptr.bindMemory(to: SIMD3<Float>.self)
+            for (i, n) in initNormals.enumerated() where i < dst.count {
+                dst[i] = n
             }
         }
         mesh.withUnsafeMutableIndices { ptr in
