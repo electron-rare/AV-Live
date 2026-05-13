@@ -17,6 +17,8 @@ class _FakeState:
         self.persons_body3d = []
         self.persons_body_ids = []
         self.pose_last_t = 0.0
+        self.persons_hands = []
+        self.persons_hands_ids = []
         self._lock = threading.RLock()
 
     def lock(self):

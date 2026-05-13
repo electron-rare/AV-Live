@@ -10,7 +10,7 @@ def _static_seated(frame_count: int = WINDOW_LEN) -> list[np.ndarray]:
     """Hip low (y small), knee bent ~80°."""
     frames = []
     for _ in range(frame_count):
-        f = np.zeros((22, 3), dtype=np.float32)
+        f = np.zeros((32, 3), dtype=np.float32)
         f[1] = [-0.1, 0.4, 0.0]
         f[2] = [0.1, 0.4, 0.0]
         f[4] = [-0.1, 0.4, 0.3]
@@ -25,7 +25,7 @@ def _static_standing(frame_count: int = WINDOW_LEN) -> list[np.ndarray]:
     """Hip high, knees ~180°."""
     frames = []
     for _ in range(frame_count):
-        f = np.zeros((22, 3), dtype=np.float32)
+        f = np.zeros((32, 3), dtype=np.float32)
         f[1] = [-0.1, 0.9, 0.0]
         f[2] = [0.1, 0.9, 0.0]
         f[4] = [-0.1, 0.5, 0.0]

@@ -21,6 +21,7 @@ from torch.utils.data import DataLoader, Dataset
 
 from data_only_viz.action_head import (
     ActionHeadModel,
+    EXPR_DIM,
     FeatureExtractor,
     HIP_LEFT,
     HIP_RIGHT,
@@ -52,19 +53,35 @@ class WindowDataset(Dataset[tuple[torch.Tensor, int]]):
         stack = row.j3d_stack
         if self._augment:
             stack = random_augment(stack, self._rng)
+        T = stack.shape[0]
+        # expression and mouth_open stacks (zeros if absent / legacy)
+        if row.expr_stack is not None:
+            expr_s = row.expr_stack.astype(np.float32)
+        else:
+            expr_s = np.zeros((T, EXPR_DIM), dtype=np.float32)
+        if row.mouth_open_stack is not None:
+            mouth_s = row.mouth_open_stack.astype(np.float32)
+        else:
+            mouth_s = np.zeros(T, dtype=np.float32)
         feats = []
         prev = stack[0]
         prev_vel = np.zeros_like(prev)
-        for t in range(stack.shape[0]):
+        for t in range(T):
             cur = stack[t]
             vel = cur - prev
             accel = vel - prev_vel
             hip_y = float((cur[HIP_LEFT, 1] + cur[HIP_RIGHT, 1]) * 0.5)
             knee_angle = FeatureExtractor._mean_knee_angle(cur)
             sym = FeatureExtractor._symmetry_score(vel)
+            expr_t = expr_s[t] if t < len(expr_s) else np.zeros(EXPR_DIM, dtype=np.float32)
+            expr_vec = np.zeros(EXPR_DIM, dtype=np.float32)
+            n = min(EXPR_DIM, len(expr_t))
+            expr_vec[:n] = expr_t[:n]
+            mouth_t = float(mouth_s[t]) if t < len(mouth_s) else 0.0
             feat = np.concatenate([
                 cur.reshape(-1), vel.reshape(-1), accel.reshape(-1),
-                np.array([hip_y, knee_angle, sym], dtype=np.float32),
+                expr_vec,
+                np.array([hip_y, knee_angle, sym, mouth_t], dtype=np.float32),
             ]).astype(np.float32, copy=False)
             feats.append(feat)
             prev_vel = vel

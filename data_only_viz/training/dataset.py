@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import json
 import random
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Iterable, Iterator
 
@@ -15,26 +15,32 @@ class RawFrame:
     ts: float
     session: str
     pid: int
-    j3d: np.ndarray  # (22, 3) float32
+    j3d: np.ndarray          # (32, 3) float32 (v2: body22 + 10 fingertips)
+    expression: np.ndarray | None = None  # (EXPR_DIM,) or None
+    mouth_open: float = 0.0
 
 
 @dataclass
 class WindowRow:
-    j3d_stack: np.ndarray  # (window_len, 22, 3) float32
+    j3d_stack: np.ndarray          # (window_len, 32, 3) float32
     session: str
     pid_local: int
     first_ts: float
+    expr_stack: np.ndarray | None = None   # (window_len, 10) or None
+    mouth_open_stack: np.ndarray | None = None  # (window_len,) or None
 
 
 @dataclass
 class DatasetRow:
     window_id: str
     label: str
-    j3d_stack: np.ndarray  # (window_len, 22, 3) float32
+    j3d_stack: np.ndarray          # (window_len, 32, 3) float32
     session: str
     pid_local: int
     auto_label_confidence: float
     manually_validated: bool
+    expr_stack: np.ndarray | None = None   # (window_len, 10) or None
+    mouth_open_stack: np.ndarray | None = None  # (window_len,) or None
 
 
 def load_frames_jsonl(path: Path) -> list[RawFrame]:
@@ -45,11 +51,15 @@ def load_frames_jsonl(path: Path) -> list[RawFrame]:
             if not line:
                 continue
             d = json.loads(line)
+            expr_raw = d.get("expression")
+            expr = np.asarray(expr_raw, dtype=np.float32) if expr_raw is not None else None
             rows.append(RawFrame(
                 ts=float(d["ts"]),
                 session=str(d["session"]),
                 pid=int(d["pid"]),
                 j3d=np.asarray(d["j3d"], dtype=np.float32),
+                expression=expr,
+                mouth_open=float(d.get("mouth_open", 0.0)),
             ))
     return rows
 
@@ -68,14 +78,32 @@ def sliding_windows(frames: list[RawFrame],
         for start in range(0, len(grp) - window_len + 1, stride):
             chunk = grp[start:start + window_len]
             stack = np.stack([c.j3d for c in chunk]).astype(np.float32)
+            # Expression stack: zeros if not present
+            if any(c.expression is not None for c in chunk):
+                expr_dim = max(
+                    (len(c.expression) for c in chunk if c.expression is not None),
+                    default=10,
+                )
+                expr_stack = np.zeros((window_len, expr_dim), dtype=np.float32)
+                for t, c in enumerate(chunk):
+                    if c.expression is not None:
+                        n = min(expr_dim, len(c.expression))
+                        expr_stack[t, :n] = c.expression[:n]
+            else:
+                expr_stack = None
+            mouth_stack = np.array(
+                [c.mouth_open for c in chunk], dtype=np.float32
+            )
             yield WindowRow(j3d_stack=stack, session=sess,
-                            pid_local=pid, first_ts=chunk[0].ts)
+                            pid_local=pid, first_ts=chunk[0].ts,
+                            expr_stack=expr_stack,
+                            mouth_open_stack=mouth_stack)
 
 
 def write_dataset_jsonl(rows: Iterable[DatasetRow], path: Path) -> None:
     with path.open("w") as f:
         for r in rows:
-            f.write(json.dumps({
+            d: dict = {
                 "window_id": r.window_id,
                 "label": r.label,
                 "j3d": r.j3d_stack.astype(np.float32).tolist(),
@@ -83,7 +111,12 @@ def write_dataset_jsonl(rows: Iterable[DatasetRow], path: Path) -> None:
                 "pid_local": r.pid_local,
                 "auto_label_confidence": float(r.auto_label_confidence),
                 "manually_validated": bool(r.manually_validated),
-            }) + "\n")
+            }
+            if r.expr_stack is not None:
+                d["expr_stack"] = r.expr_stack.astype(np.float32).tolist()
+            if r.mouth_open_stack is not None:
+                d["mouth_open_stack"] = r.mouth_open_stack.astype(np.float32).tolist()
+            f.write(json.dumps(d) + "\n")
 
 
 def load_dataset_jsonl(path: Path) -> list[DatasetRow]:
@@ -94,6 +127,10 @@ def load_dataset_jsonl(path: Path) -> list[DatasetRow]:
             if not line:
                 continue
             d = json.loads(line)
+            expr_raw = d.get("expr_stack")
+            expr = np.asarray(expr_raw, dtype=np.float32) if expr_raw is not None else None
+            mouth_raw = d.get("mouth_open_stack")
+            mouth = np.asarray(mouth_raw, dtype=np.float32) if mouth_raw is not None else None
             out.append(DatasetRow(
                 window_id=d["window_id"],
                 label=d["label"],
@@ -102,6 +139,8 @@ def load_dataset_jsonl(path: Path) -> list[DatasetRow]:
                 pid_local=int(d["pid_local"]),
                 auto_label_confidence=float(d["auto_label_confidence"]),
                 manually_validated=bool(d["manually_validated"]),
+                expr_stack=expr,
+                mouth_open_stack=mouth,
             ))
     return out
 

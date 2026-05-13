@@ -11,14 +11,15 @@ def test_module_imports() -> None:
     assert hasattr(action_head, "PerPersonBuffer")
     assert hasattr(action_head, "ActionHead")
     assert action_head.WINDOW_LEN == 16
-    assert action_head.J3D_JOINTS == 22
+    assert action_head.J3D_JOINTS == 32
+    assert action_head.FEATURE_DIM == 302
     assert action_head.NUM_CLASSES == 3
     assert action_head.LABELS == ("debout", "assise", "danse")
 
 
 def _rand_j3d(seed: int = 0) -> np.ndarray:
     rng = np.random.default_rng(seed)
-    return rng.normal(size=(22, 3)).astype(np.float32)
+    return rng.normal(size=(32, 3)).astype(np.float32)
 
 
 def test_buffer_starts_empty() -> None:
@@ -58,15 +59,15 @@ def test_buffer_forget_releases_pid() -> None:
 def test_buffer_rejects_bad_shape() -> None:
     from data_only_viz.action_head import PerPersonBuffer
     buf = PerPersonBuffer()
-    with pytest.raises(ValueError, match="22"):
-        buf.append(pid=1, j3d=np.zeros((17, 3), dtype=np.float32))
+    with pytest.raises(ValueError, match="32"):
+        buf.append(pid=1, j3d=np.zeros((22, 3), dtype=np.float32))
 
 
 def test_feature_extractor_shape_full_buffer() -> None:
     from data_only_viz.action_head import FeatureExtractor, WINDOW_LEN, FEATURE_DIM
     frames = [_rand_j3d(i) for i in range(WINDOW_LEN)]
     feat = FeatureExtractor.from_buffer(frames)
-    assert feat.shape == (FEATURE_DIM,)
+    assert feat.shape == (302,)
     assert feat.dtype == np.float32
     assert not np.isnan(feat).any()
 
@@ -91,13 +92,13 @@ def test_feature_extractor_kinetics_speed_and_accel() -> None:
     from data_only_viz.action_head import FeatureExtractor, WINDOW_LEN
     frames = []
     for t in range(WINDOW_LEN):
-        f = np.zeros((22, 3), dtype=np.float32)
+        f = np.zeros((32, 3), dtype=np.float32)
         f[0, 0] = 0.1 * t
         frames.append(f)
     kin = FeatureExtractor.kinetics(frames)
     assert kin.shape == (3,)
     assert kin[0] > 0
-    assert abs(kin[0] - 0.1 / 22) < 1e-4
+    assert abs(kin[0] - 0.1 / 32) < 1e-4
     assert abs(kin[1]) < 1e-4
 
 
@@ -105,7 +106,7 @@ def test_feature_extractor_symmetry_sign() -> None:
     from data_only_viz.action_head import FeatureExtractor, WINDOW_LEN, WRIST_LEFT, WRIST_RIGHT
     frames = []
     for t in range(WINDOW_LEN):
-        f = np.zeros((22, 3), dtype=np.float32)
+        f = np.zeros((32, 3), dtype=np.float32)
         f[WRIST_LEFT, 0] = 0.05 * t
         f[WRIST_RIGHT, 0] = -0.05 * t
         frames.append(f)

@@ -15,7 +15,7 @@ def _make_session_jsonl(path: Path, n_frames: int = 64) -> None:
             row = {"ts": t / 30.0,
                    "session": "sess01",
                    "pid": 1,
-                   "j3d": rng.normal(size=(22, 3)).tolist()}
+                   "j3d": rng.normal(size=(32, 3)).tolist()}
             f.write(json.dumps(row) + "\n")
 
 
@@ -25,7 +25,7 @@ def test_load_frames_jsonl(tmp_path: Path) -> None:
     _make_session_jsonl(p)
     frames = load_frames_jsonl(p)
     assert len(frames) == 64
-    assert frames[0].j3d.shape == (22, 3)
+    assert frames[0].j3d.shape == (32, 3)
     assert frames[0].pid == 1
     assert frames[0].session == "sess01"
 
@@ -40,7 +40,7 @@ def test_sliding_windows(tmp_path: Path) -> None:
     frames = load_frames_jsonl(p)
     windows = list(sliding_windows(frames, window_len=16, stride=4))
     assert len(windows) == 13
-    assert windows[0].j3d_stack.shape == (16, 22, 3)
+    assert windows[0].j3d_stack.shape == (16, 32, 3)
     assert windows[0].session == "sess01"
 
 
@@ -55,7 +55,7 @@ def test_write_and_load_dataset_jsonl(tmp_path: Path) -> None:
         DatasetRow(
             window_id=f"sess01_pid1_w{i:04d}",
             label="debout" if i % 2 == 0 else "danse",
-            j3d_stack=rng.normal(size=(16, 22, 3)).astype(np.float32),
+            j3d_stack=rng.normal(size=(16, 32, 3)).astype(np.float32),
             session="sess01",
             pid_local=1,
             auto_label_confidence=0.8,
@@ -68,7 +68,7 @@ def test_write_and_load_dataset_jsonl(tmp_path: Path) -> None:
     loaded = load_dataset_jsonl(out)
     assert len(loaded) == 5
     assert loaded[0].label == "debout"
-    assert loaded[0].j3d_stack.shape == (16, 22, 3)
+    assert loaded[0].j3d_stack.shape == (16, 32, 3)
     assert np.allclose(loaded[0].j3d_stack, rows[0].j3d_stack, atol=1e-6)
 
 
@@ -79,7 +79,7 @@ def test_split_by_session(tmp_path: Path) -> None:
     for sess in ("s01", "s02", "s03", "s04", "s05", "s06", "s07"):
         rows.append(DatasetRow(
             window_id=f"{sess}_w0", label="debout",
-            j3d_stack=rng.normal(size=(16, 22, 3)).astype(np.float32),
+            j3d_stack=rng.normal(size=(16, 32, 3)).astype(np.float32),
             session=sess, pid_local=1, auto_label_confidence=0.7,
             manually_validated=False,
         ))

@@ -19,10 +19,12 @@ def _make_tiny_dataset(tmp_path: Path) -> Path:
             rows.append(DatasetRow(
                 window_id=f"{sess}_w{w:03d}",
                 label=label,
-                j3d_stack=rng.normal(size=(16, 22, 3)).astype(np.float32),
+                j3d_stack=rng.normal(size=(16, 32, 3)).astype(np.float32),
                 session=sess, pid_local=1,
                 auto_label_confidence=0.8,
                 manually_validated=True,
+                expr_stack=np.zeros((16, 10), dtype=np.float32),
+                mouth_open_stack=np.zeros(16, dtype=np.float32),
             ))
     out = tmp_path / "tiny.jsonl"
     write_dataset_jsonl(rows, out)
@@ -57,5 +59,5 @@ def test_trained_checkpoint_loadable(tmp_path: Path) -> None:
           lr=1e-3, device="cpu", seed=0, log_every=10_000)
     head = ActionHead(ckpt_path=ckpt)
     for i in range(5):
-        label, probs, _ = head.step(pid=1, j3d=np.zeros((22, 3), dtype=np.float32))
+        label, probs, _ = head.step(pid=1, j3d=np.zeros((32, 3), dtype=np.float32))
     assert abs(float(probs.sum()) - 1.0) < 1e-5

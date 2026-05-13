@@ -3,8 +3,10 @@ from __future__ import annotations
 
 import numpy as np
 
-# SMPL-X left/right joint mirror map (subset 22 joints used by Multi-HMR).
+# SMPL-X left/right joint mirror map for 32-joint layout.
+# Body joints 0..21 (unchanged), fingertips 22..31 (L 22..26 <-> R 27..31).
 MIRROR_MAP: tuple[int, ...] = (
+    # 22 body (unchanged)
     0,
     2, 1,
     3,
@@ -19,7 +21,10 @@ MIRROR_MAP: tuple[int, ...] = (
     17, 16,
     19, 18,
     21, 20,
+    # 10 fingertips: L (22..26) <-> R (27..31)
+    27, 28, 29, 30, 31, 22, 23, 24, 25, 26,
 )
+assert len(MIRROR_MAP) == 32
 
 
 def mirror_x(stack: np.ndarray) -> np.ndarray:

@@ -11,7 +11,7 @@ torch = pytest.importorskip("torch")
 
 def _rand_j3d(seed: int = 0) -> np.ndarray:
     rng = np.random.default_rng(seed)
-    return rng.normal(size=(22, 3)).astype(np.float32)
+    return rng.normal(size=(32, 3)).astype(np.float32)
 
 
 def test_model_forward_shape() -> None:
@@ -24,11 +24,11 @@ def test_model_forward_shape() -> None:
     assert h_new.shape == h.shape
 
 
-def test_model_param_count_under_50k() -> None:
+def test_model_param_count_under_80k() -> None:
     from data_only_viz.action_head import ActionHeadModel
     model = ActionHeadModel()
     n = sum(p.numel() for p in model.parameters())
-    assert n < 50_000, f"too many params: {n}"
+    assert n < 80_000, f"too many params: {n}"
 
 
 def test_action_head_step_warmup_returns_debout() -> None:

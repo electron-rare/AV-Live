@@ -8,16 +8,17 @@ WINDOW_LEN = 16
 
 def _sample_stack(seed: int = 0) -> np.ndarray:
     rng = np.random.default_rng(seed)
-    return rng.normal(size=(WINDOW_LEN, 22, 3)).astype(np.float32)
+    return rng.normal(size=(WINDOW_LEN, 32, 3)).astype(np.float32)
 
 
 def test_mirror_swap_left_right_joints() -> None:
-    from data_only_viz.training.augment import mirror_x
+    from data_only_viz.training.augment import mirror_x, MIRROR_MAP
     x = _sample_stack(0)
     y = mirror_x(x)
-    assert np.allclose(y[..., 0], -x[..., 0][:, [
-        0,2,1,3,5,4,6,8,7,9,11,10,12,14,13,15,17,16,19,18,21,20
-    ]], atol=1e-6)
+    # Check output shape
+    assert y.shape == (WINDOW_LEN, 32, 3)
+    # x-coords are negated after reindexing
+    assert np.allclose(y[..., 0], -x[:, list(MIRROR_MAP), :][:, :, 0], atol=1e-6)
 
 
 def test_noise_within_sigma() -> None:
