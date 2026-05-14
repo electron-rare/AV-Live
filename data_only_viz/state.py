@@ -119,6 +119,35 @@ class State:
     # Multi-HMR (SMPL-X 10475 verts x N personnes)
     persons_smplx: list = field(default_factory=list)   # list[SMPLXPerson]
     smplx_last_t: float = 0.0
+    # SMPL-X joint positions (127 joints incl. body + jaw + eyes + hands)
+    # per pid, shape (127, 3) float32, camera coords (z>0 forward).
+    # Indices 25-39 = left hand 15 finger joints, 40-54 = right hand.
+    persons_smplx_joints: dict = field(default_factory=dict)
+
+    # HaMeR MANO hand meshes (v1.2 task #26-28). Keyed by pid -> side
+    # (0=left, 1=right) -> ndarray shape (778, 3) in camera-space metres.
+    # Companion arrays per pid/side:
+    #   persons_hands_mesh_t : last_update timestamp (perf_counter)
+    #   persons_hands_mesh_cam_t : (3,) translation of the hand mesh root.
+    persons_hands_mesh: dict = field(default_factory=dict)
+    persons_hands_mesh_cam_t: dict = field(default_factory=dict)
+    persons_hands_mesh_last_t: float = 0.0
+
+    # ARKit body tracking (iOS ARBodyTracker app) : 91 joints world
+    # space per pid. Same units as MediaPipe pose_world_landmarks
+    # (metres, hip-centered). Fresh = updated within < 1 s.
+    persons_arkit_joints: dict = field(default_factory=dict)
+    persons_arkit_last_t: dict = field(default_factory=dict)
+
+    # v1.3: centralised webcam source. WebcamSource owns the single
+    # cv2.VideoCapture on the host and writes BGR frames here so all
+    # consumers (MediaPipe Multi, Apple Vision, Multi-HMR worker,
+    # HaMeR) read from one shared buffer instead of fighting over the
+    # camera device. ``latest_bgr_id`` is a monotonic counter so a
+    # consumer can detect new frames vs. re-reads.
+    latest_bgr: object = None        # np.ndarray (H, W, 3) BGR uint8
+    latest_bgr_id: int = 0
+    latest_bgr_t: float = 0.0
 
     # Renderer
     width: int = 1280
