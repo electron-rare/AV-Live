@@ -126,3 +126,35 @@ def _to_pcd(points: np.ndarray, voxel_size_m: float, estimate_normals: bool):
             search_param=o3d.geometry.KDTreeSearchParamHybrid(radius=voxel_size_m * 2, max_nn=30),
         )
     return pcd
+
+
+def partition_lidar_by_pid(
+    lidar_points_cam: np.ndarray,
+    pelvises: dict[int, np.ndarray],
+    max_dist_m: float = 1.0,
+) -> dict[int, np.ndarray]:
+    """Assign each LiDAR point to the closest pelvis within ``max_dist_m``.
+
+    Points beyond ``max_dist_m`` from every pelvis (background, furniture)
+    are dropped. Returns ``{pid: (M, 3) float32}`` — pids with zero assigned
+    points are omitted.
+    """
+    if not pelvises or lidar_points_cam.size == 0:
+        return {}
+    pids = list(pelvises.keys())
+    centers = np.stack([pelvises[p] for p in pids]).astype(np.float32)
+    pts = np.ascontiguousarray(lidar_points_cam, dtype=np.float32)
+
+    diff = pts[:, None, :] - centers[None, :, :]
+    d2 = np.einsum("npk,npk->np", diff, diff)
+    nearest = d2.argmin(axis=1)
+    nearest_d = np.sqrt(d2[np.arange(d2.shape[0]), nearest])
+
+    mask = nearest_d <= max_dist_m
+    out: dict[int, np.ndarray] = {}
+    for idx, pid in enumerate(pids):
+        sel = mask & (nearest == idx)
+        if not sel.any():
+            continue
+        out[pid] = pts[sel]
+    return out

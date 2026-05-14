@@ -66,3 +66,33 @@ def test_icp_preserves_dtype_and_shape() -> None:
     out = register_mesh_to_lidar(src, tgt, config=IcpConfig())
     assert out.vertices_registered.shape == src.shape
     assert out.vertices_registered.dtype == np.float32
+
+
+def test_partition_lidar_by_pid_two_people() -> None:
+    from data_only_viz.icp_fusion import partition_lidar_by_pid
+
+    src_a = _synthetic_smplx_torso(seed=10) + np.array([-0.75, 0.0, 0.0], dtype=np.float32)
+    src_b = _synthetic_smplx_torso(seed=11) + np.array([+0.75, 0.0, 0.0], dtype=np.float32)
+    pelvis_a = src_a.mean(axis=0)
+    pelvis_b = src_b.mean(axis=0)
+
+    lidar = np.concatenate([
+        src_a + 0.01 * np.random.RandomState(20).randn(*src_a.shape).astype(np.float32),
+        src_b + 0.01 * np.random.RandomState(21).randn(*src_b.shape).astype(np.float32),
+        np.array([[10.0, 10.0, 10.0]] * 100, dtype=np.float32),
+    ])
+
+    parts = partition_lidar_by_pid(lidar, pelvises={0: pelvis_a, 1: pelvis_b}, max_dist_m=1.0)
+
+    assert set(parts.keys()) == {0, 1}
+    assert parts[0].shape[0] > 1000
+    assert parts[1].shape[0] > 1000
+    assert not np.any(np.linalg.norm(parts[0] - np.array([10, 10, 10]), axis=1) < 0.5)
+    assert not np.any(np.linalg.norm(parts[1] - np.array([10, 10, 10]), axis=1) < 0.5)
+
+
+def test_partition_returns_empty_dict_when_no_pelvises() -> None:
+    from data_only_viz.icp_fusion import partition_lidar_by_pid
+
+    out = partition_lidar_by_pid(np.zeros((100, 3), dtype=np.float32), pelvises={}, max_dist_m=1.0)
+    assert out == {}
