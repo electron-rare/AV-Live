@@ -255,9 +255,15 @@ class AppDelegate(NSObject):
                 from .multi_hmr_worker import MultiHMRWorker
                 from .smplx_osc_sender import SMPLXTCPSender
                 if MultiHMRWorker.is_available():
+                    # target_fps=30 : the worker loop used to self-throttle
+                    # at 10 fps (sleep(period - dt)). With the async remote
+                    # backend (drop-newest in / latest out queue), we want
+                    # the loop to spin at camera rate so we always submit
+                    # the freshest frame and drain the freshest result.
                     self._pose_worker = MultiHMRWorker(
                         self._state, num_persons=4,
-                        target_fps=10.0,
+                        target_fps=float(_os.environ.get(
+                            "MULTIHMR_LOOP_FPS", "30.0")),
                         device=getattr(self._opts, "pose_device", "mps"),
                         det_thresh=getattr(self._opts, "det_thresh", 0.15),
                         nms_kernel_size=getattr(

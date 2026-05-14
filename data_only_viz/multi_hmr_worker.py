@@ -513,6 +513,7 @@ class MultiHMRWorker:
         frame_count = 0
         persons_count = 0
         skipped_static = 0
+        fresh_count = 0
         next_heartbeat = time.monotonic() + 5.0
         prev_thumb: np.ndarray | None = None
 
@@ -569,6 +570,7 @@ class MultiHMRWorker:
             else:
                 self._last_humans = humans
                 reused_humans = False
+                fresh_count += 1
 
             t_post_start = time.monotonic()
             t_now = time.monotonic()
@@ -579,12 +581,14 @@ class MultiHMRWorker:
                           "(no fresh result)", len(humans))
             if t_now >= next_heartbeat:
                 fps = frame_count / 5.0
+                fresh_fps = fresh_count / 5.0
                 avg = persons_count / max(1, frame_count)
                 LOG.info(
-                    "hb[coreml]: %.1f fps, %.2f persons/frame, %d skipped",
-                    fps, avg, skipped_static)
+                    "hb[coreml]: %.1f fps (fresh=%.1f), %.2f persons/frame, "
+                    "%d skipped", fps, fresh_fps, avg, skipped_static)
                 frame_count = 0
                 persons_count = 0
+                fresh_count = 0
                 skipped_static = 0
                 next_heartbeat = t_now + 5.0
 
@@ -592,6 +596,16 @@ class MultiHMRWorker:
                 with self.state.lock():
                     self.state.persons_smplx = []
                 time.sleep(self.period)
+                continue
+
+            # If async backend reused last humans, keep state untouched and
+            # spin to the next frame without re-running dedup/tracker/
+            # smoothing (saves ~3-5 ms CPU per loop iteration and avoids
+            # walking the One-Euro filter forward on stale data).
+            if reused_humans:
+                dt = time.monotonic() - t_cap_start
+                if dt < self.period:
+                    time.sleep(self.period - dt)
                 continue
 
             # Dedup intra-frame (same logic as pytorch path).
