@@ -2,6 +2,7 @@ import AppKit
 import AVFoundation
 import MetalKit
 import RealityKit
+import simd
 import SwiftUI
 
 /// Wrapper SwiftUI : webcam en BACKGROUND LEGER (opacite controlable)
@@ -195,6 +196,119 @@ struct BodyView: NSViewRepresentable {
             c.sceneRenderer?.uniforms.hand_r_x = 0
             c.sceneRenderer?.uniforms.hand_r_y = 0
         }
+        // ---- 2026-05-14 face/hand/body3d derivatives ----
+        // Simple EMA smoother to limit jitter from raw detections.
+        func ema(_ key: String, _ raw: Float, alpha: Float = 0.7) -> Float {
+            let prev = c.smoothedUniforms[key] ?? raw
+            let next = alpha * prev + (1.0 - alpha) * raw
+            c.smoothedUniforms[key] = next
+            return next
+        }
+
+        // --- Face : mouth_open, eye_open_l/r, head_tilt, head_yaw ---
+        var rawMouth: Float = 0
+        var rawEyeL: Float = 0
+        var rawEyeR: Float = 0
+        var rawTilt: Float = 0
+        var rawYaw: Float = 0
+        if let face = poseListener.faces.values.first {
+            let pts = face.points
+            let has = face.hasPoint
+            // dlib 68 : upper inner lip 51, lower inner lip 57
+            if has[51] && has[57] {
+                rawMouth = abs(pts[51].y - pts[57].y)
+            }
+            // Eye L : 36..41, Eye R : 42..47
+            func eyeRatio(_ a: Int, _ b: Int) -> Float {
+                var xs: [Float] = []
+                var ys: [Float] = []
+                for i in a...b where has[i] {
+                    xs.append(pts[i].x)
+                    ys.append(pts[i].y)
+                }
+                guard let mxX = xs.max(), let mnX = xs.min(),
+                      let mxY = ys.max(), let mnY = ys.min() else {
+                    return 0
+                }
+                let w = max(mxX - mnX, 1e-4)
+                let h = mxY - mnY
+                return h / w
+            }
+            rawEyeL = eyeRatio(36, 41)
+            rawEyeR = eyeRatio(42, 47)
+            // head_tilt : line eyeL_center -> eyeR_center
+            if has[36] && has[45] {
+                let dy = pts[45].y - pts[36].y
+                let dx = pts[45].x - pts[36].x
+                rawTilt = atan2(dy, dx)
+            }
+            // head_yaw proxy : nose(30) vs eye midpoint y
+            if has[30] && has[36] && has[45] {
+                let midY = (pts[36].y + pts[45].y) * 0.5
+                rawYaw = (pts[30].y - midY) * 4.0  // amplify
+            }
+        }
+        c.sceneRenderer?.uniforms.mouth_open = ema("mouth", rawMouth)
+        c.sceneRenderer?.uniforms.eye_open_l = ema("eyeL", rawEyeL)
+        c.sceneRenderer?.uniforms.eye_open_r = ema("eyeR", rawEyeR)
+        c.sceneRenderer?.uniforms.head_tilt = ema("tilt", rawTilt)
+        c.sceneRenderer?.uniforms.head_yaw = ema("yaw", rawYaw)
+
+        // --- Hands : finger_pinch_l, finger_pinch_r ---
+        // MediaPipe : 4 = thumb_tip, 8 = index_tip ; side : 0=L, 1=R.
+        var rawPinchL: Float = 0
+        var rawPinchR: Float = 0
+        for h in poseListener.hands.values {
+            guard h.hasPoint[4] && h.hasPoint[8] else { continue }
+            let d = simd_distance(h.points[4], h.points[8])
+            if h.side == 0 { rawPinchL = d } else { rawPinchR = d }
+        }
+        c.sceneRenderer?.uniforms.finger_pinch_l = ema("pinchL", rawPinchL)
+        c.sceneRenderer?.uniforms.finger_pinch_r = ema("pinchR", rawPinchR)
+
+        // --- Body3D : pelvis pos, body_height, arm_spread, velocity ---
+        // MediaPipe : 23 left_hip, 24 right_hip ; 0 nose ;
+        // 15 left_wrist, 16 right_wrist.
+        var rawBX: Float = 0, rawBY: Float = 0, rawBZ: Float = 0
+        var rawHeight: Float = 0, rawSpread: Float = 0
+        var rawVel: Float = 0
+        if let body = poseListener.body3d.values.first {
+            let kp = body.kps
+            let has = body.hasPoint
+            if has[23] && has[24] {
+                let pelvis = SIMD3<Float>(
+                    (kp[23].x + kp[24].x) * 0.5,
+                    (kp[23].y + kp[24].y) * 0.5,
+                    (kp[23].z + kp[24].z) * 0.5)
+                rawBX = pelvis.x
+                rawBY = pelvis.y
+                rawBZ = pelvis.z
+                // Velocity : EMA of delta magnitude (alpha=0.3)
+                if let last = c.lastPelvis {
+                    let dist = simd_distance(pelvis, last)
+                    c.poseVelocityEMA = 0.3 * c.poseVelocityEMA + 0.7 * dist
+                }
+                c.lastPelvis = pelvis
+                rawVel = c.poseVelocityEMA
+                if has[0] {
+                    // body_height : pelvis.y - head.y (MP y points down so
+                    // head < pelvis ; take abs).
+                    rawHeight = abs(pelvis.y - kp[0].y)
+                }
+            }
+            if has[15] && has[16] {
+                rawSpread = abs(kp[15].x - kp[16].x)
+            }
+        } else {
+            c.lastPelvis = nil
+            c.poseVelocityEMA *= 0.9  // decay
+        }
+        c.sceneRenderer?.uniforms.body_x = ema("bx", rawBX)
+        c.sceneRenderer?.uniforms.body_y = ema("by", rawBY)
+        c.sceneRenderer?.uniforms.body_z = ema("bz", rawBZ)
+        c.sceneRenderer?.uniforms.body_height = ema("bh", rawHeight)
+        c.sceneRenderer?.uniforms.arm_spread = ema("spread", rawSpread)
+        c.sceneRenderer?.uniforms.pose_velocity = ema("vel", rawVel, alpha: 0.5)
         c.container?.layer?.backgroundColor = NSColor(
             white: CGFloat(settings.bgBrightness), alpha: 1.0).cgColor
         c.cameraEntity?.camera.fieldOfViewInDegrees =
@@ -229,6 +343,11 @@ struct BodyView: NSViewRepresentable {
         var skel3dAnchor: AnchorEntity?
         var skel3d: Skeleton3DRenderer?
         var kbMonitor: Any?
+        // ---- Pose-derived smoothing state (alpha-beta EMA) ----
+        // EMA alpha=0.7, beta=0.05 (velocity correction).
+        var smoothedUniforms: [String: Float] = [:]
+        var lastPelvis: SIMD3<Float>?
+        var poseVelocityEMA: Float = 0
 
         deinit {
             if let m = kbMonitor {

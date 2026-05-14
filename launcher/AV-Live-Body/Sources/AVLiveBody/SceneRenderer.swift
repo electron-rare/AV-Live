@@ -8,7 +8,9 @@ import MetalKit
 /// data_only_viz Python. Sert de couche backing sous l'ARView dans
 /// BodyView.
 final class SceneRenderer: NSObject, MTKViewDelegate {
-    // Mirror C struct of scene.metal SceneUniforms (20 floats)
+    // Mirror C struct of scene.metal SceneUniforms (36 floats, 144 B,
+    // 16-byte aligned). Append-only : nouveaux uniforms ajoutes apres
+    // hand_r_y pour preserver la compat des 18 premiers slots.
     struct SceneUniforms {
         var time: Float = 0
         var rms: Float = 0
@@ -28,8 +30,25 @@ final class SceneRenderer: NSObject, MTKViewDelegate {
         var hand_l_y: Float = 0
         var hand_r_x: Float = 0
         var hand_r_y: Float = 0
+        // ---- Pose 2026-05-14 additions ----
+        var mouth_open: Float = 0
+        var eye_open_l: Float = 0
+        var eye_open_r: Float = 0
+        var head_tilt: Float = 0
+        var head_yaw: Float = 0
+        var finger_pinch_l: Float = 0
+        var finger_pinch_r: Float = 0
+        var body_x: Float = 0
+        var body_y: Float = 0
+        var body_z: Float = 0
+        var body_height: Float = 0
+        var arm_spread: Float = 0
+        var pose_velocity: Float = 0
         var _pad0: Float = 0
         var _pad1: Float = 0
+        var _pad2: Float = 0
+        var _pad3: Float = 0
+        var _pad4: Float = 0
     }
 
     private let device: MTLDevice

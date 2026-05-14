@@ -279,7 +279,8 @@ class TracedMHMR(nn.Module):
             zeros_p = torch.zeros(K_PERSONS, 3)
             zeros_s = torch.zeros(K_PERSONS)
             zeros_b = torch.zeros(K_PERSONS, 10)
-            return zeros, zeros_p, zeros_s, zeros_b, zeros_b
+            zeros_j = torch.zeros(K_PERSONS, 127, 3)
+            return zeros, zeros_p, zeros_s, zeros_b, zeros_b, zeros_j
         v3d = torch.stack([h["v3d"] for h in humans])
         transl = torch.stack([h["transl_pelvis"] for h in humans])
         scores = torch.stack([
@@ -288,13 +289,15 @@ class TracedMHMR(nn.Module):
         ]).squeeze(-1)
         shape = torch.stack([h["shape"] for h in humans])
         expr = torch.stack([h["expression"] for h in humans])
-        # NOTE: CoreML mlprogram conversion currently produces all-NaN
-        # outputs for v3d and transl while PyTorch eager produces valid
-        # finite values from the same trace. nan_to_num here masks the
-        # symptom but yields all-zero meshes (no information). Leave
-        # raw outputs and let downstream decide; investigation tracked
-        # in task #2 (op-by-op bisection needed).
-        return v3d, transl, scores, shape, expr
+        # Joints (SMPL-X). smplx.create(use_pca=False) populates
+        # output.joints of shape (B, 127, 3) which is then carried as
+        # 'j3d' in smpl_layer.py:148 already in camera space (same
+        # transl_up applied as v3d). The first 55 are the standard
+        # SMPL-X joints (22 body + jaw + 2 eyes + 30 fingers); the
+        # remaining 72 are face/landmark anchors. Downstream code can
+        # slice [..., :55, :] if it only needs the skeleton.
+        j3d = torch.stack([h["j3d"] for h in humans])
+        return v3d, transl, scores, shape, expr, j3d
 
 
 wrapper = TracedMHMR(model).eval()
@@ -309,10 +312,10 @@ example_x = torch.rand(1, 3, IMG_SIZE, IMG_SIZE)
 
 print("==> Sanity forward")
 with torch.no_grad():
-    v3d, transl, scores, shape, expr = wrapper(example_x, example_K)
+    v3d, transl, scores, shape, expr, joints = wrapper(example_x, example_K)
 print(f"  v3d: {tuple(v3d.shape)}, transl: {tuple(transl.shape)},")
 print(f"  scores: {tuple(scores.shape)}, shape: {tuple(shape.shape)},")
-print(f"  expr: {tuple(expr.shape)}")
+print(f"  expr: {tuple(expr.shape)}, joints: {tuple(joints.shape)}")
 
 print("==> torch.jit.trace")
 try:
@@ -535,6 +538,16 @@ try:
     out_path = f"/tmp/{_OUT_NAME}"
     mlmodel.save(out_path)
     print(f"  CONVERT OK -> {out_path}")
+    # Dump output names + shapes so we can wire OUT_* constants.
+    try:
+        spec = mlmodel.get_spec()
+        print("==> mlpackage outputs:")
+        for o in spec.description.output:
+            mt = o.type.multiArrayType
+            shape = list(mt.shape) if mt is not None else []
+            print(f"    {o.name}  shape={shape}")
+    except Exception as e:  # noqa: BLE001
+        print(f"  spec dump failed: {e}")
 except Exception as e:
     print(f"  CONVERT FAILED: {type(e).__name__}: {e}")
     raise

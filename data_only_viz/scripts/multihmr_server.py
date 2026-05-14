@@ -77,11 +77,13 @@ DEFAULT_MLPACKAGE = Path(
     or str(Path.home() / ".cache" / "av-live-multihmr"
            / "multihmr_full_672_s.mlpackage"))
 
-OUT_V3D = "var_2412"
-OUT_TRANSL = "var_2415"
-OUT_SCORES = "var_2428"
-OUT_BETAS = "var_2431"
-OUT_EXPR = "var_2434"
+OUT_V3D = "var_2420"
+OUT_TRANSL = "var_2423"
+OUT_SCORES = "var_2436"
+OUT_BETAS = "var_2439"
+OUT_EXPR = "var_2442"
+OUT_JOINTS = "var_2445"  # (4, 127, 3) SMPL-X joints incl fingers
+N_JOINTS = 127
 
 
 def recv_exact(sock: socket.socket, n: int) -> bytes:

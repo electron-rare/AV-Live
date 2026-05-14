@@ -40,11 +40,12 @@ N_PERSONS_FIXED = 4
 N_VERTS = 10475
 
 # CoreML output names from the exported .mlpackage.
-OUT_V3D = "var_2412"          # (4, 10475, 3)
-OUT_TRANSL = "var_2415"       # (4, 1, 3)
-OUT_SCORES = "var_2428"       # (4,)
-OUT_BETAS = "var_2431"        # (4, 10)
-OUT_EXPR = "var_2434"         # (4, 10)
+OUT_V3D = "var_2420"          # (4, 10475, 3)
+OUT_TRANSL = "var_2423"       # (4, 1, 3)
+OUT_SCORES = "var_2436"       # (4,)
+OUT_BETAS = "var_2439"        # (4, 10)
+OUT_EXPR = "var_2442"         # (4, 10)
+OUT_JOINTS = "var_2445"       # (4, 127, 3) SMPL-X joints incl. fingers
 
 # MLMultiArrayDataType raw values (from CoreML headers).
 ML_DTYPE_FLOAT32 = 65568
