@@ -100,6 +100,10 @@ class MultiHMRWorker:
         # (cf tracker.py) pour resister aux occlusions et au mouvement
         # rapide. Multi-HMR a 3 fps -> 30 frames = 10s de survie.
         self._tracker = IoUTracker(iou_threshold=0.15, max_miss=30)
+        # Lazily-loaded CoreML backend for predict_once (single-shot,
+        # off-thread). Independent of the worker thread's _run_coreml
+        # backend instance — predict_once must work even without start().
+        self._coreml_backend_singleshot = None
 
     @staticmethod
     def is_available() -> bool:
@@ -116,19 +120,82 @@ class MultiHMRWorker:
     def stop(self) -> None:
         self._stop.set()
 
+    def _get_or_load_coreml_backend(self):
+        """Lazily load the CoreML backend for single-shot inference.
+
+        Returns the cached `MultiHMRCoreMLBackend` instance, or None if
+        the backend cannot be imported / the .mlpackage is missing.
+        Thread-safe enough for our use (calibration CLI is single-
+        threaded; the worker thread uses its own backend in _run_coreml).
+        """
+        if self._coreml_backend_singleshot is not None:
+            return self._coreml_backend_singleshot
+        try:
+            from .multihmr_coreml import MultiHMRCoreMLBackend
+            backend = MultiHMRCoreMLBackend(COREML_MLPACKAGE)
+        except (ImportError, FileNotFoundError) as e:
+            LOG.info("predict_once: CoreML backend unavailable: %s", e)
+            return None
+        except Exception as e:  # noqa: BLE001
+            LOG.warning("predict_once: CoreML backend init failed: %s", e)
+            return None
+        self._coreml_backend_singleshot = backend
+        return backend
+
     def predict_once(self, rgb_image):
         """Single-shot SMPL-X prediction on one RGB image.
 
-        Used by calibrate_lidar.py to acquire a pelvis vertex without
-        spinning the worker thread. The current PyTorch path is
-        deeply coupled to the run loop (model lifecycle, camera, MPS
-        setup) so this is left as a stub — calibrate_lidar.py keeps
-        its placeholder until a follow-up refactor extracts a pure
-        ``_infer(rgb) -> humans`` helper.
+        Args:
+            rgb_image: (H, W, 3) uint8 RGB array. Will be center-
+                cropped + resized to 672x672 internally.
+
+        Returns:
+            First `SMPLXPerson` detection (pid=0) or None if no
+            humans pass the detection threshold.
+
+        Raises:
+            NotImplementedError: if the CoreML backend is unavailable
+                (PyTorch single-shot path is TBD).
         """
-        raise NotImplementedError(
-            "MultiHMRWorker.predict_once is not wired yet — see "
-            "scripts/calibrate_lidar.py for the placeholder it gates")
+        backend = self._get_or_load_coreml_backend()
+        if backend is None:
+            raise NotImplementedError(
+                "CoreML backend unavailable; PyTorch single-shot path TBD")
+
+        try:
+            import cv2
+        except ImportError as e:
+            raise NotImplementedError(
+                "opencv-python required for predict_once: %s" % e)
+
+        rgb = np.asarray(rgb_image)
+        if rgb.ndim != 3 or rgb.shape[2] != 3:
+            raise ValueError(
+                f"rgb_image must be (H,W,3), got {rgb.shape}")
+        h, w = rgb.shape[:2]
+        if (h, w) != (IMG_SIZE, IMG_SIZE):
+            side = min(h, w)
+            y0 = (h - side) // 2
+            x0 = (w - side) // 2
+            rgb = rgb[y0:y0 + side, x0:x0 + side]
+            rgb = cv2.resize(rgb, (IMG_SIZE, IMG_SIZE))
+
+        img = rgb.transpose(2, 0, 1).astype(np.float32) / 255.0
+        focal = float(IMG_SIZE)
+        K_np = np.array([[focal, 0.0, IMG_SIZE / 2.0],
+                         [0.0, focal, IMG_SIZE / 2.0],
+                         [0.0, 0.0, 1.0]], dtype=np.float32)
+
+        humans = backend.infer(img, K_np, det_thresh=self.det_thresh)
+        if not humans:
+            return None
+
+        hh = humans[0]
+        v3d = hh["v3d"].detach().cpu().numpy()
+        return SMPLXPerson(
+            pid=0,
+            vertices_3d=np.ascontiguousarray(v3d, dtype=np.float32),
+        )
 
     def _run(self) -> None:
         if self.backend == "coreml":

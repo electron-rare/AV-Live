@@ -51,3 +51,16 @@ def test_state_mutations_are_all_under_lock():
             f"line {lineno} mutates persons_smplx without a nearby `state.lock()` context:\n"
             f"{lines[lineno - 1]}"
         )
+
+
+def test_predict_once_returns_none_when_coreml_unavailable(monkeypatch):
+    from data_only_viz.multi_hmr_worker import MultiHMRWorker
+    from data_only_viz.state import State
+    # Force CoreML loader to return None
+    state = State()
+    worker = MultiHMRWorker(state, num_persons=1)
+    monkeypatch.setattr(worker, "_get_or_load_coreml_backend", lambda: None)
+    import pytest, numpy as np
+    rgb = np.zeros((480, 640, 3), dtype=np.uint8)
+    with pytest.raises(NotImplementedError):
+        worker.predict_once(rgb)
