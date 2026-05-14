@@ -31,6 +31,12 @@ Python **3.11+** requis. `pyproject.toml` est la source de vérité — ne jamai
 
 - État partagé multi-thread : `state.py` expose `State.lock()` — toujours mutationner sous lock.
 - Filtrage temporel : `euro_filter.py` (One Euro Filter) sur les keypoints avant tracker.
+- ARKit fusion : `iphone_osc_listener.py` consume /body3d/kp UDP :57128
+  → `state.persons_arkit_joints`. `pose_filter.py::ArkitFuse` (stage
+  `arkit_fuse`) splices the 14 mapped body slots into MediaPipe pose
+  before kalman ; `multi_hmr_worker::arkit_pelvis_z_override` locks the
+  SMPL-X cam translation z to the ARKit pelvis. Mapping in
+  `arkit_joint_map.py`.
 - Association multi-personne : `tracker.py` IoU-based, `scipy.optimize.linear_sum_assignment`.
 - Shaders Metal dans `shaders/` (`.metal`), recompilés au runtime ; topologie mesh (SMPL faces) en binaire dans `mesh_topology.py`.
 - OSC out : `osc_listener.py` / `pose_bridge.py` — destination `oscope-of` sur `:57123`.
