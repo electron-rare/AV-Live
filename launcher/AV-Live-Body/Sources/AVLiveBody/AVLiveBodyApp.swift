@@ -65,14 +65,17 @@ struct ContentView: View {
     @StateObject private var renderer = MeshRenderer()
     @StateObject private var settings = RenderSettings()
     @StateObject private var poseListener = PoseOSCListener()
+    @StateObject private var arkitListener = ArkitOSCListener()
 
     var body: some View {
         ZStack(alignment: .topLeading) {
             BodyView(renderer: renderer, settings: settings,
-                     poseListener: poseListener)
+                     poseListener: poseListener,
+                     arkitListener: arkitListener)
                 .onAppear {
                     renderer.startOSCServer()
                     poseListener.start()
+                    arkitListener.start()
                 }
                 .onReceive(NotificationCenter.default.publisher(
                     for: .toggleSettings)) { _ in

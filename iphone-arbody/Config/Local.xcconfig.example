@@ -1,0 +1,8 @@
+// Copy this file to Config/Local.xcconfig and fill in your Apple Developer
+// Team ID. The Team ID is the 10-character alphanumeric string visible in
+// Xcode → Settings → Accounts → (your Apple ID) → Manage Certificates,
+// or via: security find-identity -v -p codesigning
+//
+// Config/Local.xcconfig is gitignored and must never be committed.
+
+DEVELOPMENT_TEAM = YOUR_TEAM_ID

@@ -85,6 +85,8 @@ final class Skeleton3DRenderer: ObservableObject {
     private var poseSub: AnyCancellable?
     private var faceSub: AnyCancellable?
     private var handSub: AnyCancellable?
+    private var arkitSub: AnyCancellable?
+    private var lastArkit: [Int: ArkitOSCListener.ArkitBodyFrame] = [:]
     private var lastUpdateAt: TimeInterval = 0
     /// Optional per-pid offset to align the skeleton with another
     /// renderer's coordinate space (typically MeshRenderer's pelvis).
@@ -108,7 +110,8 @@ final class Skeleton3DRenderer: ObservableObject {
 
     /// Attach to a scene by giving it an AnchorEntity that owns all
     /// skeleton entities, and start observing the listener.
-    func attach(to anchor: Entity, listener: PoseOSCListener) {
+    func attach(to anchor: Entity, listener: PoseOSCListener,
+                arkitListener: ArkitOSCListener? = nil) {
         rootAnchor = anchor
         poseSub = listener.$body3d
             .receive(on: DispatchQueue.main)
@@ -125,6 +128,14 @@ final class Skeleton3DRenderer: ObservableObject {
             .sink { [weak self] frames in
                 Task { @MainActor in self?.lastHands = frames }
             }
+        if let arkit = arkitListener {
+            arkitSub = arkit.$bodies
+                .receive(on: DispatchQueue.main)
+                .sink { [weak self] frames in
+                    Task { @MainActor in self?.lastArkit = frames }
+                }
+        }
+        // TODO: render yellow ARKit markers from lastArkit in update()
     }
 
     func detach() {
@@ -134,6 +145,8 @@ final class Skeleton3DRenderer: ObservableObject {
         faceSub = nil
         handSub?.cancel()
         handSub = nil
+        arkitSub?.cancel()
+        arkitSub = nil
         for (_, p) in persons { p.root.removeFromParent() }
         persons.removeAll()
         lastSeenAt.removeAll()
