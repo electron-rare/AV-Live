@@ -158,3 +158,58 @@ def partition_lidar_by_pid(
             continue
         out[pid] = pts[sel]
     return out
+
+
+PELVIS_VERT_INDEX = 5559  # SMPL-X canonical pelvis vertex
+
+
+@dataclass
+class FusionMetadata:
+    applied: set[int]
+    fitness: dict[int, float]
+    rmse_m: dict[int, float]
+    n_lidar_points_used: int
+
+
+class FusionWorker:
+    """Per-frame ICP fusion orchestrator (caller-driven, no internal thread)."""
+
+    def __init__(self, extrinsic, config: IcpConfig | None = None) -> None:
+        self._extrinsic = extrinsic
+        self._config = config or IcpConfig()
+
+    def set_extrinsic(self, extrinsic) -> None:
+        self._extrinsic = extrinsic
+
+    def run_once(self, state) -> FusionMetadata:
+        applied: set[int] = set()
+        fitness: dict[int, float] = {}
+        rmse: dict[int, float] = {}
+
+        lidar = getattr(state, "lidar_points", None)
+        if lidar is None or getattr(lidar, "size", 0) == 0 or not state.persons_smplx:
+            return FusionMetadata(applied, fitness, rmse, 0)
+
+        T = np.asarray(self._extrinsic.T_arkit_to_cam, dtype=np.float32)
+        homog = np.concatenate([lidar, np.ones((lidar.shape[0], 1), dtype=np.float32)], axis=1)
+        lidar_cam = (homog @ T.T)[:, :3]
+
+        pelvises = {
+            p.pid: p.vertices_3d[PELVIS_VERT_INDEX]
+            for p in state.persons_smplx
+            if p.vertices_3d is not None
+        }
+        parts = partition_lidar_by_pid(lidar_cam, pelvises, max_dist_m=1.0)
+
+        for person in state.persons_smplx:
+            pts = parts.get(person.pid)
+            if pts is None:
+                continue
+            result = register_mesh_to_lidar(person.vertices_3d, pts, self._config)
+            fitness[person.pid] = result.fitness
+            rmse[person.pid] = result.rmse_m
+            if result.accepted:
+                person.vertices_3d = result.vertices_registered
+                applied.add(person.pid)
+
+        return FusionMetadata(applied, fitness, rmse, lidar_cam.shape[0])

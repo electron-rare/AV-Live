@@ -139,6 +139,14 @@ class State:
     persons_arkit_joints: dict = field(default_factory=dict)
     persons_arkit_last_t: dict = field(default_factory=dict)
 
+    # ---- LiDAR / ICP mesh fusion (Task 8 - 2026-05-14) ----
+    # Set by the LidarTCPReader poller; consumed by FusionWorker.run_once.
+    # The mesh-level fusion is complementary to the ARKit *joint* fusion
+    # above: joints are sparse + 60 Hz, LiDAR is dense + 5-10 Hz.
+    lidar_points: object = None          # np.ndarray (N, 3) float32 ARKit world; None if no frame
+    lidar_timestamp_ns: int = 0
+    icp_metadata: object = None          # FusionMetadata from icp_fusion or None
+
     # v1.3: centralised webcam source. WebcamSource owns the single
     # cv2.VideoCapture on the host and writes BGR frames here so all
     # consumers (MediaPipe Multi, Apple Vision, Multi-HMR worker,

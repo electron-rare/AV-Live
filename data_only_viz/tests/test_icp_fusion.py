@@ -96,3 +96,49 @@ def test_partition_returns_empty_dict_when_no_pelvises() -> None:
 
     out = partition_lidar_by_pid(np.zeros((100, 3), dtype=np.float32), pelvises={}, max_dist_m=1.0)
     assert out == {}
+
+
+def test_fusion_worker_in_place_update(monkeypatch) -> None:
+    from data_only_viz.icp_fusion import FusionWorker, IcpConfig
+    from data_only_viz.lidar_calib import Extrinsic
+    from data_only_viz.state import SMPLXPerson, State
+
+    src = _synthetic_smplx_torso(seed=30)
+    verts = np.zeros((10475, 3), dtype=np.float32)
+    verts[: src.shape[0]] = src
+    verts[5559] = src.mean(axis=0)
+
+    person = SMPLXPerson(pid=0, vertices_3d=verts.copy())
+    state = State()
+    state.persons_smplx = [person]
+
+    lidar_pts = src + np.array([0.0, 0.04, 0.0], dtype=np.float32)
+    state.lidar_points = lidar_pts
+    state.lidar_timestamp_ns = 1
+
+    worker = FusionWorker(
+        extrinsic=Extrinsic.identity(),
+        config=IcpConfig(),
+    )
+    metadata = worker.run_once(state)
+
+    assert metadata.applied == {0}
+    delta = state.persons_smplx[0].vertices_3d[5559] - verts[5559]
+    assert 0.02 <= delta[1] <= 0.06
+
+
+def test_fusion_worker_skips_when_no_lidar() -> None:
+    from data_only_viz.icp_fusion import FusionWorker, IcpConfig
+    from data_only_viz.lidar_calib import Extrinsic
+    from data_only_viz.state import SMPLXPerson, State
+
+    verts = np.zeros((10475, 3), dtype=np.float32)
+    verts[5559] = [0.0, 1.0, 2.0]
+    state = State()
+    state.persons_smplx = [SMPLXPerson(pid=0, vertices_3d=verts.copy())]
+    state.lidar_points = None
+
+    worker = FusionWorker(extrinsic=Extrinsic.identity(), config=IcpConfig())
+    metadata = worker.run_once(state)
+    assert metadata.applied == set()
+    np.testing.assert_array_equal(state.persons_smplx[0].vertices_3d, verts)
