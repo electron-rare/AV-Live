@@ -20,6 +20,7 @@ from pathlib import Path
 
 import numpy as np
 
+from .arkit_joint_map import ARKIT_PELVIS_IDX
 from .euro_filter import OneEuroFilter
 from .state import PoseKp, SMPLXPerson, State
 from .tracker import IoUTracker
@@ -36,6 +37,26 @@ COREML_MLPACKAGE = Path(
 
 IMG_SIZE = 672
 N_VERTS = 10475
+
+
+def arkit_pelvis_z_override(state, pid: int, z_pred: float,
+                            fresh_sec: float = 1.0) -> float:
+    """Return ARKit pelvis world-z if a fresh ARKit frame exists for
+    this pid, otherwise return the Multi-HMR predicted z unchanged.
+
+    Used to resolve Multi-HMR's monocular scale ambiguity: ARKit's
+    LiDAR-anchored pelvis position is ground truth in the iPhone
+    world frame, which (after extrinsics calibration) is the same
+    metric scale as the SMPL-X cam-space output.
+    """
+    with state.lock():
+        arr = state.persons_arkit_joints.get(pid)
+        last_t = state.persons_arkit_last_t.get(pid, 0.0)
+    if arr is None:
+        return float(z_pred)
+    if time.perf_counter() - last_t > fresh_sec:
+        return float(z_pred)
+    return float(arr[ARKIT_PELVIS_IDX, 2])
 
 
 class MultiHMRWorker:
@@ -371,6 +392,10 @@ class MultiHMRWorker:
                 v3d = hh["v3d"].detach().cpu().numpy()
                 transl = hh.get("transl_pelvis", hh.get("transl"))
                 transl_np = transl.detach().cpu().numpy().flatten()
+                if transl_np.size >= 3:
+                    transl_np = transl_np.copy()
+                    transl_np[2] = arkit_pelvis_z_override(
+                        self.state, pid, float(transl_np[2]))
 
                 shape_raw = hh["shape"].detach().cpu().numpy().flatten()
                 expr_raw = hh["expression"].detach().cpu().numpy().flatten()
@@ -612,6 +637,10 @@ class MultiHMRWorker:
                     continue
                 v3d = hh["v3d"].detach().cpu().numpy()
                 transl_np = hh["transl_pelvis"].detach().cpu().numpy().flatten()
+                if transl_np.size >= 3:
+                    transl_np = transl_np.copy()
+                    transl_np[2] = arkit_pelvis_z_override(
+                        self.state, pid, float(transl_np[2]))
                 shape_raw = hh["shape"].detach().cpu().numpy().flatten()
                 expr_raw = hh["expression"].detach().cpu().numpy().flatten()
 
