@@ -5,9 +5,23 @@ import SwiftUI
 import simd
 
 /// RealityKit renderer for MediaPipe Pose 3D world landmarks (33 joints,
-/// metric coords relative to the hip-center). Consumes the `body3d`
-/// publisher of `PoseOSCListener` and maintains one entity tree per
-/// detected person.
+/// metric coords relative to the hip-center) fused with dlib face 68
+/// 2D landmarks and MediaPipe Hand 21 2D landmarks per side.
+///
+/// Topology: a SINGLE LowLevelMesh (topology=.line) per person bundles
+/// body bones + face chains + hand chains + anatomical connectors into
+/// one continuous procedural wireframe humanoid. Vertices are layed out
+/// contiguously :
+///
+///   slots [0..33)      : 33 body landmarks (MediaPipe Pose)
+///   slots [33..101)    : 68 dlib face landmarks (anchored on nose)
+///   slots [101..122)   : 21 left-hand landmarks (anchored on left wrist)
+///   slots [122..143)   : 21 right-hand landmarks (anchored on right wrist)
+///
+/// Indices are baked once at makePerson and split into 4 mesh parts
+/// (one per material colour), so the draw cost is 4 draw-calls per
+/// person regardless of which segments are valid (invalid segments
+/// collapse to zero-length degenerate lines).
 ///
 /// Coordinate mapping (MediaPipe -> RealityKit):
 ///   MediaPipe : x = right, y = down,  z = forward (away from cam).
@@ -15,10 +29,10 @@ import simd
 ///   => convert with (x, -y, -z).
 @MainActor
 final class Skeleton3DRenderer: ObservableObject {
-    /// 32 bones connecting MediaPipe Pose 33 landmarks. Indices are
-    /// the canonical MediaPipe Pose landmark indices. Source: official
-    /// `mp.solutions.pose.POSE_CONNECTIONS` (Holistic / Pose Landmarker
-    /// share the same 33-pt schema).
+
+    // MARK: - Topology constants
+
+    /// 32 bones connecting MediaPipe Pose 33 landmarks.
     static let POSE_CONNECTIONS: [(Int, Int, BoneChain)] = [
         // Face (kept light: nose <-> inner eyes <-> outer eyes <-> ears)
         (0, 1, .face), (1, 2, .face), (2, 3, .face), (3, 7, .face),
@@ -41,40 +55,102 @@ final class Skeleton3DRenderer: ObservableObject {
         (28, 30, .leg), (28, 32, .leg), (30, 32, .leg),
     ]
 
+    /// dlib 68 face chains (subset of MediaPipe 478 in our pipeline).
+    /// Open chains are listed as runs ; closed loops include the
+    /// wrap-around edge.
+    static let FACE_CHAINS: [[Int]] = [
+        // jaw 0..16 (open)
+        Array(0...16),
+        // right brow 17..21 (open)
+        Array(17...21),
+        // left brow 22..26 (open)
+        Array(22...26),
+        // nose bridge 27..30 (open)
+        Array(27...30),
+        // nose base 31..35 (open)
+        Array(31...35),
+        // right eye 36..41 (closed)
+        [36, 37, 38, 39, 40, 41, 36],
+        // left eye 42..47 (closed)
+        [42, 43, 44, 45, 46, 47, 42],
+        // outer lips 48..59 (closed)
+        [48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 48],
+        // inner lips 60..67 (closed)
+        [60, 61, 62, 63, 64, 65, 66, 67, 60],
+    ]
+
+    /// MediaPipe Hand 21 chains.
+    static let HAND_CHAINS: [[Int]] = [
+        // palm closure : wrist -> index_mcp -> middle_mcp -> ring_mcp
+        // -> pinky_mcp -> wrist
+        [0, 5, 9, 13, 17, 0],
+        // thumb (with wrist connector 0-1)
+        [0, 1, 2, 3, 4],
+        // index
+        [5, 6, 7, 8],
+        // middle
+        [9, 10, 11, 12],
+        // ring
+        [13, 14, 15, 16],
+        // pinky
+        [17, 18, 19, 20],
+    ]
+
     enum BoneChain {
         case trunk, arm, leg, face
-        var color: NSColor {
+        /// Material slot in the part list (see materialPalette).
+        var materialIndex: Int {
             switch self {
-            case .trunk: return .white
-            case .arm:   return .systemTeal
-            case .leg:   return .systemPink   // approx magenta
-            case .face:  return NSColor(white: 0.7, alpha: 1.0)
+            case .trunk: return 0    // white
+            case .arm:   return 1    // cyan
+            case .leg:   return 2    // magenta/pink
+            case .face:  return 3    // light grey
             }
         }
     }
 
-    // Wireframe pur : joints micro (1 mm, quasi invisibles), bones
-    // 2 mm = lignes fines. radius=0 fait planter MeshResource.generate.
-    private static let jointRadius: Float = 0.001   // 1 mm — quasi nul
-    private static let boneRadius:  Float = 0.003   // 3 mm — line-like
-    private static let faceJointRadius: Float = 0.001
-    private static let handJointRadius: Float = 0.001
+    // MARK: - Layout offsets
+
+    private static let bodyOffset:      Int = 0
+    private static let bodyCount:       Int = 33
+    private static let faceOffset:      Int = 33
+    private static let faceCount:       Int = 68
+    private static let lHandOffset:     Int = 33 + 68          // 101
+    private static let rHandOffset:     Int = 33 + 68 + 21     // 122
+    private static let handCount:       Int = 21
+    private static let vertexCount:     Int = 33 + 68 + 21 + 21 // 143
+
+    // Material slot indices.
+    private static let matWhite:  Int = 0
+    private static let matCyan:   Int = 1
+    private static let matPink:   Int = 2
+    private static let matGrey:   Int = 3
+
+    // MARK: - Tunables
+
     private static let handScale3D: Float = 0.18      // typical hand size (m)
-    private static let faceForwardOffset: Float = 0.05 // push face in front of nose
+    private static let faceForwardOffset: Float = 0.05
     private static let minConfidence: Float = 0.3
     private static let retainSec: TimeInterval = 1.0
-
-    /// Update throttle : tick at most every `updatePeriod` seconds even
-    /// if the publisher fires faster (Combine debounce-style on a clock).
     private static let updatePeriod: TimeInterval = 1.0 / 30.0
+
+    // MARK: - Per-person state
+
+    private struct PartLayout {
+        /// Per-material : list of (vertex-slot-a, vertex-slot-b) edges.
+        var edges: [(Int, Int)]
+        /// Pre-computed index range in the global index buffer.
+        var indexOffset: Int
+        var indexCount: Int
+    }
 
     private struct PersonEntities {
         var root: Entity
-        var joints: [ModelEntity]     // 33 spheres
-        var bones: [ModelEntity]      // 32 bone entities, same order as POSE_CONNECTIONS
-        var faceJoints: [ModelEntity]      // 68 dlib face landmarks
-        var leftHandJoints: [ModelEntity]  // 21 cyan
-        var rightHandJoints: [ModelEntity] // 21 magenta
+        var modelEntity: ModelEntity
+        var mesh: LowLevelMesh
+        /// Per-material part layout (4 parts). Indices are baked at
+        /// build time, only vertex positions change per frame.
+        var parts: [PartLayout]
     }
 
     private var persons: [Int: PersonEntities] = [:]
@@ -86,15 +162,10 @@ final class Skeleton3DRenderer: ObservableObject {
     private var faceSub: AnyCancellable?
     private var handSub: AnyCancellable?
     private var lastUpdateAt: TimeInterval = 0
-    /// Optional per-pid offset to align the skeleton with another
-    /// renderer's coordinate space (typically MeshRenderer's pelvis).
-    /// When nil for a pid, falls back to the renderer's default anchor.
     private var pelvisOffsets: [Int: SIMD3<Float>] = [:]
 
-    /// External wiring : MeshRenderer or any other source publishes a
-    /// pelvis world position per pid. We translate each person's root
-    /// entity to that pose so the openpos skeleton co-locates with the
-    /// dense SMPL-X mesh.
+    // MARK: - Public API
+
     func setPelvisOffsets(_ offsets: [Int: SIMD3<Float>]) {
         pelvisOffsets = offsets
         for (pid, entities) in persons {
@@ -106,8 +177,6 @@ final class Skeleton3DRenderer: ObservableObject {
         }
     }
 
-    /// Attach to a scene by giving it an AnchorEntity that owns all
-    /// skeleton entities, and start observing the listener.
     func attach(to anchor: Entity, listener: PoseOSCListener) {
         rootAnchor = anchor
         poseSub = listener.$body3d
@@ -128,12 +197,9 @@ final class Skeleton3DRenderer: ObservableObject {
     }
 
     func detach() {
-        poseSub?.cancel()
-        poseSub = nil
-        faceSub?.cancel()
-        faceSub = nil
-        handSub?.cancel()
-        handSub = nil
+        poseSub?.cancel(); poseSub = nil
+        faceSub?.cancel(); faceSub = nil
+        handSub?.cancel(); handSub = nil
         for (_, p) in persons { p.root.removeFromParent() }
         persons.removeAll()
         lastSeenAt.removeAll()
@@ -150,9 +216,7 @@ final class Skeleton3DRenderer: ObservableObject {
 
         guard let anchor = rootAnchor else { return }
 
-        // Mark fresh pids
         for pid in frames.keys { lastSeenAt[pid] = now }
-        // GC stale persons
         let cutoff = now - Self.retainSec
         for (pid, p) in persons where (lastSeenAt[pid] ?? 0) < cutoff {
             p.root.removeFromParent()
@@ -167,147 +231,74 @@ final class Skeleton3DRenderer: ObservableObject {
         }
     }
 
-    private func apply(frame: PoseOSCListener.Pose3DFrame,
-                       pid: Int,
-                       to entities: PersonEntities) {
-        // Convert all 33 keypoints to RealityKit space once.
+    /// Build the full vertex array (143 SIMD3<Float>) for a given frame.
+    /// Invalid points are emitted at SIMD3<Float>(NaN, NaN, NaN) so the
+    /// edge culling pass downstream can collapse incident edges.
+    private func buildVertices(frame: PoseOSCListener.Pose3DFrame,
+                               pid: Int)
+        -> (vertices: [SIMD3<Float>], valid: [Bool])
+    {
+        var v = [SIMD3<Float>](repeating: .zero, count: Self.vertexCount)
+        var ok = [Bool](repeating: false, count: Self.vertexCount)
+
+        // ---- Body (33 slots) ----
         var rk = [SIMD3<Float>](repeating: .zero, count: 33)
-        var valid = [Bool](repeating: false, count: 33)
         for i in 0..<33 {
             let k = frame.kps[i]
             let visible = frame.hasPoint[i] && k.w >= Self.minConfidence
-            valid[i] = visible
-            // Mediapipe (x right, y down, z forward) -> RK (x right, y up, z back)
             rk[i] = SIMD3<Float>(k.x, -k.y, -k.z)
+            v[Self.bodyOffset + i] = rk[i]
+            ok[Self.bodyOffset + i] = visible
         }
 
-        // Joints: position spheres and toggle visibility.
-        for i in 0..<33 {
-            let joint = entities.joints[i]
-            if valid[i] {
-                joint.transform.translation = rk[i]
-                joint.isEnabled = true
+        // ---- Face (68 slots) anchored on body nose rk[0] ----
+        let nose = ok[Self.bodyOffset + 0] ? rk[0] : SIMD3<Float>(0, 0, 0)
+        if let face = lastFace[pid], ok[Self.bodyOffset + 0] {
+            // Head width in 3D from ears, fallback 0.18 m.
+            let headWidth3D: Float
+            if ok[Self.bodyOffset + 7] && ok[Self.bodyOffset + 8] {
+                headWidth3D = max(0.10, simd_length(rk[7] - rk[8]))
             } else {
-                joint.isEnabled = false
+                headWidth3D = 0.18
+            }
+            // 2D bbox of face points.
+            var minX: Float =  .infinity, maxX: Float = -.infinity
+            var sumX: Float = 0, sumY: Float = 0
+            var n: Float = 0
+            for i in 0..<68 where face.hasPoint[i] {
+                let p = face.points[i]
+                if p.x < minX { minX = p.x }
+                if p.x > maxX { maxX = p.x }
+                sumX += p.x; sumY += p.y; n += 1
+            }
+            if n > 4 && maxX > minX {
+                let face2DWidth = max(maxX - minX, 1e-4)
+                let scale = headWidth3D / face2DWidth
+                let cx = sumX / n
+                let cy = sumY / n
+                for i in 0..<68 {
+                    let slot = Self.faceOffset + i
+                    if face.hasPoint[i] {
+                        let dx = face.points[i].x - cx
+                        let dy = face.points[i].y - cy
+                        v[slot] = nose + SIMD3<Float>(
+                            dx * scale,
+                            -dy * scale,
+                            Self.faceForwardOffset)
+                        ok[slot] = true
+                    }
+                }
             }
         }
 
-        // Bones: orient + scale length between endpoints.
-        for (bIdx, (a, b, _)) in Self.POSE_CONNECTIONS.enumerated() {
-            let bone = entities.bones[bIdx]
-            if !valid[a] || !valid[b] {
-                bone.isEnabled = false
-                continue
-            }
-            let pa = rk[a]
-            let pb = rk[b]
-            let delta = pb - pa
-            let len = simd_length(delta)
-            if len < 1e-5 {
-                bone.isEnabled = false
-                continue
-            }
-            let mid = (pa + pb) * 0.5
-            // Bone mesh is a cylinder of height=1 along +Y. Rotate +Y
-            // onto the (b-a) direction.
-            let dir = delta / len
-            let yAxis = SIMD3<Float>(0, 1, 0)
-            let dot = simd_dot(yAxis, dir)
-            let rot: simd_quatf
-            if dot > 0.9999 {
-                rot = simd_quatf(angle: 0, axis: SIMD3(0, 1, 0))
-            } else if dot < -0.9999 {
-                rot = simd_quatf(angle: .pi, axis: SIMD3(1, 0, 0))
-            } else {
-                let axis = simd_normalize(simd_cross(yAxis, dir))
-                let angle = acos(dot)
-                rot = simd_quatf(angle: angle, axis: axis)
-            }
-            bone.transform.translation = mid
-            bone.transform.rotation = rot
-            // Scale length only on Y, keep XZ at 1 to preserve radius.
-            bone.transform.scale = SIMD3<Float>(1, len, 1)
-            bone.isEnabled = true
-        }
-
-        // --- Face landmarks (68) anchored on nose joint rk[0] ---
-        applyFace(pid: pid, rk: rk, valid: valid, to: entities)
-
-        // --- Hand landmarks (21 left + 21 right) anchored on wrists ---
-        applyHands(rk: rk, valid: valid, to: entities)
-    }
-
-    private func applyFace(pid: Int,
-                           rk: [SIMD3<Float>],
-                           valid: [Bool],
-                           to entities: PersonEntities) {
-        guard let face = lastFace[pid] else {
-            for j in entities.faceJoints { j.isEnabled = false }
-            return
-        }
-        // Head width in 3D : distance between ears (rk[7] left ear,
-        // rk[8] right ear). Fall back to a sane default if missing.
-        let headWidth3D: Float
-        if valid[7] && valid[8] {
-            headWidth3D = max(0.10, simd_length(rk[7] - rk[8]))
-        } else {
-            headWidth3D = 0.18
-        }
-        // Compute 2D bbox width of face points + centroid.
-        var minX: Float =  .infinity, maxX: Float = -.infinity
-        var sumX: Float = 0, sumY: Float = 0
-        var n: Float = 0
-        for i in 0..<68 where face.hasPoint[i] {
-            let p = face.points[i]
-            if p.x < minX { minX = p.x }
-            if p.x > maxX { maxX = p.x }
-            sumX += p.x
-            sumY += p.y
-            n += 1
-        }
-        let nose = valid[0] ? rk[0] : SIMD3<Float>(0, 0, 0)
-        guard n > 4, maxX > minX else {
-            for j in entities.faceJoints { j.isEnabled = false }
-            return
-        }
-        let face2DWidth = max(maxX - minX, 1e-4)
-        let scale = headWidth3D / face2DWidth
-        let cx = sumX / n
-        let cy = sumY / n
-        for i in 0..<68 {
-            let j = entities.faceJoints[i]
-            if face.hasPoint[i] {
-                let dx = face.points[i].x - cx
-                let dy = face.points[i].y - cy
-                // Flip y : image y down -> RK y up. +z to push in front of nose.
-                j.transform.translation = nose + SIMD3<Float>(
-                    dx * scale, -dy * scale, Self.faceForwardOffset)
-                j.isEnabled = true
-            } else {
-                j.isEnabled = false
-            }
-        }
-    }
-
-    private func applyHands(rk: [SIMD3<Float>],
-                            valid: [Bool],
-                            to entities: PersonEntities) {
-        // Disable by default ; re-enable per side if a matching frame found.
-        for j in entities.leftHandJoints  { j.isEnabled = false }
-        for j in entities.rightHandJoints { j.isEnabled = false }
-
-        // Iterate cached hand frames (keyed by pid in OSC ; here we route
-        // purely by `side` since the python emits side=0/1 explicitly).
+        // ---- Hands (21 + 21) anchored on rk[15]/rk[16] ----
         for (_, hand) in lastHands {
             let isLeft = (hand.side == 0)
             let wristIdx = isLeft ? 15 : 16
-            guard valid[wristIdx] else { continue }
+            guard ok[Self.bodyOffset + wristIdx] else { continue }
             let wrist = rk[wristIdx]
-            let target = isLeft
-                ? entities.leftHandJoints
-                : entities.rightHandJoints
+            let baseOffset = isLeft ? Self.lHandOffset : Self.rHandOffset
 
-            // Centroid of valid hand points.
             var sumX: Float = 0, sumY: Float = 0, n: Float = 0
             for i in 0..<21 where hand.hasPoint[i] {
                 sumX += hand.points[i].x
@@ -317,17 +308,58 @@ final class Skeleton3DRenderer: ObservableObject {
             guard n > 2 else { continue }
             let cx = sumX / n
             let cy = sumY / n
-            let scale = Self.handScale3D
+            let s = Self.handScale3D
             for i in 0..<21 {
-                let j = target[i]
+                let slot = baseOffset + i
                 if hand.hasPoint[i] {
                     let dx = hand.points[i].x - cx
                     let dy = hand.points[i].y - cy
-                    j.transform.translation = wrist + SIMD3<Float>(
-                        dx * scale, -dy * scale, 0)
-                    j.isEnabled = true
-                } else {
-                    j.isEnabled = false
+                    v[slot] = wrist + SIMD3<Float>(dx * s, -dy * s, 0)
+                    ok[slot] = true
+                }
+            }
+        }
+
+        return (v, ok)
+    }
+
+    private func apply(frame: PoseOSCListener.Pose3DFrame,
+                       pid: Int,
+                       to entities: PersonEntities) {
+        let built = buildVertices(frame: frame, pid: pid)
+        let v = built.vertices
+        let ok = built.valid
+
+        // Push vertices into the LowLevelMesh. Edges whose endpoints
+        // are invalid get the second endpoint collapsed onto the first
+        // (zero-length line, invisible).
+        entities.mesh.withUnsafeMutableBytes(bufferIndex: 0) { ptr in
+            let dst = ptr.bindMemory(to: SIMD3<Float>.self)
+            let n = min(dst.count, v.count)
+            for i in 0..<n { dst[i] = v[i] }
+        }
+
+        // Rewrite the index buffer slot-by-slot only for edges whose
+        // validity changed. For simplicity (and since the buffer is
+        // small : ~280 indices), rewrite the whole index buffer each
+        // frame, collapsing invalid edges to a single repeated slot.
+        // This is cheap enough at 30 Hz.
+        entities.mesh.withUnsafeMutableIndices { ptr in
+            let dst = ptr.bindMemory(to: UInt32.self)
+            var cursor = 0
+            for part in entities.parts {
+                for (a, b) in part.edges {
+                    let validEdge = ok[a] && ok[b]
+                    if validEdge {
+                        dst[cursor] = UInt32(a)
+                        dst[cursor + 1] = UInt32(b)
+                    } else {
+                        // Degenerate edge : both indices point to a, so
+                        // the line has zero length and renders nothing.
+                        dst[cursor] = UInt32(a)
+                        dst[cursor + 1] = UInt32(a)
+                    }
+                    cursor += 2
                 }
             }
         }
@@ -335,80 +367,167 @@ final class Skeleton3DRenderer: ObservableObject {
 
     // MARK: - Construction
 
+    /// Compute the flat edge list per material, in the order matWhite,
+    /// matCyan, matPink, matGrey. Returns the parts plus the total
+    /// index count.
+    private func buildEdgeTable() -> [PartLayout] {
+        var byMat: [Int: [(Int, Int)]] = [
+            Self.matWhite: [],
+            Self.matCyan:  [],
+            Self.matPink:  [],
+            Self.matGrey:  [],
+        ]
+
+        // ---- Body bones ----
+        for (a, b, chain) in Self.POSE_CONNECTIONS {
+            byMat[chain.materialIndex, default: []].append(
+                (Self.bodyOffset + a, Self.bodyOffset + b))
+        }
+
+        // ---- Face chains (grey) ----
+        for chain in Self.FACE_CHAINS {
+            guard chain.count >= 2 else { continue }
+            for k in 0..<(chain.count - 1) {
+                byMat[Self.matGrey, default: []].append((
+                    Self.faceOffset + chain[k],
+                    Self.faceOffset + chain[k + 1]))
+            }
+        }
+
+        // ---- Hand chains : left=cyan, right=pink ----
+        for chain in Self.HAND_CHAINS {
+            guard chain.count >= 2 else { continue }
+            for k in 0..<(chain.count - 1) {
+                byMat[Self.matCyan, default: []].append((
+                    Self.lHandOffset + chain[k],
+                    Self.lHandOffset + chain[k + 1]))
+                byMat[Self.matPink, default: []].append((
+                    Self.rHandOffset + chain[k],
+                    Self.rHandOffset + chain[k + 1]))
+            }
+        }
+
+        // ---- Anatomical connectors (white) ----
+        // body nose (0) -> face nose-bridge top (slot 27)
+        byMat[Self.matWhite, default: []].append((
+            Self.bodyOffset + 0, Self.faceOffset + 27))
+        // body left wrist (15) -> left hand wrist (idx 0)
+        byMat[Self.matWhite, default: []].append((
+            Self.bodyOffset + 15, Self.lHandOffset + 0))
+        // body right wrist (16) -> right hand wrist (idx 0)
+        byMat[Self.matWhite, default: []].append((
+            Self.bodyOffset + 16, Self.rHandOffset + 0))
+
+        var parts: [PartLayout] = []
+        var cursor = 0
+        for mat in 0..<4 {
+            let edges = byMat[mat] ?? []
+            let ic = edges.count * 2
+            parts.append(PartLayout(
+                edges: edges, indexOffset: cursor, indexCount: ic))
+            cursor += ic
+        }
+        return parts
+    }
+
     private func makePerson(pid: Int, parent: Entity) -> PersonEntities {
         let root = Entity()
         parent.addChild(root)
-
-        // Joint sphere mesh shared across joints (cheap to reuse).
-        let sphereMesh = MeshResource.generateSphere(
-            radius: Self.jointRadius)
-        let jointMat = SimpleMaterial(
-            color: .white, roughness: 0.6, isMetallic: false)
-        var joints: [ModelEntity] = []
-        joints.reserveCapacity(33)
-        for _ in 0..<33 {
-            let e = ModelEntity(mesh: sphereMesh, materials: [jointMat])
-            e.isEnabled = false
-            root.addChild(e)
-            joints.append(e)
+        if let off = pelvisOffsets[pid] {
+            root.transform.translation = off
         }
 
-        // One cylinder per bone (height=1, scaled at runtime).
-        let cylMesh = MeshResource.generateCylinder(
-            height: 1.0, radius: Self.boneRadius)
-        var bones: [ModelEntity] = []
-        bones.reserveCapacity(Self.POSE_CONNECTIONS.count)
-        for (_, _, chain) in Self.POSE_CONNECTIONS {
-            let mat = SimpleMaterial(
-                color: chain.color, roughness: 0.6, isMetallic: false)
-            let e = ModelEntity(mesh: cylMesh, materials: [mat])
-            e.isEnabled = false
-            root.addChild(e)
-            bones.append(e)
-        }
-        // Face sub-spheres (68 dlib landmarks, neutral light grey).
-        let faceMesh = MeshResource.generateSphere(
-            radius: Self.faceJointRadius)
-        let faceMat = SimpleMaterial(
-            color: NSColor(white: 0.85, alpha: 1.0),
-            roughness: 0.7, isMetallic: false)
-        var faceJoints: [ModelEntity] = []
-        faceJoints.reserveCapacity(68)
-        for _ in 0..<68 {
-            let e = ModelEntity(mesh: faceMesh, materials: [faceMat])
-            e.isEnabled = false
-            root.addChild(e)
-            faceJoints.append(e)
+        let parts = buildEdgeTable()
+        let totalIndices = parts.reduce(0) { $0 + $1.indexCount }
+
+        // Build LowLevelMesh : single position buffer (float3), line
+        // topology, 4 parts referencing 4 materials.
+        let posAttr = LowLevelMesh.Attribute(
+            semantic: .position, format: .float3, offset: 0)
+        let posLayout = LowLevelMesh.Layout(
+            bufferIndex: 0,
+            bufferStride: MemoryLayout<SIMD3<Float>>.stride)
+        let desc = LowLevelMesh.Descriptor(
+            vertexCapacity: Self.vertexCount,
+            vertexAttributes: [posAttr],
+            vertexLayouts: [posLayout],
+            indexCapacity: max(totalIndices, 2),
+            indexType: .uint32)
+
+        guard let mesh = try? LowLevelMesh(descriptor: desc) else {
+            // Fallback : empty entity, log and bail.
+            NSLog("Skeleton3DRenderer: LowLevelMesh creation FAILED pid=%d", pid)
+            let dummy = ModelEntity()
+            root.addChild(dummy)
+            return PersonEntities(
+                root: root, modelEntity: dummy,
+                mesh: try! LowLevelMesh(descriptor: desc),
+                parts: parts)
         }
 
-        // Hand sub-spheres : left=cyan, right=magenta, 21 each.
-        let handMesh = MeshResource.generateSphere(
-            radius: Self.handJointRadius)
-        let leftMat = SimpleMaterial(
-            color: .systemCyan, roughness: 0.6, isMetallic: false)
-        let rightMat = SimpleMaterial(
-            color: .systemPink, roughness: 0.6, isMetallic: false)
-        var leftHand: [ModelEntity] = []
-        var rightHand: [ModelEntity] = []
-        leftHand.reserveCapacity(21)
-        rightHand.reserveCapacity(21)
-        for _ in 0..<21 {
-            let el = ModelEntity(mesh: handMesh, materials: [leftMat])
-            el.isEnabled = false
-            root.addChild(el)
-            leftHand.append(el)
-            let er = ModelEntity(mesh: handMesh, materials: [rightMat])
-            er.isEnabled = false
-            root.addChild(er)
-            rightHand.append(er)
+        // Init vertices to zero (everything collapses at origin until
+        // the first frame arrives).
+        mesh.withUnsafeMutableBytes(bufferIndex: 0) { ptr in
+            let dst = ptr.bindMemory(to: SIMD3<Float>.self)
+            for i in 0..<min(dst.count, Self.vertexCount) {
+                dst[i] = .zero
+            }
         }
-        NSLog("Skeleton3DRenderer: spawned pid=%d (33 joints, %d bones, 68 face, 21+21 hands)",
-              pid, bones.count)
-        return PersonEntities(root: root,
-                              joints: joints,
-                              bones: bones,
-                              faceJoints: faceJoints,
-                              leftHandJoints: leftHand,
-                              rightHandJoints: rightHand)
+
+        // Bake the index buffer once. Edges are collapsed/restored at
+        // apply() time only by rewriting them in place ; the layout is
+        // fixed.
+        mesh.withUnsafeMutableIndices { ptr in
+            let dst = ptr.bindMemory(to: UInt32.self)
+            var cursor = 0
+            for part in parts {
+                for (a, _) in part.edges {
+                    // Start collapsed (a, a) — invisible until first frame.
+                    dst[cursor]     = UInt32(a)
+                    dst[cursor + 1] = UInt32(a)
+                    cursor += 2
+                }
+            }
+        }
+
+        // Configure parts (one per material). UnlitMaterial works fine
+        // with line topology and is the cheapest path.
+        let bounds = BoundingBox(min: SIMD3(-4, -4, -4),
+                                 max: SIMD3(4, 4, 4))
+        var meshParts: [LowLevelMesh.Part] = []
+        for (i, p) in parts.enumerated() {
+            meshParts.append(.init(
+                indexOffset: p.indexOffset * MemoryLayout<UInt32>.size,
+                indexCount: max(p.indexCount, 0),
+                topology: .line,
+                materialIndex: i,
+                bounds: bounds))
+        }
+        mesh.parts.replaceAll(meshParts)
+
+        // Materials per chain group.
+        let materials: [any RealityKit.Material] = [
+            UnlitMaterial(color: .white),                       // 0 trunk + connectors
+            UnlitMaterial(color: .systemTeal),                  // 1 arms + L hand
+            UnlitMaterial(color: .systemPink),                  // 2 legs + R hand
+            UnlitMaterial(color: NSColor(white: 0.85,
+                                         alpha: 1.0)),          // 3 face
+        ]
+
+        var modelEntity = ModelEntity()
+        if let resource = try? MeshResource(from: mesh) {
+            modelEntity = ModelEntity(mesh: resource,
+                                      materials: materials)
+        }
+        root.addChild(modelEntity)
+
+        NSLog("Skeleton3DRenderer: spawned pid=%d (1 fused LowLevelMesh, %d verts, %d line indices, 4 parts)",
+              pid, Self.vertexCount, totalIndices)
+
+        return PersonEntities(
+            root: root,
+            modelEntity: modelEntity,
+            mesh: mesh,
+            parts: parts)
     }
 }

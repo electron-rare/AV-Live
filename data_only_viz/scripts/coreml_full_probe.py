@@ -14,7 +14,10 @@ import torch
 import torch.nn as nn
 
 CACHE = Path.home() / ".cache" / "av-live-multihmr"
-CKPT = CACHE / "checkpoints" / "multiHMR_672_S.pt"
+_CKPT_NAME = os.environ.get("MULTIHMR_CKPT_NAME", "multiHMR_672_S.pt")
+CKPT = CACHE / "checkpoints" / _CKPT_NAME
+_OUT_NAME = os.environ.get("MULTIHMR_OUT_NAME",
+                           _CKPT_NAME.replace(".pt", ".mlpackage").lower())
 MULTIHMR_REPO = CACHE / "multi-hmr"
 
 sys.path.insert(0, str(MULTIHMR_REPO))
@@ -529,7 +532,7 @@ try:
         # teste 2026-05-14 : aucun gain sur GPU compute-bound.
         compute_precision=ct.precision.FLOAT32,
     )
-    out_path = "/tmp/multihmr_full_672_s.mlpackage"
+    out_path = f"/tmp/{_OUT_NAME}"
     mlmodel.save(out_path)
     print(f"  CONVERT OK -> {out_path}")
 except Exception as e:

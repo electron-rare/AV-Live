@@ -85,6 +85,12 @@ class MultiHMRWorker:
         backend = os.environ.get("MULTIHMR_BACKEND", "pytorch").strip().lower()
         if backend == "coreml":
             return COREML_MLPACKAGE.exists()
+        if backend == "remote":
+            try:
+                from .multihmr_remote import MultiHMRRemoteBackend
+                return MultiHMRRemoteBackend.is_available()
+            except Exception:  # noqa: BLE001
+                return False
         return CKPT.exists() and SMPLX_PATH.exists() and MULTIHMR_REPO.exists()
 
     def start(self) -> None:
@@ -97,7 +103,10 @@ class MultiHMRWorker:
 
     def _run(self) -> None:
         if self.backend == "coreml":
-            self._run_coreml()
+            self._run_coreml(remote=False)
+            return
+        if self.backend == "remote":
+            self._run_coreml(remote=True)
             return
         self._run_pytorch()
 
@@ -442,20 +451,34 @@ class MultiHMRWorker:
     # ------------------------------------------------------------------
     # CoreML backend
     # ------------------------------------------------------------------
-    def _run_coreml(self) -> None:
+    def _run_coreml(self, remote: bool = False) -> None:
         """CoreML inference path (ANE+GPU+CPU via Apple's framework).
 
         Mirrors _run_pytorch but loads the .mlpackage via pyobjc + the
         CoreML.framework, bypassing torch/MPS entirely. ~3-4x faster
-        on M5 (28.8ms median vs ~100ms with MPS)."""
+        on M5 (28.8ms median vs ~100ms with MPS).
+
+        If ``remote=True``, the local CoreML backend is swapped for a
+        TCP client (``MultiHMRRemoteBackend``) that talks to a server
+        running the same mlpackage on a faster Mac (macm1, M1 Max).
+        """
         try:
             import cv2
         except ImportError as e:
             LOG.error("opencv-python missing: %s", e)
             return
         try:
-            from .multihmr_coreml import MultiHMRCoreMLBackend
-            backend = MultiHMRCoreMLBackend(COREML_MLPACKAGE)
+            if remote:
+                from .multihmr_remote import MultiHMRRemoteBackend
+                host = os.environ.get(
+                    "MULTIHMR_REMOTE_HOST", "192.168.0.175")
+                port = int(os.environ.get(
+                    "MULTIHMR_REMOTE_PORT", "57140"))
+                backend = MultiHMRRemoteBackend(host=host, port=port)
+                LOG.info("Multi-HMR remote backend (%s:%d)", host, port)
+            else:
+                from .multihmr_coreml import MultiHMRCoreMLBackend
+                backend = MultiHMRCoreMLBackend(COREML_MLPACKAGE)
         except Exception as e:  # noqa: BLE001
             LOG.error("CoreML backend init failed: %s", e)
             return
@@ -483,8 +506,9 @@ class MultiHMRWorker:
         if not cap.start():
             LOG.error("AVCapture start failed pour %s", info["name"])
             return
-        LOG.info("camera ouverte %s (%s) [coreml backend]",
-                 info["name"], info["type"])
+        LOG.info("camera ouverte %s (%s) [%s backend]",
+                 info["name"], info["type"],
+                 "remote" if remote else "coreml")
 
         frame_count = 0
         persons_count = 0
@@ -536,10 +560,23 @@ class MultiHMRWorker:
                 time.sleep(self.period)
                 continue
 
+            # Async remote backend may return None when no fresh result
+            # is ready yet — reuse the previous frame's humans so the
+            # visualiser keeps drawing instead of clearing.
+            if humans is None:
+                humans = getattr(self, "_last_humans", []) or []
+                reused_humans = True
+            else:
+                self._last_humans = humans
+                reused_humans = False
+
             t_post_start = time.monotonic()
             t_now = time.monotonic()
             frame_count += 1
             persons_count += len(humans) if humans else 0
+            if reused_humans:
+                LOG.debug("hb[remote]: reusing %d cached humans "
+                          "(no fresh result)", len(humans))
             if t_now >= next_heartbeat:
                 fps = frame_count / 5.0
                 avg = persons_count / max(1, frame_count)

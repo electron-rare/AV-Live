@@ -45,8 +45,9 @@ class SMPLXTCPSender:
     def __init__(self, state: State, host: str = "127.0.0.1",
                  port: int = PORT, target_fps: float = 30.0,
                  enable_rigging: bool = True) -> None:
+        import os as _os
         self.state = state
-        self.host = host
+        self.host = _os.environ.get("AVBODY_HOST", host)
         self.port = port
         self.period = 1.0 / max(1.0, target_fps)
         self._stop = threading.Event()
