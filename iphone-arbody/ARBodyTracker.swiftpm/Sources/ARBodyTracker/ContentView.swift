@@ -9,13 +9,26 @@ struct ContentView: View {
     @State private var swiftPort: String = "57129"    // -> AVLiveBody ArkitOSCListener (diagnostic)
     @State private var sendEnvMesh: Bool = false
 
+    /// Replace the live ARView with a gradient placeholder. Camera is
+    /// unavailable inside Xcode previews; enable this flag there so the
+    /// panel + skeleton overlay can still be laid out.
+    var useMockBackground: Bool = false
+    /// Overlay a synthetic ARKit T-pose so the skeleton renderer can be
+    /// tuned without running on a device.
+    var useMockSkeleton: Bool = false
+
     var body: some View {
         GeometryReader { geo in
             ZStack(alignment: .topLeading) {
-                ARViewContainer(session: session)
+                cameraBackground
                     .ignoresSafeArea()
-                SkeletonOverlay(snapshot: session.skeleton2D,
-                                parents: session.bodyParentIndices)
+                SkeletonOverlay(
+                    snapshot: useMockSkeleton
+                        ? SkeletonSnapshot.mockTPose(in: geo.size)
+                        : session.skeleton2D,
+                    parents: useMockSkeleton
+                        ? SkeletonSnapshot.mockParents
+                        : session.bodyParentIndices)
                     .ignoresSafeArea()
                     .allowsHitTesting(false)
                 controlPanel
@@ -24,6 +37,27 @@ struct ContentView: View {
             .onChange(of: geo.size) { _, newSize in
                 session.viewportSize = newSize
             }
+        }
+    }
+
+    @ViewBuilder
+    private var cameraBackground: some View {
+        if useMockBackground {
+            ZStack {
+                LinearGradient(
+                    colors: [
+                        Color(red: 0.18, green: 0.20, blue: 0.24),
+                        Color(red: 0.05, green: 0.05, blue: 0.08),
+                    ],
+                    startPoint: .top,
+                    endPoint: .bottom)
+                Text("camera preview\n(unavailable in Xcode canvas)")
+                    .font(.caption)
+                    .multilineTextAlignment(.center)
+                    .foregroundStyle(.white.opacity(0.35))
+            }
+        } else {
+            ARViewContainer(session: session)
         }
     }
 
@@ -86,6 +120,65 @@ struct ContentView: View {
     }
 }
 
+extension SkeletonSnapshot {
+    /// Parent indices for the 16-joint preview stick figure. Each entry
+    /// is the parent joint index, or -1 for the root (head).
+    static let mockParents: [Int] = [
+        -1,  // 0 head
+         0,  // 1 neck
+         1,  // 2 lShoulder
+         1,  // 3 rShoulder
+         2,  // 4 lElbow
+         3,  // 5 rElbow
+         4,  // 6 lWrist
+         5,  // 7 rWrist
+         1,  // 8 spine
+         8,  // 9 pelvis
+         9,  // 10 lHip
+         9,  // 11 rHip
+        10,  // 12 lKnee
+        11,  // 13 rKnee
+        12,  // 14 lAnkle
+        13,  // 15 rAnkle
+    ]
+
+    /// Synthetic 16-joint stick figure used by Xcode previews. ARKit
+    /// is not available in the preview canvas, so we cannot rely on
+    /// `ARSkeletonDefinition.neutralBodySkeleton3D` (returns nil).
+    static func mockTPose(in size: CGSize) -> SkeletonSnapshot {
+        // Normalized layout: origin at body center, +y down, ±1 spans
+        // roughly the full body height.
+        let layout: [CGPoint] = [
+            CGPoint(x:  0.00, y: -0.45),
+            CGPoint(x:  0.00, y: -0.32),
+            CGPoint(x: -0.18, y: -0.30),
+            CGPoint(x:  0.18, y: -0.30),
+            CGPoint(x: -0.30, y: -0.12),
+            CGPoint(x:  0.30, y: -0.12),
+            CGPoint(x: -0.36, y:  0.08),
+            CGPoint(x:  0.36, y:  0.08),
+            CGPoint(x:  0.00, y: -0.10),
+            CGPoint(x:  0.00, y:  0.06),
+            CGPoint(x: -0.10, y:  0.09),
+            CGPoint(x:  0.10, y:  0.09),
+            CGPoint(x: -0.12, y:  0.30),
+            CGPoint(x:  0.12, y:  0.30),
+            CGPoint(x: -0.13, y:  0.46),
+            CGPoint(x:  0.13, y:  0.46),
+        ]
+        let scale = min(size.width * 0.9, size.height * 0.8)
+        let cx = size.width * 0.5
+        let cy = size.height * 0.5
+        let pts: [CGPoint?] = layout.map {
+            CGPoint(x: cx + $0.x * scale,
+                    y: cy + $0.y * scale)
+        }
+        return SkeletonSnapshot(
+            points: pts,
+            tracked: Array(repeating: true, count: pts.count))
+    }
+}
+
 /// Draws ARKit body joints + bones over the camera view. Bones are
 /// derived from `ARSkeletonDefinition.defaultBody3D` parent indices.
 struct SkeletonOverlay: View {
@@ -119,4 +212,16 @@ struct SkeletonOverlay: View {
             }
         }
     }
+}
+
+#Preview("iPhone 15 Pro — portrait") {
+    ContentView(useMockBackground: true, useMockSkeleton: true)
+}
+
+#Preview("iPhone 15 Pro — landscape", traits: .landscapeLeft) {
+    ContentView(useMockBackground: true, useMockSkeleton: true)
+}
+
+#Preview("Empty camera (no body)") {
+    ContentView(useMockBackground: true, useMockSkeleton: false)
 }

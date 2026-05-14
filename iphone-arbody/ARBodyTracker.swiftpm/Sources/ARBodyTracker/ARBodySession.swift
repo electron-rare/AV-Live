@@ -13,12 +13,27 @@ import SwiftUI
 /// LiDAR (sceneDepth + scene reconstruction mesh) is enabled when the
 /// device supports it (iPhone Pro / Pro Max). RGB-only fallback on
 /// non-LiDAR devices.
+/// Lightweight 2D snapshot of the tracked skeleton, ready for SwiftUI
+/// Canvas. Joint indices follow `ARSkeletonDefinition.defaultBody3D`.
+struct SkeletonSnapshot: Equatable {
+    /// Projected joint positions in viewport coordinates, or nil if the
+    /// joint falls outside the view / is not finite.
+    let points: [CGPoint?]
+    /// Per-joint tracking flag (`ARSkeleton.isJointTracked`).
+    let tracked: [Bool]
+}
+
 @MainActor
 final class ARBodySession: NSObject, ObservableObject, ARSessionDelegate {
     @Published var running: Bool = false
     @Published var status: String = "idle"
     @Published var framesSent: Int = 0
     @Published var jointsPerSec: Double = 0
+    @Published var bodyCount: Int = 0
+    @Published var skeleton2D: SkeletonSnapshot?
+    /// Set by the SwiftUI view via GeometryReader so the projection
+    /// matches the on-screen ARView size.
+    var viewportSize: CGSize = .zero
     private var host: String = "192.168.0.159"
     private var pythonPort: UInt16 = 57128
     private var swiftPort: UInt16 = 57129
@@ -28,6 +43,8 @@ final class ARBodySession: NSObject, ObservableObject, ARSessionDelegate {
     private var lastFrameTime: TimeInterval = 0
     private var jointsInSecond: Int = 0
     private var lastSecond: TimeInterval = 0
+    private let bodyParents: [Int] =
+        ARSkeletonDefinition.defaultBody3D.parentIndices
 
     let arView = ARView(frame: .zero)
 
@@ -54,10 +71,10 @@ final class ARBodySession: NSObject, ObservableObject, ARSessionDelegate {
         }
         let cfg = ARBodyTrackingConfiguration()
         var feats: [String] = []
-        if ARWorldTrackingConfiguration.supportsFrameSemantics(.sceneDepth) {
-            cfg.frameSemantics.insert(.sceneDepth)
-            feats.append("LiDAR depth")
-        }
+        // No extra frame semantics: `.sceneDepth` is reserved to
+        // ARWorldTracking, and `.personSegmentationWithDepth` is
+        // rejected per-frame by ABPKPersonIDTracker in this config
+        // (spams the console without producing usable depth).
         // NOTE: ARBodyTrackingConfiguration does not expose
         // sceneReconstruction (that's ARWorldTrackingConfiguration
         // territory). Env mesh capture requires a separate ARSession
@@ -111,18 +128,22 @@ final class ARBodySession: NSObject, ObservableObject, ARSessionDelegate {
             if t - self.lastFrameTime < 1.0 / 30.0 { return }
             self.lastFrameTime = t
 
-            var bodyCount: Int = 0
+            var count: Int = 0
+            var firstBody: ARBodyAnchor?
             for anchor in frame.anchors {
                 guard let body = anchor as? ARBodyAnchor else { continue }
-                self.publishJoints(pid: bodyCount, body: body)
-                bodyCount += 1
+                self.publishJoints(pid: count, body: body)
+                if count == 0 { firstBody = body }
+                count += 1
             }
             self.sendOSC(addr: "/body3d/count",
-                         args: [.int32(Int32(bodyCount))])
+                         args: [.int32(Int32(count))])
             self.framesSent &+= 1
+            self.bodyCount = count
+            self.updateSkeleton2D(body: firstBody, camera: frame.camera)
 
             let now = Date().timeIntervalSinceReferenceDate
-            self.jointsInSecond &+= bodyCount * 91
+            self.jointsInSecond &+= count * 91
             if now - self.lastSecond >= 1.0 {
                 self.jointsPerSec = Double(self.jointsInSecond)
                     / max(0.001, now - self.lastSecond)
@@ -131,6 +152,44 @@ final class ARBodySession: NSObject, ObservableObject, ARSessionDelegate {
             }
         }
     }
+
+    private func currentInterfaceOrientation() -> UIInterfaceOrientation {
+        for scene in UIApplication.shared.connectedScenes {
+            if let ws = scene as? UIWindowScene {
+                return ws.interfaceOrientation
+            }
+        }
+        return .portrait
+    }
+
+    private func updateSkeleton2D(body: ARBodyAnchor?, camera: ARCamera) {
+        guard let body, viewportSize.width > 1, viewportSize.height > 1
+        else {
+            if skeleton2D != nil { skeleton2D = nil }
+            return
+        }
+        let xforms = body.skeleton.jointModelTransforms
+        let root = body.transform
+        let orient = currentInterfaceOrientation()
+        var pts: [CGPoint?] = Array(repeating: nil, count: xforms.count)
+        var tracked: [Bool] = Array(repeating: false, count: xforms.count)
+        for (i, m) in xforms.enumerated() {
+            let w = root * m
+            let p3 = simd_make_float3(w.columns.3.x,
+                                      w.columns.3.y,
+                                      w.columns.3.z)
+            let p2 = camera.projectPoint(p3,
+                                         orientation: orient,
+                                         viewportSize: viewportSize)
+            if p2.x.isFinite && p2.y.isFinite { pts[i] = p2 }
+            tracked[i] = body.skeleton.isJointTracked(i)
+        }
+        skeleton2D = SkeletonSnapshot(points: pts, tracked: tracked)
+    }
+
+    /// Exposed for SwiftUI overlays that need to wire bone parent
+    /// indices without re-reading the ARKit skeleton definition.
+    var bodyParentIndices: [Int] { bodyParents }
 
     private func publishJoints(pid: Int, body: ARBodyAnchor) {
         let skeleton = body.skeleton
