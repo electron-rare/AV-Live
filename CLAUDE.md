@@ -1,6 +1,6 @@
 # AV-Live
 
-Live coding audio-visual performance system : moteur SuperCollider, visualiseur openFrameworks piloté par un oscilloscope Hantek 6022BL, app menubar macOS qui orchestre le tout.
+Live coding audio-visual performance system : moteur SuperCollider, visualiseur openFrameworks piloté par un oscilloscope Hantek 6022BL, app menubar macOS qui orchestre le tout. **RC0.1+ (tag `v0.1.0-rc1`)** ajoute le pipeline Multi-HMR distribué M5 ↔ macm1 sur LAN gigabit + 10 scènes Metal pose-réactives + unified 3D armature wireframe (body+face+hands).
 
 ## Communication
 
@@ -26,6 +26,27 @@ Toujours répondre en français à l'utilisateur. Code, commentaires de code, co
 | Détection pose / mesh / body tracking | `data_only_viz/` |
 | Bridge web / UI de live coding | `web_realart/` |
 | Plans / specs en cours | `docs/superpowers/plans/` |
+| Multi-HMR remote server pyobjc | `data_only_viz/scripts/multihmr_server.py` (tourne sur macm1) |
+| Mesh dense rigger 27 fps perçu | `data_only_viz/mesh_rigger.py` |
+| 3D wireframe armature (body+face+hands) | `launcher/AV-Live-Body/Sources/AVLiveBody/Skeleton3DRenderer.swift` |
+| Pose → Metal scenes uniforms | `launcher/AV-Live-Body/Sources/AVLiveBody/BodyView.swift` + `Resources/scene.metal` |
+| Filter chain (median + Kalman + lookahead + IK) | `data_only_viz/pose_filter.py` |
+| DINO re-id pid matching | `data_only_viz/dino_reid.py` |
+
+## RC0.1+ environment variables
+
+| Env | Default | Effect |
+|-----|---------|--------|
+| `MULTIHMR_BACKEND` | `pytorch` | `pytorch`, `coreml`, `remote` |
+| `MULTIHMR_REMOTE_HOST` | `127.0.0.1` | macm1 IP for remote inference |
+| `MULTIHMR_REMOTE_JPEG` | `1` | JPEG q=80 on the wire |
+| `MULTIHMR_REMOTE_ASYNC` | `1` | client double-buffer queue |
+| `MULTIHMR_SERVER_BACKEND` | `pyobjc` | server: `pyobjc` or `coremltools` |
+| `MULTIHMR_LOOP_FPS` | `30` | Python worker loop target_fps |
+| `AVBODY_HOST` | `127.0.0.1` | route TCP mesh + OSC to remote AVLiveBody |
+| `MEDIAPIPE_DELEGATE` | `cpu` | `gpu` Metal SRGBA (faster, flake on M5) |
+| `POSE_FILTER` | `median+kalman+lookahead+ik` | filter chain stages |
+| `MULTIHMR_REID` | `dino` | DINO cosine matching, `iou` fallback |
 
 ## Conventions globales
 
