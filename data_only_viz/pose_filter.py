@@ -18,13 +18,18 @@ from collections import deque
 from dataclasses import dataclass, field
 from typing import Iterable
 
+from .arkit_joint_map import ARKIT91_TO_MP33
+from .euro_filter import OneEuroFilter, SkeletonFilter
 from .state import Kp3D, State
 
 LOG = logging.getLogger("pose_filter")
 
 NUM_JOINTS = 33
 DEFAULT_STAGES = ("median", "kalman", "lookahead", "ik")
-ALL_STAGES = ("median", "kalman", "spring", "lookahead", "ik")
+ALL_STAGES = (
+    "median", "kalman", "spring", "lookahead", "ik",
+    "one_euro_joints", "one_euro_bones", "arkit_fuse",
+)
 
 # MediaPipe POSE_LANDMARKS indices used by IK constraints.
 L_SHOULDER, R_SHOULDER = 11, 12
@@ -478,13 +483,23 @@ class PoseFilterChain:
         self.spring = SpringDamper(enabled="spring" in self.enabled)
         self.lookahead = LookaheadPredictor()
         self.ik = IKConstraints()
+        # One Euro filters (CHI 2012) — adaptive low-pass driven by speed.
+        # Joints variant: applied in joint-space, per (pid, joint_idx).
+        # Bones variant: applied to bone vectors (child - parent) along
+        # the MediaPipe Pose 33 subset that overlaps SMPL-X fused joints.
+        self.one_euro_joints = SkeletonFilter(min_cutoff=1.2, beta=0.08)
+        self.one_euro_bones = BoneOneEuroFilter(min_cutoff=1.0, beta=0.05)
+        self.arkit_fuse = ArkitFuse()
         self.last_apply_ms: float = 0.0
+        self.last_apply_bones_ms: float = 0.0
         LOG.info("PoseFilterChain stages=%s", self.enabled or ("off",))
 
     def reset(self) -> None:
         self.median.reset()
         self.kalman.reset()
         self.spring.reset()
+        self.one_euro_joints.reset_all()
+        self.one_euro_bones.reset_all()
 
     def apply(self, bodies3d: list[list[Kp3D]], ids: list[int],
               t_now: float) -> list[list[Kp3D]]:
@@ -498,14 +513,21 @@ class PoseFilterChain:
         use_spring = "spring" in self.enabled
         use_lookahead = "lookahead" in self.enabled
         use_ik = "ik" in self.enabled
+        use_one_euro_joints = "one_euro_joints" in self.enabled
+        use_arkit_fuse = "arkit_fuse" in self.enabled
 
         for body_i, kps in enumerate(bodies3d):
             pid = ids[body_i] if body_i < len(ids) else -1
+            if use_arkit_fuse and self.state is not None:
+                kps = self.arkit_fuse.apply(self.state, pid, kps, t_now)
             new_kps: list[Kp3D] = []
             for j_idx, kp in enumerate(kps):
                 x, y, z, c = kp.x, kp.y, kp.z, kp.c
                 if use_median:
                     x, y, z = self.median.apply(pid, j_idx, x, y, z)
+                if use_one_euro_joints:
+                    x, y, z = self.one_euro_joints.smooth(
+                        pid, j_idx, x, y, z, t_now)
                 if use_kalman:
                     x, y, z = self.kalman.step(pid, j_idx, x, y, z, t_now)
                 if use_spring:
@@ -534,6 +556,150 @@ class PoseFilterChain:
         if not hasattr(self, "_hand_chain"):
             self._hand_chain = HandFilterChain()
         return self._hand_chain.apply(hands, ids, handedness, t_now)
+
+    # ---- Bone-space One Euro (Point B) --------------------------------
+    def apply_bones(self, bodies3d: list[list[Kp3D]], ids: list[int],
+                    t_now: float) -> list[list[Kp3D]]:
+        """Filter bone vectors (child - parent) for the body skeleton.
+
+        Called *after* SMPL-X fusion in multi.py. No-op unless
+        ``one_euro_bones`` is in POSE_FILTER. Mutates the child slot
+        of each bone in-place — parents are walked in topological
+        order (root → leaves) so children always see updated parents.
+        """
+        if not bodies3d or "one_euro_bones" not in self.enabled:
+            self.last_apply_bones_ms = 0.0
+            return bodies3d
+        t0 = time.perf_counter()
+        for body_i, kps in enumerate(bodies3d):
+            pid = ids[body_i] if body_i < len(ids) else -1
+            self.one_euro_bones.apply_body(pid, kps, t_now)
+        self.last_apply_bones_ms = (time.perf_counter() - t0) * 1000.0
+        return bodies3d
+
+    def forget_person(self, pid: int) -> None:
+        """Drop per-pid state on track loss (caller responsibility)."""
+        try:
+            self.one_euro_joints.forget(pid)
+            self.one_euro_bones.forget(pid)
+        except Exception:  # noqa: BLE001
+            pass
+
+
+# ============================ bone One Euro ===============================
+
+# Body skeleton bones expressed as (parent_idx, child_idx) over the
+# MediaPipe Pose 33 indexing — chosen to overlap with the 14
+# SMPL-X-fused slots (cf. multi.py SMPLX_TO_MP33). Topological order:
+# legs first, then arms, then bridges (clavicle, pelvis), then torso.
+BODY_BONES: tuple[tuple[int, int], ...] = (
+    (L_HIP, L_KNEE),         # 23 -> 25
+    (L_KNEE, L_ANKLE),       # 25 -> 27
+    (L_ANKLE, L_FOOT),       # 27 -> 31
+    (R_HIP, R_KNEE),         # 24 -> 26
+    (R_KNEE, R_ANKLE),       # 26 -> 28
+    (R_ANKLE, R_FOOT),       # 28 -> 32
+    (L_SHOULDER, L_ELBOW),   # 11 -> 13
+    (L_ELBOW, L_WRIST),      # 13 -> 15
+    (R_SHOULDER, R_ELBOW),   # 12 -> 14
+    (R_ELBOW, R_WRIST),      # 14 -> 16
+    (L_SHOULDER, R_SHOULDER),  # clavicle bridge
+    (L_HIP, R_HIP),          # pelvis bridge
+    (L_SHOULDER, L_HIP),     # left torso
+    (R_SHOULDER, R_HIP),     # right torso
+)
+
+
+class BoneOneEuroFilter:
+    """One Euro filter applied to bone vectors of the body skeleton.
+
+    For each bone (parent, child), the vector ``child - parent`` is
+    smoothed component-wise. Child position is then reconstructed as
+    ``parent + smoothed_bone``. This preserves bone *direction*
+    stability frame-to-frame while remaining responsive to genuine
+    pose changes (One Euro adaptive cutoff).
+
+    State is keyed by ``(pid, bone_idx)`` and lives in three
+    OneEuroFilter instances per bone (one per axis).
+    """
+
+    def __init__(self, min_cutoff: float = 1.0, beta: float = 0.05) -> None:
+        self._min_cutoff = min_cutoff
+        self._beta = beta
+        # (pid, bone_idx) -> (fx, fy, fz)
+        self._table: dict[tuple[int, int], tuple[
+            OneEuroFilter, OneEuroFilter, OneEuroFilter]] = {}
+
+    def _filters_for(self, pid: int, bone_idx: int) -> tuple[
+            OneEuroFilter, OneEuroFilter, OneEuroFilter]:
+        key = (pid, bone_idx)
+        f = self._table.get(key)
+        if f is None:
+            f = (
+                OneEuroFilter(self._min_cutoff, self._beta),
+                OneEuroFilter(self._min_cutoff, self._beta),
+                OneEuroFilter(self._min_cutoff, self._beta),
+            )
+            self._table[key] = f
+        return f
+
+    def apply_body(self, pid: int, kps: list[Kp3D], t: float) -> None:
+        n = len(kps)
+        for bone_idx, (p_idx, c_idx) in enumerate(BODY_BONES):
+            if p_idx >= n or c_idx >= n:
+                continue
+            p = kps[p_idx]
+            c = kps[c_idx]
+            if not (_kp_finite(p) and _kp_finite(c)):
+                continue
+            dx = c.x - p.x
+            dy = c.y - p.y
+            dz = c.z - p.z
+            fx, fy, fz = self._filters_for(pid, bone_idx)
+            sx = fx(dx, t)
+            sy = fy(dy, t)
+            sz = fz(dz, t)
+            kps[c_idx] = Kp3D(
+                x=p.x + sx, y=p.y + sy, z=p.z + sz, c=c.c)
+
+    def forget(self, pid: int) -> None:
+        self._table = {k: v for k, v in self._table.items() if k[0] != pid}
+
+    def reset_all(self) -> None:
+        self._table.clear()
+
+
+class ArkitFuse:
+    """Splice ARKit 91-joint world-space data into MediaPipe Pose 33.
+
+    Reads ``state.persons_arkit_joints[pid]`` (shape (91, 3)) when fresh
+    (last_t within FRESH_SEC). Writes the 14 body slots covered by
+    ARKIT91_TO_MP33 ; everything else (face landmarks, finger tips)
+    stays MediaPipe-driven.
+    """
+
+    FRESH_SEC: float = 1.0
+
+    def apply(self, state: "State", pid: int,
+              kps: list[Kp3D], t_now: float) -> list[Kp3D]:
+        with state.lock():
+            arr = state.persons_arkit_joints.get(pid)
+            last_t = state.persons_arkit_last_t.get(pid, 0.0)
+        if arr is None:
+            return kps
+        if t_now - last_t > self.FRESH_SEC:
+            return kps
+        out = list(kps)
+        n = len(out)
+        for arkit_idx, mp33_idx in ARKIT91_TO_MP33:
+            if mp33_idx >= n:
+                continue
+            x = float(arr[arkit_idx, 0])
+            y = float(arr[arkit_idx, 1])
+            z = float(arr[arkit_idx, 2])
+            old = out[mp33_idx]
+            out[mp33_idx] = Kp3D(x=x, y=y, z=z, c=getattr(old, "c", 1.0))
+        return out
 
 
 # ============================ face / hand =================================
