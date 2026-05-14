@@ -53,3 +53,10 @@ sound_algo/*.log
 .vscode/
 *.swp
 *~
+
+# tool session state (claude-mem / remember skill)
+.remember/
+
+# macOS / iCloud collision artifacts (auto-created on rename)
+*\ 2
+*\ 2.*

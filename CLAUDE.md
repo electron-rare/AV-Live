@@ -27,6 +27,16 @@ Toujours répondre en français à l'utilisateur. Code, commentaires de code, co
 | Bridge web / UI de live coding | `web_realart/` |
 | Plans / specs en cours | `docs/superpowers/plans/` |
 
+## Network topology
+
+| Host | mDNS | IP (DHCP) | Role |
+|------|------|-----------|------|
+| GrosMac M5 | `grosmac.local` | LAN | Source + visualisation (AVLiveBody + data_only_viz + data_feeds) |
+| macm1 M1 Max | `supra-m1.local` | `192.168.0.175` | Sink (Multi-HMR CoreML + Apple Vision ANE + SMPL-X TCP) |
+| iPhone 16 Pro | (Personal Hotspot) | DHCP | ARKit/LiDAR pub via OSC `/body3d/kp` |
+
+`AVBODY_HOST` / `MULTIHMR_REMOTE_HOST` accept mDNS hostnames — résiste aux changements DHCP (notamment iPhone hotspot 172.20.10.x).
+
 ## Environment variables
 
 | Env | Default | Effect |
