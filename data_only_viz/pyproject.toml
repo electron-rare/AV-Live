@@ -38,6 +38,11 @@ detrpose = [
     "iopath>=0.1.10",
     "opencv-python>=4.10",
 ]
+# Open3D for ICP fusion between iPhone LiDAR and Multi-HMR SMPL-X meshes.
+# CPU-only is sufficient at 5-10 Hz LiDAR cadence.
+lidar = [
+    "open3d>=0.18,<0.20",
+]
 nlf = [
     "torch>=2.4",
     "torchvision>=0.19",
