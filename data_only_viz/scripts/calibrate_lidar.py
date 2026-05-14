@@ -61,11 +61,17 @@ def main(argv: list[str] | None = None) -> int:
     reader = LidarTCPReader(host=args.lidar_host, port=args.lidar_port)
     reader.start()
 
-    # NB: the actual Multi-HMR getter is wired in Task 9 when the main pipeline
-    # exposes a single-shot predictor. For now this script is the *scaffolding*
-    # — Task 9 plugs in `multi_hmr_worker.predict_once()`.
+    # Task 9 added the ``MultiHMRWorker.predict_once`` API surface but
+    # left the body as ``NotImplementedError`` — the existing PyTorch
+    # path is too coupled to the worker thread for a clean extraction.
+    # When ``predict_once`` is wired (follow-up task), replace this
+    # placeholder by opening cv2.VideoCapture(args.webcam_index),
+    # running ``worker.predict_once(rgb)`` and returning
+    # ``person.vertices_3d[_PELVIS_VERT_INDEX]``.
     def _placeholder_pelvis_cam() -> np.ndarray:
-        raise SystemExit("calibrate_lidar requires Task 9 to be complete (predict_once API)")
+        raise SystemExit(
+            "calibrate_lidar needs MultiHMRWorker.predict_once to be "
+            "implemented (currently NotImplementedError)")
 
     pairs_cam, pairs_arkit = [], []
     try:

@@ -116,6 +116,20 @@ class MultiHMRWorker:
     def stop(self) -> None:
         self._stop.set()
 
+    def predict_once(self, rgb_image):
+        """Single-shot SMPL-X prediction on one RGB image.
+
+        Used by calibrate_lidar.py to acquire a pelvis vertex without
+        spinning the worker thread. The current PyTorch path is
+        deeply coupled to the run loop (model lifecycle, camera, MPS
+        setup) so this is left as a stub — calibrate_lidar.py keeps
+        its placeholder until a follow-up refactor extracts a pure
+        ``_infer(rgb) -> humans`` helper.
+        """
+        raise NotImplementedError(
+            "MultiHMRWorker.predict_once is not wired yet — see "
+            "scripts/calibrate_lidar.py for the placeholder it gates")
+
     def _run(self) -> None:
         if self.backend == "coreml":
             self._run_coreml()

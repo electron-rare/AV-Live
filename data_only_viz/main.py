@@ -260,6 +260,29 @@ class AppDelegate(NSObject):
             LOG.info("worker: + iPhone OSC listener :57128")
         except Exception as e:  # noqa: BLE001
             LOG.warning("iphone OSC listener start failed (%s)", e)
+        # ICP LiDAR fusion (opt-in via ICP_FUSION=1). Parallel to the
+        # ARKit pelvis fuse: ICP operates on SMPL-X dense vertices, not
+        # joints. Requires a calibrated extrinsic on disk (see
+        # scripts/calibrate_lidar.py) and an iPhone LiDAR stream
+        # broadcasting on ICP_LIDAR_HOST:ICP_LIDAR_PORT.
+        if _os.environ.get("ICP_FUSION", "0") == "1":
+            host = _os.environ.get("ICP_LIDAR_HOST")
+            if not host:
+                LOG.warning("ICP_FUSION=1 but ICP_LIDAR_HOST unset — "
+                            "fusion disabled")
+            else:
+                try:
+                    from .icp_fusion_worker import IcpFusionThread
+                    self._icp_fusion = IcpFusionThread(
+                        self._state,
+                        host=host,
+                        port=int(_os.environ.get("ICP_LIDAR_PORT", "5500")),
+                    )
+                    self._icp_fusion.start()
+                    LOG.info("worker: + ICP LiDAR fusion -> %s:%s", host,
+                             _os.environ.get("ICP_LIDAR_PORT", "5500"))
+                except Exception as e:  # noqa: BLE001
+                    LOG.warning("icp fusion start failed (%s)", e)
         # 0. Multi-HMR (SMPL-X 10475 verts mesh dense) — opt-in via flag
         if getattr(self._opts, "multi_hmr", False):
             try:
@@ -596,6 +619,12 @@ class AppDelegate(NSObject):
         self._listener.stop()
         if self._pose_worker is not None:
             self._pose_worker.stop()
+        icp = getattr(self, "_icp_fusion", None)
+        if icp is not None:
+            try:
+                icp.stop()
+            except Exception as e:  # noqa: BLE001
+                LOG.warning("icp fusion stop failed (%s)", e)
         LOG.info("bye")
 
 
