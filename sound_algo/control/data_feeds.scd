@@ -266,6 +266,172 @@
 };
 
 // =====================================================================
+//  VELIB Paris  -- flux velos partages
+// =====================================================================
+~feedDefPriv.(\d_velib_total, '/data/velib/total', { |msg|
+    ~feedSet.(\velib_bikes,   msg[1]);
+    ~feedSet.(\velib_docks,   msg[2]);
+    ~feedSet.(\velib_stations,msg[3]);
+});
+~feedDefPriv.(\d_velib_flow, '/data/velib/flow', { |msg|
+    ~feedSet.(\velib_flow_min, msg[1]);  // bikes/min, signe
+});
+~feedDefPriv.(\d_velib_density, '/data/velib/density', { |msg|
+    ~feedSet.(\velib_density, msg[1]);   // 0..1
+});
+~feedDefPriv.(\d_velib_hot, '/data/velib/hotspot', { |msg|
+    ~feedSet.(\velib_hotspot, [msg[1], msg[2], msg[3], msg[4]]);
+});
+
+// =====================================================================
+//  SYTADIN  -- trafic perimetre Ile-de-France
+// =====================================================================
+~feedDefPriv.(\d_syt_flow, '/data/sytadin/flow', { |msg|
+    ~feedSet.(\syt_flow_avg, msg[1]);
+    ~feedSet.(\syt_flow_max, msg[2]);
+});
+~feedDefPriv.(\d_syt_speed, '/data/sytadin/speed', { |msg|
+    ~feedSet.(\syt_speed_avg, msg[1]);
+    ~feedSet.(\syt_speed_min, msg[2]);  // capteur le plus lent
+});
+~feedDefPriv.(\d_syt_occ, '/data/sytadin/occupancy', { |msg|
+    ~feedSet.(\syt_occ_avg, msg[1]);
+    ~feedSet.(\syt_occ_max, msg[2]);
+});
+~feedDefPriv.(\d_syt_jam, '/data/sytadin/jam', { |msg|
+    ~feedSet.(\syt_jam_count, msg[1]);
+});
+
+// =====================================================================
+//  HUB'EAU  -- rivieres france (hydrometrie)
+// =====================================================================
+~feedDefPriv.(\d_river_lvl, '/data/rivers/level', { |msg|
+    var sid = msg[1], h = msg[2], q = msg[3];
+    var all = ~feeds[\river_stations] ? IdentityDictionary.new;
+    all[sid.asSymbol] = (h: h, q: q);
+    ~feedSet.(\river_stations, all);
+});
+~feedDefPriv.(\d_river_avg, '/data/rivers/avg', { |msg|
+    ~feedSet.(\river_avg_h, msg[1]);
+    ~feedSet.(\river_avg_q, msg[2]);
+});
+~feedDefPriv.(\d_river_alert, '/data/rivers/alert', { |msg|
+    ~feedSet.(\river_alert, [msg[1], msg[2]]);
+    ("*** RIVER ALERT " ++ msg[1] ++ " severity " ++ msg[2] ++ " ***").postln;
+});
+
+// =====================================================================
+//  IDFM / PRIM  -- disruptions metro/RER
+// =====================================================================
+~feedDefPriv.(\d_idfm_disrn, '/data/idfm/disruption_n', { |msg|
+    ~feedSet.(\idfm_disruption_n, msg[1]);
+});
+~feedDefPriv.(\d_idfm_disr, '/data/idfm/disruption', { |msg|
+    ~feedSet.(\idfm_last_disruption, [msg[1], msg[2]]);
+    if(msg[2] >= 2) {
+        ("[idfm] disruption line=" ++ msg[1] ++ " sev=" ++ msg[2]).postln;
+    };
+});
+
+// =====================================================================
+//  AIS  -- bateaux temps reel monde
+// =====================================================================
+~feedDefPriv.(\d_ais_ship, '/data/ais/ship', { |msg|
+    var mmsi = msg[1], lat = msg[2], lon = msg[3], sog = msg[4], cog = msg[5];
+    ~feedSet.(\ais_last_ship, [mmsi, lat, lon, sog, cog]);
+});
+~feedDefPriv.(\d_ais_cargo, '/data/ais/cargo', { |msg|
+    ~feedSet.(\ais_last_cargo, [msg[1], msg[2], msg[3], msg[4]]);
+});
+~feedDefPriv.(\d_ais_count, '/data/ais/count', { |msg|
+    ~feedSet.(\ais_count, msg[1]);
+});
+~feedDefPriv.(\d_ais_rate, '/data/ais/rate', { |msg|
+    ~feedSet.(\ais_rate, msg[1]);
+});
+
+// =====================================================================
+//  GBFS multi-villes  -- velos partages FR + BE
+// =====================================================================
+~feedDefPriv.(\d_gbfs_sum_fr, '/data/gbfs/sum/bikes_fr', { |msg|
+    ~feedSet.(\gbfs_sum_fr, msg[1]);
+});
+~feedDefPriv.(\d_gbfs_sum_be, '/data/gbfs/sum/bikes_be', { |msg|
+    ~feedSet.(\gbfs_sum_be, msg[1]);
+});
+~feedDefPriv.(\d_gbfs_sum_cities, '/data/gbfs/sum/cities', { |msg|
+    ~feedSet.(\gbfs_cities_ok, msg[1]);
+});
+// Per-ville : 10 OSCdef explicites (SC ne supporte pas wildcard natif).
+~gbfsCities = [\lyon, \bordeaux, \lille, \toulouse, \nantes,
+    \strasbourg, \rennes, \nancy, \bruxelles, \anvers];
+~gbfsCities.do { |city|
+    [\bikes, \docks, \density].do { |sub|
+        var path = "/data/gbfs/" ++ city.asString ++ "/" ++ sub.asString;
+        var key  = (\gbfs_ ++ city ++ "_" ++ sub).asSymbol;
+        var defKey = (\d_gbfs_ ++ city ++ "_" ++ sub).asSymbol;
+        ~feedDefPriv.(defKey, path, { |msg|
+            ~feeds[key] = msg[1];
+        });
+    };
+};
+
+// =====================================================================
+//  ECO2MIX  -- mix electrique FR temps reel (via ODRE keyless)
+// =====================================================================
+~feedDefPriv.(\d_eco_mix, '/data/eco2mix/mix', { |msg|
+    var keys = [\nuclear, \gas, \coal, \oil, \hydro, \wind, \solar, \bio];
+    keys.do { |k, i| ~feeds[(\eco_ ++ k).asSymbol] = msg[i+1] ? 0.0 };
+});
+~feedDefPriv.(\d_eco_co2, '/data/eco2mix/co2', { |msg|
+    ~feedSet.(\eco_co2, msg[1]);
+});
+~feedDefPriv.(\d_eco_load, '/data/eco2mix/load', { |msg|
+    ~feedSet.(\eco_load, msg[1]);
+});
+~feedDefPriv.(\d_eco_renew, '/data/eco2mix/renew', { |msg|
+    ~feedSet.(\eco_renew, msg[1]);
+});
+
+// =====================================================================
+//  TELERAY IRSN  -- radioactivite gamma temps reel
+// =====================================================================
+~feedDefPriv.(\d_rad_avg, '/data/radioactivity/avg', { |msg|
+    ~feedSet.(\rad_avg, msg[1]);
+});
+~feedDefPriv.(\d_rad_max, '/data/radioactivity/max', { |msg|
+    ~feedSet.(\rad_max, [msg[1], msg[2]]);
+});
+~feedDefPriv.(\d_rad_min, '/data/radioactivity/min', { |msg|
+    ~feedSet.(\rad_min, msg[1]);
+});
+~feedDefPriv.(\d_rad_n, '/data/radioactivity/n', { |msg|
+    ~feedSet.(\rad_n, msg[1]);
+});
+~feedDefPriv.(\d_rad_anom, '/data/radioactivity/anomaly', { |msg|
+    ~feedSet.(\rad_anomaly, [msg[1], msg[2]]);
+    ("*** RAD ANOMALY " ++ msg[1] ++ " = " ++ msg[2] ++ " nSv/h ***").postln;
+});
+
+// =====================================================================
+//  CARBURANTS  -- prix temps reel FR
+// =====================================================================
+~feedDefPriv.(\d_fuel_avg, '/data/fuel/avg', { |msg|
+    var keys = [\sp95, \sp98, \e10, \e85, \gazole, \gplc];
+    keys.do { |k, i| ~feeds[(\fuel_ ++ k).asSymbol] = msg[i+1] ? 0.0 };
+});
+~feedDefPriv.(\d_fuel_cheap, '/data/fuel/cheapest', { |msg|
+    ~feedSet.(\fuel_sp95_min, msg[1]);
+    ~feedSet.(\fuel_gazole_min, msg[2]);
+});
+~feedDefPriv.(\d_fuel_spread, '/data/fuel/spread', { |msg|
+    ~feedSet.(\fuel_spread, msg[1]);
+});
+~feedDefPriv.(\d_fuel_n, '/data/fuel/n', { |msg|
+    ~feedSet.(\fuel_n_stations, msg[1]);
+});
+
+// =====================================================================
 //  Heartbeat -- detection de pont down
 // =====================================================================
 ~feedDefPriv.(\d_heartbeat, '/data/heartbeat', { |msg|
