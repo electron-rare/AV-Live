@@ -235,11 +235,13 @@ class MultiHMRRemoteBackend:
         self.use_async = _env_flag("MULTIHMR_REMOTE_ASYNC", True)
 
         # Async pipeline state.
+        # Multi-buffer queues (2 in / 3 out) absorb jitter without
+        # stalling capture. Drop-oldest semantics on overflow.
         self._in_q: queue.Queue[tuple[bytes, float, float]] = queue.Queue(
-            maxsize=1)
+            maxsize=2)
         self._out_q: queue.Queue[
             tuple[list[dict[str, Any]], dict[str, float]]
-        ] = queue.Queue(maxsize=1)
+        ] = queue.Queue(maxsize=3)
         self._stop = threading.Event()
         self._async_det_thresh = 0.3
         self._worker_thread: threading.Thread | None = None

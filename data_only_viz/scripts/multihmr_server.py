@@ -150,17 +150,109 @@ def decode_request(payload: bytes) -> tuple[np.ndarray, np.ndarray, float]:
     return img, K, decode_ms
 
 
+ML_DTYPE_FLOAT16 = 65552
+ML_DTYPE_FLOAT32 = 65568
+ML_DTYPE_DOUBLE = 65600
+
+
+def _np_to_mlarray(arr: np.ndarray, MLMultiArray):
+    """Create a contiguous float32 MLMultiArray from a numpy array."""
+    import ctypes
+    arr = np.ascontiguousarray(arr, dtype=np.float32)
+    shape = [int(s) for s in arr.shape]
+    ml = MLMultiArray.alloc().initWithShape_dataType_error_(
+        shape, ML_DTYPE_FLOAT32, None)
+    if ml is None:
+        raise RuntimeError("MLMultiArray alloc failed")
+    ptr = ml.dataPointer()
+    addr = int(ptr) if isinstance(ptr, int) else ctypes.cast(
+        ptr, ctypes.c_void_p).value
+    if addr is None:
+        raise RuntimeError("MLMultiArray dataPointer null")
+    ctypes.memmove(addr, arr.ctypes.data, arr.nbytes)
+    return ml
+
+
+def _mlarray_to_np(ml) -> np.ndarray:
+    """Copy an MLMultiArray (FLOAT16/32/64) to numpy float32."""
+    import ctypes
+    shape = tuple(int(s) for s in ml.shape())
+    dtype_id = int(ml.dataType())
+    count = 1
+    for s in shape:
+        count *= s
+    ptr = ml.dataPointer()
+    addr = int(ptr) if isinstance(ptr, int) else ctypes.cast(
+        ptr, ctypes.c_void_p).value
+    if addr is None:
+        raise RuntimeError("MLMultiArray dataPointer null")
+    if dtype_id == ML_DTYPE_FLOAT16:
+        raw = (ctypes.c_uint16 * count).from_address(addr)
+        arr = np.ctypeslib.as_array(raw).view(np.float16).astype(np.float32)
+    elif dtype_id == ML_DTYPE_FLOAT32:
+        raw = (ctypes.c_float * count).from_address(addr)
+        arr = np.ctypeslib.as_array(raw).copy()
+    elif dtype_id == ML_DTYPE_DOUBLE:
+        raw = (ctypes.c_double * count).from_address(addr)
+        arr = np.ctypeslib.as_array(raw).astype(np.float32)
+    else:
+        raise RuntimeError(f"unsupported MLMultiArray dtype {dtype_id}")
+    return arr.reshape(shape)
+
+
 class CoreMLModel:
-    """Thin wrapper around coremltools.MLModel for server-side use."""
+    """pyobjc-direct CoreML wrapper. Drops the ~30 ms coremltools.MLModel.predict
+    overhead by using CoreML.framework directly (MLDictionaryFeatureProvider
+    + MLMultiArray ctypes memcpy). Fallback to coremltools if pyobjc missing,
+    via MULTIHMR_SERVER_BACKEND=coremltools env."""
 
     def __init__(self, mlpackage_path: Path) -> None:
-        import coremltools as ct
-        from coremltools.models import MLModel
         self.path = Path(mlpackage_path)
         if not self.path.exists():
             raise FileNotFoundError(f"mlpackage missing: {self.path}")
+        backend = os.environ.get(
+            "MULTIHMR_SERVER_BACKEND", "pyobjc").strip().lower()
         cu_env = os.environ.get(
             "COREML_COMPUTE_UNITS", "cpu_and_gpu").strip().lower()
+        if backend == "pyobjc":
+            self._use_pyobjc = True
+            self._init_pyobjc(cu_env)
+        else:
+            self._use_pyobjc = False
+            self._init_coremltools(cu_env)
+
+    def _init_pyobjc(self, cu_env: str) -> None:
+        import objc
+        from Foundation import NSURL
+        ns: dict = {}
+        objc.loadBundle("CoreML", ns,
+                        "/System/Library/Frameworks/CoreML.framework")
+        cu_map = {"cpu_only": 0, "cpu_and_gpu": 1, "all": 2,
+                  "cpu_and_ne": 3}
+        cu = cu_map.get(cu_env, 1)
+        MLModel = ns["MLModel"]
+        MLModelConfiguration = ns["MLModelConfiguration"]
+        cfg = MLModelConfiguration.alloc().init()
+        try:
+            cfg.setComputeUnits_(cu)
+        except Exception:  # noqa: BLE001
+            pass
+        url = NSURL.fileURLWithPath_(str(self.path))
+        compiled_url = MLModel.compileModelAtURL_error_(url, None)
+        if compiled_url is None:
+            raise RuntimeError(f"compileModelAtURL failed for {self.path}")
+        model = MLModel.modelWithContentsOfURL_configuration_error_(
+            compiled_url, cfg, None)
+        if model is None:
+            raise RuntimeError(f"MLModel load failed for {compiled_url}")
+        self._model = model
+        self._ns = ns
+        LOG.info("loading mlpackage %s via pyobjc (computeUnit=%s)",
+                 self.path.name, cu_env)
+
+    def _init_coremltools(self, cu_env: str) -> None:
+        import coremltools as ct
+        from coremltools.models import MLModel as CTMLModel
         cu_map = {
             "cpu_only": ct.ComputeUnit.CPU_ONLY,
             "cpu_and_gpu": ct.ComputeUnit.CPU_AND_GPU,
@@ -168,9 +260,9 @@ class CoreMLModel:
             "cpu_and_ne": ct.ComputeUnit.CPU_AND_NE,
         }
         cu = cu_map.get(cu_env, ct.ComputeUnit.CPU_AND_GPU)
-        LOG.info("loading mlpackage %s (computeUnit=%s)",
+        LOG.info("loading mlpackage %s via coremltools (computeUnit=%s)",
                  self.path.name, cu_env)
-        self.model = MLModel(str(self.path), compute_units=cu)
+        self.model = CTMLModel(str(self.path), compute_units=cu)
 
     def predict(self, image_uint8_hwc: np.ndarray, K_33: np.ndarray
                 ) -> dict[str, np.ndarray]:
@@ -179,8 +271,40 @@ class CoreMLModel:
         K = K_33.astype(np.float32)
         if K.ndim == 2:
             K = K[np.newaxis, ...]
-        feats = {"image": img4, "cam_K": K}
-        return self.model.predict(feats)
+        if self._use_pyobjc:
+            return self._predict_pyobjc(img4, K)
+        return self.model.predict({"image": img4, "cam_K": K})
+
+    def _predict_pyobjc(self, image_4d: np.ndarray, K_33: np.ndarray
+                        ) -> dict[str, np.ndarray]:
+        ns = self._ns
+        MLMultiArray = ns["MLMultiArray"]
+        MLDictionaryFeatureProvider = ns["MLDictionaryFeatureProvider"]
+        MLFeatureValue = ns["MLFeatureValue"]
+        img_ml = _np_to_mlarray(image_4d, MLMultiArray)
+        k_ml = _np_to_mlarray(K_33, MLMultiArray)
+        feats = {
+            "image": MLFeatureValue.featureValueWithMultiArray_(img_ml),
+            "cam_K": MLFeatureValue.featureValueWithMultiArray_(k_ml),
+        }
+        provider = MLDictionaryFeatureProvider.alloc(
+            ).initWithDictionary_error_(feats, None)
+        if provider is None:
+            raise RuntimeError("MLDictionaryFeatureProvider alloc failed")
+        out = self._model.predictionFromFeatures_error_(provider, None)
+        if out is None:
+            raise RuntimeError("MLModel predict failed")
+        names = [str(n) for n in out.featureNames()]
+        result: dict[str, np.ndarray] = {}
+        for n in names:
+            fv = out.featureValueForName_(n)
+            if fv is None:
+                continue
+            ml = fv.multiArrayValue()
+            if ml is None:
+                continue
+            result[n] = _mlarray_to_np(ml)
+        return result
 
 
 def _zero_outputs() -> tuple[np.ndarray, ...]:

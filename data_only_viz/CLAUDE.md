@@ -20,6 +20,7 @@ Python **3.11+** requis. `pyproject.toml` est la source de vérité — ne jamai
 | Backend | Fichier | Statut |
 |---------|---------|--------|
 | MediaPipe Holistic | `holistic.py` | stable |
+| MediaPipe multi (Pose+Face+Hand) | `multi.py` | stable ; `MEDIAPIPE_DELEGATE=gpu` (défaut) ou `cpu`. **GPU Metal exige SRGBA 4-ch** (3-ch SRGB crashe `gpu_buffer_storage_cv_pixel_buffer.cc`) — multi.py route auto vers `cv2.COLOR_BGR2RGBA` + `mp.ImageFormat.SRGBA` quand delegate=GPU. Bench M5 image-mode SRGBA : pose 2.9 vs 6.7 ms (GPU/CPU), face 1.0 vs 4.1, hand 3.2 vs 6.1 |
 | Ultralytics YOLOv8-pose | `pose.py` | stable, modèle `yolov8n-pose.pt` à la racine repo |
 | Apple Vision (Core ML) | `apple_vision_pose.py`, `coreml_pose.py` | macOS uniquement |
 | DETRPose | `detrpose.py` | clone manuel + checkpoint, voir docstring |

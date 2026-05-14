@@ -358,8 +358,18 @@ class MultiWorker:
                 time.sleep(self.period)
                 continue
             h, w = frame_bgr.shape[:2]
-            frame_rgb = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2RGB)
-            mp_img = mp.Image(image_format=mp.ImageFormat.SRGB, data=frame_rgb)
+            # MediaPipe GPU delegate on macOS uploads via CVPixelBuffer
+            # which only accepts 4-channel formats. SRGB (3ch) crashes
+            # in gpu_buffer_storage_cv_pixel_buffer.cc with
+            # "unsupported ImageFrame format: 1". Use SRGBA when on GPU.
+            if _deleg == BaseOptions.Delegate.GPU:
+                frame_rgba = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2RGBA)
+                mp_img = mp.Image(image_format=mp.ImageFormat.SRGBA,
+                                  data=frame_rgba)
+            else:
+                frame_rgb = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2RGB)
+                mp_img = mp.Image(image_format=mp.ImageFormat.SRGB,
+                                  data=frame_rgb)
             ts = int(time.monotonic() * 1000) - t0_ms
             try:
                 pose_res = pose.detect_for_video(mp_img, ts)

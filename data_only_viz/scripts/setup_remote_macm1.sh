@@ -46,7 +46,8 @@ ssh "$HOST" "bash -lc 'set -e
     uv venv --python 3.12 $REMOTE_VENV --quiet
   fi
   uv pip install --python $REMOTE_VENV/bin/python --quiet \
-      coremltools numpy opencv-python-headless
+      coremltools numpy opencv-python-headless \
+      pyobjc-core pyobjc-framework-Cocoa pyobjc-framework-CoreML
 '"
 
 echo "==> Killing any stale server on :$PORT"
