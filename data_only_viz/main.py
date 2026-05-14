@@ -249,6 +249,17 @@ class AppDelegate(NSObject):
         # 2. Apple Vision body pose (fallback si MediaPipe casse)
         # 3. CoreML pose, DETRPose, Holistic, YOLO — fallbacks
         import os as _os
+        # iPhone ARBodyTracker (option 2 LiDAR fusion) : always-on
+        # listener on :57128. Harmless if no iPhone is broadcasting ;
+        # state.persons_arkit_joints stays empty and the arkit_fuse
+        # stage no-ops. Activated via POSE_FILTER=...+arkit_fuse.
+        try:
+            from .iphone_osc_listener import IphoneOSCListener
+            self._iphone_osc = IphoneOSCListener(self._state)
+            self._iphone_osc.start()
+            LOG.info("worker: + iPhone OSC listener :57128")
+        except Exception as e:  # noqa: BLE001
+            LOG.warning("iphone OSC listener start failed (%s)", e)
         # 0. Multi-HMR (SMPL-X 10475 verts mesh dense) — opt-in via flag
         if getattr(self._opts, "multi_hmr", False):
             try:
