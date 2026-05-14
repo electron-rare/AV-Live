@@ -66,6 +66,7 @@ struct ContentView: View {
     @StateObject private var settings = RenderSettings()
     @StateObject private var poseListener = PoseOSCListener()
     @StateObject private var arkitListener = ArkitOSCListener()
+    @StateObject private var dataFeeds = DataFeedsOSCListener()
 
     var body: some View {
         ZStack(alignment: .topLeading) {
@@ -76,6 +77,7 @@ struct ContentView: View {
                     renderer.startOSCServer()
                     poseListener.start()
                     arkitListener.start()
+                    dataFeeds.start()
                 }
                 .onReceive(NotificationCenter.default.publisher(
                     for: .toggleSettings)) { _ in
@@ -96,6 +98,15 @@ struct ContentView: View {
 
             // HUD coin haut-gauche : mode + touches + pose
             HUDOverlay(settings: settings, poseListener: poseListener)
+
+            // Data feeds HUD : telemetrie open-data (eco2mix, velib, ...)
+            VStack {
+                Spacer()
+                HStack {
+                    DataHUDOverlay(data: dataFeeds, settings: settings)
+                    Spacer()
+                }
+            }
 
             // Bouton settings coin haut-droit
             HStack {

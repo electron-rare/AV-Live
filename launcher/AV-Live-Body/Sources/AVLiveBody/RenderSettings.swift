@@ -39,4 +39,7 @@ final class RenderSettings: ObservableObject {
 
     // Settings panel visibility
     @Published var showPanel: Bool = false
+
+    // Data feeds HUD overlay (open-data telemetry chips)
+    @Published var showDataHUD: Bool = true
 }
