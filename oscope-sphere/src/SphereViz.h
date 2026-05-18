@@ -20,10 +20,12 @@ public:
     void drawSkin();
     void drawPoints();
     void drawWireframe();
+    void drawShells(float time, float bass, float kick);
     void setColormap(int id) { colormapId_ = id; }
 
 private:
     void bindUniforms();
+    void drawWireMesh(const ofFloatColor& tint);
 
     std::unique_ptr<oscope::SpectrogramBuffer> spectro_;
     ofVboMesh     mesh_;

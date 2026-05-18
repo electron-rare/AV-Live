@@ -3,7 +3,8 @@
 uniform sampler2D spectroTex;   // width = time, height = freq, R32F [0,1]
 uniform float scrollOffset;
 uniform int   colormapId;
-uniform int   renderMode;       // 0 = skin, 1 = points
+uniform int   renderMode;       // 0 = skin, 1 = points, 2 = wireframe
+uniform vec4  shellTint;        // rgb tint + alpha for wireframe / shells
 
 in vec2  vSphereUV;
 in vec3  vViewPos;
@@ -47,8 +48,9 @@ void main() {
     }
 
     if (renderMode == 2) {
-        // wireframe: bright unlit colormap lines
-        fragColor = vec4(col * 1.4 + vec3(0.06), 1.0);
+        // wireframe / concentric shells: bright lines, tinted per draw
+        vec3 wc = (col * 1.4 + vec3(0.06)) * shellTint.rgb;
+        fragColor = vec4(wc, shellTint.a);
         return;
     }
 

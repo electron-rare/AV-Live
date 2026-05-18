@@ -36,9 +36,12 @@ private:
     bool  layerB_   = true;
     bool  layerC_   = true;
     bool  layerD_   = true;
+    bool  layerE_   = true;
     int   colormap_ = 0;
     float scopeSr_  = 16.0e6f;
     float spin_     = 0.0f;
     float pulse_    = 1.0f;
+    float bass_     = 0.0f;
+    float kick_     = 0.0f;
     std::string statusText_;
 };

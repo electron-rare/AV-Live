@@ -99,10 +99,41 @@ void SphereViz::drawPoints() {
     shader_.end();
 }
 
-void SphereViz::drawWireframe() {
+void SphereViz::drawWireMesh(const ofFloatColor& tint) {
     shader_.begin();
     bindUniforms();
     shader_.setUniform1i("renderMode", 2);
+    shader_.setUniform4f("shellTint", tint.r, tint.g, tint.b, tint.a);
     mesh_.drawWireframe();
     shader_.end();
+}
+
+void SphereViz::drawWireframe() {
+    drawWireMesh(ofFloatColor(1.0f, 1.0f, 1.0f, 1.0f));
+}
+
+void SphereViz::drawShells(float t, float bass, float kick) {
+    ofDisableDepthTest();
+    ofEnableBlendMode(OF_BLENDMODE_ADD);
+
+    // outer shell: larger, counter-spinning, blue, breathes with bass
+    ofPushMatrix();
+    ofRotateYDeg(-t * 23.0f);
+    ofRotateXDeg( t * 14.0f);
+    const float so = 1.40f + bass * 0.25f;
+    ofScale(so, so, so);
+    drawWireMesh(ofFloatColor(0.28f, 0.62f, 1.00f, 0.55f));
+    ofPopMatrix();
+
+    // inner shell: smaller, opposite spin, magenta, pulses with kick
+    ofPushMatrix();
+    ofRotateYDeg( t * 34.0f);
+    ofRotateXDeg(-t * 23.0f);
+    const float si = 0.62f + kick * 0.30f;
+    ofScale(si, si, si);
+    drawWireMesh(ofFloatColor(1.00f, 0.42f, 0.80f, 0.60f));
+    ofPopMatrix();
+
+    ofDisableBlendMode();
+    ofEnableDepthTest();
 }
