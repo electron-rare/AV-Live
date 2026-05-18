@@ -12,6 +12,10 @@ void SphereViz::setup(int icoIterations, int spectroWidth, int spectroHeight) {
     mesh_.addNormals(src.getNormals());
     mesh_.addIndices(src.getIndices());
 
+    // ofDisableArbTex() is a global, app-wide GL state change: it makes all
+    // textures use normalized [0,1] coordinates. oscope-sphere has a single
+    // SphereViz so this is safe; revisit if other ARB-texture components are
+    // ever added.
     ofDisableArbTex();
     spectroPix_.allocate(spectroWidth, spectroHeight, OF_PIXELS_GRAY);
     spectroPix_.set(0.0f);
@@ -19,7 +23,8 @@ void SphereViz::setup(int icoIterations, int spectroWidth, int spectroHeight) {
     spectroTex_.setTextureWrap(GL_REPEAT, GL_CLAMP_TO_EDGE);
     spectroTex_.setTextureMinMagFilter(GL_LINEAR, GL_LINEAR);
 
-    shader_.load("shaders/sphere");
+    if (!shader_.load("shaders/sphere"))
+        ofLogError("SphereViz") << "failed to load shaders/sphere";
 }
 
 void SphereViz::pushSpectrogramColumn(const std::vector<float>& magCh1,
