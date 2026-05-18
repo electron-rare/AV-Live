@@ -6,7 +6,7 @@ final class USBMuxProtocolTests: XCTestCase {
         let body: [String: Any] = ["MessageType": "ListDevices"]
         let packet = USBMuxProtocol.encode(plist: body, tag: 3)
         XCTAssertGreaterThan(packet.count, 16)
-        XCTAssertEqual(Int(USBMuxProtocol.readLE32(packet, 0)),
+        XCTAssertEqual(USBMuxProtocol.readLE32(packet, 0).map(Int.init),
                        packet.count)
         XCTAssertEqual(USBMuxProtocol.readLE32(packet, 4), 1)
         XCTAssertEqual(USBMuxProtocol.readLE32(packet, 8), 8)

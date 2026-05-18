@@ -28,7 +28,8 @@ enum USBMuxProtocol {
         for i in 0..<4 { d.append(UInt8((v >> (8 * i)) & 0xFF)) }
     }
 
-    static func readLE32(_ d: Data, _ offset: Int) -> UInt32 {
+    static func readLE32(_ d: Data, _ offset: Int) -> UInt32? {
+        guard offset >= 0, d.count >= offset + 4 else { return nil }
         let b = [UInt8](d)
         var v: UInt32 = 0
         for i in 0..<4 { v |= UInt32(b[offset + i]) << (8 * i) }
