@@ -22,6 +22,8 @@ public:
     void setColormap(int id) { colormapId_ = id; }
 
 private:
+    void bindUniforms();
+
     std::unique_ptr<oscope::SpectrogramBuffer> spectro_;
     ofVboMesh     mesh_;
     ofShader      shader_;

@@ -66,14 +66,18 @@ void SphereViz::setWaveform(const std::vector<float>& ch1,
     waveTex_.loadData(wavePix_);
 }
 
-void SphereViz::drawSkin() {
-    shader_.begin();
+void SphereViz::bindUniforms() {
     shader_.setUniformTexture("spectroTex", spectroTex_, 0);
     shader_.setUniformTexture("waveformTex", waveTex_, 1);
     shader_.setUniform1f("scrollOffset", scrollOffset_);
     shader_.setUniform1f("displaceAmount", displace_);
     shader_.setUniform1f("baseRadius", baseRadius_);
     shader_.setUniform1i("colormapId", colormapId_);
+}
+
+void SphereViz::drawSkin() {
+    shader_.begin();
+    bindUniforms();
     shader_.setUniform1i("renderMode", 0);
     mesh_.draw();
     shader_.end();
@@ -81,12 +85,7 @@ void SphereViz::drawSkin() {
 
 void SphereViz::drawPoints() {
     shader_.begin();
-    shader_.setUniformTexture("spectroTex", spectroTex_, 0);
-    shader_.setUniformTexture("waveformTex", waveTex_, 1);
-    shader_.setUniform1f("scrollOffset", scrollOffset_);
-    shader_.setUniform1f("displaceAmount", displace_);
-    shader_.setUniform1f("baseRadius", baseRadius_);
-    shader_.setUniform1i("colormapId", colormapId_);
+    bindUniforms();
     shader_.setUniform1i("renderMode", 1);
     mesh_.drawVertices();
     shader_.end();
