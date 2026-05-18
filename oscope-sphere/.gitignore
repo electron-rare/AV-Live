@@ -4,3 +4,4 @@ bin/oscope-sphere_debug
 bin/oscope-sphere.app/
 *.o
 *.d
+openFrameworks-Info.plist
