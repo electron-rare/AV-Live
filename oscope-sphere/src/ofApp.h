@@ -4,6 +4,7 @@
 #include "AudioAnalyzer.h"
 #include "DemoSignal.h"
 #include "SphereViz.h"
+#include "OrbitRings.h"
 #include <string>
 #include <vector>
 
@@ -23,6 +24,7 @@ private:
     oscope::DemoSignal    demo_{48000.0f};
 
     SphereViz sphere_;
+    OrbitRings rings_;
     ofEasyCam cam_;
 
     std::vector<float> buf1_;

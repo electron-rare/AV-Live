@@ -12,6 +12,7 @@ void ofApp::setup() {
     cam_.setFarClip(5000.0f);
 
     sphere_.setup(5, 512, 256, 1024);
+    rings_.setup(512);
 
     hantek_.setSampleRate(16000000u);
     const oscope::HantekStatus st = hantek_.start();
@@ -47,6 +48,7 @@ void ofApp::update() {
     sphere_.pushSpectrogramColumn(analyzerCh1_.magDown(),
                                   analyzerCh2_.magDown());
     sphere_.setWaveform(buf1_, buf2_);
+    rings_.setWaveform(buf1_, buf2_);
 }
 
 void ofApp::draw() {
@@ -54,6 +56,7 @@ void ofApp::draw() {
     ofPushMatrix();
     ofRotateYDeg(ofGetElapsedTimef() * 6.0f);
     if (layerA_) sphere_.drawSkin();
+    if (layerB_) rings_.draw();
     ofPopMatrix();
     cam_.end();
     drawHud();
