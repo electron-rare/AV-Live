@@ -22,20 +22,32 @@ static void test_shape_and_bounds() {
     CHECK(differ);
 }
 
-// Phase is continuous across calls: a second block differs from the first.
-static void test_phase_advances() {
-    DemoSignal demo(48000.0f);
+// Splitting next() into two calls must equal one combined call:
+// proves the generator is deterministic AND phase-continuous across
+// call boundaries (a restart or glitch would break the identity).
+static void test_phase_continuity() {
+    DemoSignal whole(48000.0f);
+    std::vector<float> aw, bw;
+    whole.next(aw, bw, 128);
+
+    DemoSignal split(48000.0f);
     std::vector<float> a1, b1, a2, b2;
-    demo.next(a1, b1, 64);
-    demo.next(a2, b2, 64);
-    bool same = true;
-    for (std::size_t i = 0; i < 64; ++i)
-        if (std::fabs(a1[i] - a2[i]) > 1e-4f) same = false;
-    CHECK(!same);
+    split.next(a1, b1, 64);
+    split.next(a2, b2, 64);
+
+    bool ch1Match = true, ch2Match = true;
+    for (std::size_t i = 0; i < 64; ++i) {
+        if (aw[i]      != a1[i]) ch1Match = false;
+        if (aw[i + 64] != a2[i]) ch1Match = false;
+        if (bw[i]      != b1[i]) ch2Match = false;
+        if (bw[i + 64] != b2[i]) ch2Match = false;
+    }
+    CHECK(ch1Match);
+    CHECK(ch2Match);
 }
 
 int main() {
     test_shape_and_bounds();
-    test_phase_advances();
+    test_phase_continuity();
     REPORT();
 }
