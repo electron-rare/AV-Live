@@ -39,12 +39,24 @@ DEFAULT_MLPACKAGE = (
 N_PERSONS_FIXED = 4
 N_VERTS = 10475
 
-# CoreML output names from the exported .mlpackage.
-OUT_V3D = "var_2412"          # (4, 10475, 3)
-OUT_TRANSL = "var_2415"       # (4, 1, 3)
-OUT_SCORES = "var_2428"       # (4,)
-OUT_BETAS = "var_2431"        # (4, 10)
-OUT_EXPR = "var_2434"         # (4, 10)
+# CoreML output names from the exported .mlpackage. The exported
+# `multihmr_full_672_s.mlpackage` (2026-05-14 re-convert) renumbered
+# the MIL vars; verified against the on-disk artifact's spec.
+OUT_V3D = "var_2420"          # (4, 10475, 3)
+OUT_TRANSL = "var_2423"       # (4, 1, 3)
+OUT_SCORES = "var_2436"       # (4,)
+OUT_BETAS = "var_2439"        # (4, 10)
+OUT_EXPR = "var_2442"         # (4, 10)
+# var_2445 (4, 127, 3) = j3d joints — present but unused here.
+
+# DINOv2 backbone was trained on ImageNet-normalized RGB; the public
+# `infer()` contract takes [0,1] CHW input and applies this here so
+# every caller stays normalization-agnostic. Feeding raw [0,1] to the
+# model collapses all detection scores to ~0.01 ("0 detections" bug).
+_IMG_NORM_MEAN = np.array([0.485, 0.456, 0.406],
+                          dtype=np.float32).reshape(1, 3, 1, 1)
+_IMG_NORM_STD = np.array([0.229, 0.224, 0.225],
+                         dtype=np.float32).reshape(1, 3, 1, 1)
 
 # MLMultiArrayDataType raw values (from CoreML headers).
 ML_DTYPE_FLOAT32 = 65568
@@ -245,7 +257,8 @@ class MultiHMRCoreMLBackend:
         """Run a forward pass and return list of humans dicts.
 
         Args:
-            image_chw_float32: (3, 672, 672) or (1, 3, 672, 672) in [0,1].
+            image_chw_float32: (3, 672, 672) or (1, 3, 672, 672), RGB in
+                [0,1]. ImageNet normalization is applied internally.
             K_33: (3, 3) or (1, 3, 3) camera intrinsics.
             det_thresh: scores threshold; CoreML forwards K=4 always.
 
@@ -264,6 +277,7 @@ class MultiHMRCoreMLBackend:
         if K.shape != (1, 3, 3):
             raise ValueError(f"K shape {K.shape}, expected (1,3,3)")
 
+        img = (img - _IMG_NORM_MEAN) / _IMG_NORM_STD
         raw = self._predict(img, K)
         v3d = raw.get(OUT_V3D)
         transl = raw.get(OUT_TRANSL)
