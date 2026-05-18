@@ -38,4 +38,29 @@ final class StreamDemuxerTests: XCTestCase {
         XCTAssertEqual(out.count, 1)
         XCTAssertEqual(out[0].payload, Data([7]))
     }
+
+    func testPartialMagicAtBoundary() {
+        var d = StreamDemuxer()
+        XCTAssertTrue(d.feed(Data([0x41, 0x56, 0x4C])).isEmpty)
+        let payload = Data([42])
+        let h = FrameHeader(tag: .meta, pid: 0, timestamp: 0,
+                            length: UInt32(payload.count))
+        var rest = Data([0x31])
+        rest.append(h.encoded().dropFirst(4))
+        rest.append(payload)
+        let out = d.feed(rest)
+        XCTAssertEqual(out.count, 1)
+        XCTAssertEqual(out[0].payload, payload)
+    }
+
+    func testSkipsCorruptOversizedLength() {
+        var d = StreamDemuxer()
+        // Header claiming a 4 GB payload, then a valid frame after.
+        let bad = FrameHeader(tag: .video, pid: 0, timestamp: 0,
+                              length: UInt32.max).encoded()
+        let good = frame(.video, Data([5, 5]))
+        let out = d.feed(bad + good)
+        XCTAssertEqual(out.count, 1)
+        XCTAssertEqual(out[0].payload, Data([5, 5]))
+    }
 }

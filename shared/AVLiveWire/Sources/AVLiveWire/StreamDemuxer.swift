@@ -6,6 +6,10 @@ public struct StreamDemuxer {
         public let payload: Data
     }
 
+    /// Largest plausible payload (8 MB) — comfortably covers any HEVC
+    /// access unit. A header claiming more is treated as corrupt.
+    public static let maxPayloadLength: UInt32 = 8 * 1024 * 1024
+
     private var buffer = Data()
     public init() {}
 
@@ -24,6 +28,12 @@ public struct StreamDemuxer {
             if start > 0 { buffer.removeFirst(start) }
             guard buffer.count >= FrameHeader.byteCount,
                   let h = FrameHeader(decoding: buffer) else { break }
+            if h.length > Self.maxPayloadLength {
+                // Implausible length — corrupt header; skip the magic
+                // and resync on the next one.
+                buffer.removeFirst(FrameHeader.magic.count)
+                continue
+            }
             let total = FrameHeader.byteCount + Int(h.length)
             guard buffer.count >= total else { break }
             let payloadStart = buffer.index(
