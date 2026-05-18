@@ -1,4 +1,5 @@
 import Cocoa
+import CoreVideo
 import SwiftUI
 
 /// Forces a regular, keyboard-focusable foreground app.
@@ -16,8 +17,51 @@ struct AVLiveBodyApp: App {
 
     var body: some Scene {
         WindowGroup {
-            Text("AVLiveBody")
+            ContentView()
                 .frame(minWidth: 900, minHeight: 600)
         }
+    }
+}
+
+@MainActor
+struct ContentView: View {
+    @StateObject private var consumer = USBSkeletonConsumer()
+    @State private var controller = SceneController()
+    private let multiHMR: MultiHMRCoreML? = MultiHMRCoreML()
+    /// Placeholder intrinsics until a `.meta` frame supplies real ones.
+    private let cameraK: [Float] = [
+        672, 0, 336, 0, 672, 336, 0, 0, 1,
+    ]
+
+    var body: some View {
+        ZStack(alignment: .top) {
+            SceneView(controller: controller)
+            StatusBar(consumer: consumer)
+        }
+        .onAppear { wire() }
+        .onReceive(consumer.$skeletons) { skeletons in
+            controller.updateSkeleton(skeletons)
+        }
+    }
+
+    private func wire() {
+        let controller = self.controller
+        let multiHMR = self.multiHMR
+        let consumer = self.consumer
+        let cameraK = self.cameraK
+        consumer.onVideoFrame = { pixelBuffer in
+            MainActor.assumeIsolated {
+                controller.updateVideo(pixelBuffer)
+                if let hmr = multiHMR {
+                    let raw = hmr.infer(
+                        pixelBuffer, cameraK: cameraK)
+                    let fused = BodyFusion.fuse(
+                        persons: raw,
+                        skeletons: consumer.skeletons)
+                    controller.updateMesh(fused)
+                }
+            }
+        }
+        consumer.start()
     }
 }
