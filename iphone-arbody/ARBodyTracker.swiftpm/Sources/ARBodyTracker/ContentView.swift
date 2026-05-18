@@ -1,6 +1,7 @@
 import SwiftUI
 import ARKit
 import RealityKit
+import UIKit
 
 struct ContentView: View {
     @StateObject private var session = ARBodySession()
@@ -30,7 +31,16 @@ struct ContentView: View {
                     .allowsHitTesting(false)
                 controlPanel
             }
-            .onAppear { session.viewportSize = geo.size }
+            .onAppear {
+                session.viewportSize = geo.size
+                // Keep the screen awake during streaming sessions; iOS
+                // would otherwise lock and tear down the USBServer TCP
+                // listener within seconds of inactivity.
+                UIApplication.shared.isIdleTimerDisabled = true
+            }
+            .onDisappear {
+                UIApplication.shared.isIdleTimerDisabled = false
+            }
             .onChange(of: geo.size) { _, newSize in
                 session.viewportSize = newSize
             }
