@@ -34,6 +34,8 @@ void main() {
     if (renderMode == 1) {
         r *= 1.06;                  // float the point cloud outside the skin
         gl_PointSize = 6.0;
+    } else if (renderMode == 2) {
+        r *= 1.01;                  // wireframe sits just above the lit skin
     }
 
     vec4 viewPos = modelViewMatrix * vec4(dir * r, 1.0);

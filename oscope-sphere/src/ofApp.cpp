@@ -72,6 +72,7 @@ void ofApp::draw() {
     ofRotateXDeg(16.0f * std::sin(t * 0.27f));   // slow tumble
     ofScale(pulse_, pulse_, pulse_);             // audio pulse
     if (layerA_) sphere_.drawSkin();
+    if (layerD_) sphere_.drawWireframe();
     if (layerC_) sphere_.drawPoints();
     if (layerB_) rings_.draw();
     ofPopMatrix();
@@ -86,6 +87,7 @@ void ofApp::drawHud() {
     hud += std::string("[1] skin   ") + (layerA_ ? "on" : "off") + "\n";
     hud += std::string("[2] rings  ") + (layerB_ ? "on" : "off") + "\n";
     hud += std::string("[3] points ") + (layerC_ ? "on" : "off") + "\n";
+    hud += std::string("[4] wire   ") + (layerD_ ? "on" : "off") + "\n";
     hud += std::string("[c] colormap   [space] ") +
            (frozen_ ? "frozen" : "live");
     ofDrawBitmapString(hud, 16, 24);
@@ -97,6 +99,7 @@ void ofApp::keyPressed(int key) {
         case '1': layerA_ = !layerA_; break;
         case '2': layerB_ = !layerB_; break;
         case '3': layerC_ = !layerC_; break;
+        case '4': layerD_ = !layerD_; break;
         case 'c':
         case 'C': colormap_ = (colormap_ + 1) % 2; break;
         case ' ': frozen_ = !frozen_; break;

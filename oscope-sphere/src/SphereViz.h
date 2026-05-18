@@ -19,6 +19,7 @@ public:
 
     void drawSkin();
     void drawPoints();
+    void drawWireframe();
     void setColormap(int id) { colormapId_ = id; }
 
 private:

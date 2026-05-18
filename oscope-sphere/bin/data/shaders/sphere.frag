@@ -46,6 +46,12 @@ void main() {
         return;
     }
 
+    if (renderMode == 2) {
+        // wireframe: bright unlit colormap lines
+        fragColor = vec4(col * 1.4 + vec3(0.06), 1.0);
+        return;
+    }
+
     // skin: light the displaced relief with a screen-space face normal
     vec3 N = normalize(cross(dFdx(vViewPos), dFdy(vViewPos)));
     vec3 V = normalize(-vViewPos);

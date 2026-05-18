@@ -98,3 +98,11 @@ void SphereViz::drawPoints() {
     pointsMesh_.draw();
     shader_.end();
 }
+
+void SphereViz::drawWireframe() {
+    shader_.begin();
+    bindUniforms();
+    shader_.setUniform1i("renderMode", 2);
+    mesh_.drawWireframe();
+    shader_.end();
+}

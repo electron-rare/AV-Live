@@ -35,6 +35,7 @@ private:
     bool  layerA_   = true;
     bool  layerB_   = true;
     bool  layerC_   = true;
+    bool  layerD_   = true;
     int   colormap_ = 0;
     float scopeSr_  = 16.0e6f;
     float spin_     = 0.0f;
