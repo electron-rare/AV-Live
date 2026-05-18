@@ -4,6 +4,7 @@ uniform mat4 modelViewProjectionMatrix;
 uniform sampler2D waveformTex;   // width = samples, height = 2 (row0 CH1, row1 CH2)
 uniform float displaceAmount;
 uniform float baseRadius;
+uniform int   renderMode;        // 0 = skin, 1 = points
 
 in vec4 position;
 
@@ -21,5 +22,8 @@ void main() {
     float r    = baseRadius * (1.0 + displaceAmount * wave);
 
     gl_Position = modelViewProjectionMatrix * vec4(dir * r, 1.0);
+    if (renderMode == 1) {
+        gl_PointSize = 3.0;
+    }
     vSphereUV = vec2(lon, lat);
 }

@@ -18,6 +18,7 @@ public:
                      const std::vector<float>& ch2);
 
     void drawSkin();
+    void drawPoints();
     void setColormap(int id) { colormapId_ = id; }
 
 private:

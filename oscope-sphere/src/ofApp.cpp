@@ -56,6 +56,7 @@ void ofApp::draw() {
     ofPushMatrix();
     ofRotateYDeg(ofGetElapsedTimef() * 6.0f);
     if (layerA_) sphere_.drawSkin();
+    if (layerC_) sphere_.drawPoints();
     if (layerB_) rings_.draw();
     ofPopMatrix();
     cam_.end();

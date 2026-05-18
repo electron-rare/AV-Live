@@ -74,6 +74,20 @@ void SphereViz::drawSkin() {
     shader_.setUniform1f("displaceAmount", displace_);
     shader_.setUniform1f("baseRadius", baseRadius_);
     shader_.setUniform1i("colormapId", colormapId_);
+    shader_.setUniform1i("renderMode", 0);
     mesh_.draw();
+    shader_.end();
+}
+
+void SphereViz::drawPoints() {
+    shader_.begin();
+    shader_.setUniformTexture("spectroTex", spectroTex_, 0);
+    shader_.setUniformTexture("waveformTex", waveTex_, 1);
+    shader_.setUniform1f("scrollOffset", scrollOffset_);
+    shader_.setUniform1f("displaceAmount", displace_);
+    shader_.setUniform1f("baseRadius", baseRadius_);
+    shader_.setUniform1i("colormapId", colormapId_);
+    shader_.setUniform1i("renderMode", 1);
+    mesh_.drawVertices();
     shader_.end();
 }

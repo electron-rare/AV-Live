@@ -3,6 +3,7 @@
 uniform sampler2D spectroTex;   // width = time, height = freq, R32F [0,1]
 uniform float scrollOffset;
 uniform int   colormapId;
+uniform int   renderMode;       // 0 = skin, 1 = points
 
 in vec2 vSphereUV;
 out vec4 fragColor;
@@ -33,5 +34,9 @@ void main() {
     float u = fract(vSphereUV.x - scrollOffset);
     float mag = clamp(texture(spectroTex, vec2(u, vSphereUV.y)).r, 0.0, 1.0);
     vec3 col = (colormapId == 0) ? magma(mag) : viridis(mag);
+    if (renderMode == 1) {
+        vec2 d = gl_PointCoord - vec2(0.5);
+        if (dot(d, d) > 0.25) discard;       // round the points
+    }
     fragColor = vec4(col, 1.0);
 }
