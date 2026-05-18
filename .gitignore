@@ -19,8 +19,9 @@ iphone-arbody/**/*.xcuserstate
 iphone-arbody/build/
 iphone-arbody/DerivedData/
 
-# SwiftPM build artifacts
+# SwiftPM build + editor artifacts
 .build/
+.swiftpm/
 
 # openFrameworks — on garde les shaders + settings.json pour qu'ils
 # arrivent sur les autres machines, mais on ignore les binaires.
