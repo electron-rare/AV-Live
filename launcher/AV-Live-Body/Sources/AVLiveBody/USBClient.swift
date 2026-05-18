@@ -58,6 +58,8 @@ final class UnixMuxTransport: MuxTransport {
         guard fd >= 0 else { return nil }
         var addr = sockaddr_un()
         addr.sun_family = sa_family_t(AF_UNIX)
+        precondition(path.utf8.count < 104,
+                     "usbmuxd socket path exceeds sun_path limit")
         _ = path.withCString { src in
             withUnsafeMutablePointer(to: &addr.sun_path) {
                 $0.withMemoryRebound(to: CChar.self, capacity: 104) {
@@ -75,7 +77,20 @@ final class UnixMuxTransport: MuxTransport {
     }
 
     func send(_ data: Data) {
-        data.withUnsafeBytes { _ = Darwin.write(fd, $0.baseAddress, data.count) }
+        guard fd >= 0 else { return }
+        data.withUnsafeBytes { buf in
+            guard let base = buf.baseAddress else { return }
+            var off = 0
+            while off < data.count {
+                let w = Darwin.write(fd, base.advanced(by: off),
+                                     data.count - off)
+                if w <= 0 {
+                    if w < 0 && errno == EINTR { continue }
+                    break
+                }
+                off += w
+            }
+        }
     }
 
     /// Read one usbmux packet: 4-byte LE length prefix then body.
@@ -99,13 +114,22 @@ final class UnixMuxTransport: MuxTransport {
             let r = buf.withUnsafeMutableBytes {
                 Darwin.read(fd, $0.baseAddress!.advanced(by: got), n - got)
             }
-            if r <= 0 { return got > 0 && !exact
-                ? Data(buf[0..<got]) : nil }
+            if r < 0 {
+                if errno == EINTR { continue }
+                return got > 0 && !exact ? Data(buf[0..<got]) : nil
+            }
+            if r == 0 {   // EOF — peer closed
+                return got > 0 && !exact ? Data(buf[0..<got]) : nil
+            }
             got += r
             if !exact { break }
         }
         return Data(buf[0..<got])
     }
 
-    func close() { if fd >= 0 { Darwin.close(fd) } }
+    deinit { close() }
+
+    func close() {
+        if fd >= 0 { Darwin.close(fd); fd = -1 }
+    }
 }
