@@ -1,7 +1,7 @@
 import ARKit
+import AVLiveWire
 import Combine
 import Foundation
-import Network
 import RealityKit
 import SwiftUI
 
@@ -31,15 +31,15 @@ final class ARBodySession: NSObject, ObservableObject, ARSessionDelegate {
     @Published var jointsPerSec: Double = 0
     @Published var bodyCount: Int = 0
     @Published var skeleton2D: SkeletonSnapshot?
+    @Published var usbState: USBServer.State = .idle
     /// Set by the SwiftUI view via GeometryReader so the projection
     /// matches the on-screen ARView size.
     var viewportSize: CGSize = .zero
-    private var host: String = "192.168.0.159"
-    private var pythonPort: UInt16 = 57128
-    private var swiftPort: UInt16 = 57129
     private var sendEnvMesh: Bool = false
     private let session = ARSession()
-    private var conns: [NWConnection] = []
+    private let usb = USBServer()
+    private let videoEncoder = VideoEncoder()
+    private var videoStarted = false
     private var lastFrameTime: TimeInterval = 0
     private var jointsInSecond: Int = 0
     private var lastSecond: TimeInterval = 0
@@ -54,13 +54,22 @@ final class ARBodySession: NSObject, ObservableObject, ARSessionDelegate {
         arView.session.delegate = self
         arView.environment.background = .color(.black)
         arView.debugOptions = []
+        usb.onState = { [weak self] s in
+            Task { @MainActor in self?.usbState = s }
+        }
+        videoEncoder.onPayload = { [weak self] payload in
+            Task { @MainActor in
+                guard let self, self.usbState == .connected else {
+                    return
+                }
+                self.usb.send(tag: .video, pid: -1,
+                              timestamp: self.lastFrameTime,
+                              payload: payload.encoded())
+            }
+        }
     }
 
-    func configure(host: String, pythonPort: UInt16, swiftPort: UInt16,
-                   sendEnvMesh: Bool) {
-        self.host = host
-        self.pythonPort = pythonPort
-        self.swiftPort = swiftPort
+    func configure(sendEnvMesh: Bool) {
         self.sendEnvMesh = sendEnvMesh
     }
 
@@ -83,7 +92,7 @@ final class ARBodySession: NSObject, ObservableObject, ARSessionDelegate {
             feats.append("env-mesh: requires separate session (TODO)")
         }
         cfg.automaticImageScaleEstimationEnabled = true
-        openUDP()
+        usb.start()
         session.run(cfg, options: [.resetTracking, .removeExistingAnchors])
         status = feats.isEmpty
             ? "running (RGB only)"
@@ -93,30 +102,11 @@ final class ARBodySession: NSObject, ObservableObject, ARSessionDelegate {
 
     func stop() {
         session.pause()
-        for c in conns { c.cancel() }
-        conns.removeAll()
+        usb.stop()
+        videoEncoder.stop()
+        videoStarted = false
         running = false
         status = "stopped"
-    }
-
-    // MARK: - UDP fanout
-
-    private func openUDP() {
-        let ports: [UInt16] = [pythonPort, swiftPort]
-        for p in ports where p != 0 {
-            guard let nwPort = NWEndpoint.Port(rawValue: p) else { continue }
-            let conn = NWConnection(
-                to: .hostPort(host: NWEndpoint.Host(host), port: nwPort),
-                using: .udp)
-            conn.start(queue: .global(qos: .userInitiated))
-            conns.append(conn)
-        }
-    }
-
-    private func sendDatagram(_ data: Data) {
-        for c in conns {
-            c.send(content: data, completion: .idempotent)
-        }
     }
 
     // MARK: - ARSessionDelegate
@@ -128,16 +118,26 @@ final class ARBodySession: NSObject, ObservableObject, ARSessionDelegate {
             if t - self.lastFrameTime < 1.0 / 30.0 { return }
             self.lastFrameTime = t
 
+            // Encode the camera frame to HEVC and stream it over USB.
+            let img = frame.capturedImage
+            let w = Int32(CVPixelBufferGetWidth(img))
+            let h = Int32(CVPixelBufferGetHeight(img))
+            if !self.videoStarted, w > 0, h > 0 {
+                self.videoEncoder.start(width: w, height: h)
+                self.videoStarted = true
+            }
+            if self.videoStarted {
+                self.videoEncoder.encode(img, pts: t)
+            }
+
             var count: Int = 0
             var firstBody: ARBodyAnchor?
             for anchor in frame.anchors {
                 guard let body = anchor as? ARBodyAnchor else { continue }
-                self.publishJoints(pid: count, body: body)
+                self.publishUSB(pid: count, timestamp: t, body: body)
                 if count == 0 { firstBody = body }
                 count += 1
             }
-            self.sendOSC(addr: "/body3d/count",
-                         args: [.int32(Int32(count))])
             self.framesSent &+= 1
             self.bodyCount = count
             self.updateSkeleton2D(body: firstBody, camera: frame.camera)
@@ -191,64 +191,27 @@ final class ARBodySession: NSObject, ObservableObject, ARSessionDelegate {
     /// indices without re-reading the ARKit skeleton definition.
     var bodyParentIndices: [Int] { bodyParents }
 
-    private func publishJoints(pid: Int, body: ARBodyAnchor) {
+    private func publishUSB(pid: Int, timestamp: TimeInterval,
+                             body: ARBodyAnchor) {
+        guard usbState == .connected else { return }
         let skeleton = body.skeleton
         let transforms = skeleton.jointModelTransforms
         let root = body.transform
-        for (idx, m) in transforms.enumerated() {
-            let world = root * m
-            sendOSC(addr: "/body3d/kp",
-                    args: [.int32(Int32(pid)),
-                           .int32(Int32(idx)),
-                           .float32(world.columns.3.x),
-                           .float32(world.columns.3.y),
-                           .float32(world.columns.3.z)])
+        var payload = SkeletonPayload()
+        let n = min(SkeletonPayload.jointCount, transforms.count)
+        for i in 0..<n {
+            let w = root * transforms[i]
+            payload.joints[i] = SIMD3(w.columns.3.x,
+                                      w.columns.3.y,
+                                      w.columns.3.z)
+            payload.valid[i] = skeleton.isJointTracked(i)
         }
+        usb.send(tag: .skeleton,
+                 pid: Int16(clamping: pid),
+                 timestamp: timestamp,
+                 payload: payload.encoded())
     }
 
-    // MARK: - OSC minimal encoder
-
-    enum OSCArg {
-        case int32(Int32)
-        case float32(Float)
-        case string(String)
-    }
-
-    private func sendOSC(addr: String, args: [OSCArg]) {
-        var data = Data()
-        appendOSCString(addr, into: &data)
-        var types = ","
-        for a in args {
-            switch a {
-            case .int32: types.append("i")
-            case .float32: types.append("f")
-            case .string: types.append("s")
-            }
-        }
-        appendOSCString(types, into: &data)
-        for a in args {
-            switch a {
-            case .int32(let v):
-                var be = v.bigEndian
-                withUnsafeBytes(of: &be) { data.append(contentsOf: $0) }
-            case .float32(let v):
-                var be = v.bitPattern.bigEndian
-                withUnsafeBytes(of: &be) { data.append(contentsOf: $0) }
-            case .string(let s):
-                appendOSCString(s, into: &data)
-            }
-        }
-        sendDatagram(data)
-    }
-
-    private func appendOSCString(_ s: String, into data: inout Data) {
-        let bytes = Array(s.utf8) + [0]
-        data.append(contentsOf: bytes)
-        let pad = (4 - data.count % 4) % 4
-        if pad > 0 {
-            data.append(contentsOf: [UInt8](repeating: 0, count: pad))
-        }
-    }
 }
 
 struct ARViewContainer: UIViewRepresentable {

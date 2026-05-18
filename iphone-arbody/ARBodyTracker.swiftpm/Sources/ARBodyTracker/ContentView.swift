@@ -4,9 +4,6 @@ import RealityKit
 
 struct ContentView: View {
     @StateObject private var session = ARBodySession()
-    @State private var host: String = "192.168.0.159"
-    @State private var pythonPort: String = "57128"   // -> data_only_viz IphoneOSCListener
-    @State private var swiftPort: String = "57129"    // -> AVLiveBody ArkitOSCListener (diagnostic)
     @State private var sendEnvMesh: Bool = false
 
     /// Replace the live ARView with a gradient placeholder. Camera is
@@ -40,6 +37,22 @@ struct ContentView: View {
         }
     }
 
+    private var usbDotColor: Color {
+        switch session.usbState {
+        case .idle:       return .gray
+        case .listening:  return .yellow
+        case .connected:  return .green
+        }
+    }
+
+    private var usbStateLabel: String {
+        switch session.usbState {
+        case .idle:       return "idle"
+        case .listening:  return "listening :\(USBServer.port)"
+        case .connected:  return "connected"
+        }
+    }
+
     @ViewBuilder
     private var cameraBackground: some View {
         if useMockBackground {
@@ -66,24 +79,6 @@ struct ContentView: View {
             Text("AR Body → AV-Live")
                 .font(.headline)
                 .foregroundColor(.white)
-            HStack {
-                Text("Host").foregroundColor(.white)
-                TextField("GrosMac IP", text: $host)
-                    .keyboardType(.numbersAndPunctuation)
-                    .textFieldStyle(.roundedBorder)
-            }
-            HStack {
-                Text("Py").foregroundColor(.white)
-                TextField("57128", text: $pythonPort)
-                    .keyboardType(.numberPad)
-                    .textFieldStyle(.roundedBorder)
-                    .frame(width: 70)
-                Text("Swift").foregroundColor(.white)
-                TextField("57129", text: $swiftPort)
-                    .keyboardType(.numberPad)
-                    .textFieldStyle(.roundedBorder)
-                    .frame(width: 70)
-            }
             Toggle(isOn: $sendEnvMesh) {
                 Text("Env mesh (LiDAR)").foregroundColor(.white)
             }
@@ -92,11 +87,7 @@ struct ContentView: View {
                     if session.running {
                         session.stop()
                     } else {
-                        session.configure(
-                            host: host,
-                            pythonPort: UInt16(pythonPort) ?? 57128,
-                            swiftPort: UInt16(swiftPort) ?? 57129,
-                            sendEnvMesh: sendEnvMesh)
+                        session.configure(sendEnvMesh: sendEnvMesh)
                         session.start()
                     }
                 }
@@ -109,9 +100,18 @@ struct ContentView: View {
                     .background(.black.opacity(0.5))
                     .cornerRadius(6)
             }
-            Text("bodies: \(session.bodyCount)  frames: \(session.framesSent)  joints/s: \(Int(session.jointsPerSec))")
-                .font(.caption2)
-                .foregroundColor(.white)
+            HStack(spacing: 6) {
+                Circle()
+                    .fill(usbDotColor)
+                    .frame(width: 8, height: 8)
+                Text("USB \(usbStateLabel)")
+                    .font(.caption2)
+                    .foregroundColor(.white.opacity(0.8))
+                Spacer(minLength: 8)
+                Text("bodies: \(session.bodyCount)  frames: \(session.framesSent)  j/s: \(Int(session.jointsPerSec))")
+                    .font(.caption2)
+                    .foregroundColor(.white)
+            }
         }
         .padding(12)
         .background(.black.opacity(0.5))
