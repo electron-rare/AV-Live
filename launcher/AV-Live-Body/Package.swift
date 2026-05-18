@@ -15,6 +15,14 @@ let package = Package(
             swiftSettings: [
                 .swiftLanguageMode(.v5),
             ]
-        )
+        ),
+        .testTarget(
+            name: "AVLiveBodyTests",
+            dependencies: ["AVLiveBody"],
+            path: "Tests/AVLiveBodyTests",
+            swiftSettings: [
+                .swiftLanguageMode(.v5),
+            ]
+        ),
     ]
 )
