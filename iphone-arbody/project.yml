@@ -10,6 +10,10 @@ configFiles:
   Debug: Config/Shared.xcconfig
   Release: Config/Shared.xcconfig
 
+packages:
+  AVLiveWire:
+    path: ../shared/AVLiveWire
+
 targets:
   ARBodyTracker:
     type: application
@@ -19,6 +23,9 @@ targets:
       - path: ARBodyTracker.swiftpm/Sources/ARBodyTracker
         excludes:
           - Info.plist
+    dependencies:
+      - package: AVLiveWire
+        product: AVLiveWire
     configFiles:
       Debug: Config/Shared.xcconfig
       Release: Config/Shared.xcconfig
