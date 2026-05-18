@@ -47,11 +47,11 @@ struct ContentView: View {
     private func wire() {
         let controller = self.controller
         let multiHMR = self.multiHMR
-        let consumer = self.consumer
         let cameraK = self.cameraK
-        consumer.onVideoFrame = { pixelBuffer in
+        consumer.onVideoFrame = { [weak consumer] pixelBuffer in
             MainActor.assumeIsolated {
                 controller.updateVideo(pixelBuffer)
+                guard let consumer else { return }
                 if let hmr = multiHMR {
                     let raw = hmr.infer(
                         pixelBuffer, cameraK: cameraK)
