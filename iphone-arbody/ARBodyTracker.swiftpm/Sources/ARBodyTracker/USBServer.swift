@@ -17,12 +17,16 @@ final class USBServer {
     func start() {
         let params = NWParameters.tcp
         params.allowLocalEndpointReuse = true
-        listener = try? NWListener(using: params,
-            on: NWEndpoint.Port(rawValue: Self.port)!)
-        listener?.newConnectionHandler = { [weak self] conn in
+        guard let l = try? NWListener(using: params,
+            on: NWEndpoint.Port(rawValue: Self.port)!) else {
+            onState?(.idle)
+            return
+        }
+        listener = l
+        l.newConnectionHandler = { [weak self] conn in
             self?.adopt(conn)
         }
-        listener?.start(queue: queue)
+        l.start(queue: queue)
         onState?(.listening)
     }
 
@@ -43,6 +47,8 @@ final class USBServer {
     func send(tag: FrameTag, pid: Int16, timestamp: Double,
               payload: Data) {
         guard let conn = connection else { return }
+        guard payload.count <= Int(StreamDemuxer.maxPayloadLength)
+        else { return }
         let header = FrameHeader(tag: tag, pid: pid,
             timestamp: timestamp, length: UInt32(payload.count))
         conn.send(content: header.encoded() + payload,
