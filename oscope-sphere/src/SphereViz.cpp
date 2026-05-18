@@ -78,6 +78,7 @@ void SphereViz::bindUniforms() {
     shader_.setUniformTexture("waveformTex", waveTex_, 1);
     shader_.setUniform1f("scrollOffset", scrollOffset_);
     shader_.setUniform1f("displaceAmount", displace_);
+    shader_.setUniform1f("spectroAmount", spectroAmount_);
     shader_.setUniform1f("baseRadius", baseRadius_);
     shader_.setUniform1i("colormapId", colormapId_);
 }

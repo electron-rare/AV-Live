@@ -5,7 +5,9 @@ uniform float scrollOffset;
 uniform int   colormapId;
 uniform int   renderMode;       // 0 = skin, 1 = points
 
-in vec2 vSphereUV;
+in vec2  vSphereUV;
+in vec3  vViewPos;
+in float vWave;
 out vec4 fragColor;
 
 // Polynomial colormap fits (public domain, Matt Zucker).
@@ -34,9 +36,24 @@ void main() {
     float u = fract(vSphereUV.x - scrollOffset);
     float mag = clamp(texture(spectroTex, vec2(u, vSphereUV.y)).r, 0.0, 1.0);
     vec3 col = (colormapId == 0) ? magma(mag) : viridis(mag);
+
     if (renderMode == 1) {
+        // round point sprites + a touch of waveform sheen
         vec2 d = gl_PointCoord - vec2(0.5);
-        if (dot(d, d) > 0.25) discard;       // round the points
+        if (dot(d, d) > 0.25) discard;
+        col += 0.20 * abs(vWave);
+        fragColor = vec4(col, 1.0);
+        return;
     }
-    fragColor = vec4(col, 1.0);
+
+    // skin: light the displaced relief with a screen-space face normal
+    vec3 N = normalize(cross(dFdx(vViewPos), dFdy(vViewPos)));
+    vec3 V = normalize(-vViewPos);
+    if (dot(N, V) < 0.0) N = -N;
+    vec3  L    = normalize(vec3(0.45, 0.65, 0.75));
+    float diff = max(dot(N, L), 0.0);
+    float rim  = pow(1.0 - max(dot(N, V), 0.0), 2.5);
+
+    vec3 lit = col * (0.35 + 0.85 * diff) + rim * vec3(0.35, 0.45, 0.65);
+    fragColor = vec4(lit, 1.0);
 }

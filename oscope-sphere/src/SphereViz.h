@@ -35,6 +35,7 @@ private:
     int   waveformLen_ = 0;
     float baseRadius_  = 200.0f;
     float scrollOffset_ = 0.0f;
-    float displace_    = 0.18f;
+    float displace_     = 0.28f;
+    float spectroAmount_ = 0.40f;
     int   colormapId_  = 0;
 };

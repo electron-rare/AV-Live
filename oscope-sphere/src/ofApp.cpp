@@ -1,4 +1,6 @@
 #include "ofApp.h"
+#include <algorithm>
+#include <cmath>
 
 void ofApp::setup() {
     ofSetFrameRate(60);
@@ -30,10 +32,6 @@ void ofApp::setup() {
 void ofApp::update() {
     if (frozen_) return;
 
-    // Auto-rotation advances only when the mouse is not orbiting the camera.
-    if (!ofGetMousePressed())
-        spin_ += 6.0f * static_cast<float>(ofGetLastFrameTime());
-
     if (demoMode_) {
         demo_.next(buf1_, buf2_, 8192);
     } else {
@@ -48,6 +46,17 @@ void ofApp::update() {
     analyzerCh1_.update(buf1_, buf1_, sr);
     analyzerCh2_.update(buf2_, buf2_, sr);
 
+    // Audio-reactive motion: rotation speed tracks signal energy, the whole
+    // sphere pulses with the kick transient.
+    const oscope::AudioBands& b1 = analyzerCh1_.bands();
+    const oscope::AudioBands& b2 = analyzerCh2_.bands();
+    const float energy = 0.5f * (b1.full + b2.full);
+    const float kick   = std::max(b1.kick, b2.kick);
+    const float dt     = static_cast<float>(ofGetLastFrameTime());
+    if (!ofGetMousePressed())
+        spin_ += (8.0f + 80.0f * energy) * dt;
+    pulse_ += (1.0f + 0.20f * kick - pulse_) * 0.25f;
+
     sphere_.setColormap(colormap_);
     sphere_.pushSpectrogramColumn(analyzerCh1_.magDown(),
                                   analyzerCh2_.magDown());
@@ -56,9 +65,12 @@ void ofApp::update() {
 }
 
 void ofApp::draw() {
+    const float t = ofGetElapsedTimef();
     cam_.begin();
     ofPushMatrix();
     ofRotateYDeg(spin_);
+    ofRotateXDeg(16.0f * std::sin(t * 0.27f));   // slow tumble
+    ofScale(pulse_, pulse_, pulse_);             // audio pulse
     if (layerA_) sphere_.drawSkin();
     if (layerC_) sphere_.drawPoints();
     if (layerB_) rings_.draw();
