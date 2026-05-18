@@ -11,7 +11,7 @@ void ofApp::setup() {
     cam_.setNearClip(1.0f);
     cam_.setFarClip(5000.0f);
 
-    sphere_.setup(5, 512, 256);
+    sphere_.setup(5, 512, 256, 1024);
 
     hantek_.setSampleRate(16000000u);
     const oscope::HantekStatus st = hantek_.start();
@@ -46,6 +46,7 @@ void ofApp::update() {
     sphere_.setColormap(colormap_);
     sphere_.pushSpectrogramColumn(analyzerCh1_.magDown(),
                                   analyzerCh2_.magDown());
+    sphere_.setWaveform(buf1_, buf2_);
 }
 
 void ofApp::draw() {

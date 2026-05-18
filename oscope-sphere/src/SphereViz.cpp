@@ -1,7 +1,9 @@
 #include "SphereViz.h"
 #include <algorithm>
 
-void SphereViz::setup(int icoIterations, int spectroWidth, int spectroHeight) {
+void SphereViz::setup(int icoIterations, int spectroWidth, int spectroHeight,
+                      int waveformLen) {
+    waveformLen_ = waveformLen;
     spectro_ = std::make_unique<oscope::SpectrogramBuffer>(spectroWidth,
                                                            spectroHeight);
 
@@ -23,6 +25,12 @@ void SphereViz::setup(int icoIterations, int spectroWidth, int spectroHeight) {
     spectroTex_.setTextureWrap(GL_REPEAT, GL_CLAMP_TO_EDGE);
     spectroTex_.setTextureMinMagFilter(GL_LINEAR, GL_LINEAR);
 
+    wavePix_.allocate(waveformLen, 2, OF_PIXELS_GRAY);
+    wavePix_.set(0.0f);
+    waveTex_.allocate(wavePix_);
+    waveTex_.setTextureWrap(GL_REPEAT, GL_CLAMP_TO_EDGE);
+    waveTex_.setTextureMinMagFilter(GL_LINEAR, GL_LINEAR);
+
     if (!shader_.load("shaders/sphere"))
         ofLogError("SphereViz") << "failed to load shaders/sphere";
 }
@@ -37,10 +45,34 @@ void SphereViz::pushSpectrogramColumn(const std::vector<float>& magCh1,
                     static_cast<float>(spectro_->width());
 }
 
+void SphereViz::setWaveform(const std::vector<float>& ch1,
+                            const std::vector<float>& ch2) {
+    float* px = wavePix_.getData();
+    const int L = waveformLen_;
+    auto fillRow = [&](const std::vector<float>& src, int row) {
+        const int n = static_cast<int>(src.size());
+        for (int i = 0; i < L; ++i) {
+            float v = 0.0f;
+            if (n > 0) {
+                int idx = n - L + i;          // newest L samples
+                if (idx < 0) idx = 0;
+                v = src[idx];
+            }
+            px[row * L + i] = v;
+        }
+    };
+    fillRow(ch1, 0);
+    fillRow(ch2, 1);
+    waveTex_.loadData(wavePix_);
+}
+
 void SphereViz::drawSkin() {
     shader_.begin();
     shader_.setUniformTexture("spectroTex", spectroTex_, 0);
+    shader_.setUniformTexture("waveformTex", waveTex_, 1);
     shader_.setUniform1f("scrollOffset", scrollOffset_);
+    shader_.setUniform1f("displaceAmount", displace_);
+    shader_.setUniform1f("baseRadius", baseRadius_);
     shader_.setUniform1i("colormapId", colormapId_);
     mesh_.draw();
     shader_.end();
