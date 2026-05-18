@@ -46,3 +46,6 @@ targets:
       - target: AVLiveBody
       - package: AVLiveWire
         product: AVLiveWire
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
