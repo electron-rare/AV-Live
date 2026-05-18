@@ -40,11 +40,11 @@ final class USBSkeletonConsumer: ObservableObject {
         stateLock.lock()
         if running { stateLock.unlock(); return }
         running = true
-        stateLock.unlock()
         let t = Thread { [weak self] in self?.loop() }
         t.name = "cc.avlive.usbconsumer"
-        t.start()
         thread = t
+        stateLock.unlock()
+        t.start()
     }
 
     func stop() {
