@@ -75,6 +75,7 @@ final class Skeleton3DRenderer: ObservableObject {
         var faceJoints: [ModelEntity]      // 68 dlib face landmarks
         var leftHandJoints: [ModelEntity]  // 21 cyan
         var rightHandJoints: [ModelEntity] // 21 magenta
+        var arkitMarkers: [ModelEntity]    // 91 yellow ARKit/USB joints
     }
 
     private var persons: [Int: PersonEntities] = [:]
@@ -135,7 +136,6 @@ final class Skeleton3DRenderer: ObservableObject {
                     Task { @MainActor in self?.lastArkit = frames }
                 }
         }
-        // TODO: render yellow ARKit markers from lastArkit in update()
     }
 
     func detach() {
@@ -163,8 +163,9 @@ final class Skeleton3DRenderer: ObservableObject {
 
         guard let anchor = rootAnchor else { return }
 
-        // Mark fresh pids
+        // Mark fresh pids (MediaPipe pose + ARKit/USB skeleton)
         for pid in frames.keys { lastSeenAt[pid] = now }
+        for pid in lastArkit.keys { lastSeenAt[pid] = now }
         // GC stale persons
         let cutoff = now - Self.retainSec
         for (pid, p) in persons where (lastSeenAt[pid] ?? 0) < cutoff {
@@ -177,6 +178,41 @@ final class Skeleton3DRenderer: ObservableObject {
             let entities = persons[pid] ?? makePerson(pid: pid, parent: anchor)
             persons[pid] = entities
             apply(frame: frame, pid: pid, to: entities)
+        }
+
+        // Ensure entity trees exist for ARKit/USB-only pids, then
+        // draw their 91 joint markers.
+        for pid in lastArkit.keys where persons[pid] == nil {
+            persons[pid] = makePerson(pid: pid, parent: anchor)
+        }
+        applyArkit()
+    }
+
+    /// Draw the 91-joint ARKit/USB skeletons as yellow joint markers.
+    /// ARKit joints are world-space metric; convert to RealityKit
+    /// space (x, y, z) -> (x, -y, -z) like the MediaPipe path.
+    private func applyArkit() {
+        for (pid, entities) in persons {
+            guard let frame = lastArkit[pid] else {
+                for m in entities.arkitMarkers { m.isEnabled = false }
+                continue
+            }
+            let n = min(entities.arkitMarkers.count,
+                        frame.joints.count, frame.hasJoint.count)
+            for i in 0..<n {
+                let marker = entities.arkitMarkers[i]
+                if frame.hasJoint[i] {
+                    let j = frame.joints[i]
+                    marker.transform.translation =
+                        SIMD3<Float>(j.x, -j.y, -j.z)
+                    marker.isEnabled = true
+                } else {
+                    marker.isEnabled = false
+                }
+            }
+            for i in n..<entities.arkitMarkers.count {
+                entities.arkitMarkers[i].isEnabled = false
+            }
         }
     }
 
@@ -415,13 +451,25 @@ final class Skeleton3DRenderer: ObservableObject {
             root.addChild(er)
             rightHand.append(er)
         }
-        NSLog("Skeleton3DRenderer: spawned pid=%d (33 joints, %d bones, 68 face, 21+21 hands)",
+        // ARKit/USB skeleton: 91 yellow joint markers.
+        let arkitMat = SimpleMaterial(
+            color: .systemYellow, roughness: 0.6, isMetallic: false)
+        var arkitMarkers: [ModelEntity] = []
+        arkitMarkers.reserveCapacity(91)
+        for _ in 0..<91 {
+            let e = ModelEntity(mesh: sphereMesh, materials: [arkitMat])
+            e.isEnabled = false
+            root.addChild(e)
+            arkitMarkers.append(e)
+        }
+        NSLog("Skeleton3DRenderer: spawned pid=%d (%d bones, +91 arkit)",
               pid, bones.count)
         return PersonEntities(root: root,
                               joints: joints,
                               bones: bones,
                               faceJoints: faceJoints,
                               leftHandJoints: leftHand,
-                              rightHandJoints: rightHand)
+                              rightHandJoints: rightHand,
+                              arkitMarkers: arkitMarkers)
     }
 }
