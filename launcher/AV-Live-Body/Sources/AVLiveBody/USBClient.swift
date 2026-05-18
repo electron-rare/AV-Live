@@ -1,4 +1,5 @@
 import Foundation
+import Darwin
 
 /// Transport abstraction over the usbmuxd Unix socket. The real
 /// implementation wraps a `socket(AF_UNIX)`; tests inject a mock.
@@ -46,4 +47,65 @@ final class USBClient {
         else { return false }
         return number == 0
     }
+}
+
+/// Production transport: blocking AF_UNIX socket to usbmuxd.
+final class UnixMuxTransport: MuxTransport {
+    private var fd: Int32 = -1
+
+    init?(path: String = "/var/run/usbmuxd") {
+        fd = socket(AF_UNIX, SOCK_STREAM, 0)
+        guard fd >= 0 else { return nil }
+        var addr = sockaddr_un()
+        addr.sun_family = sa_family_t(AF_UNIX)
+        _ = path.withCString { src in
+            withUnsafeMutablePointer(to: &addr.sun_path) {
+                $0.withMemoryRebound(to: CChar.self, capacity: 104) {
+                    strcpy($0, src)
+                }
+            }
+        }
+        let size = socklen_t(MemoryLayout<sockaddr_un>.size)
+        let ok = withUnsafePointer(to: &addr) {
+            $0.withMemoryRebound(to: sockaddr.self, capacity: 1) {
+                Darwin.connect(fd, $0, size)
+            }
+        }
+        if ok != 0 { Darwin.close(fd); return nil }
+    }
+
+    func send(_ data: Data) {
+        data.withUnsafeBytes { _ = Darwin.write(fd, $0.baseAddress, data.count) }
+    }
+
+    /// Read one usbmux packet: 4-byte LE length prefix then body.
+    func receivePacket() -> Data? {
+        guard let head = readN(4) else { return nil }
+        guard let len = USBMuxProtocol.readLE32(head, 0) else { return nil }
+        let total = Int(len)
+        guard total >= 16, let rest = readN(total - 4) else { return nil }
+        return head + rest
+    }
+
+    /// Read raw tunneled bytes after a successful Connect.
+    func readStream(max: Int = 65536) -> Data? {
+        readN(max, exact: false)
+    }
+
+    private func readN(_ n: Int, exact: Bool = true) -> Data? {
+        var buf = [UInt8](repeating: 0, count: n)
+        var got = 0
+        while got < n {
+            let r = buf.withUnsafeMutableBytes {
+                Darwin.read(fd, $0.baseAddress!.advanced(by: got), n - got)
+            }
+            if r <= 0 { return got > 0 && !exact
+                ? Data(buf[0..<got]) : nil }
+            got += r
+            if !exact { break }
+        }
+        return Data(buf[0..<got])
+    }
+
+    func close() { if fd >= 0 { Darwin.close(fd) } }
 }
