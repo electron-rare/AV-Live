@@ -2,9 +2,12 @@ import AVLiveWire
 import Foundation
 import simd
 
-/// Associates Multi-HMR meshes with USB skeletons and corrects the
-/// mesh pelvis depth. Pure, stateless — unit-testable.
+/// Overrides the highest-scoring Multi-HMR mesh's pelvis depth with
+/// the first valid USB skeleton pelvis z. Single-person assumption:
+/// with multiple skeletons in the dict the source pelvis is arbitrary
+/// (dict iteration order). Pure, stateless — unit-testable.
 enum BodyFusion {
+    /// ARSkeleton3D joint 0 = root (hips), per ARSkeletonDefinition.defaultBody3D.
     static let pelvisJoint = 0
 
     static func fuse(persons: [MultiHMRPerson],

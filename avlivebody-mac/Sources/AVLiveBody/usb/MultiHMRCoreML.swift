@@ -30,15 +30,14 @@ final class MultiHMRCoreML {
     init?() {
         guard let url = Bundle.main.url(
             forResource: "multihmr_full_672_s",
-            withExtension: "mlpackage") else {
+            withExtension: "mlmodelc") else {
             NSLog("MultiHMRCoreML: mlpackage resource missing")
             return nil
         }
         let cfg = MLModelConfiguration()
         cfg.computeUnits = .cpuAndGPU
         do {
-            let compiled = try MLModel.compileModel(at: url)
-            model = try MLModel(contentsOf: compiled, configuration: cfg)
+            model = try MLModel(contentsOf: url, configuration: cfg)
         } catch {
             NSLog("MultiHMRCoreML: load failed %@",
                   String(describing: error))
