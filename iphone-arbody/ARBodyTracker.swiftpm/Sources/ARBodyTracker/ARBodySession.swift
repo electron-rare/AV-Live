@@ -5,14 +5,10 @@ import Foundation
 import RealityKit
 import SwiftUI
 
-/// Drives the ARKit body-tracking session and broadcasts joints to
-/// GrosMac via OSC UDP. Two destinations are supported simultaneously :
-/// - Python `IphoneOSCListener` on :57128 (drives ArkitFuse + cam-z lock)
-/// - Swift `ArkitOSCListener` on :57129 (diagnostic overlay in AVLiveBody)
+/// Drives the ARKit body-tracking session and streams the 91-joint
+/// skeleton plus HEVC-encoded camera video to the tethered Mac over
+/// USB (AVLiveWire frames via usbmuxd). No network involved.
 ///
-/// LiDAR (sceneDepth + scene reconstruction mesh) is enabled when the
-/// device supports it (iPhone Pro / Pro Max). RGB-only fallback on
-/// non-LiDAR devices.
 /// Lightweight 2D snapshot of the tracked skeleton, ready for SwiftUI
 /// Canvas. Joint indices follow `ARSkeletonDefinition.defaultBody3D`.
 struct SkeletonSnapshot: Equatable {

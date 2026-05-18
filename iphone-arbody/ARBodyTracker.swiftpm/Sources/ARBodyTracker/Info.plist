@@ -15,11 +15,7 @@
     <key>NSCameraUsageDescription</key>
     <string>Required for ARKit body tracking and LiDAR depth capture.</string>
     <key>NSLocalNetworkUsageDescription</key>
-    <string>Streams ARKit body joints (OSC/UDP) to the AV-Live host on the local network.</string>
-    <key>NSBonjourServices</key>
-    <array>
-        <string>_osc._udp</string>
-    </array>
+    <string>Streams ARKit body tracking and camera video to a tethered Mac over USB.</string>
     <key>UIApplicationSceneManifest</key>
     <dict>
         <key>UIApplicationSupportsMultipleScenes</key><false/>
