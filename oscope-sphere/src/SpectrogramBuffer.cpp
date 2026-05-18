@@ -30,22 +30,21 @@ float SpectrogramBuffer::norm01(float magnitude) {
 
 void SpectrogramBuffer::pushColumn(const std::vector<float>& magCh1,
                                    const std::vector<float>& magCh2) {
-    const int col  = writeIndex_;
-    const int half = height_ / 2;
+    const int col   = writeIndex_;
+    const int half  = height_ / 2;
+    const float denom = static_cast<float>(std::max(1, half - 1));
 
     // CH1 -> northern rows [half, height_): row half = equator (low freq),
     // row height_-1 = north pole (high freq).
     for (int r = half; r < height_; ++r) {
-        const float frac = static_cast<float>(r - half) /
-                           static_cast<float>(half - 1);
+        const float frac = static_cast<float>(r - half) / denom;
         data_[static_cast<std::size_t>(r) * width_ + col] =
             norm01(logResample(magCh1, frac));
     }
     // CH2 -> southern rows [0, half): row half-1 = equator (low freq),
     // row 0 = south pole (high freq).
     for (int r = 0; r < half; ++r) {
-        const float frac = static_cast<float>(half - 1 - r) /
-                           static_cast<float>(half - 1);
+        const float frac = static_cast<float>(half - 1 - r) / denom;
         data_[static_cast<std::size_t>(r) * width_ + col] =
             norm01(logResample(magCh2, frac));
     }
