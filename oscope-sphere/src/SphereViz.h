@@ -26,6 +26,7 @@ private:
 
     std::unique_ptr<oscope::SpectrogramBuffer> spectro_;
     ofVboMesh     mesh_;
+    ofVboMesh     pointsMesh_;
     ofShader      shader_;
     ofTexture     spectroTex_;
     ofTexture     waveTex_;

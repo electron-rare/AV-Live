@@ -20,10 +20,11 @@ void main() {
     float row  = (dir.y >= 0.0) ? 0.25 : 0.75;          // CH1 north, CH2 south
     float wave = texture(waveformTex, vec2(lon, row)).r; // [-1,1]
     float r    = baseRadius * (1.0 + displaceAmount * wave);
+    if (renderMode == 1) {
+        r *= 1.05;            // float the point cloud just outside the skin
+        gl_PointSize = 6.0;
+    }
 
     gl_Position = modelViewProjectionMatrix * vec4(dir * r, 1.0);
-    if (renderMode == 1) {
-        gl_PointSize = 3.0;
-    }
     vSphereUV = vec2(lon, lat);
 }

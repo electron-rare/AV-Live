@@ -14,6 +14,13 @@ void SphereViz::setup(int icoIterations, int spectroWidth, int spectroHeight,
     mesh_.addNormals(src.getNormals());
     mesh_.addIndices(src.getIndices());
 
+    // A separate GL_POINTS-primitive mesh for layer C. drawVertices() on the
+    // indexed skin mesh does not yield a proper point primitive (gl_PointCoord
+    // ends up degenerate), so the point cloud needs its own points mesh.
+    pointsMesh_.clear();
+    pointsMesh_.setMode(OF_PRIMITIVE_POINTS);
+    pointsMesh_.addVertices(src.getVertices());
+
     // ofDisableArbTex() is a global, app-wide GL state change: it makes all
     // textures use normalized [0,1] coordinates. oscope-sphere has a single
     // SphereViz so this is safe; revisit if other ARB-texture components are
@@ -87,6 +94,6 @@ void SphereViz::drawPoints() {
     shader_.begin();
     bindUniforms();
     shader_.setUniform1i("renderMode", 1);
-    mesh_.drawVertices();
+    pointsMesh_.draw();
     shader_.end();
 }
