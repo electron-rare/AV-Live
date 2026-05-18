@@ -24,7 +24,11 @@ final class SceneController {
     private var orbitPitch: Float = 0
     private var orbitRadius: Float = 3.0
 
+    private var didSetUp = false
+
     func setUp() {
+        guard !didSetUp else { return }
+        didSetUp = true
         arView.environment.background = .color(.black)
         arView.scene.addAnchor(worldAnchor)
 
@@ -94,13 +98,19 @@ final class OrbitTarget: NSObject {
     private var last: CGPoint = .zero
 
     @objc func handlePan(_ g: NSPanGestureRecognizer) {
-        let p = g.translation(in: g.view)
-        if g.state == .began { last = p }
-        let dx = Float(p.x - last.x)
-        let dy = Float(p.y - last.y)
-        last = p
-        Task { @MainActor in
-            self.controller?.orbit(dx: dx, dy: -dy)
+        switch g.state {
+        case .began:
+            last = g.translation(in: g.view)
+        case .changed:
+            let p = g.translation(in: g.view)
+            let dx = Float(p.x - last.x)
+            let dy = Float(p.y - last.y)
+            last = p
+            MainActor.assumeIsolated {
+                self.controller?.orbit(dx: dx, dy: -dy)
+            }
+        default:
+            break
         }
     }
 }
