@@ -1,0 +1,5 @@
+#include? "Local.xcconfig"
+
+MACOSX_DEPLOYMENT_TARGET = 15.0
+SWIFT_VERSION = 5.10
+CODE_SIGN_STYLE = Automatic
