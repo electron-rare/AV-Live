@@ -1,3 +1,5 @@
+> Note (2026-05-18): the `AV-Live-Body` directory has been archived to `_archive-AV-Live-Body/` — superseded by the new app at `/avlivebody-mac/`. See `docs/superpowers/specs/2026-05-18-avlivebody-macos-rewrite-design.md`.
+
 # launcher — AVLiveLauncher
 
 App menubar macOS (SwiftUI, SwiftPM, macOS 11+) qui démarre/arrête `sclang+scsynth`, le serveur web et `oscope-of`, log les sorties, et expose un mode picker.
