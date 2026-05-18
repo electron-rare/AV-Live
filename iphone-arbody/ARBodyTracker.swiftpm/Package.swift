@@ -8,9 +8,15 @@ let package = Package(
     products: [
         .executable(name: "ARBodyTracker", targets: ["ARBodyTracker"]),
     ],
+    dependencies: [
+        .package(path: "../../shared/AVLiveWire"),
+    ],
     targets: [
         .executableTarget(
             name: "ARBodyTracker",
+            dependencies: [
+                .product(name: "AVLiveWire", package: "AVLiveWire"),
+            ],
             path: "Sources/ARBodyTracker"
         ),
     ]
