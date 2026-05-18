@@ -13,6 +13,7 @@ struct BodyView: NSViewRepresentable {
     @ObservedObject var settings: RenderSettings
     @ObservedObject var poseListener: PoseOSCListener
     @ObservedObject var arkitListener: ArkitOSCListener
+    @ObservedObject var usbConsumer: USBSkeletonConsumer
 
     func makeNSView(context: Context) -> NSView {
         let container = NSView(frame: .zero)
@@ -109,7 +110,8 @@ struct BodyView: NSViewRepresentable {
         arView.scene.addAnchor(skel3dAnchor)
         let skel3d = Skeleton3DRenderer()
         skel3d.attach(to: skel3dAnchor, listener: poseListener,
-                      arkitListener: arkitListener)
+                      arkitListener: arkitListener,
+                      usbConsumer: usbConsumer)
         context.coordinator.skel3dAnchor = skel3dAnchor
         context.coordinator.skel3d = skel3d
         context.coordinator.keyLight = key

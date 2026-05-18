@@ -67,17 +67,20 @@ struct ContentView: View {
     @StateObject private var poseListener = PoseOSCListener()
     @StateObject private var arkitListener = ArkitOSCListener()
     @StateObject private var dataFeeds = DataFeedsOSCListener()
+    @StateObject private var usbConsumer = USBSkeletonConsumer()
 
     var body: some View {
         ZStack(alignment: .topLeading) {
             BodyView(renderer: renderer, settings: settings,
                      poseListener: poseListener,
-                     arkitListener: arkitListener)
+                     arkitListener: arkitListener,
+                     usbConsumer: usbConsumer)
                 .onAppear {
                     renderer.startOSCServer()
                     poseListener.start()
                     arkitListener.start()
                     dataFeeds.start()
+                    usbConsumer.start()
                 }
                 .onReceive(NotificationCenter.default.publisher(
                     for: .toggleSettings)) { _ in

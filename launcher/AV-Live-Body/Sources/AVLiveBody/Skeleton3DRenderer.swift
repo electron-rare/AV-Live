@@ -87,6 +87,7 @@ final class Skeleton3DRenderer: ObservableObject {
     private var faceSub: AnyCancellable?
     private var handSub: AnyCancellable?
     private var arkitSub: AnyCancellable?
+    private var usbSub: AnyCancellable?
     private var lastArkit: [Int: ArkitOSCListener.ArkitBodyFrame] = [:]
     private var lastUpdateAt: TimeInterval = 0
     /// Optional per-pid offset to align the skeleton with another
@@ -112,7 +113,8 @@ final class Skeleton3DRenderer: ObservableObject {
     /// Attach to a scene by giving it an AnchorEntity that owns all
     /// skeleton entities, and start observing the listener.
     func attach(to anchor: Entity, listener: PoseOSCListener,
-                arkitListener: ArkitOSCListener? = nil) {
+                arkitListener: ArkitOSCListener? = nil,
+                usbConsumer: USBSkeletonConsumer? = nil) {
         rootAnchor = anchor
         poseSub = listener.$body3d
             .receive(on: DispatchQueue.main)
@@ -136,6 +138,13 @@ final class Skeleton3DRenderer: ObservableObject {
                     Task { @MainActor in self?.lastArkit = frames }
                 }
         }
+        if let usb = usbConsumer {
+            usbSub = usb.$bodies
+                .receive(on: DispatchQueue.main)
+                .sink { [weak self] frames in
+                    Task { @MainActor in self?.lastArkit = frames }
+                }
+        }
     }
 
     func detach() {
@@ -147,6 +156,8 @@ final class Skeleton3DRenderer: ObservableObject {
         handSub = nil
         arkitSub?.cancel()
         arkitSub = nil
+        usbSub?.cancel()
+        usbSub = nil
         for (_, p) in persons { p.root.removeFromParent() }
         persons.removeAll()
         lastSeenAt.removeAll()
