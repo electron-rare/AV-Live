@@ -26,7 +26,7 @@ struct AVLiveBodyApp: App {
 @MainActor
 struct ContentView: View {
     @StateObject private var consumer = USBSkeletonConsumer()
-    @State private var controller = SceneController()
+    private let controller = SceneController()
     private let multiHMR: MultiHMRCoreML? = MultiHMRCoreML()
     /// Placeholder intrinsics until a `.meta` frame supplies real ones.
     private let cameraK: [Float] = [
@@ -39,6 +39,7 @@ struct ContentView: View {
             StatusBar(consumer: consumer)
         }
         .onAppear { wire() }
+        .onDisappear { consumer.stop() }
         .onReceive(consumer.$skeletons) { skeletons in
             controller.updateSkeleton(skeletons)
         }

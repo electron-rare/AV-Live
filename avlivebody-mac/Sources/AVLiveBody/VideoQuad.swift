@@ -32,8 +32,12 @@ final class VideoQuad {
         guard let cg = ciContext.createCGImage(
             ci, from: ci.extent) else { return }
         guard let texture = try? TextureResource(
-            image: cg,
-            options: .init(semantic: .color)) else { return }
+            image: cg, options: .init(semantic: .color)) else {
+            NSLog("VideoQuad: TextureResource creation failed (%dx%d)",
+                  CVPixelBufferGetWidth(pixelBuffer),
+                  CVPixelBufferGetHeight(pixelBuffer))
+            return
+        }
         var material = UnlitMaterial()
         material.color = .init(tint: .white,
                                texture: .init(texture))

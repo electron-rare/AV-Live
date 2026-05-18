@@ -33,8 +33,7 @@ final class SkeletonEntity {
                 let marker = pool[i]
                 if payload.valid[i] {
                     let j = payload.joints[i]
-                    marker.transform.translation =
-                        SIMD3<Float>(j.x, -j.y, -j.z)
+                    marker.transform.translation = arkitToRealityKit(j)
                     marker.isEnabled = true
                 } else {
                     marker.isEnabled = false

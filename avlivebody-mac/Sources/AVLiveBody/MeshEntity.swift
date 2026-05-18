@@ -33,8 +33,7 @@ final class MeshEntity {
             entity.model = ModelComponent(mesh: mesh,
                                           materials: [material])
             let t = person.translation
-            entity.transform.translation =
-                SIMD3<Float>(t.x, -t.y, -t.z)
+            entity.transform.translation = arkitToRealityKit(t)
             entity.isEnabled = true
         }
         for idx in pools.keys where idx >= persons.count {
@@ -44,12 +43,13 @@ final class MeshEntity {
 
     private func buildMesh(_ verts: [SIMD3<Float>])
         -> MeshResource? {
-        guard verts.count == Self.vertexCount,
-              !faces.isEmpty else { return nil }
+        guard verts.count == Self.vertexCount, !faces.isEmpty else {
+            NSLog("MeshEntity: vertex count mismatch %d (expected %d), faces=%d",
+                  verts.count, Self.vertexCount, faces.count)
+            return nil
+        }
         var descriptor = MeshDescriptor(name: "smplx")
-        descriptor.positions = MeshBuffer(verts.map {
-            SIMD3<Float>($0.x, -$0.y, -$0.z)
-        })
+        descriptor.positions = MeshBuffer(verts.map(arkitToRealityKit))
         descriptor.primitives = .triangles(faces)
         return try? MeshResource.generate(from: [descriptor])
     }
