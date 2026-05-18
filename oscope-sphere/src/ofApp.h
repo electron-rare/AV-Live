@@ -37,5 +37,6 @@ private:
     bool  layerC_   = true;
     int   colormap_ = 0;
     float scopeSr_  = 16.0e6f;
+    float spin_     = 0.0f;
     std::string statusText_;
 };

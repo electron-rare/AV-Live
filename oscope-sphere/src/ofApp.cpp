@@ -30,6 +30,10 @@ void ofApp::setup() {
 void ofApp::update() {
     if (frozen_) return;
 
+    // Auto-rotation advances only when the mouse is not orbiting the camera.
+    if (!ofGetMousePressed())
+        spin_ += 6.0f * static_cast<float>(ofGetLastFrameTime());
+
     if (demoMode_) {
         demo_.next(buf1_, buf2_, 8192);
     } else {
@@ -54,7 +58,7 @@ void ofApp::update() {
 void ofApp::draw() {
     cam_.begin();
     ofPushMatrix();
-    ofRotateYDeg(ofGetElapsedTimef() * 6.0f);
+    ofRotateYDeg(spin_);
     if (layerA_) sphere_.drawSkin();
     if (layerC_) sphere_.drawPoints();
     if (layerB_) rings_.draw();
