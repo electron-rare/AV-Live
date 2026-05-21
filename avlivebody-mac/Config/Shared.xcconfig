@@ -1,0 +1,8 @@
+#include? "Local.xcconfig"
+
+MACOSX_DEPLOYMENT_TARGET = 15.0
+SWIFT_VERSION = 5.10
+// Manual ad-hoc signing for local dev (no Apple Mac Development cert
+// required). Override here or via target settings for distribution.
+CODE_SIGN_STYLE = Manual
+CODE_SIGN_IDENTITY = -

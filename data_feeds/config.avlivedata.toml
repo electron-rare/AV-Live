@@ -1,0 +1,37 @@
+[osc]
+host = "127.0.0.1"
+port = 57127
+
+[feeds.eco2mix]
+enabled = true
+interval_sec = 60
+
+[feeds.velib]
+enabled = true
+interval_sec = 120
+station_codes = []
+
+[feeds.hubeau]
+enabled = true
+interval_sec = 300
+codes = ["F050001001"]
+
+[feeds.gbfs]
+enabled = false
+interval_sec = 120
+url = "https://velib-metropole-opendata.smoove.pro/opendata/Velib_Metropole/station_status.json"
+
+[feeds.ais]
+enabled = false
+
+[feeds.carburants]
+enabled = false
+
+[feeds.prim]
+enabled = false
+
+[feeds.sytadin]
+enabled = false
+
+[feeds.teleray]
+enabled = false

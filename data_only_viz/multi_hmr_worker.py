@@ -20,6 +20,7 @@ from pathlib import Path
 
 import numpy as np
 
+from .arkit_joint_map import ARKIT_PELVIS_IDX
 from .euro_filter import OneEuroFilter
 from .state import PoseKp, SMPLXPerson, State
 from .tracker import IoUTracker
@@ -30,10 +31,32 @@ CACHE = Path.home() / ".cache" / "av-live-multihmr"
 CKPT = CACHE / "checkpoints" / "multiHMR_672_S.pt"
 SMPLX_PATH = CACHE / "models" / "smplx" / "SMPLX_NEUTRAL.npz"
 MULTIHMR_REPO = CACHE / "multi-hmr"
-COREML_MLPACKAGE = CACHE / "multihmr_full_672_s.mlpackage"
+COREML_MLPACKAGE = Path(
+    os.environ.get("COREML_MLPACKAGE")
+    or str(CACHE / "multihmr_full_672_s.mlpackage"))
 
 IMG_SIZE = 672
 N_VERTS = 10475
+
+
+def arkit_pelvis_z_override(state, pid: int, z_pred: float,
+                            fresh_sec: float = 1.0) -> float:
+    """Return ARKit pelvis world-z if a fresh ARKit frame exists for
+    this pid, otherwise return the Multi-HMR predicted z unchanged.
+
+    Used to resolve Multi-HMR's monocular scale ambiguity: ARKit's
+    LiDAR-anchored pelvis position is ground truth in the iPhone
+    world frame, which (after extrinsics calibration) is the same
+    metric scale as the SMPL-X cam-space output.
+    """
+    with state.lock():
+        arr = state.persons_arkit_joints.get(pid)
+        last_t = state.persons_arkit_last_t.get(pid, 0.0)
+    if arr is None:
+        return float(z_pred)
+    if time.perf_counter() - last_t > fresh_sec:
+        return float(z_pred)
+    return float(arr[ARKIT_PELVIS_IDX, 2])
 
 
 class MultiHMRWorker:
@@ -77,6 +100,10 @@ class MultiHMRWorker:
         # (cf tracker.py) pour resister aux occlusions et au mouvement
         # rapide. Multi-HMR a 3 fps -> 30 frames = 10s de survie.
         self._tracker = IoUTracker(iou_threshold=0.15, max_miss=30)
+        # Lazily-loaded CoreML backend for predict_once (single-shot,
+        # off-thread). Independent of the worker thread's _run_coreml
+        # backend instance — predict_once must work even without start().
+        self._coreml_backend_singleshot = None
 
     @staticmethod
     def is_available() -> bool:
@@ -92,6 +119,83 @@ class MultiHMRWorker:
 
     def stop(self) -> None:
         self._stop.set()
+
+    def _get_or_load_coreml_backend(self):
+        """Lazily load the CoreML backend for single-shot inference.
+
+        Returns the cached `MultiHMRCoreMLBackend` instance, or None if
+        the backend cannot be imported / the .mlpackage is missing.
+        Thread-safe enough for our use (calibration CLI is single-
+        threaded; the worker thread uses its own backend in _run_coreml).
+        """
+        if self._coreml_backend_singleshot is not None:
+            return self._coreml_backend_singleshot
+        try:
+            from .multihmr_coreml import MultiHMRCoreMLBackend
+            backend = MultiHMRCoreMLBackend(COREML_MLPACKAGE)
+        except (ImportError, FileNotFoundError) as e:
+            LOG.info("predict_once: CoreML backend unavailable: %s", e)
+            return None
+        except Exception as e:  # noqa: BLE001
+            LOG.warning("predict_once: CoreML backend init failed: %s", e)
+            return None
+        self._coreml_backend_singleshot = backend
+        return backend
+
+    def predict_once(self, rgb_image):
+        """Single-shot SMPL-X prediction on one RGB image.
+
+        Args:
+            rgb_image: (H, W, 3) uint8 RGB array. Will be center-
+                cropped + resized to 672x672 internally.
+
+        Returns:
+            First `SMPLXPerson` detection (pid=0) or None if no
+            humans pass the detection threshold.
+
+        Raises:
+            NotImplementedError: if the CoreML backend is unavailable
+                (PyTorch single-shot path is TBD).
+        """
+        backend = self._get_or_load_coreml_backend()
+        if backend is None:
+            raise NotImplementedError(
+                "CoreML backend unavailable; PyTorch single-shot path TBD")
+
+        try:
+            import cv2
+        except ImportError as e:
+            raise NotImplementedError(
+                "opencv-python required for predict_once: %s" % e)
+
+        rgb = np.asarray(rgb_image)
+        if rgb.ndim != 3 or rgb.shape[2] != 3:
+            raise ValueError(
+                f"rgb_image must be (H,W,3), got {rgb.shape}")
+        h, w = rgb.shape[:2]
+        if (h, w) != (IMG_SIZE, IMG_SIZE):
+            side = min(h, w)
+            y0 = (h - side) // 2
+            x0 = (w - side) // 2
+            rgb = rgb[y0:y0 + side, x0:x0 + side]
+            rgb = cv2.resize(rgb, (IMG_SIZE, IMG_SIZE))
+
+        img = rgb.transpose(2, 0, 1).astype(np.float32) / 255.0
+        focal = float(IMG_SIZE)
+        K_np = np.array([[focal, 0.0, IMG_SIZE / 2.0],
+                         [0.0, focal, IMG_SIZE / 2.0],
+                         [0.0, 0.0, 1.0]], dtype=np.float32)
+
+        humans = backend.infer(img, K_np, det_thresh=self.det_thresh)
+        if not humans:
+            return None
+
+        hh = humans[0]
+        v3d = hh["v3d"].detach().cpu().numpy()
+        return SMPLXPerson(
+            pid=0,
+            vertices_3d=np.ascontiguousarray(v3d, dtype=np.float32),
+        )
 
     def _run(self) -> None:
         if self.backend == "coreml":
@@ -238,6 +342,10 @@ class MultiHMRWorker:
                 prev_thumb = thumb
 
             frame_rgb = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2RGB)
+            # Publish to state for DINOv2 reid in MeshRigger.
+            with self.state.lock():
+                self.state.last_frame_rgb = frame_rgb
+                self.state.last_frame_rgb_t = time.monotonic()
             tensor = torch.from_numpy(frame_rgb).permute(2, 0, 1).float()
             tensor = (tensor / 255.0).unsqueeze(0).to(device)
 
@@ -365,6 +473,10 @@ class MultiHMRWorker:
                 v3d = hh["v3d"].detach().cpu().numpy()
                 transl = hh.get("transl_pelvis", hh.get("transl"))
                 transl_np = transl.detach().cpu().numpy().flatten()
+                if transl_np.size >= 3:
+                    transl_np = transl_np.copy()
+                    transl_np[2] = arkit_pelvis_z_override(
+                        self.state, pid, float(transl_np[2]))
 
                 shape_raw = hh["shape"].detach().cpu().numpy().flatten()
                 expr_raw = hh["expression"].detach().cpu().numpy().flatten()
@@ -517,6 +629,9 @@ class MultiHMRWorker:
                 prev_thumb = thumb
 
             frame_rgb = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2RGB)
+            with self.state.lock():
+                self.state.last_frame_rgb = frame_rgb
+                self.state.last_frame_rgb_t = time.monotonic()
             img = frame_rgb.transpose(2, 0, 1).astype(np.float32) / 255.0
 
             t_inf_start = time.monotonic()
@@ -603,6 +718,10 @@ class MultiHMRWorker:
                     continue
                 v3d = hh["v3d"].detach().cpu().numpy()
                 transl_np = hh["transl_pelvis"].detach().cpu().numpy().flatten()
+                if transl_np.size >= 3:
+                    transl_np = transl_np.copy()
+                    transl_np[2] = arkit_pelvis_z_override(
+                        self.state, pid, float(transl_np[2]))
                 shape_raw = hh["shape"].detach().cpu().numpy().flatten()
                 expr_raw = hh["expression"].detach().cpu().numpy().flatten()
 

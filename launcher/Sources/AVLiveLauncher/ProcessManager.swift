@@ -757,38 +757,17 @@ final class ProcessManager: ObservableObject {
     /// Lance l'app SwiftPM AV-Live-Body (RealityKit) qui ecoute les
     /// vertices SMPL-X sur :57130. Necessite useMultiHMR=true.
     func startBodyApp() {
-        // Lancable a la demande depuis n'importe quel mode. Si Multi-HMR
-        // n'est pas actif, la fenetre affichera juste la cam (pas de mesh)
-        // mais le panel S et les reglages restent fonctionnels.
-        guard bodyAppProc == nil else { return }
-        let pkgDir = URL(fileURLWithPath: metalVizDir)
-            .deletingLastPathComponent()
-            .appendingPathComponent("launcher/AV-Live-Body")
-        guard FileManager.default.fileExists(
-            atPath: pkgDir.appendingPathComponent("Package.swift").path) else {
-            append(source: "launcher",
-                   text: "AV-Live-Body missing at \(pkgDir.path)")
-            return
-        }
-        let p = Process()
-        p.executableURL = URL(fileURLWithPath: "/usr/bin/env")
-        p.arguments = ["swift", "run", "-c", "release", "AVLiveBody"]
-        p.currentDirectoryURL = pkgDir
-        attach(process: p, label: "body")
-        do {
-            try p.run()
-            bodyAppProc = p
-            DispatchQueue.main.async { self.bodyAppRunning = true }
-            append(source: "launcher", text: "started AV-Live-Body")
-            p.terminationHandler = { [weak self] _ in
-                DispatchQueue.main.async {
-                    self?.bodyAppProc = nil
-                    self?.bodyAppRunning = false
-                }
-            }
-        } catch {
-            append(source: "launcher", text: "startBodyApp failed: \(error)")
-        }
+        // FIXME(rewrite-2026-05-18): wire to avlivebody-mac/AVLiveBody.app
+        // once installation path is decided. The legacy SwiftPM target at
+        // launcher/AV-Live-Body has been archived to
+        // launcher/_archive-AV-Live-Body/ and superseded by the native
+        // Xcode app at avlivebody-mac/ (xcodegen + xcodebuild). There is
+        // no `swift run` equivalent for an Xcode app target, so the
+        // spawn path is disabled until we settle on a post-build .app
+        // install location (DerivedData vs ~/Applications vs bundled).
+        NSLog("AVLiveBody is now standalone at avlivebody-mac/ — open from Xcode (build target AVLiveBody)")
+        append(source: "launcher",
+               text: "AVLiveBody spawn disabled — open avlivebody-mac/ in Xcode")
     }
 
     func stopBodyApp() {

@@ -1,0 +1,12 @@
+// Shared build settings (committed). Local overrides such as the
+// Apple Developer Team ID live in Config/Local.xcconfig (gitignored).
+// The `#include?` directive silently skips the local file if absent,
+// which is what we want on a fresh clone.
+
+#include? "Local.xcconfig"
+
+IPHONEOS_DEPLOYMENT_TARGET = 17.0
+SWIFT_VERSION = 5.10
+TARGETED_DEVICE_FAMILY = 1
+ENABLE_PREVIEWS = YES
+CODE_SIGN_STYLE = Automatic

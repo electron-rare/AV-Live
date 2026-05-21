@@ -524,10 +524,10 @@ try:
         compute_units=ct.ComputeUnit.CPU_AND_GPU,
         minimum_deployment_target=ct.target.macOS15,
         convert_to="mlprogram",
-        # FP16 OK depuis le patch roma branchless (cf rapport bisection
-        # 2026-05-13) : la source du NaN etait torch.empty + index_put_
-        # dans roma.rotmat_to_rotvec, pas la precision.
-        compute_precision=ct.precision.FLOAT16,
+        # FP32 mandatory : FP16 (global ou hybride op_selector) degrade
+        # visiblement le mesh sur poses extremes. INT8 weight quant
+        # teste 2026-05-14 : aucun gain sur GPU compute-bound.
+        compute_precision=ct.precision.FLOAT32,
     )
     out_path = "/tmp/multihmr_full_672_s.mlpackage"
     mlmodel.save(out_path)

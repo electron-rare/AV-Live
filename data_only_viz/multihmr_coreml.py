@@ -20,6 +20,7 @@ Public API:
 from __future__ import annotations
 
 import logging
+import os
 from pathlib import Path
 from typing import Any
 
@@ -38,12 +39,24 @@ DEFAULT_MLPACKAGE = (
 N_PERSONS_FIXED = 4
 N_VERTS = 10475
 
-# CoreML output names from the exported .mlpackage.
-OUT_V3D = "var_2412"          # (4, 10475, 3)
-OUT_TRANSL = "var_2415"       # (4, 1, 3)
-OUT_SCORES = "var_2428"       # (4,)
-OUT_BETAS = "var_2431"        # (4, 10)
-OUT_EXPR = "var_2434"         # (4, 10)
+# CoreML output names from the exported .mlpackage. The exported
+# `multihmr_full_672_s.mlpackage` (2026-05-14 re-convert) renumbered
+# the MIL vars; verified against the on-disk artifact's spec.
+OUT_V3D = "var_2420"          # (4, 10475, 3)
+OUT_TRANSL = "var_2423"       # (4, 1, 3)
+OUT_SCORES = "var_2436"       # (4,)
+OUT_BETAS = "var_2439"        # (4, 10)
+OUT_EXPR = "var_2442"         # (4, 10)
+# var_2445 (4, 127, 3) = j3d joints — present but unused here.
+
+# DINOv2 backbone was trained on ImageNet-normalized RGB; the public
+# `infer()` contract takes [0,1] CHW input and applies this here so
+# every caller stays normalization-agnostic. Feeding raw [0,1] to the
+# model collapses all detection scores to ~0.01 ("0 detections" bug).
+_IMG_NORM_MEAN = np.array([0.485, 0.456, 0.406],
+                          dtype=np.float32).reshape(1, 3, 1, 1)
+_IMG_NORM_STD = np.array([0.229, 0.224, 0.225],
+                         dtype=np.float32).reshape(1, 3, 1, 1)
 
 # MLMultiArrayDataType raw values (from CoreML headers).
 ML_DTYPE_FLOAT32 = 65568
@@ -161,12 +174,22 @@ class MultiHMRCoreMLBackend:
         MLModel = ns["MLModel"]
         MLModelConfiguration = ns["MLModelConfiguration"]
         cfg = MLModelConfiguration.alloc().init()
+        # MLComputeUnits: 0=CPUOnly, 1=CPUAndGPU, 2=All (ANE+GPU+CPU),
+        # 3=CPUAndNeuralEngine. Bench M5 2026-05-14 (under live-worker
+        # contention, 30 iter median, full Multi-HMR predict+copy):
+        #   CPU_AND_GPU = 252 ms  (baseline)
+        #   ALL         = 246 ms  (within noise, ANE doesn't help)
+        #   CPU_AND_NE  = 1301 ms (ANE solo catastrophic)
+        #   CPU_ONLY    = 1152 ms
+        # Standalone (no contention) FP32 = 139 ms = 7.2 fps. Default
+        # stays CPU+GPU. Override with COREML_COMPUTE_UNITS env var
+        # (`all`, `cpu_and_gpu`, `cpu_and_ne`, `cpu_only`) for A/B testing.
+        cu_env = os.environ.get("COREML_COMPUTE_UNITS", "").strip().lower()
+        cu_map = {"cpu_only": 0, "cpu_and_gpu": 1, "all": 2,
+                  "cpu_and_ne": 3}
+        cu = cu_map.get(cu_env, 1)
         try:
-            # MLComputeUnits: 0=CPUOnly, 1=CPUAndGPU, 2=All (ANE+GPU+CPU),
-            # 3=CPUAndNeuralEngine. Multi-HMR's ANEF compile fails
-            # (validated 2026-05-13 on M5), and 'All' falls back to a
-            # slow path (~146ms). CPU+GPU = 28ms = ~35fps on M5.
-            cfg.setComputeUnits_(1)
+            cfg.setComputeUnits_(cu)
         except Exception:  # noqa: BLE001
             pass
         url = NSURL.fileURLWithPath_(str(self.path))
@@ -182,8 +205,10 @@ class MultiHMRCoreMLBackend:
             raise RuntimeError(f"MLModel load failed for {compiled_url}")
         self._model = model
         self._ns = ns
-        LOG.info("Multi-HMR CoreML model loaded (%s, computeUnits=CPU+GPU)",
-                 self.path.name)
+        cu_name = {0: "CPU_ONLY", 1: "CPU+GPU", 2: "ALL", 3: "CPU+NE"}.get(
+            cu, str(cu))
+        LOG.info("Multi-HMR CoreML model loaded (%s, computeUnits=%s)",
+                 self.path.name, cu_name)
 
     @staticmethod
     def is_available(mlpackage_path: Path | None = None) -> bool:
@@ -232,7 +257,8 @@ class MultiHMRCoreMLBackend:
         """Run a forward pass and return list of humans dicts.
 
         Args:
-            image_chw_float32: (3, 672, 672) or (1, 3, 672, 672) in [0,1].
+            image_chw_float32: (3, 672, 672) or (1, 3, 672, 672), RGB in
+                [0,1]. ImageNet normalization is applied internally.
             K_33: (3, 3) or (1, 3, 3) camera intrinsics.
             det_thresh: scores threshold; CoreML forwards K=4 always.
 
@@ -251,6 +277,7 @@ class MultiHMRCoreMLBackend:
         if K.shape != (1, 3, 3):
             raise ValueError(f"K shape {K.shape}, expected (1,3,3)")
 
+        img = (img - _IMG_NORM_MEAN) / _IMG_NORM_STD
         raw = self._predict(img, K)
         v3d = raw.get(OUT_V3D)
         transl = raw.get(OUT_TRANSL)

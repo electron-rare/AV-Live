@@ -1,0 +1,54 @@
+name: AVLiveBody
+options:
+  bundleIdPrefix: cc.saillant
+  deploymentTarget:
+    macOS: "15.0"
+  createIntermediateGroups: true
+
+configFiles:
+  Debug: Config/Shared.xcconfig
+  Release: Config/Shared.xcconfig
+
+packages:
+  AVLiveWire:
+    path: ../shared/AVLiveWire
+
+targets:
+  AVLiveBody:
+    type: application
+    platform: macOS
+    deploymentTarget: "15.0"
+    sources:
+      - path: Sources/AVLiveBody
+        excludes:
+          - Info.plist
+    dependencies:
+      - package: AVLiveWire
+        product: AVLiveWire
+    configFiles:
+      Debug: Config/Shared.xcconfig
+      Release: Config/Shared.xcconfig
+    settings:
+      base:
+        PRODUCT_NAME: AVLiveBody
+        PRODUCT_BUNDLE_IDENTIFIER: cc.saillant.AVLiveBody
+        INFOPLIST_FILE: Sources/AVLiveBody/Info.plist
+        GENERATE_INFOPLIST_FILE: NO
+        CODE_SIGN_STYLE: Manual
+        CODE_SIGN_IDENTITY: "-"
+        CODE_SIGNING_REQUIRED: NO
+        CODE_SIGNING_ALLOWED: NO
+        SWIFT_VERSION: "5.10"
+        ENABLE_HARDENED_RUNTIME: NO
+  AVLiveBodyTests:
+    type: bundle.unit-test
+    platform: macOS
+    sources:
+      - path: Tests/AVLiveBodyTests
+    dependencies:
+      - target: AVLiveBody
+      - package: AVLiveWire
+        product: AVLiveWire
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
