@@ -34,8 +34,34 @@ struct SceneUniforms {
     float hand_l_y;
     float hand_r_x;
     float hand_r_y;
+    // ---- 2026-05-14 face / hand / body3d derivatives ----
+    // mouth_open      : |lip51.y - lip57.y| normalized 0..~0.15
+    // eye_open_l/r    : H/W ratio of eye bbox, ~0.15 (closed) .. 0.45 (open)
+    // head_tilt       : atan2(eye_R.y-eye_L.y, eye_R.x-eye_L.x) rad
+    // head_yaw        : nose.y - eyes_mid.y (proxy pitch, normalized)
+    // finger_pinch_l/r: simd_distance(thumb_tip[4], index_tip[8]) px-norm
+    // body_x/y/z      : pelvis world meters (MediaPipe hip-relative)
+    // body_height     : |hip.y - head.y| world meters
+    // arm_spread      : |wristL.x - wristR.x| world meters
+    // pose_velocity   : EMA(|pelvis(t) - pelvis(t-1)|), alpha=0.3
+    float mouth_open;
+    float eye_open_l;
+    float eye_open_r;
+    float head_tilt;
+    float head_yaw;
+    float finger_pinch_l;
+    float finger_pinch_r;
+    float body_x;
+    float body_y;
+    float body_z;
+    float body_height;
+    float arm_spread;
+    float pose_velocity;
     float _pad0;
     float _pad1;
+    float _pad2;
+    float _pad3;
+    float _pad4;
 };
 
 struct VsOut {
@@ -120,21 +146,25 @@ float vignette(float2 p) {
 // ===== Modes =======================================================
 
 // ---- 0 storm : tissu fbm reactif + bloom-fake ----
+// Pose mods : pose_velocity boost intensity, head_tilt shifts hue.
 float3 mode_storm(float2 p, constant SceneUniforms& U) {
-    float storm = saturate(U.kp_norm * 1.0 + max(-U.bz_norm, 0.0) * 0.5);
-    float speed = 0.08 + U.wind_norm * 1.5;
+    float storm = saturate(U.kp_norm * 1.0 + max(-U.bz_norm, 0.0) * 0.5
+                           + U.pose_velocity * 2.0);
+    float speed = 0.08 + U.wind_norm * 1.5 + U.pose_velocity * 3.0;
     float zoom = 1.8 - U.rms * 1.2;
     float n = fbm(p * zoom + float2(U.time * speed, U.time * speed * 0.7));
     n = pow(n, 1.2 - U.rms * 0.5);
     float netz = sin(U.time * 50.0 + U.netz_dev * 800.0) * 0.06;
-    float3 base = palIQ(n + storm * 0.5,
+    float hue_shift = U.head_tilt * 0.25;
+    float3 base = palIQ(n + storm * 0.5 + hue_shift,
         float3(0.10, 0.05, 0.20),
         float3(0.40, 0.30, 0.55),
         float3(1.0,  1.0,  1.0),
         float3(0.0, 0.33, 0.67));
     float bloom = smoothstep(0.7, 1.0, n);
-    return base * (n * 1.4 + 0.3) + netz + U.rms * 1.2
-         + bloom * 0.7
+    float velocity_boost = 1.0 + U.pose_velocity * 1.5;
+    return (base * (n * 1.4 + 0.3) + netz + U.rms * 1.2
+         + bloom * 0.7) * velocity_boost
          + float3(1.0, 0.55, 0.1) * U.flare * 1.4
          + float3(U.lightning_flash * 0.7);
 }
@@ -167,34 +197,40 @@ float3 mode_tunnel(float2 p, constant SceneUniforms& U) {
 }
 
 // ---- 2 plasma : volumetric noise palette IQ ----
+// Pose mods : mouth_open modulates spatial frequency; head_yaw shifts hue.
 float3 mode_plasma(float2 p, constant SceneUniforms& U) {
     float t = U.time * (0.5 + U.rms * 1.5);
+    float freq_boost = 1.0 + U.mouth_open * 12.0;
     // 3 octaves de sin/cos en composition
-    float v = sin(p.x * 4.0 + t)
-            + sin(p.y * 5.0 - t * 1.2)
+    float v = sin(p.x * 4.0 * freq_boost + t)
+            + sin(p.y * 5.0 * freq_boost - t * 1.2)
             + sin((p.x + p.y) * 3.5 + t * 0.7)
             + sin(length(p) * (8.0 + U.kp_norm * 4.0) - t * 1.8);
     v = v * 0.25 + 0.5;
     // Fake volumetric "depth" : repeat layers
     float layer2 = sin(p.x * 2.0 - t * 0.5) * sin(p.y * 2.5 + t * 0.7);
     v = mix(v, v * 0.5 + 0.5 * (layer2 + 1.0) * 0.5, 0.35);
-    float3 col = palIQ(v,
+    float hue_offset = U.head_yaw * 0.5;
+    float3 col = palIQ(v + hue_offset,
         float3(0.5),
         float3(0.5),
         float3(1.0, 1.0, 1.0),
         float3(0.0, 0.33, 0.67));
-    col *= 0.8 + U.kp_norm * 0.7 + U.social_rate * 0.5;
+    col *= 0.8 + U.kp_norm * 0.7 + U.social_rate * 0.5
+         + U.mouth_open * 1.0;
     return col + float3(0.6, 0.3, 1.0) * U.lightning_flash * 0.5;
 }
 
 // ---- 3 kaleido : KIFS fractal 6-fold avec rot 3D fake ----
+// Pose mods : arm_spread drives segment count (4..16).
 float3 mode_kaleido(float2 p, constant SceneUniforms& U) {
     float ang = U.time * 0.15 + U.flare * 2.0;
     float c = cos(ang), s = sin(ang);
     p = float2(c * p.x - s * p.y, s * p.x + c * p.y);
     float r = length(p);
     float a = atan2(p.y, p.x);
-    float seg = 6.28318 / 6.0;
+    float seg_count = clamp(ceil(4.0 + U.arm_spread * 8.0), 3.0, 16.0);
+    float seg = 6.28318 / seg_count;
     a = abs(fmod(a + seg * 0.5, seg) - seg * 0.5);
     float2 q = float2(cos(a), sin(a)) * r;
     // Iteration KIFS-like
@@ -303,14 +339,18 @@ float3 mode_metaballs(float2 p, constant SceneUniforms& U) {
 }
 
 // ---- 6 starfield : galaxy spiral + parallax ----
+// Pose mods : finger_pinch L+R drives star density per layer.
 float3 mode_starfield(float2 p, constant SceneUniforms& U) {
     float warp = U.time * (1.5 + U.wind_norm * 6.0);
+    float pinch = saturate((U.finger_pinch_l + U.finger_pinch_r) * 2.0);
+    int stars_per_layer = 30 + int(pinch * 70.0);  // 30..100
     // 3 layers of stars at different speeds
     float3 col = float3(0);
     for (int L = 0; L < 3; ++L) {
         float speed = (1.0 + float(L) * 0.5);
         float scale = 6.0 + float(L) * 4.0;
-        for (int k = 0; k < 50; ++k) {
+        for (int k = 0; k < 100; ++k) {
+            if (k >= stars_per_layer) break;
             float fk = float(k + L * 50);
             float r0 = hash21(float2(fk, 7.0 + float(L)));
             float a0 = hash21(float2(fk, 17.0 + float(L))) * 6.28;
@@ -352,8 +392,11 @@ float3 mode_bars(float2 p, constant SceneUniforms& U) {
         // Hauteur barre depend du bin "i" via hash + RMS
         float h0 = hash21(float2(float(i), 0.0));
         float h = sin(t * (0.5 + h0 * 4.0) + float(i)) * 0.5 + 0.5;
-        h = h * (0.3 + U.rms * 1.5 + U.social_rate * 0.4);
-        h = clamp(h, 0.02, 0.85);
+        // body_height (0..~1.8 m) + eye_open avg modulate bar height
+        float eyes = (U.eye_open_l + U.eye_open_r) * 0.5;
+        h = h * (0.3 + U.rms * 1.5 + U.social_rate * 0.4
+                 + U.body_height * 0.6 + eyes * 0.8);
+        h = clamp(h, 0.02, 0.95);
         float bar_top = y_base + h * perspective * 0.3;
         // Largeur = 1 / nbars perspective
         float bx = (fi - 0.5) * perspective * 1.5;

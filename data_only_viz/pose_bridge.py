@@ -85,7 +85,9 @@ class PoseSoundBridge:
         self._client = SimpleUDPClient(sclang_host, sclang_port)
         # Broadcast secondaire vers AV-Live-Body (Swift) pour overlay
         # skeleton dans la fenetre RealityKit. Silent si pas connecte.
-        self._avbody = SimpleUDPClient("127.0.0.1", 57126)
+        import os as _os
+        _avbody_host = _os.environ.get("AVBODY_HOST", "127.0.0.1")
+        self._avbody = SimpleUDPClient(_avbody_host, 57126)
         self._period = 1.0 / max(1.0, throttle_hz)
         self._last_t = 0.0
 

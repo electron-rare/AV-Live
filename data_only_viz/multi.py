@@ -303,8 +303,18 @@ class MultiWorker:
             LOG.error("download models failed: %s", e)
             return
 
+        # GPU delegate (Metal sur macOS) : libere le CPU pour OSC, state,
+        # mesh_rigger. Multi-HMR remote macm1 + MediaPipe GPU M5 =
+        # workload distribue. Toggle via MEDIAPIPE_DELEGATE=cpu si plante.
+        import os as _os
+        _deleg_name = _os.environ.get("MEDIAPIPE_DELEGATE", "gpu").lower()
+        _deleg = (BaseOptions.Delegate.GPU if _deleg_name == "gpu"
+                  else BaseOptions.Delegate.CPU)
+        LOG.info("MediaPipe delegate = %s (env MEDIAPIPE_DELEGATE)",
+                 _deleg.name)
         pose = PoseLandmarker.create_from_options(PoseLandmarkerOptions(
-            base_options=BaseOptions(model_asset_path=str(pose_p)),
+            base_options=BaseOptions(model_asset_path=str(pose_p),
+                                     delegate=_deleg),
             running_mode=RunningMode.VIDEO,
             num_poses=self.num_persons,
             min_pose_detection_confidence=self.min_conf,
@@ -312,7 +322,8 @@ class MultiWorker:
             min_tracking_confidence=self.min_conf,
         ))
         face = FaceLandmarker.create_from_options(FaceLandmarkerOptions(
-            base_options=BaseOptions(model_asset_path=str(face_p)),
+            base_options=BaseOptions(model_asset_path=str(face_p),
+                                     delegate=_deleg),
             running_mode=RunningMode.VIDEO,
             num_faces=self.num_persons,
             min_face_detection_confidence=self.min_conf,
@@ -320,14 +331,16 @@ class MultiWorker:
             min_tracking_confidence=self.min_conf,
         ))
         hand = HandLandmarker.create_from_options(HandLandmarkerOptions(
-            base_options=BaseOptions(model_asset_path=str(hand_p)),
+            base_options=BaseOptions(model_asset_path=str(hand_p),
+                                     delegate=_deleg),
             running_mode=RunningMode.VIDEO,
             num_hands=self.num_persons * 2,
             min_hand_detection_confidence=self.min_conf,
             min_hand_presence_confidence=self.min_conf,
             min_tracking_confidence=self.min_conf,
         ))
-        LOG.info("3 landmarkers prets (num=%d)", self.num_persons)
+        LOG.info("3 landmarkers prets (num=%d, delegate=%s)",
+                 self.num_persons, _deleg.name)
 
         cap = cv2.VideoCapture(self.camera_index)
         cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
@@ -345,8 +358,18 @@ class MultiWorker:
                 time.sleep(self.period)
                 continue
             h, w = frame_bgr.shape[:2]
-            frame_rgb = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2RGB)
-            mp_img = mp.Image(image_format=mp.ImageFormat.SRGB, data=frame_rgb)
+            # MediaPipe GPU delegate on macOS uploads via CVPixelBuffer
+            # which only accepts 4-channel formats. SRGB (3ch) crashes
+            # in gpu_buffer_storage_cv_pixel_buffer.cc with
+            # "unsupported ImageFrame format: 1". Use SRGBA when on GPU.
+            if _deleg == BaseOptions.Delegate.GPU:
+                frame_rgba = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2RGBA)
+                mp_img = mp.Image(image_format=mp.ImageFormat.SRGBA,
+                                  data=frame_rgba)
+            else:
+                frame_rgb = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2RGB)
+                mp_img = mp.Image(image_format=mp.ImageFormat.SRGB,
+                                  data=frame_rgb)
             ts = int(time.monotonic() * 1000) - t0_ms
             try:
                 pose_res = pose.detect_for_video(mp_img, ts)

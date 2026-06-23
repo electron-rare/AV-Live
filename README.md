@@ -1,5 +1,7 @@
 # AV-Live
 
+**Release : `v0.1.0-rc1` (2026-05-14)** — distributed Multi-HMR (M5 ↔ macm1 LAN), unified 3D armature openpos, hybrid mesh rigger 27 fps perceived, 10 pose-reactive Metal scenes. See [RC0.1+ architecture](#rc01-distributed-multi-hmr-architecture) below.
+
 > **Live coding audio-visual performance system** built around a SuperCollider sound engine, an openFrameworks oscilloscope visualizer driven by a real Hantek 6022BL USB scope, a macOS menubar launcher, and a Metal-native pose / body-mesh visualizer that listens to the same audio bus.
 >
 > 15 scripted demoparties · ~47 fullscreen visuals (26 3D parametric meshes + 18 procedural shaders + 3 dedicated C++ scenes) · 5 OS pixel-art shaders · 14 retro OS logos · 33 GLSL shader pairs (~65 files) · 1099 SynthDefs across 368 tracks (23 albums × 16) · **20 real-world data feeds** · 7 pose-estimation backends · **SMPL-X body mesh** (10 475 vertices via Multi-HMR + RealityKit) · **3 launch modes** (Full / Data-only / Body Mesh) — all reactive to the audio physically passing through the scope probes.
@@ -101,7 +103,89 @@ Metal-native fullscreen visualizer (pyobjc, MTKView, ~60 fps) driven by webcam p
 - **Renderer** : Metal pipelines compiled at runtime (`shaders/*.metal`), `bg_pipeline` (full-screen FBM) + `skel_pipeline` (skeleton lines). SMPL face topology shipped as binary (`mesh_topology.py`) for RealityKit-compatible mesh rendering.
 - **Tracker** : One Euro Filter on keypoints + IoU multi-person association (`scipy.linear_sum_assignment`, ByteTrack-like).
 - **OSC out → sclang** `:57121` : `/pose/count`, `/pose/center`, `/pose/wrist`, `/pose/head`, `/pose/sho_span`, `/pose/limb_span`.
-- **Thread-safe state** : `state.py` exposes `State.lock()` ; dataclasses `PoseKp`, `NLFPerson` (vertices_3d, joints_3d), and a multi-person container.
+- **OSC out → AVLiveBody** `:57126` UDP (mode openpos, mode 9 / touche `p`) : `/pose/skel`, `/face/kp` (68 dlib landmarks), `/hand/kp` (21 × 2 hands), `/pose3d/kp` (33 MediaPipe pose_world_landmarks 3D meters).
+- **TCP out → AVLiveBody** `:57130` : SMPL-X dense mesh (10475 verts) frame-packed binary, 30 Hz rigged interpolation between Multi-HMR keyframes.
+- **Thread-safe state** : `state.py` exposes `State.lock()` ; dataclasses `PoseKp`, `Kp3D`, `SMPLXPerson`, multi-person container.
+
+## RC0.1+ distributed Multi-HMR architecture
+
+`feat/action-head` + tag `v0.1.0-rc1` (2026-05-14). The body-mesh pipeline is now **distributed across two Apple-silicon Macs over LAN gigabit** :
+
+```
+                M5 (capture host)                              macm1 (compute host)
+            ┌─────────────────────────────────┐           ┌──────────────────────────────────┐
+            │ Caméra MacBook Pro              │           │ Multi-HMR server :57140 (pyobjc) │
+            │ data_only_viz/                  │ JPEG q80  │ multihmr_full_672_s.mlpackage    │
+            │  ├─ multi_hmr_worker             ├──TCP────▶│  ├─ Pyobjc direct CoreML.fwk     │
+            │  │    backend=remote (async)     │           │  ├─ ~87 ms predict (M1 Max GPU) │
+            │  ├─ MultiHMRRemoteBackend         │◀──RSP───┤  └─ 6 outputs (v3d 10475,         │
+            │  │    queue maxsize 2/3          │           │      transl, scores, betas,      │
+            │  │    JPEG encode q80             │           │      expression, joints 127)    │
+            │  │                                │           │                                  │
+            │  ├─ MediaPipe Holistic            │           │ AVLiveBody display (RealityKit) │
+            │  │    Metal GPU delegate          │           │  ├─ MeshRenderer (TCP :57130)    │
+            │  │    pose 33 + face 478 +        │  /pose/* │  │   SMPL-X dense, low-level    │
+            │  │    hand 21×2                   ├──UDP────▶│  │   mesh, 30 fps rigged interp │
+            │  ├─ pose_bridge (UDP :57126)      │  /face/* │  │                              │
+            │  ├─ smplx_tcp (TCP :57130, 30 Hz) │  /hand/* │  ├─ Skeleton3DRenderer (OSC)    │
+            │  ├─ MeshRigger (Hungarian + DINO  │  /pose3d/│  │   1 fused LowLevelMesh /     │
+            │  │   re-id, sticky pid 0.30/0.15) │           │  │   person : body 33 + face   │
+            │  └─ PoseFilterChain               │           │  │   68 + hand 21×2 = 143 vts  │
+            │      (median + Kalman CV +        │           │  │   288 line indices          │
+            │       lookahead + IK clamps)      │           │  └─ 10 Metal scenes (storm,   │
+            │                                   │           │      tunnel, plasma, kaleido, │
+            │ TCP loop fps : 25                 │           │      voronoi, metaballs,      │
+            │ Multi-HMR fresh fps : 9           │           │      starfield, bars, hands3d, │
+            │ MeshRigger perceived : 27         │           │      openpos), all consume    │
+            │                                   │           │      pose uniforms (mouth,     │
+            └─────────────────────────────────┘           │      velocity, head_tilt,     │
+                                                            │      arm_spread, eye_open,    │
+                                                            │      finger_pinch, body_xyz)  │
+                                                            └──────────────────────────────────┘
+```
+
+### Key technical wins (commits in `feat/action-head`)
+
+| Commit | Win |
+|--------|-----|
+| `5800156` | Multi-HMR ViT-S/672 → CoreML mlpackage (FP32, 6 outputs) |
+| `52588b9` | roma.rotmat_to_rotvec → branchless atan2 (fixed all-NaN v3d/transl bug) |
+| `4e7101c` | NaN/Inf guard on v3d before TCP ship |
+| `2c8094c` | MeshRigger : 27 fps perceived via Hungarian pid match + Vision pelvis delta |
+| `1f623fe` | AVLiveBody mirror webcam preview (CATransform3D scale -1) |
+| `9838da3` | Remote inference protocol (TCP :57140) + multi-buffer async client |
+| `67302e7` | Pyobjc server (drops coremltools overhead) + MediaPipe Metal GPU SRGBA |
+| `1828d7c` | 12 new SceneUniforms (mouth, eye, head, finger, body) drive 5 scenes |
+| `bd46f6e` | Lift Python self-throttle 10 → 30 fps loop, fresh fps metric |
+| latest | 10 Metal scenes pose-reactive + SMPL-X 127 joints output (finger props) |
+
+### Environment toggles
+
+| Env var | Default | Effect |
+|---------|---------|--------|
+| `MULTIHMR_BACKEND` | `pytorch` | `pytorch`, `coreml`, `remote` |
+| `MULTIHMR_REMOTE_HOST` | `127.0.0.1` | macm1 IP (gigabit LAN) |
+| `MULTIHMR_REMOTE_JPEG` | `1` | JPEG q=80 compression on the wire |
+| `MULTIHMR_REMOTE_ASYNC` | `1` | client double-buffer queue (maxsize 2/3) |
+| `MULTIHMR_SERVER_BACKEND` | `pyobjc` | server : `pyobjc` or `coremltools` |
+| `MULTIHMR_LOOP_FPS` | `30` | Python loop target_fps (formerly capped at 10) |
+| `AVBODY_HOST` | `127.0.0.1` | route TCP mesh + OSC pose to a remote AVLiveBody |
+| `MEDIAPIPE_DELEGATE` | `cpu` | `gpu` Metal SRGBA (faster but IOSurface flake on M5) |
+| `POSE_FILTER` | `median+kalman+lookahead+ik` | toggle filter chain stages |
+| `MULTIHMR_REID` | `dino` if mlpackage present | `dino` (cosine match) or `iou` |
+| `MULTIHMR_REID_ALPHA` | `0.5` | IoU vs cosine weight (0=DINO only, 1=IoU only) |
+
+### Hardware ceilings observed (M5 + M1 Max 32c GPU, LAN gigabit)
+
+| Path | Predict | Live loop | Mesh rigged perceived |
+|------|---------|-----------|------------------------|
+| M5 local (PyTorch MPS) | 270 ms | 3.5 fps | 27 fps |
+| M5 local (CoreML FP32) | 139 ms | 6.8 fps | 27 fps |
+| Remote macm1 (idle GPU) | 53 ms | ~18 fps | 27 fps |
+| Remote macm1 (under MLX contention) | 87 ms | 25 fps loop / 9 fps fresh | 27 fps |
+| Studio M3 Ultra (80c GPU, *training only*) | est. 35 ms (~30 fps) | — | — |
+
+Hard ceiling on macm1 ≈ 18 fps fresh predict (unified memory bandwidth + CoreML sync overhead) ; further gains require moving MLX servers off macm1 or quantising the model.
 
 ### 🎬 Demoparties — 15 narrative demos
 Each demoparty is a multi-act scripted show with unique scroller text, background sequence, scroller style, and SuperCollider album track :
