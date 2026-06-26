@@ -80,3 +80,23 @@ def test_nan_landmark_falls_back_no_exception():
     out = ext.step([h])           # must not raise
     hand = out["L"] or out["R"]
     assert math.isfinite(hand["cx"]) and math.isfinite(hand["openness"])
+
+
+def test_numpy_row_landmarks_finite_features():
+    """Landmarks as numpy rows (indexable [x, y, ...]) must yield finite cx/cy/openness."""
+    import numpy as np
+    arr = np.zeros((21, 3), dtype=np.float32)
+    # replicate _hand(0.5, 0.5, span=0.20) geometry via index access
+    arr[:] = [0.5, 0.5, 0.0]
+    arr[0] = [0.5, 0.55, 0.0]   # wrist
+    arr[9] = [0.5, 0.45, 0.0]   # middle_mcp → size 0.10
+    arr[4] = [0.4, 0.5, 0.0]    # thumb_tip
+    arr[20] = [0.6, 0.5, 0.0]   # pinky_tip → span 0.20
+    ext = HandFeatureExtractor()
+    out = ext.step([arr])        # must not raise
+    hand = out["L"] or out["R"]
+    assert hand is not None
+    assert math.isfinite(hand["cx"])
+    assert math.isfinite(hand["cy"])
+    assert math.isfinite(hand["openness"])
+    assert hand["openness"] > 0.8  # span/size = 2.0, same as test_open_hand

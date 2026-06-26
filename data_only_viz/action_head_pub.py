@@ -153,7 +153,7 @@ class ActionHeadPublisher(threading.Thread):
             if not hands and getattr(self.state, "hands_present", False):
                 lkp = getattr(self.state, "left_hand_kp", None)
                 rkp = getattr(self.state, "right_hand_kp", None)
-                hands = [h for h in (lkp, rkp) if h]
+                hands = [h for h in (lkp, rkp) if h is not None and len(h) > 0]
         feats = self._hand_ext.step(hands)
         self.bridge.send_hands(feats, t_now)
 

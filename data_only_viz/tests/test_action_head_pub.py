@@ -207,3 +207,36 @@ def test_emit_hands_called_once_per_tick_empty() -> None:
     assert feats["L"] is None
     assert feats["R"] is None
     assert feats["dist"] == 0.0
+
+
+def test_emit_hands_single_person_fallback_sends_once() -> None:
+    """Single-person fallback (hands_present=True + left/right_hand_kp) → send_hands once."""
+    from data_only_viz.action_head_pub import ActionHeadPublisher
+    state = _FakeState()
+    bridge = MagicMock()
+    pub = ActionHeadPublisher(state, bridge, ckpt_path=None)
+
+    # No per-person hands list; exercise the single-person fallback branch.
+    state.persons_hands = []
+    state.hands_present = True
+    state.left_hand_kp = _fake_hand_21(0)
+    state.right_hand_kp = _fake_hand_21(1)
+    state.persons_smplx = [_make_smplx_person(0)]
+    state.smplx_last_t = 1.0
+    pub._tick(t_now=0.0)
+
+    bridge.send_hands.assert_called_once()
+
+
+def test_emit_hands_once_for_two_pids() -> None:
+    """Two pids in persons_smplx → send_hands called exactly once, not once per pid."""
+    from data_only_viz.action_head_pub import ActionHeadPublisher
+    state = _FakeState()
+    bridge = MagicMock()
+    pub = ActionHeadPublisher(state, bridge, ckpt_path=None)
+
+    state.persons_smplx = [_make_smplx_person(0), _make_smplx_person(1)]
+    state.smplx_last_t = 1.0
+    pub._tick(t_now=0.0)
+
+    assert bridge.send_hands.call_count == 1
