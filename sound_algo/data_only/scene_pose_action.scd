@@ -107,6 +107,12 @@
 			~fxRev.(openMax.linlin(0, 1, 0.1, 0.8));
 			~fxDrive.(spdMax.linlin(0, 0.3, 0, 1));
 			~fxSt.((hf[\dist] ? 0).linlin(0, 1, 0.2, 1.0));
+		} {
+			// Mains absentes -> retour au neutre (filtre ouvert, dry-ish, unity, large)
+			~fxCut.(20000);
+			~fxRev.(0.4);
+			~fxDrive.(0);
+			~fxSt.(1.0);
 		};
 	};
 };
