@@ -30,6 +30,12 @@
 	rate:          10,     // refresh Hz
 );
 
+// Stubs FX -> cibles reelles (? = ne crase pas un stub pre-existant)
+~fxCut   = ~fxCut   ? { |hz|  if(~doFilter.notNil) { ~doFilter.set(\cutoff, hz) } };
+~fxRev   = ~fxRev   ? { |mix| if(~doRev.notNil)    { ~doRev.set(\mix, mix) } };
+~fxSt    = ~fxSt    ? { |w|   if(~doFilter.notNil) { ~doFilter.set(\width, w) } };
+~fxDrive = ~fxDrive ? { |amt| if(~doFilter.notNil) { ~doFilter.set(\drive, amt.linlin(0,1,1,3)) } };
+
 ~mapPoseToFx = {
 	var avgSpeed = 0, avgAccel = 0, avgSym = 0, avgProbs = [0, 0, 0];
 	var n = max(1, ~poseKin.size);
@@ -82,6 +88,29 @@
 	 avgSym.round(0.01)];
 };
 
+// Mapping mains -> FX : hauteur->cutoff, ouverture->reverb, vitesse->drive, dist->width
+~mapHandsToFx = {
+	var hf = ~handFeat;
+	var hasL, hasR, ys, height, openMax, spdMax;   // toutes les vars en premier (regle sclang)
+	if (hf.notNil and: { hf[\ly].notNil }) {
+		hasL = (hf[\lx] + hf[\ly]) > 0.001;
+		hasR = (hf[\rx] + hf[\ry]) > 0.001;
+		if (hasL or: { hasR }) {
+			// main la plus haute = y minimal ; height = 1 - min(y)
+			ys = [];
+			if (hasL) { ys = ys.add(hf[\ly]) };
+			if (hasR) { ys = ys.add(hf[\ry]) };
+			height  = 1 - ys.minItem;
+			openMax = max(hf[\lopen] ? 0, hf[\ropen] ? 0);
+			spdMax  = max(hf[\lspeed] ? 0, hf[\rspeed] ? 0);
+			~fxCut.(height.linexp(0, 1, 200, 8000));
+			~fxRev.(openMax.linlin(0, 1, 0.1, 0.8));
+			~fxDrive.(spdMax.linlin(0, 0.3, 0, 1));
+			~fxSt.((hf[\dist] ? 0).linlin(0, 1, 0.2, 1.0));
+		};
+	};
+};
+
 ~scenePoseAction = ~scenePoseAction ?? {
 	(
 		running: false,
@@ -94,6 +123,7 @@
 				~scenePoseAction[\routine] = Routine({
 					inf.do {
 						var snapshot = ~mapPoseToFx.();
+						~mapHandsToFx.();
 						if (~scenePoseAction[\verbose] ? false) {
 							("[pose] label=" ++ snapshot[0]
 							 ++ " s=" ++ snapshot[1]
@@ -116,6 +146,7 @@
 	)
 };
 
+~scenePoseAction[\start].();
 "[OK] SETUP scene_pose_action".postln;
 )
 
