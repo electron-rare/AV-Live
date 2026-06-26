@@ -22,6 +22,13 @@ targets:
       - path: Sources/AVLiveBody
         excludes:
           - Info.plist
+          - Resources/scene.metal
+    postBuildScripts:
+      - script: |
+          cp "${SRCROOT}/Sources/AVLiveBody/Resources/scene.metal" \
+             "${BUILT_PRODUCTS_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/scene.metal"
+        name: "Copy scene.metal source to bundle"
+        basedOnDependencyAnalysis: false
     dependencies:
       - package: AVLiveWire
         product: AVLiveWire
