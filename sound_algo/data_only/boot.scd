@@ -133,7 +133,7 @@ Routine({
     (~base ++ "scenes.scd").load;
     0.5.wait;
 
-    // -- 6b. Pose/hand -> FX mapping -----
+    // -- 6b. Pose/mains -> mapping FX -----
     (~base ++ "scene_pose_action.scd").load;
     0.5.wait;
 
