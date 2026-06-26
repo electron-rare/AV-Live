@@ -10,6 +10,7 @@ import SwiftUI
 struct LayeredSceneView: NSViewRepresentable {
     let controller: SceneController
     let renderer: SceneRenderer?
+    let showScene: Bool
 
     func makeNSView(context: Context) -> NSView {
         controller.setUp()
@@ -42,7 +43,7 @@ struct LayeredSceneView: NSViewRepresentable {
     }
 
     func updateNSView(_ nsView: NSView, context: Context) {
-        context.coordinator.mtk?.isHidden = false   // visibility via showScene handled by caller setting renderer.uniforms / hidden
+        context.coordinator.mtk?.isHidden = !showScene
     }
 
     func makeCoordinator() -> Coordinator { Coordinator() }

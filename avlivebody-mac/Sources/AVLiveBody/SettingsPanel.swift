@@ -37,11 +37,27 @@ struct SettingsPanel: View {
                     slider("Opacite video", $settings.videoOpacity,
                            0...1)
                 }
+
+                group("Scene") {
+                    Toggle("Fond shader", isOn: $settings.showScene)
+                    Picker("Mode", selection: $settings.vizMode) {
+                        ForEach(0..<10, id: \.self) { i in
+                            Text(Self.modeName(i)).tag(i)
+                        }
+                    }
+                    .pickerStyle(.menu)
+                }
             }
             .padding(16)
         }
         .frame(width: 280)
         .background(.ultraThinMaterial)
+    }
+
+    static func modeName(_ i: Int) -> String {
+        let n = ["storm","tunnel","plasma","kaleido","voronoi",
+                 "metaballs","starfield","bars","hands3d","openpos"]
+        return n.indices.contains(i) ? "\(i) \(n[i])" : "\(i)"
     }
 
     @ViewBuilder

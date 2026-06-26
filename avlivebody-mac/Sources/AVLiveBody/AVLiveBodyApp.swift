@@ -46,7 +46,8 @@ struct ContentView: View {
 
     var body: some View {
         ZStack(alignment: .topTrailing) {
-            LayeredSceneView(controller: controller, renderer: renderer)
+            LayeredSceneView(controller: controller, renderer: renderer,
+                             showScene: settings.showScene)
             StatusBar(consumer: consumer)
                 .frame(maxWidth: .infinity, alignment: .top)
             HStack(alignment: .top) {
