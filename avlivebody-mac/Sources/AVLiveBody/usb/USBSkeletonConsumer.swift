@@ -11,6 +11,10 @@ final class USBSkeletonConsumer: ObservableObject {
     /// 91-joint skeleton payloads keyed by pid.
     @Published var skeletons: [Int: SkeletonPayload] = [:]
     @Published var connected = false
+    /// Latest Vision hand landmarks from the iPhone (tag=4).
+    @Published var hands: HandsPayload?
+    /// Latest Vision face landmarks from the iPhone (tag=5).
+    @Published var face: FacePayload?
 
     /// Called on the main queue for every decoded camera frame.
     var onVideoFrame: ((CVPixelBuffer) -> Void)?
@@ -94,6 +98,18 @@ final class USBSkeletonConsumer: ObservableObject {
             guard let payload =
                 VideoPayload(decoding: frame.payload) else { return }
             videoDecoder.decode(payload)
+        case .hands:
+            guard let payload = HandsPayload(decoding: frame.payload)
+            else { return }
+            DispatchQueue.main.async { [weak self] in
+                self?.hands = payload
+            }
+        case .face:
+            guard let payload = FacePayload(decoding: frame.payload)
+            else { return }
+            DispatchQueue.main.async { [weak self] in
+                self?.face = payload
+            }
         case .meta:
             break
         }
