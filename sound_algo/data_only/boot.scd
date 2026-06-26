@@ -92,13 +92,24 @@
 Routine({
     var maxWait, waited;
 
-    // Ouvre le port 57121 pour recevoir les /control/* du launcher et
-    // de tout client externe (cf OSCSender swift). Echec silencieux
-    // si le port est deja pris (ex: web bridge actif) — dans ce cas
-    // sclang reste sur son langPort par defaut.
+    // Ouvre le port 57121 pour recevoir /control/* (launcher), /pose/* et
+    // /data/* (data_only_viz + data_feeds bridge). Si le port est pris,
+    // c'est presque toujours un holder zombie : un scsynth/bridge orphelin
+    // d'un sclang precedent qui a herite le socket 57121 via unixCmd et a
+    // survecu a son parent. On le libere et on reessaie, plutot que de
+    // fallback silencieusement (les /pose/data n'arriveraient jamais sur le
+    // langPort de repli).
     if(thisProcess.openUDPPort(57121).not) {
-        ("[data-only/boot] WARN: port 57121 occupe, fallback sur langPort = "
-         ++ NetAddr.langPort).postln;
+        "[data-only/boot] 57121 occupe — liberation du holder zombie...".postln;
+        "lsof -ti UDP:57121 | xargs kill -9 2>/dev/null".unixCmd;
+        0.5.wait;
+        if(thisProcess.openUDPPort(57121).not) {
+            ("[data-only/boot] WARN: 57121 toujours occupe, fallback sur langPort = "
+             ++ NetAddr.langPort).postln;
+        } {
+            ("[data-only/boot] 57121 recupere — sclang listening on "
+             ++ NetAddr.langPort ++ " + 57121").postln;
+        };
     } {
         ("[data-only/boot] sclang listening on " ++ NetAddr.langPort ++ " + 57121").postln;
     };
