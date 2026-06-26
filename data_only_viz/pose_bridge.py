@@ -321,6 +321,24 @@ class PoseSoundBridge:
             [int(pid), float(kin[0]), float(kin[1]), float(kin[2])],
         )
 
+    @staticmethod
+    def _hand_slot(h):
+        if not h:
+            return [0.0, 0.0, 0.0, 0.0]
+        return [float(h["cx"]), float(h["cy"]),
+                float(h["openness"]), float(h["speed"])]
+
+    def send_hands(self, feats, t):
+        """Emit /pose/hands [0, lx,ly,lopen,lspeed, rx,ry,ropen,rspeed, dist]."""
+        args = [0]
+        args += self._hand_slot(feats.get("L"))
+        args += self._hand_slot(feats.get("R"))
+        args.append(float(feats.get("dist", 0.0)))
+        try:
+            self._client.send_message("/pose/hands", args)
+        except OSError:
+            pass
+
     def send_enter(self, pid: int) -> None:
         """Send lifecycle event when person enters frame."""
         self._client.send_message("/pose/enter", [int(pid)])
