@@ -18,6 +18,8 @@ final class SkeletonEntity {
     private let material = SimpleMaterial(
         color: NSColor.systemYellow, roughness: 0.6, isMetallic: false)
 
+    func setVisible(_ visible: Bool) { root.isEnabled = visible }
+
     func update(_ skeletons: [Int: SkeletonPayload]) {
         // Drop pools for pids no longer present.
         for pid in pools.keys where skeletons[pid] == nil {

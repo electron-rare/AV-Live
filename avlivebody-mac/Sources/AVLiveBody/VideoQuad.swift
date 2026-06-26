@@ -1,3 +1,4 @@
+import AppKit
 import CoreImage
 import CoreVideo
 import Foundation
@@ -10,6 +11,7 @@ final class VideoQuad {
     let entity = ModelEntity()
 
     private let ciContext = CIContext()
+    private var opacity: Double = 1.0
     /// Plane is 1.6 m wide, 16:9; positioned 2 m behind the body.
     private static let width: Float = 1.6
     private static let height: Float = 0.9
@@ -26,6 +28,17 @@ final class VideoQuad {
             SIMD3<Float>(0, 0, Self.zBack)
     }
 
+    func setVisible(_ visible: Bool) { entity.isEnabled = visible }
+
+    func setOpacity(_ value: Double) {
+        opacity = value
+        // Re-tint current material; `update(_:)` will also use `opacity`.
+        if var mat = entity.model?.materials.first as? UnlitMaterial {
+            mat.color = .init(tint: NSColor(white: 1, alpha: CGFloat(value)))
+            entity.model?.materials = [mat]
+        }
+    }
+
     /// Replace the plane's texture from a decoded camera frame.
     func update(_ pixelBuffer: CVPixelBuffer) {
         let ci = CIImage(cvPixelBuffer: pixelBuffer)
@@ -39,8 +52,9 @@ final class VideoQuad {
             return
         }
         var material = UnlitMaterial()
-        material.color = .init(tint: .white,
-                               texture: .init(texture))
+        material.color = .init(
+            tint: NSColor(white: 1, alpha: CGFloat(opacity)),
+            texture: .init(texture))
         entity.model?.materials = [material]
     }
 }

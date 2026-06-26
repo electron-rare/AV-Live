@@ -13,7 +13,7 @@ final class MeshEntity {
     private static let vertexCount = 10475
     private let faces: [UInt32]
     private var pools: [Int: ModelEntity] = [:]
-    private let material = SimpleMaterial(
+    private var material = SimpleMaterial(
         color: NSColor(white: 0.8, alpha: 1.0),
         roughness: 0.5, isMetallic: false)
 
@@ -38,6 +38,17 @@ final class MeshEntity {
         }
         for idx in pools.keys where idx >= persons.count {
             pools[idx]?.isEnabled = false
+        }
+    }
+
+    func setVisible(_ visible: Bool) { root.isEnabled = visible }
+
+    func setMaterial(metallic: Bool, roughness: Double) {
+        material = SimpleMaterial(
+            color: NSColor(white: 0.8, alpha: 1.0),
+            roughness: .float(Float(roughness)), isMetallic: metallic)
+        for entity in pools.values {
+            entity.model?.materials = [material]
         }
     }
 
