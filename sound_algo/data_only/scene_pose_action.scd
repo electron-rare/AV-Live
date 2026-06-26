@@ -93,8 +93,8 @@
 	var hf = ~handFeat;
 	var hasL, hasR, ys, height, openMax, spdMax;   // toutes les vars en premier (regle sclang)
 	if (hf.notNil and: { hf[\ly].notNil }) {
-		hasL = (hf[\lx] + hf[\ly]) > 0.001;
-		hasR = (hf[\rx] + hf[\ry]) > 0.001;
+		hasL = ((hf[\lx] ? 0) + (hf[\ly] ? 0)) > 0.001;
+		hasR = ((hf[\rx] ? 0) + (hf[\ry] ? 0)) > 0.001;
 		if (hasL or: { hasR }) {
 			// main la plus haute = y minimal ; height = 1 - min(y)
 			ys = [];

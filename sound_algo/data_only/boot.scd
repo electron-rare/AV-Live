@@ -105,6 +105,10 @@ Routine({
 
     // Boot le serveur (idempotent : si deja boot, retourne immediatement)
     Server.local.options.numOutputBusChannels = 2;
+    // Output-only patch: don't open an input device. Avoids the mic TCC
+    // prompt and "AudioDeviceStart failed" when the default input is
+    // unavailable (e.g. an iPhone Continuity mic in the device list).
+    Server.local.options.numInputBusChannels = 0;
     Server.local.options.memSize = 65536;
 
     "[data-only/boot] booting scsynth...".postln;
