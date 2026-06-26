@@ -27,7 +27,15 @@ struct AVLiveBodyApp: App {
 struct ContentView: View {
     @StateObject private var consumer = USBSkeletonConsumer()
     private let controller = SceneController()
-    private let multiHMR: MultiHMRCoreML? = MultiHMRCoreML()
+    /// Multi-HMR mesh inference (CoreML, ~150-300 ms/frame) is OFF by
+    /// default: it would saturate the main thread and beachball the UI.
+    /// Skeleton-only rendering (iPhone 91-joint ARKit stream) otherwise.
+    /// Enable on a capable, properly-threaded host with AVBODY_MULTIHMR=1.
+    private let multiHMR: MultiHMRCoreML? = {
+        guard ProcessInfo.processInfo.environment["AVBODY_MULTIHMR"] == "1"
+        else { return nil }
+        return MultiHMRCoreML()
+    }()
     /// Placeholder intrinsics until a `.meta` frame supplies real ones.
     private let cameraK: [Float] = [
         672, 0, 336, 0, 672, 336, 0, 0, 1,
