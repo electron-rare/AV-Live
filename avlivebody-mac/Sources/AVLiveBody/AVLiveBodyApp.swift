@@ -105,6 +105,7 @@ struct ContentView: View {
                                  hands: consumer.hands,
                                  face: consumer.face,
                                  prevPelvis: &prevPelvis)
+        controller.updateHandFace(hands: consumer.hands, face: consumer.face)
     }
 
     private func wire() {

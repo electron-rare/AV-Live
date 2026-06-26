@@ -23,6 +23,7 @@ final class SceneController {
     private(set) var videoQuad: VideoQuad?
     private(set) var skeleton: SkeletonEntity?
     private(set) var mesh: MeshEntity?
+    private(set) var handFace: HandFaceSkeleton?
 
     /// Orbital camera state.
     private var orbitYaw: Float = 0
@@ -75,6 +76,10 @@ final class SceneController {
         worldAnchor.addChild(m.root)
         mesh = m
 
+        let hf = HandFaceSkeleton()
+        worldAnchor.addChild(hf.root)
+        handFace = hf
+
         installOrbitGestures()
     }
 
@@ -88,6 +93,10 @@ final class SceneController {
 
     func updateMesh(_ persons: [MultiHMRPerson]) {
         mesh?.update(persons)
+    }
+
+    func updateHandFace(hands: HandsPayload?, face: FacePayload?) {
+        handFace?.update(hands: hands, face: face)
     }
 
     func setSkeletonVisible(_ v: Bool) { skeleton?.setVisible(v) }
