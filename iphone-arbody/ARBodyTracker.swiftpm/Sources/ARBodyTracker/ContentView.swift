@@ -55,6 +55,14 @@ struct ContentView: View {
         }
     }
 
+    private var thermalColor: Color {
+        switch session.thermalLabel {
+        case "serious":  return .orange
+        case "critical": return .red
+        default:         return .green
+        }
+    }
+
     private var usbStateLabel: String {
         switch session.usbState {
         case .idle:       return "idle"
@@ -122,6 +130,12 @@ struct ContentView: View {
                     .font(.caption2)
                     .foregroundColor(.white)
             }
+            Text("fps \(String(format: "%.1f", session.arkitFps))  "
+                 + "vis \(Int(session.visionMs)) ms  "
+                 + "drop \(Int(session.visionDropRate * 100))%  "
+                 + session.thermalLabel)
+                .font(.caption2)
+                .foregroundColor(thermalColor)
         }
         .padding(12)
         .background(.black.opacity(0.5))

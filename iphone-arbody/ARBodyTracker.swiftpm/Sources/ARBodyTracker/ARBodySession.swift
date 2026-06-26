@@ -29,6 +29,10 @@ final class ARBodySession: NSObject, ObservableObject, ARSessionDelegate {
     @Published var bodyCount: Int = 0
     @Published var skeleton2D: SkeletonSnapshot?
     @Published var usbState: USBServer.State = .idle
+    @Published var arkitFps: Double = 0
+    @Published var visionMs: Double = 0
+    @Published var visionDropRate: Double = 0
+    @Published var thermalLabel: String = "nominal"
     /// Set by the SwiftUI view via GeometryReader so the projection
     /// matches the on-screen ARView size.
     var viewportSize: CGSize = .zero
@@ -42,12 +46,25 @@ final class ARBodySession: NSObject, ObservableObject, ARSessionDelegate {
         label: "cc.saillant.arbody.vision", qos: .userInitiated)
     private var visionBusy = false
     private var lastVisionTime: TimeInterval = 0
+    private var visionAttempts: Int = 0
+    private var visionDrops: Int = 0
     private var jointsInSecond: Int = 0
     private var lastSecond: TimeInterval = 0
     private let bodyParents: [Int] =
         ARSkeletonDefinition.defaultBody3D.parentIndices
 
     let arView = ARView(frame: .zero)
+
+    nonisolated static func thermalString(
+        _ s: ProcessInfo.ThermalState) -> String {
+        switch s {
+        case .nominal:  return "nominal"
+        case .fair:     return "fair"
+        case .serious:  return "serious"
+        case .critical: return "critical"
+        @unknown default: return "?"
+        }
+    }
 
     override init() {
         super.init()
@@ -66,6 +83,16 @@ final class ARBodySession: NSObject, ObservableObject, ARSessionDelegate {
                 self.usb.send(tag: .video, pid: -1,
                               timestamp: self.lastFrameTime,
                               payload: payload.encoded())
+            }
+        }
+        thermalLabel = Self.thermalString(
+            ProcessInfo.processInfo.thermalState)
+        NotificationCenter.default.addObserver(
+            forName: ProcessInfo.thermalStateDidChangeNotification,
+            object: nil, queue: .main) { [weak self] _ in
+            Task { @MainActor in
+                self?.thermalLabel = Self.thermalString(
+                    ProcessInfo.processInfo.thermalState)
             }
         }
     }
@@ -116,8 +143,14 @@ final class ARBodySession: NSObject, ObservableObject, ARSessionDelegate {
         let t = frame.timestamp
         Task { @MainActor in
             // Throttle to 30 fps max.
-            if t - self.lastFrameTime < 1.0 / 30.0 { return }
+            let dt = t - self.lastFrameTime
+            if dt < 1.0 / 30.0 { return }
             self.lastFrameTime = t
+            if dt > 0, dt < 1.0 {
+                let inst = 1.0 / dt
+                self.arkitFps = self.arkitFps == 0
+                    ? inst : self.arkitFps * 0.9 + inst * 0.1
+            }
 
             // Encode the camera frame to HEVC and stream it over USB.
             let img = frame.capturedImage
@@ -132,13 +165,24 @@ final class ARBodySession: NSObject, ObservableObject, ARSessionDelegate {
             }
 
             // Vision hands+face at ~15 fps, off-main, drop if busy.
-            if t - self.lastVisionTime >= 1.0 / 15.0, !self.visionBusy {
-                self.lastVisionTime = t
-                self.visionBusy = true
-                let buf = img   // CVPixelBuffer captured for the worker
-                self.visionQueue.async {
-                    self.runVision(on: buf, timestamp: t)
-                    Task { @MainActor in self.visionBusy = false }
+            if t - self.lastVisionTime >= 1.0 / 15.0 {
+                self.visionAttempts += 1
+                if self.visionBusy {
+                    self.visionDrops += 1
+                } else {
+                    self.lastVisionTime = t
+                    self.visionBusy = true
+                    let buf = img   // CVPixelBuffer captured for the worker
+                    self.visionQueue.async {
+                        self.runVision(on: buf, timestamp: t)
+                        Task { @MainActor in self.visionBusy = false }
+                    }
+                }
+                if self.visionAttempts >= 60 {
+                    self.visionDropRate =
+                        Double(self.visionDrops) / Double(self.visionAttempts)
+                    self.visionAttempts = 0
+                    self.visionDrops = 0
                 }
             }
 
@@ -212,7 +256,13 @@ final class ARBodySession: NSObject, ObservableObject, ARSessionDelegate {
         let faceReq = VNDetectFaceLandmarksRequest()
         let handler = VNImageRequestHandler(
             cvPixelBuffer: pixelBuffer, orientation: .right, options: [:])
+        let t0 = Date()
         try? handler.perform([handReq, faceReq])
+        let ms = Date().timeIntervalSince(t0) * 1000.0
+        Task { @MainActor in
+            self.visionMs = self.visionMs == 0
+                ? ms : self.visionMs * 0.8 + ms * 0.2
+        }
 
         // ---- hands ----
         // Fixed 21-joint order matching MediaPipe-style indexing.
