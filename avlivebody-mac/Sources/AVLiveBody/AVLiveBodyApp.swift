@@ -105,7 +105,9 @@ struct ContentView: View {
                                  hands: consumer.hands,
                                  face: consumer.face,
                                  prevPelvis: &prevPelvis)
-        controller.updateHandFace(hands: consumer.hands, face: consumer.face)
+        controller.updateHandFace(hands: consumer.hands,
+                                  face: consumer.face,
+                                  depth: Float(-(prevPelvis?.z ?? 0)))
     }
 
     private func wire() {

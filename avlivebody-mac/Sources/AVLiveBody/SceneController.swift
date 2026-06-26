@@ -95,7 +95,9 @@ final class SceneController {
         mesh?.update(persons)
     }
 
-    func updateHandFace(hands: HandsPayload?, face: FacePayload?) {
+    func updateHandFace(hands: HandsPayload?, face: FacePayload?,
+                        depth: Float) {
+        handFace?.setDepth(depth)
         handFace?.update(hands: hands, face: face)
     }
 
