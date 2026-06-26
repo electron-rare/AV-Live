@@ -102,6 +102,7 @@ class State:
     persons_body:  list[list[PoseKp]] = field(default_factory=list)
     persons_face:  list[list[PoseKp]] = field(default_factory=list)
     persons_hands: list[list[PoseKp]] = field(default_factory=list)
+    hand_feats: dict | None = None
     # MediaPipe pose_world_landmarks per person : 33 keypoints in meters,
     # relative to the hip-center. Optional companion of persons_body
     # (image-space xy). Empty if no detection or backend doesn't emit it.

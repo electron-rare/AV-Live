@@ -119,8 +119,8 @@ MESH_MAX_VERTS = 10475  # SMPL-X is the larger family; SMPL (6890) fits inside
 # de 16, regle Metal). On y stocke (time, rms, kp_norm, netz_dev,
 # lightning_flash, flare, wind_norm, bz_norm, social_rate, pose_alive,
 # pose_count, width, height, viz_mode, _pad0, _pad1).
-UNIFORM_FLOATS = 20   # +4 floats : hand_l_x/y, hand_r_x/y
-UNIFORM_SIZE = UNIFORM_FLOATS * 4   # 80 octets, aligne 16
+UNIFORM_FLOATS = 24   # +4 floats : hand_l_x/y, hand_r_x/y + hand_height, hand_openness, hand_speed, hand_dist
+UNIFORM_SIZE = UNIFORM_FLOATS * 4   # 96 octets, aligne 16
 
 
 class MetalRenderer(NSObject):
@@ -262,6 +262,14 @@ class MetalRenderer(NSObject):
             hly = 1 - (lh_wrist.y if lh_wrist else 0.5) * 2
             hrx = (rh_wrist.x if rh_wrist else 0.5) * 2 - 1
             hry = 1 - (rh_wrist.y if rh_wrist else 0.5) * 2
+            # Expressive hand features from HandFeatureExtractor
+            hf = getattr(s, "hand_feats", None) or {}
+            hl, hr = hf.get("L"), hf.get("R")
+            ys = [h["cy"] for h in (hl, hr) if h]
+            hand_height = (1.0 - min(ys)) if ys else 0.0
+            hand_open = max([h["openness"] for h in (hl, hr) if h] or [0.0])
+            hand_speed = max([h["speed"] for h in (hl, hr) if h] or [0.0])
+            hand_dist = float(hf.get("dist", 0.0))
             uniforms = struct.pack(
                 f"{UNIFORM_FLOATS}f",
                 s.elapsed(),                                       # 1
@@ -278,8 +286,10 @@ class MetalRenderer(NSObject):
                 float(s.width),                                    # 12
                 float(s.height),                                   # 13
                 float(s.viz_mode),                                 # 14
-                hlx, hly, hrx, hry,                                # 15-18 (mains)
-                0.0, 0.0,                                          # 19-20 pad
+                hlx, hly, hrx, hry,                                # 15-18 wrist xy (kept)
+                hand_height, hand_open,                            # 19-20
+                hand_speed, hand_dist,                             # 21-22
+                0.0, 0.0,                                          # 23-24 pad (16-byte align)
             )
             n_segs = self._update_skeleton(s)
             n_tris = self._update_mesh(s)
