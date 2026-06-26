@@ -152,3 +152,58 @@ def test_publisher_passes_hands_kp_to_step() -> None:
     assert len(captured_hands) == 1
     assert captured_hands[0] is not None
     assert captured_hands[0].shape == (42, 3)
+
+
+# ---------------------------------------------------------------------------
+# Task-3 tests: _emit_hands wired into _tick
+# ---------------------------------------------------------------------------
+
+def _fake_hand_21(seed: int = 0):
+    """Return a list of 21 objects with .x and .y float attributes."""
+    import types
+    rng = __import__("random").Random(seed)
+    return [
+        types.SimpleNamespace(x=rng.random(), y=rng.random())
+        for _ in range(21)
+    ]
+
+
+def test_emit_hands_called_once_per_tick_with_hands() -> None:
+    """`bridge.send_hands` must be called once per tick with L/R/dist keys."""
+    from data_only_viz.action_head_pub import ActionHeadPublisher
+    state = _FakeState()
+    bridge = MagicMock()
+    pub = ActionHeadPublisher(state, bridge, ckpt_path=None)
+
+    state.persons_hands = [_fake_hand_21(0)]
+    state.persons_smplx = [_make_smplx_person(0)]
+    state.smplx_last_t = 1.0
+    pub._tick(t_now=0.0)
+
+    bridge.send_hands.assert_called_once()
+    feats, _t = bridge.send_hands.call_args[0]
+    assert set(feats.keys()) >= {"L", "R", "dist"}
+    # One hand present → L is populated, R is None
+    assert feats["L"] is not None
+    assert feats["R"] is None
+    assert isinstance(feats["dist"], float)
+
+
+def test_emit_hands_called_once_per_tick_empty() -> None:
+    """`bridge.send_hands` still called once when persons_hands is empty."""
+    from data_only_viz.action_head_pub import ActionHeadPublisher
+    state = _FakeState()
+    bridge = MagicMock()
+    pub = ActionHeadPublisher(state, bridge, ckpt_path=None)
+
+    state.persons_hands = []
+    state.persons_smplx = [_make_smplx_person(0)]
+    state.smplx_last_t = 1.0
+    pub._tick(t_now=0.0)
+
+    bridge.send_hands.assert_called_once()
+    feats, _t = bridge.send_hands.call_args[0]
+    assert set(feats.keys()) >= {"L", "R", "dist"}
+    assert feats["L"] is None
+    assert feats["R"] is None
+    assert feats["dist"] == 0.0

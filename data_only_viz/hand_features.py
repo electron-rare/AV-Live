@@ -20,6 +20,16 @@ def _finite(v: float, fallback: float) -> float:
     return v if isinstance(v, float) and math.isfinite(v) else fallback
 
 
+def _coord(p, attr: str, idx: int, fallback: float = 0.5) -> float:
+    """Extract a coordinate from a landmark object or an indexable row."""
+    if hasattr(p, attr):
+        return float(getattr(p, attr))
+    try:
+        return float(p[idx])
+    except (TypeError, IndexError):
+        return fallback
+
+
 def _clamp(v: float, lo: float, hi: float) -> float:
     return lo if v < lo else hi if v > hi else v
 
@@ -31,8 +41,8 @@ class HandFeatureExtractor:
         self._buf = [deque(maxlen=self._history), deque(maxlen=self._history)]
 
     def _features(self, lm: list) -> dict:
-        xs = [_finite(float(p.x), 0.5) for p in lm[:21]]
-        ys = [_finite(float(p.y), 0.5) for p in lm[:21]]
+        xs = [_finite(_coord(p, "x", 0), 0.5) for p in lm[:21]]
+        ys = [_finite(_coord(p, "y", 1), 0.5) for p in lm[:21]]
         cx = _clamp(sum(xs) / len(xs), 0.0, 1.0)
         cy = _clamp(sum(ys) / len(ys), 0.0, 1.0)
         size = math.hypot(xs[MIDDLE_MCP] - xs[WRIST], ys[MIDDLE_MCP] - ys[WRIST])
@@ -55,7 +65,11 @@ class HandFeatureExtractor:
     def step(self, hands: list) -> dict:
         feats = []
         for lm in hands:
-            if lm and len(lm) >= 21:
+            try:
+                valid = lm is not None and len(lm) >= 21
+            except TypeError:
+                continue
+            if valid:
                 feats.append(self._features(lm))
         if not feats:
             self._buf[0].clear()

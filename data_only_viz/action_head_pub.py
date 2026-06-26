@@ -98,6 +98,8 @@ class ActionHeadPublisher(threading.Thread):
         self._last_smplx_t = 0.0
         self._last_body_t = 0.0
         self._last_pids: set[int] = set()
+        from data_only_viz.hand_features import HandFeatureExtractor
+        self._hand_ext = HandFeatureExtractor()
 
     def stop(self) -> None:
         self._stop.set()
@@ -142,6 +144,18 @@ class ActionHeadPublisher(threading.Thread):
             self.head.forget(gone)
             self.bridge.send_leave(pid=gone)
         self._last_pids = current_pids
+        self._emit_hands(t_now)
+
+    def _emit_hands(self, t_now: float) -> None:
+        """Lock state, extract hand features, emit /pose/hands once per tick."""
+        with self.state.lock():
+            hands = list(getattr(self.state, "persons_hands", None) or [])
+            if not hands and getattr(self.state, "hands_present", False):
+                lkp = getattr(self.state, "left_hand_kp", None)
+                rkp = getattr(self.state, "right_hand_kp", None)
+                hands = [h for h in (lkp, rkp) if h]
+        feats = self._hand_ext.step(hands)
+        self.bridge.send_hands(feats, t_now)
 
     def _read_sources(self) -> tuple[
         list[tuple[int, np.ndarray, np.ndarray, float, np.ndarray]] | None,
