@@ -83,7 +83,7 @@ public struct HandsPayload: Equatable {
     public func encoded() -> Data {
         var d = Data()
         d.append(UInt8(min(hands.count, 255)))
-        for hand in hands {
+        for hand in hands.prefix(255) {
             d.append(hand.isRight ? 1 : 0)
             for i in 0..<Self.pointsPerHand {
                 let p = i < hand.points.count ? hand.points[i] : .zero
@@ -104,13 +104,13 @@ public struct HandsPayload: Equatable {
         var result: [Hand] = []
         for _ in 0..<Int(n) {
             let isRight = b[o] != 0; o += 1
+            func f() -> Float {
+                let v = Float(bitPattern:
+                    UInt32(bigEndianBytes: b[o..<o+4]))
+                o += 4; return v
+            }
             var pts: [SIMD3<Float>] = []
             for _ in 0..<Self.pointsPerHand {
-                func f() -> Float {
-                    let v = Float(bitPattern:
-                        UInt32(bigEndianBytes: b[o..<o+4]))
-                    o += 4; return v
-                }
                 pts.append(SIMD3(f(), f(), f()))
             }
             result.append(Hand(isRight: isRight, points: pts))
