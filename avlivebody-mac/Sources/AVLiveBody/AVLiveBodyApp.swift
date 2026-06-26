@@ -27,6 +27,7 @@ struct AVLiveBodyApp: App {
 struct ContentView: View {
     @StateObject private var consumer = USBSkeletonConsumer()
     @StateObject private var settings = RenderSettings()
+    @State private var prevPelvis: SIMD3<Float>?
     private let controller = SceneController()
     private let renderer = SceneRenderer.make()
     /// Multi-HMR mesh inference (CoreML, ~150-300 ms/frame) is OFF by
@@ -68,7 +69,10 @@ struct ContentView: View {
         .onDisappear { consumer.stop() }
         .onReceive(consumer.$skeletons) { skeletons in
             controller.updateSkeleton(skeletons)
+            pushUniforms()
         }
+        .onReceive(consumer.$hands) { _ in pushUniforms() }
+        .onReceive(consumer.$face) { _ in pushUniforms() }
         .onReceive(settings.objectWillChange) { _ in
             // objectWillChange fires before the value updates; apply on
             // the next runloop tick so we read the new values.
@@ -90,6 +94,16 @@ struct ContentView: View {
         if let r = renderer {
             r.uniforms.viz_mode = Float(settings.vizMode)
         }
+    }
+
+    private func pushUniforms() {
+        guard let r = renderer else { return }
+        r.uniforms.viz_mode = Float(settings.vizMode)
+        SceneUniformBuilder.fill(&r.uniforms,
+                                 skeletons: consumer.skeletons,
+                                 hands: consumer.hands,
+                                 face: consumer.face,
+                                 prevPelvis: &prevPelvis)
     }
 
     private func wire() {
