@@ -19,7 +19,7 @@ def test_uniform_constants():
         assert UNIFORM_FLOATS == 24, f"expected 24, got {UNIFORM_FLOATS}"
         assert UNIFORM_SIZE == 96, f"expected 96, got {UNIFORM_SIZE}"
         assert struct.calcsize(f"{UNIFORM_FLOATS}f") == 96
-    except Exception as exc:  # pyobjc/Metal unavailable headless
+    except ImportError as exc:  # pyobjc/Metal unavailable headless
         # Fallback: at minimum the struct math is correct
         import pytest
         pytest.skip(f"renderer import skipped headless ({exc}); struct layout verified by test_uniform_layout_struct")

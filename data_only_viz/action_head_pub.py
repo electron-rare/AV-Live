@@ -155,7 +155,8 @@ class ActionHeadPublisher(threading.Thread):
                 rkp = getattr(self.state, "right_hand_kp", None)
                 hands = [h for h in (lkp, rkp) if h is not None and len(h) > 0]
         feats = self._hand_ext.step(hands)
-        self.state.hand_feats = feats
+        with self.state.lock():
+            self.state.hand_feats = feats
         self.bridge.send_hands(feats, t_now)
 
     def _read_sources(self) -> tuple[
