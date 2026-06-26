@@ -26,6 +26,7 @@ struct AVLiveBodyApp: App {
 @MainActor
 struct ContentView: View {
     @StateObject private var consumer = USBSkeletonConsumer()
+    @StateObject private var settings = RenderSettings()
     private let controller = SceneController()
     /// Multi-HMR mesh inference (CoreML, ~150-300 ms/frame) is OFF by
     /// default: it would saturate the main thread and beachball the UI.
@@ -42,15 +43,49 @@ struct ContentView: View {
     ]
 
     var body: some View {
-        ZStack(alignment: .top) {
+        ZStack(alignment: .topTrailing) {
             SceneView(controller: controller)
             StatusBar(consumer: consumer)
+                .frame(maxWidth: .infinity, alignment: .top)
+            HStack(alignment: .top) {
+                Spacer()
+                if settings.showPanel {
+                    SettingsPanel(settings: settings)
+                        .transition(.move(edge: .trailing))
+                }
+                Button {
+                    withAnimation { settings.showPanel.toggle() }
+                } label: {
+                    Image(systemName: "slider.horizontal.3")
+                        .padding(8)
+                }
+                .buttonStyle(.borderedProminent)
+                .padding(8)
+            }
         }
-        .onAppear { wire() }
+        .onAppear { wire(); applyAll() }
         .onDisappear { consumer.stop() }
         .onReceive(consumer.$skeletons) { skeletons in
             controller.updateSkeleton(skeletons)
         }
+        .onReceive(settings.objectWillChange) { _ in
+            // objectWillChange fires before the value updates; apply on
+            // the next runloop tick so we read the new values.
+            DispatchQueue.main.async { applyAll() }
+        }
+    }
+
+    private func applyAll() {
+        controller.setSkeletonVisible(settings.showSkeleton)
+        controller.setMeshVisible(settings.showMesh)
+        controller.setVideoVisible(settings.showVideo)
+        controller.setVideoOpacity(settings.videoOpacity)
+        controller.updateMeshMaterial(metallic: settings.meshMetallic,
+                                      roughness: settings.meshRoughness)
+        controller.setLightIntensities(key: settings.keyIntensity,
+                                       fill: settings.fillIntensity,
+                                       rim: settings.rimIntensity)
+        controller.setFieldOfView(settings.fieldOfView)
     }
 
     private func wire() {
