@@ -41,13 +41,13 @@ so we re-source it from the iPhone stream.
 iPhone ARBodyTracker
   ├─ ARBodyTrackingConfiguration  → 91-joint skeleton  (AVLiveWire tag=1, exists)
   ├─ HEVC encode                  → video              (tag=2, exists)
-  ├─ Vision VNDetectHumanHandPose on ARFrame.capturedImage → hands  (tag=3, NEW)
-  └─ Vision VNDetectFaceLandmarks  on ARFrame.capturedImage → face   (tag=4, NEW)
+  ├─ Vision VNDetectHumanHandPose on ARFrame.capturedImage → hands  (tag=4, NEW)
+  └─ Vision VNDetectFaceLandmarks  on ARFrame.capturedImage → face   (tag=5, NEW)
         (both throttled, off the main thread; rear camera, same frames as body)
                        │  usbmux TCP :7000, AVLiveWire framing
                        ▼
 Mac avlivebody-mac USBSkeletonConsumer
-  routes tag=1/2 (existing) + tag=3 hands + tag=4 face
+  routes tag=1/2 (existing) + tag=4 hands + tag=5 face
   → @Published hands, @Published face  → UI (skeleton + shader uniforms)
 ```
 
@@ -75,11 +75,11 @@ applies changes to layers and entities.
   drop the frame (same drop-if-busy discipline as the Multi-HMR fix).
 
 ### 4.2 AVLiveWire protocol (`shared/AVLiveWire/`)
-Add to `FrameTag`: `hands = 3`, `face = 4` (`FrameHeader.swift`). Framing
+Add to `FrameTag`: `hands = 4`, `face = 5` (`FrameHeader.swift`). Framing
 unchanged (19-byte header). New payload codecs in `WirePayloads.swift`:
-- **HandsPayload (tag=3):** `nHands: u8` then per hand
+- **HandsPayload (tag=4):** `nHands: u8` then per hand
   `chirality: u8 (0=left,1=right) + 21 × (x: f32, y: f32, c: f32)`.
-- **FacePayload (tag=4):** `confidence: f32 + nPoints: u16` then
+- **FacePayload (tag=5):** `confidence: f32 + nPoints: u16` then
   `nPoints × (x: f32, y: f32)` (Vision `allPoints`, ~76, normalized image coords).
 - Roundtrip encode/decode unit tests in `AVLiveWireTests` (mirror the existing
   `SkeletonPayload`/`VideoPayload` tests). `StreamDemuxer` already yields frames
@@ -124,10 +124,10 @@ Published writes hop to main like `skeletons`.
 |---|---|---|
 | `time`, `width`, `height`, `viz_mode` | clock / drawable size / panel | |
 | `pose_alive`, `pose_count` | skeleton presence/count | |
-| `hand_l_x/y`, `hand_r_x/y` | **Vision hands** (centroid/wrist, norm) | tag=3 |
-| `finger_pinch_l/r` | **Vision hands** dist(thumbTip,indexTip) norm | tag=3 |
-| `mouth_open` | **Vision face** outer/inner lips vertical gap / face H | tag=4 |
-| `eye_open_l/r` | **Vision face** eye region aspect ratio | tag=4 |
+| `hand_l_x/y`, `hand_r_x/y` | **Vision hands** (centroid/wrist, norm) | tag=4 |
+| `finger_pinch_l/r` | **Vision hands** dist(thumbTip,indexTip) norm | tag=4 |
+| `mouth_open` | **Vision face** outer/inner lips vertical gap / face H | tag=5 |
+| `eye_open_l/r` | **Vision face** eye region aspect ratio | tag=5 |
 | `head_tilt` | **Vision face** atan2 between eye centers | or ARKit head |
 | `head_yaw` | **Vision face** nose vs eye-midpoint offset | or ARKit head |
 | `body_x/y/z`, `body_height`, `arm_spread` | ARKit body joints | tag=1 |
@@ -152,11 +152,11 @@ EMA-smooth derivatives (α≈0.3). B's Swift `SceneUniforms` field order MUST ma
 ## 8. Testing
 
 - **AVLiveWire** (Phase 0): encode/decode roundtrip unit tests for HandsPayload
-  and FacePayload; demuxer recognizes tag=3/4. (`AVLiveWireTests`, existing suite
+  and FacePayload; demuxer recognizes tag=4/5. (`AVLiveWireTests`, existing suite
   is green.)
-- **iPhone** (Phase 0): builds + deploys; on-device, confirm tag=3/4 frames reach
+- **iPhone** (Phase 0): builds + deploys; on-device, confirm tag=4/5 frames reach
   the Mac (a listener prints hand/face counts).
-- **Mac consumer** (Phase 0): unit-test `route` dispatches tag=3/4 to the right
+- **Mac consumer** (Phase 0): unit-test `route` dispatches tag=4/5 to the right
   decoder with a fabricated frame.
 - **Phase 1**: `RenderSettings` defaults; wireframe-index generation (pure fn);
   build; manual — toggles, lights, material visibly work.
@@ -173,8 +173,8 @@ Live audio/visual confirmation is the user's (needs display + iPhone + a body).
 | `shared/AVLiveWire/Sources/AVLiveWire/FrameHeader.swift` | Modify | add `hands=3`, `face=4` to `FrameTag` |
 | `shared/AVLiveWire/Sources/AVLiveWire/WirePayloads.swift` | Modify | `HandsPayload`, `FacePayload` codecs |
 | `shared/AVLiveWire/Tests/...` | Modify | roundtrip tests |
-| `iphone-arbody/.../ARBodySession.swift` | Modify | Vision hand+face on AR frames, throttled, off-main; send tag=3/4 |
-| `avlivebody-mac/.../usb/USBSkeletonConsumer.swift` | Modify | route tag=3/4 → `@Published hands/face` |
+| `iphone-arbody/.../ARBodySession.swift` | Modify | Vision hand+face on AR frames, throttled, off-main; send tag=4/5 |
+| `avlivebody-mac/.../usb/USBSkeletonConsumer.swift` | Modify | route tag=4/5 → `@Published hands/face` |
 | `avlivebody-mac/.../RenderSettings.swift` | Create | UI state |
 | `avlivebody-mac/.../SettingsPanel.swift` | Create | control panel |
 | `avlivebody-mac/.../AVLiveBodyApp.swift` | Modify | ContentView: container + panel; own RenderSettings |
@@ -191,7 +191,7 @@ Live audio/visual confirmation is the user's (needs display + iPhone + a body).
 |---|---|---|
 | AVLiveWire tags/framing | `shared/AVLiveWire/.../FrameHeader.swift` (FrameTag, magic AVL1, 19 B) | add tags + payloads |
 | iPhone AR session | `iphone-arbody/.../ARBodySession.swift` | add Vision hand/face |
-| Mac consumer | `avlivebody-mac/.../usb/USBSkeletonConsumer.swift` (route by tag) | tag=3/4 |
+| Mac consumer | `avlivebody-mac/.../usb/USBSkeletonConsumer.swift` (route by tag) | tag=4/5 |
 | Layered compositing | `_archive .../BodyView.swift:23-63` | `SceneView.swift` |
 | Settings state/panel | `_archive .../RenderSettings.swift`, `SettingsPanel.swift` | new files |
 | Lights | `_archive .../BodyView.swift:72-91` | `SceneController.swift` |
