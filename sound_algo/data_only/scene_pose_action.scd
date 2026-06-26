@@ -54,7 +54,7 @@
 		var p = ps[\probs] ? [0, 0, 0];
 		avgProbs = avgProbs.collect { |v, i| v + (p[i] ? 0) };
 	};
-	avgProbs = avgProbs.collect { _ / n };
+	avgProbs = avgProbs / n;
 	labelIdx = avgProbs.maxIndex ? 0;
 
 	// Drive + filter + width
