@@ -34,6 +34,10 @@ struct SceneUniforms {
     float hand_l_y;
     float hand_r_x;
     float hand_r_y;
+    float hand_height;
+    float hand_openness;
+    float hand_speed;
+    float hand_dist;
     float _pad0;
     float _pad1;
 };
@@ -454,6 +458,10 @@ fragment float4 bg_fragment(VsOut in [[stage_in]],
     p.x *= U.width / U.height;
 
     int mode = int(U.viz_mode + 0.5);
+
+    // Mains ecartees -> leger zoom (sauf mode 8 qui pilote sa propre camera).
+    if (mode != 8) { p *= (1.0 - U.hand_dist * 0.2); }
+
     float3 color;
     if      (mode == 1) color = mode_tunnel(p, U);
     else if (mode == 2) color = mode_plasma(p, U);
@@ -465,6 +473,11 @@ fragment float4 bg_fragment(VsOut in [[stage_in]],
     else if (mode == 8) color = mode_hands3d(p, U);
     else if (mode == 9) color = mode_openpos(p, U);
     else                color = mode_storm(p, U);
+
+    // Modulation expressive pilotee par les mains (subtile, tous les modes).
+    color *= (1.0 + U.hand_height * 0.6);                            // luminosite
+    color += U.hand_openness * 0.5 * color;                         // bloom / dispersion
+    color += U.hand_speed * 0.05 * sin(U.time * 8.0 + p.x * 10.0);  // turbulence
 
     // Flash global + vignette
     color += float3(U.lightning_flash * 1.2);
