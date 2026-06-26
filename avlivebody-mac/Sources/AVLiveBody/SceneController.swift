@@ -34,7 +34,9 @@ final class SceneController {
     func setUp() {
         guard !didSetUp else { return }
         didSetUp = true
-        arView.environment.background = .color(.black)
+        arView.environment.background = .color(.clear)
+        arView.layer?.isOpaque = false
+        arView.layer?.backgroundColor = NSColor.clear.cgColor
         arView.scene.addAnchor(worldAnchor)
 
         keyLight.light.intensity = 4000

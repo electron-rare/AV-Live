@@ -28,4 +28,8 @@ final class RenderSettings: ObservableObject {
 
     // Panel visibility
     @Published var showPanel: Bool = false
+
+    // Metal shader background (Phase 2)
+    @Published var showScene: Bool = true
+    @Published var vizMode: Int = 0   // 0..9
 }

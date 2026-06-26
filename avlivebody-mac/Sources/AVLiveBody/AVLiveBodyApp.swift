@@ -28,6 +28,7 @@ struct ContentView: View {
     @StateObject private var consumer = USBSkeletonConsumer()
     @StateObject private var settings = RenderSettings()
     private let controller = SceneController()
+    private let renderer = SceneRenderer.make()
     /// Multi-HMR mesh inference (CoreML, ~150-300 ms/frame) is OFF by
     /// default: it would saturate the main thread and beachball the UI.
     /// Skeleton-only rendering (iPhone 91-joint ARKit stream) otherwise.
@@ -44,7 +45,7 @@ struct ContentView: View {
 
     var body: some View {
         ZStack(alignment: .topTrailing) {
-            SceneView(controller: controller)
+            LayeredSceneView(controller: controller, renderer: renderer)
             StatusBar(consumer: consumer)
                 .frame(maxWidth: .infinity, alignment: .top)
             HStack(alignment: .top) {
@@ -86,6 +87,9 @@ struct ContentView: View {
                                        fill: settings.fillIntensity,
                                        rim: settings.rimIntensity)
         controller.setFieldOfView(settings.fieldOfView)
+        if let r = renderer {
+            r.uniforms.viz_mode = Float(settings.vizMode)
+        }
     }
 
     private func wire() {
