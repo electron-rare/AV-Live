@@ -334,11 +334,16 @@ def _load_py_config(path: str):
     from omegaconf import OmegaConf
     # Les configs DETRPose sont des fichiers Python qui exposent un dict
     # `model = LazyCall(...)`. On utilise le helper lazy_config si dispo.
-    try:
-        from src.misc.lazy_config import LazyConfig  # type: ignore
-        return LazyConfig.load(path)
-    except ImportError:
-        pass
+    # DETRPose exposes LazyConfig from src.core (see tools/inference/torch_inf.py);
+    # the older src.misc.lazy_config path is kept as a fallback. LazyConfig.load
+    # handles the config's relative imports (`from .include...`) that a raw exec
+    # cannot.
+    for _mod in ("src.core", "src.misc.lazy_config"):
+        try:
+            mod = __import__(_mod, fromlist=["LazyConfig"])
+            return mod.LazyConfig.load(path)
+        except (ImportError, AttributeError):
+            continue
     # Fallback minimal : exec + recup des noms cles.
     ns: dict = {}
     with open(path) as f:
