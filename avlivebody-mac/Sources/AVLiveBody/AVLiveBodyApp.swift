@@ -60,14 +60,20 @@ struct ContentView: View {
         consumer.onVideoFrame = { [weak consumer] pixelBuffer in
             MainActor.assumeIsolated {
                 controller.updateVideo(pixelBuffer)
-                guard let consumer else { return }
-                if let hmr = multiHMR {
-                    let raw = hmr.infer(
-                        pixelBuffer, cameraK: cameraK)
-                    let fused = BodyFusion.fuse(
-                        persons: raw,
-                        skeletons: consumer.skeletons)
-                    controller.updateMesh(fused)
+                guard let consumer, let hmr = multiHMR else { return }
+                // Snapshot skeletons on main; run the heavy CoreML
+                // prediction off-main (drops frames if busy), then hop
+                // back to main for the light fuse + mesh UI update.
+                let skeletons = consumer.skeletons
+                hmr.inferAsync(pixelBuffer, cameraK: cameraK) { raw in
+                    DispatchQueue.main.async {
+                        MainActor.assumeIsolated {
+                            let fused = BodyFusion.fuse(
+                                persons: raw,
+                                skeletons: skeletons)
+                            controller.updateMesh(fused)
+                        }
+                    }
                 }
             }
         }

@@ -24,6 +24,13 @@ final class MultiHMRCoreML {
 
     private let model: MLModel
     private let ciContext = CIContext()
+    /// Serial background queue + busy flag for `inferAsync`: keep the
+    /// ~150-300 ms CoreML prediction off the main thread and drop frames
+    /// that arrive while one is in flight.
+    private let inferQueue = DispatchQueue(
+        label: "cc.saillant.avlivebody.multihmr", qos: .userInitiated)
+    private let inferLock = NSLock()
+    private var inferBusy = false
 
     /// Loads the bundled model. Returns nil if the resource or load
     /// fails — callers fall back to skeleton-only rendering.
@@ -42,6 +49,28 @@ final class MultiHMRCoreML {
             NSLog("MultiHMRCoreML: load failed %@",
                   String(describing: error))
             return nil
+        }
+    }
+
+    /// Async inference: runs `infer` on a background queue, DROPS the
+    /// frame if a prior prediction is still in flight, and calls
+    /// `completion` with the result ON THE BACKGROUND QUEUE (the caller
+    /// hops back to the main thread for UI). Prevents the per-frame
+    /// CoreML prediction from saturating the run loop.
+    func inferAsync(_ pixelBuffer: CVPixelBuffer,
+                    cameraK: [Float],
+                    completion: @escaping ([MultiHMRPerson]) -> Void) {
+        inferLock.lock()
+        if inferBusy { inferLock.unlock(); return }
+        inferBusy = true
+        inferLock.unlock()
+        inferQueue.async { [weak self] in
+            guard let self else { return }
+            let result = self.infer(pixelBuffer, cameraK: cameraK)
+            self.inferLock.lock()
+            self.inferBusy = false
+            self.inferLock.unlock()
+            completion(result)
         }
     }
 
