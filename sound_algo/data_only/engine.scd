@@ -21,6 +21,7 @@
 
 // -- Reset Synths d'une eventuelle relance -------------------------
 ~doRev      !? { ~doRev.free };
+~doFilter   !? { ~doFilter.free };
 ~doMaster   !? { ~doMaster.free };
 ~doMasterGroup !? { ~doMasterGroup.free };
 
@@ -35,6 +36,19 @@ s.waitForBoot {
         var dry  = In.ar(in, 2);
         var wet  = FreeVerb2.ar(dry[0], dry[1], 1.0, room, damp);
         Out.ar(out, dry + (wet * mix));
+    }).add;
+
+    SynthDef(\do_master_filter, { |out=0, cutoff=20000, width=1.0, drive=1.0|
+        var sig, mid, side;                      // all vars first (sclang rule)
+        sig = In.ar(out, 2);
+        sig = RLPF.ar(sig, cutoff.clip(80, 20000).lag(0.08), 0.7);
+        sig = (sig * drive.clip(1, 4).lag(0.05)).tanh;
+        // stereo width via mid/side
+        mid = (sig[0] + sig[1]) * 0.5;
+        side = (sig[0] - sig[1]) * 0.5 * width.clip(0, 1).lag(0.08);
+        sig = [mid + side, mid - side];
+        sig = LeakDC.ar(sig);
+        ReplaceOut.ar(out, sig);
     }).add;
 
     SynthDef(\do_master, { |out=0, gain=1.0, ceil=0.95|
@@ -55,6 +69,7 @@ s.waitForBoot {
     // -- Lance le rack FX --
     ~doRev    = Synth.tail(~doMasterGroup, \do_reverb,
         [\in, ~doReverbBus, \out, 0, \mix, 0.4]);
+    ~doFilter = Synth.tail(~doMasterGroup, \do_master_filter, [\out, 0]);
     ~doMaster = Synth.tail(~doMasterGroup, \do_master,
         [\out, 0, \gain, 1.0]);
 
