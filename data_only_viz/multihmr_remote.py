@@ -65,6 +65,9 @@ FORMAT_JPEG = 2
 IMG_BYTES = IMG_SIZE * IMG_SIZE * 3
 K_BYTES = 9 * 4
 REQ_HEADER = 4 + 1 + 3  # magic + format_id + 3-byte pad
+# Fixed RAW-format request payload (mirrors RSP_PAYLOAD_LEN). The JPEG
+# path is variable-length, so this is the upper-bound / RAW case only.
+REQ_PAYLOAD_LEN = REQ_HEADER + IMG_BYTES + K_BYTES
 
 V3D_BYTES = N_PERSONS_FIXED * N_VERTS * 3 * 4
 TRANSL_BYTES = N_PERSONS_FIXED * 1 * 3 * 4

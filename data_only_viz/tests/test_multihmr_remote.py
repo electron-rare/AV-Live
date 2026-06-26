@@ -52,7 +52,7 @@ def test_request_encode_decode_roundtrip():
     payload_len = struct.unpack("<I", req[:4])[0]
     assert payload_len == REQ_PAYLOAD_LEN
     assert req[4:8] == MAGIC_REQ
-    img_back, K_back = decode_request(req[4:])
+    img_back, K_back, _ = decode_request(req[4:])
     assert img_back.shape == (IMG_SIZE, IMG_SIZE, 3)
     np.testing.assert_array_equal(img_back, img)
     np.testing.assert_array_equal(K_back, K)
@@ -160,7 +160,7 @@ class _StubServer:
                     if not chunk:
                         return
                     buf.extend(chunk)
-                img, K = decode_request(bytes(buf))
+                img, K, _ = decode_request(bytes(buf))
                 self.requests_seen.append((img.copy(), K.copy()))
                 conn.sendall(self._stub_outputs())
         finally:
@@ -180,7 +180,8 @@ def stub_server():
         srv.stop()
 
 
-def test_remote_backend_infer_against_stub(stub_server: _StubServer):
+def test_remote_backend_infer_against_stub(stub_server: _StubServer, monkeypatch):
+    monkeypatch.setenv("MULTIHMR_REMOTE_ASYNC", "0")  # sync path for determinism
     backend = MultiHMRRemoteBackend(
         host=stub_server.host, port=stub_server.port,
         connect_timeout=2.0, io_timeout=2.0)
@@ -214,7 +215,8 @@ def test_remote_backend_infer_against_stub(stub_server: _StubServer):
     np.testing.assert_array_equal(K_seen, K)
 
 
-def test_remote_backend_threshold_filters_all(stub_server: _StubServer):
+def test_remote_backend_threshold_filters_all(stub_server: _StubServer, monkeypatch):
+    monkeypatch.setenv("MULTIHMR_REMOTE_ASYNC", "0")  # sync path for determinism
     backend = MultiHMRRemoteBackend(
         host=stub_server.host, port=stub_server.port)
     img = np.zeros((3, IMG_SIZE, IMG_SIZE), dtype=np.float32)
