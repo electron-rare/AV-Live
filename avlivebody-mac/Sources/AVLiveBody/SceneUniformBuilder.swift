@@ -22,7 +22,8 @@ enum SceneUniformBuilder {
 
         if let body = skeletons.values.first {
             func j(_ i: Int) -> SIMD3<Float>? {
-                (i < body.joints.count && body.valid[i]) ? body.joints[i] : nil
+                (i < body.joints.count && i < body.valid.count
+                    && body.valid[i]) ? body.joints[i] : nil
             }
             if let hips = j(hipsIdx) {
                 u.body_x = hips.x; u.body_y = hips.y; u.body_z = hips.z

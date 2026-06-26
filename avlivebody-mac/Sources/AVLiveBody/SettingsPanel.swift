@@ -54,10 +54,10 @@ struct SettingsPanel: View {
         .background(.ultraThinMaterial)
     }
 
+    private static let modeNames = ["storm","tunnel","plasma","kaleido",
+        "voronoi","metaballs","starfield","bars","hands3d","openpos"]
     static func modeName(_ i: Int) -> String {
-        let n = ["storm","tunnel","plasma","kaleido","voronoi",
-                 "metaballs","starfield","bars","hands3d","openpos"]
-        return n.indices.contains(i) ? "\(i) \(n[i])" : "\(i)"
+        modeNames.indices.contains(i) ? "\(i) \(modeNames[i])" : "\(i)"
     }
 
     @ViewBuilder
