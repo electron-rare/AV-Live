@@ -60,7 +60,20 @@ sound_algo/*.log
 
 # tool session state (claude-mem / remember skill)
 .remember/
+.serena/
+.claude/agent-memory/
+
+# Swift coverage artifacts
+*.profraw
+
+# local python venvs (dirs or symlinks)
+**/.venv
+
+# corrupted recovery backups
+AV-Live-corrupted-*/
 
 # macOS / iCloud collision artifacts (auto-created on rename)
 *\ 2
 *\ 2.*
+*\ 3
+*\ 3.*
