@@ -465,6 +465,7 @@
 // =====================================================================
 ~poseState = ~poseState ? Dictionary.new;
 ~poseKin   = ~poseKin   ? Dictionary.new;
+~handFeat  = ~handFeat  ? Dictionary.new;
 
 OSCdef(\poseAction, { |msg|
     var pid = msg[1];
@@ -494,6 +495,18 @@ OSCdef(\poseLeave, { |msg|
     ~poseState.removeAt(pid);
     ~poseKin.removeAt(pid);
 }, '/pose/leave');
+
+OSCdef(\poseHands, { |msg|
+    ~handFeat[\lx]     = msg[2];
+    ~handFeat[\ly]     = msg[3];
+    ~handFeat[\lopen]  = msg[4];
+    ~handFeat[\lspeed] = msg[5];
+    ~handFeat[\rx]     = msg[6];
+    ~handFeat[\ry]     = msg[7];
+    ~handFeat[\ropen]  = msg[8];
+    ~handFeat[\rspeed] = msg[9];
+    ~handFeat[\dist]   = msg[10];
+}, '/pose/hands');
 
 "[OK] action-head OSC handlers".postln;
 

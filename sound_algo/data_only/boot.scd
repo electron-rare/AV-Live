@@ -133,6 +133,10 @@ Routine({
     (~base ++ "scenes.scd").load;
     0.5.wait;
 
+    // -- 6b. Pose/hand -> FX mapping -----
+    (~base ++ "scene_pose_action.scd").load;
+    0.5.wait;
+
     // -- 7) Demarre la scene par defaut -----
     if(~doScene.isNil) {
         "[data-only/boot] ERREUR : ~doScene non defini".warn;
