@@ -128,29 +128,9 @@
     };
 };
 
-// geste bras-croises : main D a gauche de main G, a mi-hauteur, maintenu
-~concert[\detectCross] = { |pose, now|
-    // Detect via BODY WRISTS (skeleton), not hands: at full-body distance the
-    // hands aren't detected and crossing occludes them. Clear X cross = the
-    // right wrist swaps to the LEFT of the left wrist. Require the performer
-    // centered (not at a frame edge) + wrists at chest height.
-    var w = (~poseWrist.notNil.if({ ~poseWrist.values.detect({ |v| v.notNil }) })) ? ();
-    var lx = (w[\lx] ? 0.5); var rx = (w[\rx] ? 0.5);
-    var ly = (w[\ly] ? 0.5); var ry = (w[\ry] ? 0.5);
-    var centered = (lx > 0.15) and: { lx < 0.85 } and: { rx > 0.15 } and: { rx < 0.85 };
-    var midH = (ly > 0.2) and: { ly < 0.85 } and: { ry > 0.2 } and: { ry < 0.85 };
-    var crossed = pose[\hasBody] and: { centered } and: { midH }
-        and: { rx < (lx - 0.10) };
-    if(crossed) {
-        if(~concert[\crossT] <= 0) { ~concert[\crossT] = now };
-        if(((now - ~concert[\crossT]) >= ~ccCrossHold)
-            and: { (now - ~concert[\lastFire]) > ~ccCrossCool }) {
-            ~concert[\lastFire] = now;
-            ~concert[\crossT] = 0;
-            ~concert[\next].();
-        };
-    } { ~concert[\crossT] = 0 };
-};
+// Morceau advance is MANUAL only: the clickable "Morceau suivant" button (and
+// Space) send /control/concertNext -> ~concert[\next]. The gesture-cross advance
+// and the auto-chain were removed on request.
 
 ~concert[\start] = {
     if(~concert[\running]) { "[concert] deja en cours".postln } {
@@ -159,7 +139,6 @@
         } {
             ~concert[\running] = true;
             ~concert[\idx] = 0;
-            ~concert[\lastChain] = 0;
             ~ccGState = IdentityDictionary.new;
             ~concert[\clock] = TempoClock(126/60).permanent_(true);
             ~concert[\startMorceau].(0);
@@ -170,7 +149,8 @@
                     var pose = ~ccPose.value;
                     var now = thisThread.seconds;
                     var c;
-                    ~concert[\detectCross].(pose, now);
+                    // FX / harmony / melody gestures only; morceau advance is
+                    // manual (button / Space). No gesture-cross, no auto-chain.
                     ~ccEvalGestures.(pose, prev, now); prev = pose;
                     c = ~concert[\ctx];          // relire (next a pu permuter)
                     c !? { |cc|
@@ -178,12 +158,6 @@
                         cc[\m][\tick] !? { |t| t.(cc[\ctx], pose, beat) };
                     };
                     beat = beat + 1;
-                    // auto-chaine (mains libres) : avance vers un morceau au
-                    // hasard toutes les ~chainTicks ticks quand actif.
-                    if((~concert[\autoChain] == true)
-                        and: { (beat - (~concert[\lastChain] ? 0)) >= (~concert[\chainTicks] ? 1280) }) {
-                        ~concert[\lastChain] = beat; ~concert[\next].();
-                    };
                     ~ccCtlDur.wait;
                 };
             }).play(~concert[\clock]);
@@ -210,20 +184,16 @@
     ~doRegisterPriv.(\concert, { ~concert[\stop].() });
 };
 
-// Bascules live : /control/concertChain <0|1> (auto-chaine aleatoire mains
-// libres) ; /control/concertSeq <0|1> (avance sequentielle au lieu d'aleatoire).
-OSCdef(\concertChain, { |msg|
-    ~concert[\autoChain] = (msg[1] ? 0) > 0;
-    ("[concert] autoChain = " ++ ~concert[\autoChain]).postln;
-}, '/control/concertChain');
+// /control/concertNext : avance vers un morceau (bouton "Morceau suivant" +
+// touche espace dans data_only_viz). /control/concertSeq <0|1> : avance
+// sequentielle au lieu d'aleatoire. (Auto-chaine retiree.)
+OSCdef(\concertNext, { |msg|
+    if(~concert[\running] == true) { ~concert[\next].() };
+}, '/control/concertNext');
 OSCdef(\concertSeq, { |msg|
     ~concert[\seq] = (msg[1] ? 0) > 0;
     ("[concert] seq = " ++ ~concert[\seq]).postln;
 }, '/control/concertSeq');
-// /control/concertNext : avance (touche espace dans data_only_viz).
-OSCdef(\concertNext, { |msg|
-    if(~concert[\running] == true) { ~concert[\next].() };
-}, '/control/concertNext');
 
 "[data-only/scene_concert] engine ready".postln;
 )

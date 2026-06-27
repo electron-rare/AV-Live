@@ -53,8 +53,15 @@ nohup "$PY" -m data_only_viz.main --pose --iphone-usb > /tmp/concert_viz.log 2>&
 disown
 sleep 11
 
-# 4) switch to the concert scene
+# 4) floating "Morceau suivant" button panel (non-activating: keeps the viz the
+#    key window so Space still works, while the button click changes morceau
+#    regardless of focus).
+nohup "$PY" "$REPO/launcher/concert/concert_control.py" > /tmp/concert_control.log 2>&1 &
+disown
+sleep 1
+
+# 5) switch to the concert scene
 "$PY" -c "from pythonosc.udp_client import SimpleUDPClient; SimpleUDPClient('127.0.0.1',57121).send_message('/control/doScene','concert')"
 sleep 1
 
-notify "Concert lance. Espace = morceau suivant. Bras croises = morceau au hasard."
+notify "Concert lance. Bouton ou Espace = morceau suivant."
