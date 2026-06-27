@@ -170,6 +170,7 @@ Routine({
         "morceaux/04_acid_storm.scd",
         "morceaux/05_hard_pump.scd",
         "morceaux/06_hard_rave.scd",
+        "morceaux/07_dub_chords.scd",
     ].do { |f| (~base ++ f).load; 0.1.wait; };
     s.sync;
 
