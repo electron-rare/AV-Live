@@ -70,5 +70,102 @@
     (((speed ? 0).linlin(0.0, 0.6, 1, 4) * m[\hatMul]).round.asInteger).clip(1, 4);
 };
 
+// -- 5) Helpers corps unique -------------------------------------------
+~bpFirstBody = {
+    var kin = ~poseKin.notNil.if({ ~poseKin.values.detect { |v| v.notNil } });
+    var st  = ~poseState.notNil.if({ ~poseState.values.detect { |v| v.notNil } });
+    (kin: kin, state: st);
+};
+
+// -- 6) Le moteur -------------------------------------------------------
+~bpCtlDur = 0.05;
+~bpEngine = (
+    running: false, clock: nil, mode: \pulse, verbose: false,
+    pad: nil, chord: [57, 60, 64], lastLead: 0.0, arpStep: 0,
+    modeCand: \pulse, modeStable: 0, tempoSm: 100.0, routine: nil,
+    start: {
+        if(~bpEngine[\running]) { "[bp] deja en cours".postln } {
+            ~bpEngine[\running] = true;
+            ~bpEngine[\clock] = TempoClock(100/60).permanent_(true);
+            ~bpEngine[\pad] = Synth(\bp_pad, [\freq, ~bpModes[\pulse][\root].midicps, \amp, 0.0]);
+            ~bpEngine[\routine] = Routine({
+                var beatCount = 0;
+                inf.do {
+                    var b = ~bpFirstBody.value;
+                    var hasBody = b[\kin].notNil;
+                    var label = (b[\state] ? ()).at(\labelIdx);
+                    var speed = (b[\kin] ? ()).at(\speed) ? 0;
+                    var modeKey = ~bpModeForLabel.(label);
+                    var m, now, hf, tgtTempo;
+                    // -- mode stability guard + cross-fade --
+                    if(modeKey == ~bpEngine[\modeCand]) {
+                        ~bpEngine[\modeStable] = ~bpEngine[\modeStable] + 1;
+                    } { ~bpEngine[\modeCand] = modeKey; ~bpEngine[\modeStable] = 0; };
+                    if((~bpEngine[\modeStable] == 5) and: { modeKey != ~bpEngine[\mode] }) {
+                        ~bpEngine[\mode] = modeKey;
+                        ~bpEngine[\pad].set(\gate, 0);   // fade out ancien pad
+                        ~bpEngine[\pad] = Synth(\bp_pad, [
+                            \freq, ~bpModes[modeKey][\root].midicps, \amp, 0.18]);
+                        if(~bpEngine[\verbose]) { ("[bp] mode -> " ++ modeKey).postln };
+                    };
+                    m = ~bpModes[~bpEngine[\mode]];
+                    // -- tempo lisse (~2s) puis clock --
+                    tgtTempo = ~bpMap[\tempo].(~bpEngine[\mode], speed);
+                    ~bpEngine[\tempoSm] = ~bpEngine[\tempoSm]
+                        + ((tgtTempo - ~bpEngine[\tempoSm]) * 0.03);
+                    ~bpEngine[\clock].tempo = ~bpEngine[\tempoSm] / 60;
+                    // -- pad: silence si pas de corps --
+                    ~bpEngine[\pad].set(\amp, hasBody.if({ 0.18 }, { 0.06 }));
+                    // -- lead (main D au geste) --
+                    hf = ~handFeat ? ();
+                    now = thisThread.seconds;
+                    if(hasBody and: { ~bpMap[\leadTrig].(hf, ~bpEngine[\lastLead], now) }) {
+                        ~bpEngine[\lastLead] = now;
+                        Synth(\bp_lead, [
+                            \freq, ~bpMap[\leadNote].(~bpEngine[\mode], hf).midicps,
+                            \amp, (hf[\rspeed] ? 0).linlin(0.12, 0.6, 0.15, 0.4),
+                            \cutoff, (hf[\ropen] ? 0).linexp(0, 1, 600, 5000),
+                            \pan, (hf[\rx] ? 0.5).linlin(0, 1, -0.8, 0.8)]);
+                    };
+                    // -- accord courant (main G) --
+                    if(hasBody) { ~bpEngine[\chord] = ~bpMap[\chordDegrees].(~bpEngine[\mode], hf) };
+                    // -- sequence rythmique sur le beat (toutes les ~1 noire) --
+                    if((beatCount % (0.25 / ~bpCtlDur).round.max(1)) == 0) {
+                        var dens = ~bpMap[\density].(~bpEngine[\mode], speed);
+                        if(hasBody) {
+                            // arpege : note suivante de l'accord
+                            ~bpEngine[\arpStep] = (~bpEngine[\arpStep] + 1) % ~bpEngine[\chord].size;
+                            Synth(\bp_arp, [\freq, ~bpEngine[\chord][~bpEngine[\arpStep]].midicps]);
+                            // hats selon densite
+                            dens.do { |i| Synth(\bp_hat, [\amp, 0.18, \pan, 0.3.rand2]) };
+                            // kick + bass selon le mode
+                            if(m[\kick] and: { (beatCount % (1.0 / ~bpCtlDur).round.max(1)) == 0 }) {
+                                Synth(\bp_kick);
+                                Synth(\bp_bass, [\freq, (~bpEngine[\chord][0] - 12).midicps]);
+                            };
+                        };
+                    };
+                    beatCount = beatCount + 1;
+                    ~bpCtlDur.wait;
+                };
+            }).play(~bpEngine[\clock]);
+            "[bp] STARTED".postln;
+        };
+    },
+    stop: {
+        ~bpEngine[\routine] !? { |r| r.stop };
+        ~bpEngine[\pad] !? { |p| p.set(\gate, 0) };
+        ~bpEngine[\running] = false;
+        "[bp] STOPPED".postln;
+    },
+);
+
+// -- 7) Enregistrement scene -------------------------------------------
+~doScene !? {
+    // ~doScene est le selecteur defini dans scenes.scd ; on greffe \play.
+    ~bpRegisterPlay = { ~bpEngine[\start].() };
+};
+~doScenePlay = { ~bpEngine[\start].() };
+
 "[data-only/scene_pose_play] modes + scale ready".postln;
 )
