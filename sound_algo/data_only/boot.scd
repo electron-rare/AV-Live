@@ -135,6 +135,9 @@ Routine({
         "[data-only/boot] WARN: engine pas pret apres 10s".warn;
     };
 
+    // -- 3b. Concert event-FX layer -----
+    (~base ++ "concert_fx.scd").load; s.sync;
+
     // -- 4) SynthDefs -----
     (~base ++ "synthdefs.scd").load;
     s.sync;
