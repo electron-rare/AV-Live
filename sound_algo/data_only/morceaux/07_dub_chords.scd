@@ -2,11 +2,12 @@
 // mains -> feedback delay + filtre ; aere, lent.
 (
 SynthDef(\cc_dub_chord, { |out=0, freq=110, cutoff=1200, amp=0.3, pan=0, fb=0.6|
-    var env = EnvGen.kr(Env.perc(0.01, 0.5), doneAction: 2);
+    var env = EnvGen.kr(Env.perc(0.01, 0.5));                          // accord sec (court)
+    var life = EnvGen.kr(Env.linen(0.001, 4.0, 0.6), doneAction: 2);   // garde le synth le temps que le delay sonne
     var sig = Mix(Pulse.ar(freq.clip(40, 600) * [1, 1.19, 1.5], 0.3)) * 0.2;  // ~min triad
     sig = RLPF.ar(sig, cutoff.clip(200, 5000), 0.3) * env;
     sig = sig + CombL.ar(sig, 0.8, 0.66, fb.clip(0, 0.95).linlin(0, 0.95, 1, 6));
-    Out.ar(out, Pan2.ar(sig, pan.clip(-1, 1)) * amp);
+    Out.ar(out, Pan2.ar(sig, pan.clip(-1, 1)) * amp * life);
 }).add;
 SynthDef(\cc_dub_sub, { |out=0, freq=55, amp=0.0, gate=1|
     var sig = SinOsc.ar(freq.clip(20, 120));
