@@ -108,13 +108,23 @@
     ~concert[\ctx] = nil;
 };
 
+// Enchainement par choix ALEATOIRE (defaut) : saute vers un morceau != courant.
+// ~concert[\seq] = true rebascule en mode sequentiel (idx+1 wrap).
 ~concert[\next] = {
-    if(~concert[\idx] < (~concert[\morceaux].size - 1)) {
+    var n = ~concert[\morceaux].size;
+    if(n > 1) {
+        var nxt;
+        if(~concert[\seq] == true) {
+            nxt = (~concert[\idx] + 1) % n;
+        } {
+            nxt = (0 .. (n - 1)).reject({ |i| i == ~concert[\idx] }).choose;
+        };
         ~concert[\stopMorceau].();              // fade out (stop releve les gates)
-        ~concert[\idx] = ~concert[\idx] + 1;
-        ~concert[\startMorceau].(~concert[\idx]);  // fade in
+        ~concert[\idx] = nxt;
+        ~concert[\startMorceau].(nxt);          // fade in
     } {
-        "[concert] derniere piste (fin de set)".postln;
+        ~concert[\stopMorceau].();              // 0/1 morceau : on relance le courant
+        ~concert[\startMorceau].(~concert[\idx]);
     };
 };
 
@@ -149,6 +159,7 @@
         } {
             ~concert[\running] = true;
             ~concert[\idx] = 0;
+            ~concert[\lastChain] = 0;
             ~ccGState = IdentityDictionary.new;
             ~concert[\clock] = TempoClock(126/60).permanent_(true);
             ~concert[\startMorceau].(0);
@@ -167,6 +178,12 @@
                         cc[\m][\tick] !? { |t| t.(cc[\ctx], pose, beat) };
                     };
                     beat = beat + 1;
+                    // auto-chaine (mains libres) : avance vers un morceau au
+                    // hasard toutes les ~chainTicks ticks quand actif.
+                    if((~concert[\autoChain] == true)
+                        and: { (beat - (~concert[\lastChain] ? 0)) >= (~concert[\chainTicks] ? 1280) }) {
+                        ~concert[\lastChain] = beat; ~concert[\next].();
+                    };
                     ~ccCtlDur.wait;
                 };
             }).play(~concert[\clock]);
@@ -192,6 +209,17 @@
     ~concert[\start].();
     ~doRegisterPriv.(\concert, { ~concert[\stop].() });
 };
+
+// Bascules live : /control/concertChain <0|1> (auto-chaine aleatoire mains
+// libres) ; /control/concertSeq <0|1> (avance sequentielle au lieu d'aleatoire).
+OSCdef(\concertChain, { |msg|
+    ~concert[\autoChain] = (msg[1] ? 0) > 0;
+    ("[concert] autoChain = " ++ ~concert[\autoChain]).postln;
+}, '/control/concertChain');
+OSCdef(\concertSeq, { |msg|
+    ~concert[\seq] = (msg[1] ? 0) > 0;
+    ("[concert] seq = " ++ ~concert[\seq]).postln;
+}, '/control/concertSeq');
 
 "[data-only/scene_concert] engine ready".postln;
 )
