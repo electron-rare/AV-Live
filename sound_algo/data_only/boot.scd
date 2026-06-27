@@ -178,6 +178,9 @@ Routine({
         "morceaux/09_trance_pluck.scd",
         "morceaux/10_industrial.scd",
         "morceaux/11_detroit.scd",
+        "morceaux/12_trance.scd",
+        "morceaux/13_psytrance.scd",
+        "morceaux/14_punkcore.scd",
     ].do { |f| (~base ++ f).load; 0.1.wait; };
     s.sync;
 
