@@ -187,6 +187,9 @@ Routine({
     // -- 6e. Dramatic body gestures -----
     (~base ++ "concert_gestures.scd").load; s.sync;
 
+    // -- 6f. Web OSC launchpad (Pdef bank, armed via /launch) -----
+    (~base ++ "launchpad.scd").load; s.sync;
+
     // -- 7) Demarre la scene par defaut -----
     if(~doScene.isNil) {
         "[data-only/boot] ERREUR : ~doScene non defini".warn;
