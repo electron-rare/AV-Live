@@ -5,11 +5,22 @@
 <header><h1>AV-Live Control</h1><span id="status" class="off"></span></header>
 <section><h2>Patterns</h2>
   <div class="grid">
-    <button data-pad="kick">Kick</button><button data-pad="hats">Hats</button>
-    <button data-pad="clap">Clap</button><button data-pad="perc">Perc</button>
-    <button data-pad="sub">Sub</button><button data-pad="acid">Acid</button>
-    <button data-pad="arp">Arp</button><button data-pad="lead">Lead</button>
-    <button data-pad="stab">Stab</button><button data-pad="pad">Pad</button>
+    <div class="pat-cell"><button data-pad="kick">Kick</button><input type="range" min="0" max="1.5" step="0.05" value="0.8" data-vol="kick"></div>
+    <div class="pat-cell"><button data-pad="hats">Hats</button><input type="range" min="0" max="1.5" step="0.05" value="0.8" data-vol="hats"></div>
+    <div class="pat-cell"><button data-pad="clap">Clap</button><input type="range" min="0" max="1.5" step="0.05" value="0.8" data-vol="clap"></div>
+    <div class="pat-cell"><button data-pad="perc">Perc</button><input type="range" min="0" max="1.5" step="0.05" value="0.8" data-vol="perc"></div>
+    <div class="pat-cell"><button data-pad="sub">Sub</button><input type="range" min="0" max="1.5" step="0.05" value="0.8" data-vol="sub"></div>
+    <div class="pat-cell"><button data-pad="acid">Acid</button><input type="range" min="0" max="1.5" step="0.05" value="0.8" data-vol="acid"></div>
+    <div class="pat-cell"><button data-pad="arp">Arp</button><input type="range" min="0" max="1.5" step="0.05" value="0.8" data-vol="arp"></div>
+    <div class="pat-cell"><button data-pad="lead">Lead</button><input type="range" min="0" max="1.5" step="0.05" value="0.8" data-vol="lead"></div>
+    <div class="pat-cell"><button data-pad="stab">Stab</button><input type="range" min="0" max="1.5" step="0.05" value="0.8" data-vol="stab"></div>
+    <div class="pat-cell"><button data-pad="pad">Pad</button><input type="range" min="0" max="1.5" step="0.05" value="0.8" data-vol="pad"></div>
+    <div class="pat-cell"><button data-pad="ride">Ride</button><input type="range" min="0" max="1.5" step="0.05" value="0.8" data-vol="ride"></div>
+    <div class="pat-cell"><button data-pad="rim">Rim</button><input type="range" min="0" max="1.5" step="0.05" value="0.8" data-vol="rim"></div>
+    <div class="pat-cell"><button data-pad="tom">Tom</button><input type="range" min="0" max="1.5" step="0.05" value="0.8" data-vol="tom"></div>
+    <div class="pat-cell"><button data-pad="reese">Reese</button><input type="range" min="0" max="1.5" step="0.05" value="0.8" data-vol="reese"></div>
+    <div class="pat-cell"><button data-pad="bells">Bells</button><input type="range" min="0" max="1.5" step="0.05" value="0.8" data-vol="bells"></div>
+    <div class="pat-cell"><button data-pad="sweep">Sweep</button><input type="range" min="0" max="1.5" step="0.05" value="0.8" data-vol="sweep"></div>
   </div>
   <button id="clear" class="wide">Tout couper</button>
   <label>Tempo <input id="tempo" type="range" min="60" max="180" value="126"></label>

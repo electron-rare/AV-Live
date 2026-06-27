@@ -6,7 +6,9 @@ h1 { font-size: 18px; margin: 4px 0; } h2 { font-size: 14px; color: #9af; margin
 #status.on { background: #4c8; } #status.off { background: #c44; }
 .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 8px; }
 button { background: #222; color: #eee; border: 1px solid #333; border-radius: 10px;
-  padding: 18px 10px; font-size: 16px; cursor: pointer; }
+  padding: 18px 10px; font-size: 16px; cursor: pointer; width: 100%; }
 button:active { background: #2a2a2a; } button.armed { background: #2b6; color: #061; border-color: #4d9; font-weight: 700; }
 button.wide { width: 100%; margin: 8px 0; background: #422; border-color: #633; }
 label { display: block; margin: 10px 0; } input[type=range] { width: 100%; height: 36px; }
+.pat-cell { display: flex; flex-direction: column; gap: 4px; }
+.pat-cell input[type=range] { height: 20px; accent-color: #4c8; }

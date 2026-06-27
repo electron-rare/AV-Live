@@ -20,6 +20,8 @@ document.addEventListener("DOMContentLoaded", () => {
       const a = el.dataset.arg;
       send(el.dataset.osc, ...(a === undefined ? [] : [isNaN(+a) ? a : +a]));
     }));
+  document.querySelectorAll("[data-vol]").forEach((el) =>
+    el.addEventListener("input", () => send("/launch/vol", el.dataset.vol, +el.value)));
   const tempo = document.getElementById("tempo");
   tempo && tempo.addEventListener("input", () => send("/launch/tempo", +tempo.value));
   const filt = document.getElementById("filter");

@@ -2,7 +2,8 @@
 // control OSC routes. Loaded LAST by boot (after concert_fx + scene_concert +
 // morceaux + gestures), so ~ccNote/~ccHarmony/~ccMaster/~ccFire exist; all are
 // nil-guarded so this file still loads alone in tests. Patterns play on
-// ~lp[\clock] and route Out.ar(0) through the FX rack.
+// ~lpClock.value (concert clock when running, else ~lp[\clock]) and route
+// Out.ar(0) through the FX rack.
 (
 SynthDef(\lp_kick, { |out=0, amp=0.9|
     var env = EnvGen.kr(Env.perc(0.001, 0.32), doneAction: 2);
@@ -45,42 +46,133 @@ SynthDef(\lp_pad, { |out=0, freq=220, amp=0.0, cutoff=1500, gate=1|
     Out.ar(out, Pan2.ar(sig, 0) * amp.lag(0.5) * 0.25);
 }).add;
 
+// --- new drums ---
+SynthDef(\lp_ride, { |out=0, amp=0.25|
+    var env   = EnvGen.kr(Env.perc(0.001, 0.42), doneAction: 2);
+    var noise = HPF.ar(WhiteNoise.ar, 7000) * env;
+    var ring  = Ringz.ar(Impulse.ar(0), 3100, 0.08) * 0.35;
+    Out.ar(out, Pan2.ar((noise + ring) * amp, 0));
+}).add;
+SynthDef(\lp_rim, { |out=0, amp=0.35|
+    var env = EnvGen.kr(Env.perc(0.001, 0.055), doneAction: 2);
+    var sig = (BPF.ar(WhiteNoise.ar, 2000, 0.8) + (SinOsc.ar(400) * 0.4)).tanh;
+    Out.ar(out, Pan2.ar(sig * env * amp, 0));
+}).add;
+SynthDef(\lp_tom, { |out=0, amp=0.4, freq=160|
+    var fenv = EnvGen.kr(Env([freq, freq * 0.5], [0.07], \exp));
+    var env  = EnvGen.kr(Env.perc(0.003, 0.26), doneAction: 2);
+    Out.ar(out, Pan2.ar(SinOsc.ar(fenv.clip(30, 600)) * env * amp, 0));
+}).add;
+
+// --- new pitched / textural ---
+SynthDef(\lp_reese, { |out=0, freq=55, amp=0.0, gate=1|
+    var move = LFNoise2.kr(0.4).range(0.88, 1.12);
+    var sig  = Mix(Saw.ar(freq.clip(20, 200) * [0.999, 1.0, 1.013]));
+    sig = RLPF.ar(sig, (freq.clip(20, 200) * 5 * move).clip(80, 3000), 0.35);
+    sig = sig * EnvGen.kr(Env.asr(0.05, 1, 0.2), gate, doneAction: 2);
+    Out.ar(out, Pan2.ar(sig, 0) * amp.lag(0.1));
+}).add;
+SynthDef(\lp_bells, { |out=0, freq=440, amp=0.3|
+    var env = EnvGen.kr(Env.perc(0.001, 1.8, curve: -4), doneAction: 2);
+    var f   = freq.clip(200, 4000);
+    var sig = (SinOsc.ar(f)       * 0.55) +
+              (SinOsc.ar(f * 2.0) * 0.28) +
+              (SinOsc.ar(f * 3.0) * 0.12) +
+              (SinOsc.ar(f * 4.1) * 0.05);
+    Out.ar(out, Pan2.ar(sig * env * amp, 0));
+}).add;
+SynthDef(\lp_sweep, { |out=0, amp=0.0, gate=1|
+    var env    = EnvGen.kr(Env.asr(3.0, 1, 2.0), gate, doneAction: 2);
+    var cutoff = EnvGen.kr(Env([200, 6000], [10.0], \exp));
+    var sig    = RLPF.ar(WhiteNoise.ar, cutoff.clip(80, 14000), 0.12);
+    Out.ar(out, Pan2.ar(sig * env * amp.lag(0.5) * 0.6, 0));
+}).add;
+
 s.sync;
 
 ~lp = ~lp ? ();
 ~lp[\clock] = ~lp[\clock] ? TempoClock(126/60).permanent_(true);
 ~lp[\armed] = ~lp[\armed] ? Set.new;
+~lp[\vol]   = ~lp[\vol]   ? IdentityDictionary.new;
 
-Pdef(\lp_kick, Pbind(\instrument, \lp_kick, \dur, 1, \amp, 0.9));
-Pdef(\lp_hats, Pbind(\instrument, \lp_hat, \dur, Pseq([Rest(0.5), 0.5], inf), \amp, 0.28));
-Pdef(\lp_clap, Pbind(\instrument, \lp_clap, \dur, Pseq([Rest(1), 1], inf), \amp, 0.5));
-Pdef(\lp_perc, Pbind(\instrument, \lp_perc, \dur, Pseq([0.75, 0.25, 0.5, 0.5], inf),
-    \freq, Pseq([420, 640, 520], inf), \amp, 0.32));
+// clock-sync helper: use concert clock when concert is running
+~lpClock = {
+    (~concert.notNil and: {
+        (~concert[\running] == true) and: { ~concert[\clock].notNil }
+    }).if({ ~concert[\clock] }, { ~lp[\clock] })
+};
 
+// per-pattern volume (default 0.8, max 1.5)
+~lpVol = { |nm| (~lp[\vol][nm] ? 0.8).clip(0, 1.5) };
+
+// note helper (nil-guards ~ccNote)
 ~lpNote = { |deg, oct=0| (~ccNote.notNil).if({ ~ccNote.(deg, oct) }, { 45 + (oct*12) + ([0,2,3,5,7,8,10][deg % 7]) }) };
-Pdef(\lp_sub, Pbind(\instrument, \lp_sub, \dur, 4, \freq, Pfunc { ~lpNote.(0, -1).midicps }, \amp, 0.22, \legato, 1));
+
+// --- 10 original Pdefs (all \amp wrapped with ~lpVol) ---
+Pdef(\lp_kick, Pbind(\instrument, \lp_kick, \dur, 1,
+    \amp, Pfunc { 0.9 * ~lpVol.(\kick) }));
+Pdef(\lp_hats, Pbind(\instrument, \lp_hat, \dur, Pseq([Rest(0.5), 0.5], inf),
+    \amp, Pfunc { 0.28 * ~lpVol.(\hats) }));
+Pdef(\lp_clap, Pbind(\instrument, \lp_clap, \dur, Pseq([Rest(1), 1], inf),
+    \amp, Pfunc { 0.5 * ~lpVol.(\clap) }));
+Pdef(\lp_perc, Pbind(\instrument, \lp_perc,
+    \dur, Pseq([0.75, 0.25, 0.5, 0.5], inf),
+    \freq, Pseq([420, 640, 520], inf),
+    \amp, Pfunc { 0.32 * ~lpVol.(\perc) }));
+
+Pdef(\lp_sub, Pbind(\instrument, \lp_sub, \dur, 4,
+    \freq, Pfunc { ~lpNote.(0, -1).midicps },
+    \amp, Pfunc { 0.22 * ~lpVol.(\sub) }, \legato, 1));
 Pdef(\lp_acid, Pbind(\instrument, \lp_acid, \dur, 0.25,
     \degree, Pseq([0,0,7,0,3,0,5,2], inf),
     \freq, Pfunc { |e| ~lpNote.(e[\degree], 0).midicps },
-    \cutoff, Pseq([500,900,1400,700], inf), \res, 0.32, \amp, 0.26, \pan, Pwhite(-0.2,0.2)));
+    \cutoff, Pseq([500,900,1400,700], inf), \res, 0.32,
+    \amp, Pfunc { 0.26 * ~lpVol.(\acid) }, \pan, Pwhite(-0.2,0.2)));
 Pdef(\lp_arp, Pbind(\instrument, \lp_pluck, \dur, 0.25,
     \degree, Pseq([0,2,4,7,4,2], inf),
-    \freq, Pfunc { |e| ~lpNote.(e[\degree], 1).midicps }, \cutoff, 3000, \amp, 0.2, \pan, Pwhite(-0.3,0.3)));
+    \freq, Pfunc { |e| ~lpNote.(e[\degree], 1).midicps },
+    \cutoff, 3000, \amp, Pfunc { 0.2 * ~lpVol.(\arp) }, \pan, Pwhite(-0.3,0.3)));
 Pdef(\lp_lead, Pbind(\instrument, \lp_pluck, \dur, Pseq([1, 0.5, 0.5, 2], inf),
     \degree, Pseq([7,5,4,0,2,4], inf),
-    \freq, Pfunc { |e| ~lpNote.(e[\degree], 1).midicps }, \cutoff, 4000, \amp, 0.24));
+    \freq, Pfunc { |e| ~lpNote.(e[\degree], 1).midicps },
+    \cutoff, 4000, \amp, Pfunc { 0.24 * ~lpVol.(\lead) }));
 Pdef(\lp_stab, Pbind(\instrument, \lp_pluck, \dur, Pseq([Rest(0.5), 0.5], inf),
-    \freq, Pfunc { [0,2,4].collect { |d| ~lpNote.(d, 0).midicps } }, \cutoff, 2200, \amp, 0.2));
+    \freq, Pfunc { [0,2,4].collect { |d| ~lpNote.(d, 0).midicps } },
+    \cutoff, 2200, \amp, Pfunc { 0.2 * ~lpVol.(\stab) }));
 Pdef(\lp_pad, Pbind(\instrument, \lp_pad, \dur, 8,
     \freq, Pfunc { [0,2,4].collect { |d| ~lpNote.(d, 0).midicps } },
-    \cutoff, Pfunc { ((~ccHarmony ? ()).at(\pad) == \bright).if({ 3200 }, { 1200 }) }, \amp, 0.3, \legato, 1));
+    \cutoff, Pfunc { ((~ccHarmony ? ()).at(\pad) == \bright).if({ 3200 }, { 1200 }) },
+    \amp, Pfunc { 0.3 * ~lpVol.(\pad) }, \legato, 1));
 
+// --- 6 new Pdefs ---
+Pdef(\lp_ride, Pbind(\instrument, \lp_ride,
+    \dur, Pseq([0.5, 0.5, 0.5, Rest(0.5)], inf),
+    \amp, Pfunc { 0.25 * ~lpVol.(\ride) }));
+Pdef(\lp_rim, Pbind(\instrument, \lp_rim,
+    \dur, Pseq([Rest(1), 0.5, Rest(0.5), Rest(1), 0.5, Rest(0.5)], inf),
+    \amp, Pfunc { 0.35 * ~lpVol.(\rim) }));
+Pdef(\lp_tom, Pbind(\instrument, \lp_tom,
+    \dur, Pseq([Rest(1.5), 0.5, Rest(1), 1], inf),
+    \freq, Pseq([180, 120, 160], inf),
+    \amp, Pfunc { 0.4 * ~lpVol.(\tom) }));
+Pdef(\lp_reese, Pbind(\instrument, \lp_reese, \dur, 8,
+    \freq, Pfunc { ~lpNote.(0, -1).midicps },
+    \amp, Pfunc { 0.3 * ~lpVol.(\reese) }, \legato, 1));
+Pdef(\lp_bells, Pbind(\instrument, \lp_bells,
+    \dur, Pseq([2, 1.5, 2.5, 2], inf),
+    \degree, Pseq([0, 2, 4, 7], inf),
+    \freq, Pfunc { |e| ~lpNote.(e[\degree], 2).midicps },
+    \amp, Pfunc { 0.22 * ~lpVol.(\bells) }));
+Pdef(\lp_sweep, Pbind(\instrument, \lp_sweep, \dur, 8,
+    \amp, Pfunc { 0.25 * ~lpVol.(\sweep) }, \legato, 1));
+
+// arm / disarm a pattern by bare name (e.g. "kick" -> Pdef(\lp_kick))
 ~lpArm = { |name, on|
-    var nm = name.asSymbol;
+    var nm  = name.asSymbol;
     var key = ("lp_" ++ name.asString).asSymbol;
     if(Pdef.all.includesKey(key)) {
         on.if({
-            Pdef(key).play(~lp[\clock], quant: 1);
+            Pdef(key).play(~lpClock.value, quant: 1);
             ~lp[\armed].add(nm);
         }, {
             Pdef(key).stop;
@@ -93,11 +185,16 @@ OSCdef(\lpLaunch, { |msg|
     ~lpArm.((msg[1] ? \nil).asString, (msg[2] ? 0) > 0);
 }, '/launch');
 OSCdef(\lpTempo, { |msg|
-    ~lp[\clock].tempo = ((msg[1] ? 126).clip(60, 200)) / 60;
+    var t = ((msg[1] ? 126).clip(60, 200)) / 60;
+    ~lp[\clock].tempo = t;
+    ~concert !? { ~concert[\clock] !? { |c| c.tempo = t } };
 }, '/launch/tempo');
 OSCdef(\lpClear, { |msg|
     ~lp[\armed].copy.do { |nm| ~lpArm.(nm, false) };
 }, '/launch/clear');
+OSCdef(\lpVol, { |msg|
+    ~lp[\vol][(msg[1] ? \nil).asSymbol] = (msg[2] ? 0.8).clip(0, 1.5);
+}, '/launch/vol');
 
 OSCdef(\ctlHarmRoot, { |msg|
     ~ccHarmony !? { ~ccHarmony[\root] = (~ccHarmony[\root] + (msg[1] ? 0)).clip(33, 57) };
@@ -119,5 +216,5 @@ OSCdef(\ctlFxBreak, { |msg|
     ~ccMaster !? { ((msg[1] ? 0) > 0).if({ ~ccMaster[\filterTo].(450, 1.0) }, { ~ccMaster[\filterTo].(20000, 1.5) }) };
 }, '/control/fx/breakdown');
 
-"[data-only/launchpad] drums + arm/tempo/clear ready".postln;
+"[data-only/launchpad] 16 patterns + clock-sync + vol faders ready".postln;
 )
