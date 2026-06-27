@@ -1,7 +1,7 @@
 // Registered body gestures. FX/dramatic family here; harmony/melody appended in
 // later tasks. Loaded after the morceaux (needs ~ccGestureAdd, ~ccFire, ~ccMaster).
 (
-var meanY = { |a, b| ((a[\y] ? 0.5) + (b[\y] ? 0.5)) * 0.5 };
+var meanY = { |a, b| (((a ? ())[\y] ? 0.5) + ((b ? ())[\y] ? 0.5)) * 0.5 };
 
 // JUMP — body center rose fast then we fire (one-shot)
 ~ccGestureAdd.((name:\jump, family:\fx, hold:0, cooldown:0.7,
@@ -14,8 +14,8 @@ var meanY = { |a, b| ((a[\y] ? 0.5) + (b[\y] ? 0.5)) * 0.5 };
     detect: { |pose, prev|
         var s = pose[\skel]; var p = prev[\skel];
         (s.notNil and: { p.notNil }) and: {
-            var dl = (s[\ankL][\y] ? 0.95) - (p[\ankL][\y] ? 0.95);
-            var dr = (s[\ankR][\y] ? 0.95) - (p[\ankR][\y] ? 0.95);
+            var dl = ((s[\ankL] ? ())[\y] ? 0.95) - ((p[\ankL] ? ())[\y] ? 0.95);
+            var dr = ((s[\ankR] ? ())[\y] ? 0.95) - ((p[\ankR] ? ())[\y] ? 0.95);
             dl.max(dr) > 0.05 } },
     fire: { ~ccFire.(\kick) }));
 
@@ -32,8 +32,8 @@ var meanY = { |a, b| ((a[\y] ? 0.5) + (b[\y] ? 0.5)) * 0.5 };
     detect: { |pose, prev|
         var s = pose[\skel]; var p = prev[\skel];
         (s.notNil and: { p.notNil }) and: {
-            var now = (s[\shR][\x] ? 0.6) - (s[\shL][\x] ? 0.4);
-            var was = (p[\shR][\x] ? 0.6) - (p[\shL][\x] ? 0.4);
+            var now = ((s[\shR] ? ())[\x] ? 0.6) - ((s[\shL] ? ())[\x] ? 0.4);
+            var was = ((p[\shR] ? ())[\x] ? 0.6) - ((p[\shL] ? ())[\x] ? 0.4);
             (now.sign != was.sign) and: { was.abs > 0.05 } } },
     fire: { ~ccMaster[\stutterOn].(0.9) }));
 
@@ -43,8 +43,31 @@ var meanY = { |a, b| ((a[\y] ? 0.5) + (b[\y] ? 0.5)) * 0.5 };
         var s = pose[\skel]; var w = ~poseWrist.notNil.if({ ~poseWrist.values.detect({|v| v.notNil}) });
         (s.notNil and: { w.notNil }) and: {
             (((w[\rx] ? 0.5) - (w[\lx] ? 0.5)).abs > 0.4)
-            and: { ((w[\ry] ? 0.5) - (s[\shR][\y] ? 0.35)).abs < 0.14 } } },
+            and: { ((w[\ry] ? 0.5) - ((s[\shR] ? ())[\y] ? 0.35)).abs < 0.14 } } },
     fire: { ~ccFire.(\swell) }));
 
-"[data-only/concert_gestures] fx gestures registered".postln;
+// --- harmony family ---
+~ccGestureAdd.((name:\stepR, family:\harmony, hold:0.5, cooldown:1.0,
+    detect: { |pose, prev| (pose[\center][\cx] ? 0.5) > 0.70 },
+    fire: { ~ccHarmony[\root] = (~ccHarmony[\root] + 2).clip(33, 57) }));
+~ccGestureAdd.((name:\stepL, family:\harmony, hold:0.5, cooldown:1.0,
+    detect: { |pose, prev| (pose[\center][\cx] ? 0.5) < 0.30 },
+    fire: { ~ccHarmony[\root] = (~ccHarmony[\root] - 2).clip(33, 57) }));
+~ccGestureAdd.((name:\leanFwd, family:\harmony, hold:0.4, cooldown:1.0,
+    detect: { |pose, prev| var s=pose[\skel]; s.notNil and: {
+        ((((s[\shL] ? ())[\y]?0.35)+((s[\shR] ? ())[\y]?0.35))*0.5) < (((((s[\hipL] ? ())[\y]?0.6)+((s[\hipR] ? ())[\y]?0.6))*0.5) - 0.28) } },
+    fire: { ~ccHarmony[\pad] = \bright }));
+~ccGestureAdd.((name:\leanBack, family:\harmony, hold:0.4, cooldown:1.0,
+    detect: { |pose, prev| var s=pose[\skel]; s.notNil and: {
+        ((((s[\shL] ? ())[\y]?0.35)+((s[\shR] ? ())[\y]?0.35))*0.5) > (((((s[\hipL] ? ())[\y]?0.6)+((s[\hipR] ? ())[\y]?0.6))*0.5) - 0.20) } },
+    fire: { ~ccHarmony[\pad] = \dark }));
+~ccGestureAdd.((name:\tilt, family:\harmony, hold:0.4, cooldown:1.2,
+    detect: { |pose, prev| var s=pose[\skel]; s.notNil and: {
+        var mid = ((((s[\shL] ? ())[\x]?0.4)+((s[\shR] ? ())[\x]?0.6))*0.5);
+        (((s[\nose] ? ())[\x]?0.5) - mid).abs > 0.06 } },
+    fire: { var keys = ~ccScales.keys.asArray.sort;
+        var i = keys.indexOf(~ccHarmony[\scale]) ? 0;
+        ~ccHarmony[\scale] = keys.wrapAt(i + 1) }));
+
+"[data-only/concert_gestures] fx + harmony gestures registered".postln;
 )
