@@ -112,7 +112,7 @@ Pad armed-state is tracked client-side (the SC engine is fire-and-forget). A sma
   `/control/fx/crash` runs without error. No live-audio assertion (tuned at smoke).
 - **Node** (vitest/node): a WS `{addr:"/launch",args:["kick",1]}` produces one OSC
   packet addressed to the configured host:port (mock the UDP socket).
-- **Web UI**: manual — from GrosMac open `http://supra-m1.local:<port>/control.html`
+- **Web UI**: manual — from GrosMac open `http://supra-m1.local:<port>/control/`
   (server on macm1), click pads, confirm OSC reaches the local SC (engine posts on `/launch`).
 - **Live smoke**: GrosMac browser → arm drums + acid + arp, change harmony + fire
   FX, with the body-concert running on macm1; tune levels/tempo by ear.
