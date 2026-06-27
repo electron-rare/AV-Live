@@ -78,7 +78,7 @@
 };
 
 // -- 6) Le moteur -------------------------------------------------------
-~bpCtlDur = 0.05;
+~bpCtlDur = 0.05;  // periode du tick de controle, en BEATS (la routine tourne sur le TempoClock)
 ~bpEngine = (
     running: false, clock: nil, mode: \pulse, verbose: false,
     pad: nil, chord: [57, 60, 64], lastLead: 0.0, arpStep: 0,
@@ -155,16 +155,14 @@
     stop: {
         ~bpEngine[\routine] !? { |r| r.stop };
         ~bpEngine[\pad] !? { |p| p.set(\gate, 0) };
+        ~bpEngine[\clock] !? { |c| c.stop };
+        ~bpEngine[\clock] = nil;
         ~bpEngine[\running] = false;
         "[bp] STOPPED".postln;
     },
 );
 
 // -- 7) Enregistrement scene -------------------------------------------
-~doScene !? {
-    // ~doScene est le selecteur defini dans scenes.scd ; on greffe \play.
-    ~bpRegisterPlay = { ~bpEngine[\start].() };
-};
 ~doScenePlay = { ~bpEngine[\start].() };
 
 "[data-only/scene_pose_play] modes + scale ready".postln;
