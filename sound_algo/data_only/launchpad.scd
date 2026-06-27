@@ -99,5 +99,25 @@ OSCdef(\lpClear, { |msg|
     ~lp[\armed].copy.do { |nm| ~lpArm.(nm, false) };
 }, '/launch/clear');
 
+OSCdef(\ctlHarmRoot, { |msg|
+    ~ccHarmony !? { ~ccHarmony[\root] = (~ccHarmony[\root] + (msg[1] ? 0)).clip(33, 57) };
+}, '/control/harmony/root');
+OSCdef(\ctlHarmScale, { |msg|
+    var nm = (msg[1] ? \minor).asSymbol;
+    (~ccHarmony.notNil and: { (~ccScales ? ()).includesKey(nm) }).if({ ~ccHarmony[\scale] = nm });
+}, '/control/harmony/scale');
+OSCdef(\ctlHarmOct, { |msg| ~ccHarmony !? { ~ccHarmony[\octave] = (msg[1] ? 0).asInteger.clip(0, 2) } }, '/control/harmony/octave');
+OSCdef(\ctlHarmPhrase, { |msg| ~ccHarmony !? { ~ccHarmony[\phrase] = (msg[1] ? 0).asInteger.clip(0, 3) } }, '/control/harmony/phrase');
+OSCdef(\ctlFxFilter, { |msg|
+    ~ccMaster !? { ~ccMaster[\filterTo].((msg[1] ? 1).clip(0,1).linexp(0, 1, 120, 20000), 0.2) };
+}, '/control/fx/filter');
+OSCdef(\ctlFxStutter, { |msg| ~ccMaster !? { ~ccMaster[\stutterOn].(0.9) } }, '/control/fx/stutter');
+OSCdef(\ctlFxCrash, { |msg| ~ccFire !? { ~ccFire.(\crash) } }, '/control/fx/crash');
+OSCdef(\ctlFxKick, { |msg| ~ccFire !? { ~ccFire.(\kick) } }, '/control/fx/kick');
+OSCdef(\ctlFxSwell, { |msg| ~ccFire !? { ~ccFire.(\swell) } }, '/control/fx/swell');
+OSCdef(\ctlFxBreak, { |msg|
+    ~ccMaster !? { ((msg[1] ? 0) > 0).if({ ~ccMaster[\filterTo].(450, 1.0) }, { ~ccMaster[\filterTo].(20000, 1.5) }) };
+}, '/control/fx/breakdown');
+
 "[data-only/launchpad] drums + arm/tempo/clear ready".postln;
 )
