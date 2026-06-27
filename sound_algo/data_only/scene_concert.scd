@@ -52,8 +52,11 @@
         var on = g[\detect].(pose, prev) == true;
         if(on) {
             if(st[\holdT] <= 0) { st[\holdT] = now };
+            // edge gestures fire once on the false->true transition (re-arm
+            // only after the detect drops); held gestures re-fire per cooldown.
             if(((now - st[\holdT]) >= (g[\hold] ? 0))
-                and: { (now - st[\lastFire]) > (g[\cooldown] ? 0.5) }) {
+                and: { (now - st[\lastFire]) > (g[\cooldown] ? 0.5) }
+                and: { (g[\edge] != true) or: { st[\fired].not } }) {
                 st[\lastFire] = now; st[\holdT] = now; st[\fired] = true;
                 g[\fire].();
             };

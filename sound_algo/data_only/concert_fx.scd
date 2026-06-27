@@ -30,10 +30,22 @@ SynthDef(\cc_ev_swell, { |out=0, revOut, amp=0.3|
 s.sync;
 ~ccStutter = nil;
 ~ccMaster = (
-    filterTo: { |cut=20000, time=0.3| ~doFilter !? { |f| f.set(\cutoff, cut.clip(120, 20000)) } },
+    filterTo: { |cut=20000, time=0.3|
+        ~doFilter !? { |f|
+            var from = ~ccCutNow ? 20000;
+            var tgt = cut.clip(120, 20000);
+            var steps = (time * 30).max(1).round.asInteger;
+            ~ccCutRamp !? { |r| r.stop };
+            ~ccCutNow = tgt;
+            ~ccCutRamp = Routine({
+                steps.do { |i| f.set(\cutoff, from.blend(tgt, (i + 1) / steps)); (time / steps).wait };
+            }).play(AppClock);
+        };
+    },
     dip: { ~doFilter !? { |f|
+        ~ccCutRamp !? { |r| r.stop };
         f.set(\cutoff, 300);
-        AppClock.sched(0.18, { f.set(\cutoff, 20000); nil }); } },
+        AppClock.sched(0.18, { f.set(\cutoff, 20000); ~ccCutNow = 20000; nil }); } },
     stutterOn: { |dur=0.6|
         ~doMaster !? { |m|
             ~ccStutter ?? { ~ccStutter = Synth.before(m, \cc_master_stutter, [\out, 0, \mix, 0]) };

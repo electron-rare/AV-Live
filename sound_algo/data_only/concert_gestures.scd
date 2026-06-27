@@ -48,10 +48,10 @@ var meanY = { |a, b| (((a ? ())[\y] ? 0.5) + ((b ? ())[\y] ? 0.5)) * 0.5 };
     fire: { ~ccFire.(\swell) }));
 
 // --- harmony family ---
-~ccGestureAdd.((name:\stepR, family:\harmony, hold:0.5, cooldown:1.0,
+~ccGestureAdd.((name:\stepR, family:\harmony, edge: true, hold:0.5, cooldown:1.0,
     detect: { |pose, prev| (pose[\center][\cx] ? 0.5) > 0.70 },
     fire: { ~ccHarmony[\root] = (~ccHarmony[\root] + 2).clip(33, 57) }));
-~ccGestureAdd.((name:\stepL, family:\harmony, hold:0.5, cooldown:1.0,
+~ccGestureAdd.((name:\stepL, family:\harmony, edge: true, hold:0.5, cooldown:1.0,
     detect: { |pose, prev| (pose[\center][\cx] ? 0.5) < 0.30 },
     fire: { ~ccHarmony[\root] = (~ccHarmony[\root] - 2).clip(33, 57) }));
 ~ccGestureAdd.((name:\leanFwd, family:\harmony, hold:0.4, cooldown:1.0,
@@ -62,7 +62,7 @@ var meanY = { |a, b| (((a ? ())[\y] ? 0.5) + ((b ? ())[\y] ? 0.5)) * 0.5 };
     detect: { |pose, prev| var s=pose[\skel]; s.notNil and: {
         ((((s[\shL] ? ())[\y]?0.35)+((s[\shR] ? ())[\y]?0.35))*0.5) > (((((s[\hipL] ? ())[\y]?0.6)+((s[\hipR] ? ())[\y]?0.6))*0.5) - 0.20) } },
     fire: { ~ccHarmony[\pad] = \dark }));
-~ccGestureAdd.((name:\tilt, family:\harmony, hold:0.4, cooldown:1.2,
+~ccGestureAdd.((name:\tilt, family:\harmony, edge: true, hold:0.4, cooldown:1.2,
     detect: { |pose, prev| var s=pose[\skel]; s.notNil and: {
         var mid = ((((s[\shL] ? ())[\x]?0.4)+((s[\shR] ? ())[\x]?0.6))*0.5);
         (((s[\nose] ? ())[\x]?0.5) - mid).abs > 0.06 } },
@@ -71,7 +71,7 @@ var meanY = { |a, b| (((a ? ())[\y] ? 0.5) + ((b ? ())[\y] ? 0.5)) * 0.5 };
         ~ccHarmony[\scale] = keys.wrapAt(i + 1) }));
 
 // --- melody family ---
-~ccGestureAdd.((name:\armRaise, family:\melody, hold:0.4, cooldown:1.0,
+~ccGestureAdd.((name:\armRaise, family:\melody, edge: true, hold:0.4, cooldown:1.0,
     detect: { |pose, prev|
         var s=pose[\skel]; var w=~poseWrist.notNil.if({~poseWrist.values.detect({|v| v.notNil})});
         (s.notNil and: { w.notNil }) and: {
