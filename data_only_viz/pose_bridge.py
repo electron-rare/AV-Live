@@ -194,6 +194,17 @@ class PoseSoundBridge:
             try: self._avbody.send_message("/pose/limb_span", [pid, float(span)])
             except OSError: pass
 
+        if len(body) >= 29:
+            def _xy(i):
+                kp = body[i]
+                return [float(getattr(kp, "x", 0.0)), float(getattr(kp, "y", 0.0))]
+            skel = [pid]
+            for idx in (0, 11, 12, 23, 24, 25, 26, 27, 28):   # nose, sh L/R, hip L/R, knee L/R, ank L/R
+                skel += _xy(idx)
+            cli.send_message("/pose/skel", skel)
+            try: self._avbody.send_message("/pose/skel", skel)
+            except OSError: pass
+
     # ------------------------------------------------------------------
     def send_face(self, persons_face: Sequence[Sequence[Any]],
                   persons_face_ids: Sequence[int], t_now: float,

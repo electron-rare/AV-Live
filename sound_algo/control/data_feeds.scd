@@ -496,6 +496,7 @@ OSCdef(\poseLeave, { |msg|
     ~poseKin.removeAt(pid);
     ~poseCenter.removeAt(pid);
     ~poseWrist !? { ~poseWrist.removeAt(pid) };
+    ~poseSkel !? { ~poseSkel.removeAt(pid) };
 }, '/pose/leave');
 
 OSCdef(\poseHands, { |msg|
@@ -520,6 +521,15 @@ OSCdef(\poseWrist, { |msg|
     { e[\rx] = msg[3]; e[\ry] = msg[4]; };
     ~poseWrist[pid] = e;
 }, '/pose/wrist');
+
+~poseSkel = ~poseSkel ? Dictionary.new;
+OSCdef(\poseSkel, { |msg|
+    var pid = msg[1].asInteger;
+    var p = { |i| (x: msg[2 + (i*2)], y: msg[3 + (i*2)]) };
+    ~poseSkel[pid] = (
+        nose: p.(0), shL: p.(1), shR: p.(2), hipL: p.(3), hipR: p.(4),
+        kneeL: p.(5), kneeR: p.(6), ankL: p.(7), ankR: p.(8));
+}, '/pose/skel');
 
 ~poseCenter = ~poseCenter ? Dictionary.new;
 OSCdef(\poseCenter, { |msg|
