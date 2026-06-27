@@ -319,6 +319,7 @@
         \quiet,   { ~doSceneQuiet.value },
         \live_pose, { ~doSceneLivePose.value },
         \play,    { ~doScenePlay.value },
+        \concert, { ~doSceneConcert.value },
         \all,     {
             ~doSceneCavity.value;
             ~doSceneGeo.value;

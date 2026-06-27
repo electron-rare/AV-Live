@@ -494,6 +494,7 @@ OSCdef(\poseLeave, { |msg|
     var pid = msg[1];
     ~poseState.removeAt(pid);
     ~poseKin.removeAt(pid);
+    ~poseCenter.removeAt(pid);
 }, '/pose/leave');
 
 OSCdef(\poseHands, { |msg|
@@ -507,6 +508,20 @@ OSCdef(\poseHands, { |msg|
     ~handFeat[\rspeed] = msg[9];
     ~handFeat[\dist]   = msg[10];
 }, '/pose/hands');
+
+~poseCenter = ~poseCenter ? Dictionary.new;
+OSCdef(\poseCenter, { |msg|
+    var pid = msg[1].asInteger;
+    var e = ~poseCenter[pid] ? ();
+    e[\cx] = msg[2]; e[\cy] = msg[3];
+    ~poseCenter[pid] = e;
+}, '/pose/center');
+OSCdef(\poseShoSpan, { |msg|
+    var pid = msg[1].asInteger;
+    var e = ~poseCenter[pid] ? ();
+    e[\depth] = msg[2];   // shoulder span proxy: bigger = closer
+    ~poseCenter[pid] = e;
+}, '/pose/sho_span');
 
 "[OK] action-head OSC handlers".postln;
 

@@ -160,6 +160,14 @@ Routine({
     (~base ++ "scene_pose_play.scd").load;
     0.5.wait;
 
+    // -- 6d. Concert engine + morceaux -----
+    (~base ++ "scene_concert.scd").load;
+    0.3.wait;
+    [
+        "morceaux/01_hypno_drift.scd",
+    ].do { |f| (~base ++ f).load; 0.1.wait; };
+    s.sync;
+
     // -- 7) Demarre la scene par defaut -----
     if(~doScene.isNil) {
         "[data-only/boot] ERREUR : ~doScene non defini".warn;
