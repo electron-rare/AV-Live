@@ -178,6 +178,9 @@ Routine({
     ].do { |f| (~base ++ f).load; 0.1.wait; };
     s.sync;
 
+    // -- 6e. Dramatic body gestures -----
+    (~base ++ "concert_gestures.scd").load; s.sync;
+
     // -- 7) Demarre la scene par defaut -----
     if(~doScene.isNil) {
         "[data-only/boot] ERREUR : ~doScene non defini".warn;
