@@ -38,7 +38,31 @@
     var handsLive = ((hf[\rx] ? 0) > 0.001) or: { (hf[\lx] ? 0) > 0.001 };
     var hands = handsLive.if({ hf }, { ~ccWristFeat.value });
     (kin: (kin ? ()), state: (st ? ()), center: (ctr ? ()),
-     hands: hands, hasBody: kin.notNil);
+     hands: hands, hasBody: kin.notNil,
+     skel: ((~poseSkel.notNil.if({ ~poseSkel.values.detect({ |v| v.notNil }) })) ? ()));
+};
+
+// -- registre des gestes (framework extensible) --
+~ccGestures = ~ccGestures ? [];
+~ccGestureAdd = { |g| ~ccGestures = ~ccGestures.add(g) };
+~ccGState = IdentityDictionary.new;   // name -> (holdT:, lastFire:, fired:)
+~ccEvalGestures = { |pose, prev, now|
+    ~ccGestures.do { |g|
+        var st = ~ccGState[g[\name]] ? (holdT: 0.0, lastFire: -100.0, fired: false);
+        var on = g[\detect].(pose, prev) == true;
+        if(on) {
+            if(st[\holdT] <= 0) { st[\holdT] = now };
+            if(((now - st[\holdT]) >= (g[\hold] ? 0))
+                and: { (now - st[\lastFire]) > (g[\cooldown] ? 0.5) }) {
+                st[\lastFire] = now; st[\holdT] = now; st[\fired] = true;
+                g[\fire].();
+            };
+        } {
+            if(st[\fired]) { g[\release] !? { |r| r.() }; st[\fired] = false };
+            st[\holdT] = 0;
+        };
+        ~ccGState[g[\name]] = st;
+    };
 };
 
 // -- registre des morceaux --
@@ -109,15 +133,18 @@
         } {
             ~concert[\running] = true;
             ~concert[\idx] = 0;
+            ~ccGState = IdentityDictionary.new;
             ~concert[\clock] = TempoClock(126/60).permanent_(true);
             ~concert[\startMorceau].(0);
             ~concert[\routine] = Routine({
                 var beat = 0;
+                var prev = ~ccPose.value;
                 inf.do {
                     var pose = ~ccPose.value;
                     var now = thisThread.seconds;
                     var c;
                     ~concert[\detectCross].(pose, now);
+                    ~ccEvalGestures.(pose, prev, now); prev = pose;
                     c = ~concert[\ctx];          // relire (next a pu permuter)
                     c !? { |cc|
                         cc[\m][\update].(cc[\ctx], pose);
