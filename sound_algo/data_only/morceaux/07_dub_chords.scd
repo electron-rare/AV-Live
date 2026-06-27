@@ -23,15 +23,15 @@ SynthDef(\cc_dub_kick, { |out=0, amp=0.5|
 ~concertAdd.((
     name: "Dub Chords", style: \dub,
     start: { |ctx|
-        ctx[\sub] = Synth(\cc_dub_sub, [\freq, 41.midicps * 0 + 55, \amp, 0.16]);
-        ctx[\last] = 0.0; ctx[\root] = 50;
+        ctx[\sub] = Synth(\cc_dub_sub, [\freq, ~ccNote.(0, -1).midicps, \amp, 0.16]);
+        ctx[\last] = 0.0;
     },
     update: { |ctx, pose|
         var hf = pose[\hands];
         ctx[\cut] = (1 - (hf[\ly] ? 1)).clip(0, 1).linexp(0, 1, 400, 3000);
         ctx[\fb]  = (hf[\ropen] ? 0.5).clip(0, 1);
         if(((hf[\rspeed] ? 0) > 0.12) and: { (thisThread.seconds - ctx[\last]) > 0.4 }) {
-            var note = ctx[\root] + [0, 3, 7, 10].choose;
+            var note = ~ccNote.([0, 2, 4, 6].choose);
             ctx[\last] = thisThread.seconds;
             Synth(\cc_dub_chord, [\freq, note.midicps, \cutoff, (ctx[\cut] ? 1200),
                 \fb, (ctx[\fb] ? 0.6), \amp, 0.26, \pan, 0.3.rand2]);

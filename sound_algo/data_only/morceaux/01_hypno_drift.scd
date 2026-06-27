@@ -22,15 +22,18 @@ SynthDef(\cc_drift_kick, { |out=0, amp=0.5|
 ~concertAdd.((
     name: "Hypno Drift", style: \hypnotic,
     start: { |ctx|
-        ctx[\drone] = Synth(\cc_drift_drone, [\freq, 55, \cutoff, 300, \amp, 0.22]);
-        ctx[\sub]   = Synth(\cc_drift_sub,   [\freq, 55, \amp, 0.18]);
+        var f = ~ccNote.(0, -1).midicps;   // drone/sub root, one octave below ccHarmony
+        ctx[\drone] = Synth(\cc_drift_drone, [\freq, f, \cutoff, 300, \amp, 0.22]);
+        ctx[\sub]   = Synth(\cc_drift_sub,   [\freq, f, \amp, 0.18]);
         ctx[\cut]   = 300; ctx[\pan] = 0;
     },
     update: { |ctx, pose|
         var hf = pose[\hands];
         var ctr = pose[\center];
+        var pad = (~ccHarmony[\pad] ? \dark);
+        var base = (pad == \bright).if({ 700 }, { 250 });   // bright pad -> higher base cutoff
         var hi = (1 - (((hf[\ry] ? 1) + (hf[\ly] ? 1)) * 0.5)).clip(0, 1);
-        var tgt = hi.linexp(0, 1, 250, 4500);
+        var tgt = hi.linexp(0, 1, base, 4500);
         var panT = ((ctr[\cx] ? 0.5) * 2 - 1).clip(-1, 1);
         ctx[\cut] = ctx[\cut] + ((tgt - ctx[\cut]) * 0.05);
         ctx[\pan] = ctx[\pan] + ((panT - ctx[\pan]) * 0.05);

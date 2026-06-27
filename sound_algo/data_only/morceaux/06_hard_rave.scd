@@ -25,14 +25,14 @@ SynthDef(\cc_rave_crash, { |out=0, amp=0.3|
     update: { |ctx, pose|
         var hf = pose[\hands];
         var accel = (pose[\kin][\accel] ? 0);
-        ctx[\trans] = ((hf[\ly] ? 0.5) < 0.4).if({ 5 }, { 0 });
+        ctx[\trans] = ((hf[\ly] ? 0.5) < 0.4).if({ 3 }, { 0 });   // left hand high -> +1 degree-third
         // saut : pic d'acceleration -> crash (anti-rebond)
         if(accel > 0.45) {
             if(ctx[\crashed] == 0) { Synth(\cc_rave_crash, [\amp, 0.3]); ctx[\crashed] = 1 };
         } { ctx[\crashed] = 0 };
         // stab au geste main D (vitesse main D)
         if(((hf[\rspeed] ? 0) > 0.18) and: { (thisThread.seconds - ctx[\last]) > 0.12 }) {
-            var note = 50 + (ctx[\trans] ? 0) + [0, 7, 12].choose;
+            var note = ~ccNote.([0, 4, 7].choose + (ctx[\trans] ? 0));
             ctx[\last] = thisThread.seconds;
             Synth(\cc_rave_stab, [\freq, note.midicps,
                 \amp, (hf[\rspeed] ? 0).linlin(0.18, 0.6, 0.18, 0.4),

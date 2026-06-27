@@ -18,25 +18,33 @@ SynthDef(\cc_acid_kick, { |out=0, amp=0.6|
 ~concertAdd.((
     name: "Acid Line", style: \acid,
     start: { |ctx|
-        ctx[\pat] = [0, 0, 12, 0, 3, 0, 7, 0];   // degres (demi-tons depuis root)
-        ctx[\root] = 45; ctx[\step] = 0;
+        // scale-DEGREE phrases (read via ~ccNote); picked by ~ccHarmony[\phrase]
+        ctx[\phrases] = [
+            [0, 0, 7, 0, 2, 0, 4, 0],
+            [0, 3, 0, 7, 5, 0, 2, 0],
+            [0, 7, 3, 10, 0, 5, 2, 0],
+            [0, 0, 0, 5, 7, 7, 4, 2]
+        ];
+        ctx[\pat] = ctx[\phrases][0];
+        ctx[\step] = 0;
     },
     update: { |ctx, pose|
         var hf = pose[\hands];
         var speed = (pose[\kin][\speed] ? 0);
         ctx[\cut] = (1 - (hf[\ry] ? 1)).clip(0, 1).linexp(0, 1, 200, 4000);
         ctx[\res] = (hf[\ropen] ? 0.3).clip(0, 1);
-        ctx[\oct] = ((hf[\ly] ? 0.5) < 0.4).if({ 12 }, { 0 });
+        ctx[\oct] = ((hf[\ly] ? 0.5) < 0.4).if({ 1 }, { 0 });   // octave up
         ~concert[\clock] !? { |c| c.tempo = speed.linlin(0, 0.6, 124, 140).clip(124, 140) / 60 };
     },
     tick: { |ctx, pose, beat|
         var sixteenth = (0.25 / ~ccCtlDur).round.max(1);
         var quarter = (1.0 / ~ccCtlDur).round.max(1);
+        ctx[\pat] = ctx[\phrases].wrapAt(~ccHarmony[\phrase] ? 0);   // melodic-phrase gesture
         if(pose[\hasBody]) {
             if((beat % quarter) == 0) { Synth(\cc_acid_kick, [\amp, 0.6]) };
             if((beat % sixteenth) == 0) {
                 var deg = ctx[\pat].wrapAt(ctx[\step]);
-                var note = (ctx[\root] + deg + (ctx[\oct] ? 0));
+                var note = ~ccNote.(deg, (ctx[\oct] ? 0));
                 Synth(\cc_acid_303, [\freq, note.midicps,
                     \cutoff, (ctx[\cut] ? 600), \res, (ctx[\res] ? 0.3),
                     \amp, 0.28, \pan, 0.15.rand2]);

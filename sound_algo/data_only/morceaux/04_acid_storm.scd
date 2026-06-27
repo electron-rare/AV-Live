@@ -23,7 +23,16 @@ SynthDef(\cc_storm_screech, { |out=0, amp=0.2|
 
 ~concertAdd.((
     name: "Acid Storm", style: \acid,
-    start: { |ctx| ctx[\pat] = [0, 12, 0, 3, 10, 0, 7, 5]; ctx[\root] = 43; ctx[\step] = 0; ctx[\screeched] = 0; },
+    start: { |ctx|
+        // scale-DEGREE phrases (read via ~ccNote); picked by ~ccHarmony[\phrase]
+        ctx[\phrases] = [
+            [0, 7, 0, 2, 6, 0, 4, 3],
+            [0, 0, 7, 5, 0, 3, 7, 2],
+            [0, 7, 10, 4, 0, 7, 3, 5],
+            [0, 5, 7, 0, 9, 7, 4, 2]
+        ];
+        ctx[\pat] = ctx[\phrases][0]; ctx[\step] = 0; ctx[\screeched] = 0;
+    },
     update: { |ctx, pose|
         var hf = pose[\hands];
         ctx[\cut] = (1 - (hf[\ry] ? 1)).clip(0, 1).linexp(0, 1, 250, 5000);
@@ -37,10 +46,11 @@ SynthDef(\cc_storm_screech, { |out=0, amp=0.2|
     tick: { |ctx, pose, beat|
         var sixteenth = (0.25 / ~ccCtlDur).round.max(1);
         var quarter = (1.0 / ~ccCtlDur).round.max(1);
+        ctx[\pat] = ctx[\phrases].wrapAt(~ccHarmony[\phrase] ? 0);   // melodic-phrase gesture
         if(pose[\hasBody]) {
             if((beat % quarter) == 0) { Synth(\cc_storm_kick, [\amp, 0.7]) };
             if((beat % sixteenth) == 0) {
-                var note = ctx[\root] + ctx[\pat].wrapAt(ctx[\step]);
+                var note = ~ccNote.(ctx[\pat].wrapAt(ctx[\step]));
                 Synth(\cc_storm_303, [\freq, note.midicps, \cutoff, (ctx[\cut] ? 800),
                     \res, (ctx[\res] ? 0.4), \drive, (ctx[\drive] ? 2), \amp, 0.26, \pan, 0.2.rand2]);
                 ctx[\step] = ctx[\step] + 1;

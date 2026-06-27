@@ -14,7 +14,7 @@ SynthDef(\cc_space_click, { |out=0, amp=0.2, pan=0|
 
 ~concertAdd.((
     name: "Dub Space", style: \dub,
-    start: { |ctx| ctx[\sub] = Synth(\cc_space_sub, [\freq, 48, \amp, 0.14]); ctx[\last] = 0.0; },
+    start: { |ctx| ctx[\sub] = Synth(\cc_space_sub, [\freq, ~ccNote.(0, -2).midicps, \amp, 0.14]); ctx[\last] = 0.0; },
     update: { |ctx, pose|
         var hf = pose[\hands];
         var depth = (pose[\center][\depth] ? 0.5);   // grand = proche ; recul = petit
