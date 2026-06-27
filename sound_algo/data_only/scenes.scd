@@ -318,6 +318,7 @@
         \pulse,   { ~doScenePulse.value },
         \quiet,   { ~doSceneQuiet.value },
         \live_pose, { ~doSceneLivePose.value },
+        \play,    { ~doScenePlay.value },
         \all,     {
             ~doSceneCavity.value;
             ~doSceneGeo.value;
@@ -344,6 +345,6 @@ OSCdef(\do_scene, { |msg|
     AppClock.sched(0, { ~doScene.(name); nil });
 }, '/control/doScene');
 
-"[data-only/scenes] 9 scenes available : \\cavity \\geo \\body \\weather \\flight \\pulse \\quiet \\all \\full \\stop".postln;
+"[data-only/scenes] 10 scenes available : \\cavity \\geo \\body \\weather \\flight \\pulse \\quiet \\live_pose \\play \\all \\full \\stop".postln;
 "[data-only/scenes] OSC : /control/doScene <\\name>".postln;
 )

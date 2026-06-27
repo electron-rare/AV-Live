@@ -140,6 +140,10 @@ Routine({
     s.sync;
     0.5.wait;
 
+    // -- 4b. Body-play SynthDefs -----
+    (~base ++ "synthdefs_play.scd").load;
+    s.sync;
+
     // -- 5) OSCdef des flux data_feeds -----
     (~repoRoot ++ "control/data_feeds.scd").load;
     0.5.wait;
@@ -150,6 +154,10 @@ Routine({
 
     // -- 6b. Pose/mains -> mapping FX -----
     (~base ++ "scene_pose_action.scd").load;
+    0.5.wait;
+
+    // -- 6c. Body-play engine -----
+    (~base ++ "scene_pose_play.scd").load;
     0.5.wait;
 
     // -- 7) Demarre la scene par defaut -----
