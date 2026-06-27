@@ -14,16 +14,22 @@ the running concert** (next morceau, harmony, master FX) — all over OSC into t
 ## Architecture
 
 ```
-Browser (GrosMac/tablet)  ⇄ WebSocket ⇄  Node server (GrosMac, extends web_realart)
-                                              │  OSC/UDP
-                                              ▼
-                                    macm1 SC  supra-m1.local:57121
+Browser (GrosMac / tablet / phone, on the LAN)
+   │  http + WebSocket  ->  http://supra-m1.local:<WEB_PORT>
+   ▼
+Node server  (runs ON macm1, extends web_realart)
+   │  OSC/UDP  ->  127.0.0.1:57121   (local SC, no network hop)
+   ▼
+macm1 SC concert engine
 ```
 
-- The Node server bridges WebSocket ⇄ OSC. Each UI control sends a `{addr, args}`
-  JSON message; the server forwards it as an OSC packet to `AVLIVE_SC_HOST`
-  (default `supra-m1.local`) port `57121`. mDNS hostname → DHCP-resilient.
-- The concert + patterns play on macm1's audio. GrosMac is only the surface.
+- The Node server **runs on macm1**, co-located with the SC concert engine, so it
+  forwards OSC to **localhost** (`127.0.0.1:57121`) — no LAN hop, lowest latency.
+  The browser (GrosMac or any LAN device) loads the page from
+  `http://supra-m1.local:<WEB_PORT>`. Env `AVLIVE_SC_HOST` (default `127.0.0.1`),
+  `AVLIVE_SC_PORT` (default `57121`), `AVLIVE_WEB_PORT` (page port); only set
+  `AVLIVE_SC_HOST` if the bridge ever runs off-box.
+- The concert + patterns play on macm1's audio. The browser is only the surface.
 
 ## A. SC launchpad (`sound_algo/data_only/launchpad.scd`, new, loaded last by boot)
 
@@ -77,7 +83,8 @@ without the full concert.
 - A WebSocket endpoint: on `{addr, args}` JSON, send an OSC message to
   `AVLIVE_SC_HOST:57121` (reuse web_realart's existing OSC client/lib; add a sender
   to the SC host if it only targets oscope today).
-- Env: `AVLIVE_SC_HOST` (default `supra-m1.local`), `AVLIVE_SC_PORT` (default 57121).
+- Runs on macm1 alongside SC → OSC to localhost. Env: `AVLIVE_SC_HOST` (default
+  `127.0.0.1`), `AVLIVE_SC_PORT` (default 57121), `AVLIVE_WEB_PORT` (page port).
 - Keep the existing feeds functionality intact (additive only).
 
 ## D. Web UI (`web_realart/public/control.html` + `control.js` + `control.css`)
@@ -105,8 +112,8 @@ Pad armed-state is tracked client-side (the SC engine is fire-and-forget). A sma
   `/control/fx/crash` runs without error. No live-audio assertion (tuned at smoke).
 - **Node** (vitest/node): a WS `{addr:"/launch",args:["kick",1]}` produces one OSC
   packet addressed to the configured host:port (mock the UDP socket).
-- **Web UI**: manual — open `http://grosmac.local:<port>/control.html`, click pads,
-  confirm OSC reaches macm1 SC (engine posts on `/launch`).
+- **Web UI**: manual — from GrosMac open `http://supra-m1.local:<port>/control.html`
+  (server on macm1), click pads, confirm OSC reaches the local SC (engine posts on `/launch`).
 - **Live smoke**: GrosMac browser → arm drums + acid + arp, change harmony + fire
   FX, with the body-concert running on macm1; tune levels/tempo by ear.
 
