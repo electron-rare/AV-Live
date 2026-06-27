@@ -38,21 +38,20 @@ xcrun devicectl device process launch --device "$DEV" cc.saillant.ARBodyTracker 
 sleep 3
 
 # 2) SuperCollider engine (boots to body-play; loads concert + gestures + morceaux).
-#    sclang needs a controlling TTY to boot scsynth reliably, so run it in a
-#    Terminal window (also a live log). Launched FIRST so it boots while the viz
-#    comes up, and so the viz ends up the frontmost window (Space goes to it).
-osascript -e "tell application \"Terminal\" to do script \"cd '$REPO/sound_algo/data_only' && '$SCLANG' boot.scd 2>&1 | tee /tmp/sc_boot.log\"" >/dev/null 2>&1
+#    sclang needs a controlling TTY to boot scsynth reliably -> run boot_sc.command
+#    in Terminal via `open` (proven; needs no Automation/TCC permission, unlike
+#    `osascript tell Terminal`). Launched FIRST so the viz can end up frontmost.
+open "$REPO/launcher/concert/boot_sc.command"
 sleep 32
 
 # 3) pose pipeline (iPhone USB HEVC -> MediaPipe -> mirror -> OSC). Launched LAST:
 #    its window self-activates frontmost + KEY, so its keyboard handler captures
 #    Space = next morceau. (The local NSEvent monitor only fires when this window
 #    is key; the global monitor needs Input Monitoring permission. Keeping the viz
-#    frontmost is the reliable path — click it to refocus if Space stops working.)
+#    frontmost is the reliable path -- click it to refocus if Space stops working.)
 nohup "$PY" -m data_only_viz.main --pose --iphone-usb > /tmp/concert_viz.log 2>&1 &
 disown
 sleep 11
-osascript -e 'tell application "Terminal" to set visible of front window to false' >/dev/null 2>&1
 
 # 4) switch to the concert scene
 "$PY" -c "from pythonosc.udp_client import SimpleUDPClient; SimpleUDPClient('127.0.0.1',57121).send_message('/control/doScene','concert')"
