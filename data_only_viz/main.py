@@ -207,8 +207,16 @@ class AppDelegate(NSObject):
         vienne du MAIN THREAD AppKit. OpenCV depuis un worker thread plante
         avec 'can not spin main run loop from other thread'. On demande ici,
         sur le main thread, PUIS on lance le pose worker avec
-        OPENCV_AVFOUNDATION_SKIP_AUTH=1 pour qu'il ne tente pas une 2e demande."""
+        OPENCV_AVFOUNDATION_SKIP_AUTH=1 pour qu'il ne tente pas une 2e demande.
+
+        Exception: when --iphone-usb is set, IphoneUSBSource connects via
+        usbmuxd — no Mac-camera TCC needed — so we skip straight to the worker.
+        """
         import os
+        if getattr(self._opts, "iphone_usb", False):
+            LOG.info("iphone-usb mode — skipping camera TCC request")
+            self._start_pose_worker()
+            return
         os.environ["OPENCV_AVFOUNDATION_SKIP_AUTH"] = "1"
         try:
             from AVFoundation import (
@@ -366,7 +374,9 @@ class AppDelegate(NSObject):
         if _os.environ.get("AV_LIVE_MEDIAPIPE") != "0":
             try:
                 from .multi import MultiWorker
-                self._pose_worker = MultiWorker(self._state, num_persons=4)
+                self._pose_worker = MultiWorker(
+                    self._state, num_persons=4,
+                    iphone_usb=getattr(self._opts, "iphone_usb", False))
                 self._pose_worker.start()
                 LOG.info("worker: MediaPipe Multi (Pose+Face+Hand × 4)")
                 return
@@ -668,6 +678,8 @@ def main() -> int:
                    choices=["n", "s", "l"],
                    default="n",
                    help="DETRPose model size (default: n)")
+    p.add_argument("--iphone-usb", dest="iphone_usb", action="store_true",
+                   help="drive pose from the iPhone USB stream (no Mac camera)")
     p.add_argument("-v", "--verbose", action="store_true")
     opts = p.parse_args()
 

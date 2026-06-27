@@ -78,9 +78,11 @@ class MultiWorker:
         target_fps: float = 18.0,
         num_persons: int = 4,
         min_conf: float = 0.4,
+        iphone_usb: bool = False,
     ) -> None:
         self.state = state
         self.camera_index = camera_index
+        self.iphone_usb = iphone_usb
         self.period = 1.0 / max(1.0, target_fps)
         self.num_persons = num_persons
         self.min_conf = min_conf
@@ -342,13 +344,19 @@ class MultiWorker:
         LOG.info("3 landmarkers prets (num=%d, delegate=%s)",
                  self.num_persons, _deleg.name)
 
-        cap = cv2.VideoCapture(self.camera_index)
-        cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
-        cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
-        if not cap.isOpened():
-            LOG.error("camera index %d indisponible (TCC ?)", self.camera_index)
-            return
-        LOG.info("camera ouverte (index %d)", self.camera_index)
+        if self.iphone_usb:
+            from .iphone_usb_source import IphoneUSBSource  # noqa: PLC0415
+            cap = IphoneUSBSource(self.state)
+            cap.start()
+            LOG.info("multi — iphone USB source")
+        else:
+            cap = cv2.VideoCapture(self.camera_index)
+            cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
+            cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+            if not cap.isOpened():
+                LOG.error("camera index %d indisponible (TCC ?)", self.camera_index)
+                return
+            LOG.info("camera ouverte (index %d)", self.camera_index)
 
         t0_ms = int(time.monotonic() * 1000)
         while not self._stop.is_set():
