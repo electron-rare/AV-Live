@@ -167,6 +167,7 @@ Routine({
         "morceaux/01_hypno_drift.scd",
         "morceaux/02_hypno_roll.scd",
         "morceaux/03_acid_line.scd",
+        "morceaux/04_acid_storm.scd",
     ].do { |f| (~base ++ f).load; 0.1.wait; };
     s.sync;
 
