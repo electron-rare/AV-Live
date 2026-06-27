@@ -1,20 +1,22 @@
-# Body-trigger framework — Phase 1 (skeleton data + FX/dramatic gestures)
+# Body-trigger framework (skeleton data + FX + harmonic/melodic conducting)
 
-Date: 2026-06-27
+Date: 2026-06-27 (rev: harmonic/melodic brought IN scope)
 Status: design approved, pending spec review
 Scope: `sound_algo/data_only/` + `sound_algo/control/data_feeds.scd` + `data_only_viz/pose_bridge.py`
 
 ## Goal
 
-Make the body fire EVENTS during the concert, via an extensible gesture→event
-framework (not a fixed list). Phase 1 ships: (A) a skeleton data layer feeding
-the full body to SC, (B) the `~ccGesture` framework (declarative registry +
-engine evaluation with hold/cooldown), and (C) a master "event FX" layer + a
-first batch of FX/dramatic gestures (jump, stomp, squat, spin, T-pose →
-crash/drop, kick, breakdown, stutter, swell). Adding ANY future trigger =
-register one more `~ccGesture` — Phase 2 (harmonic/melodic triggers + a global
-`~ccHarmony` the morceaux read) plugs into the SAME framework with no engine
-change.
+Make the body CONDUCT the concert, via an extensible gesture→event framework
+(not a fixed list). Ships: (A) a skeleton data layer feeding the full body to
+SC, (B) the `~ccGesture` framework (declarative registry + engine evaluation
+with hold/cooldown), (C) a master "event FX" layer + FX/dramatic gestures
+(jump, stomp, squat, spin, T-pose → crash/drop, kick, breakdown, stutter,
+swell), and (D) a global harmonic/melodic state `~ccHarmony` that the pitched
+morceaux READ for their root/scale/pad/phrase, CHANGED by harmonic gestures
+(step→transpose, lean→pad bright/dark, head-tilt→scale) and melodic gestures
+(arm-raise→next phrase, head up/down→octave). Adding ANY further trigger =
+register one more `~ccGesture` with no engine change — that is the framework's
+whole point.
 
 ## Context — what exists
 
@@ -105,6 +107,51 @@ bus + a master synth in a group ordered after the morceaux, before the rack).
 All five are GLOBAL (same gesture → same event in any morceau), so they're
 learnable and don't depend on the active morceau.
 
+## D. Harmonic & melodic conducting (`~ccHarmony`)
+
+A global harmonic/melodic state the body conducts and the pitched morceaux read:
+
+```
+~ccHarmony = (root: 45, scale: \minor, pad: \dark, phrase: 0, octave: 0);
+~ccScales  = ( minor:    [0,2,3,5,7,8,10],  dorian: [0,2,3,5,7,9,10],
+               phrygian: [0,1,3,5,7,8,10],  penta:  [0,2,4,7,9] );
+// quantize a scale degree to the current root+scale(+octave) -> midinote
+~ccNote = { |degree, oct=0|
+    var sc = ~ccScales[~ccHarmony[\scale]];
+    var d  = degree.asInteger;
+    ~ccHarmony[\root] + ((~ccHarmony[\octave] + oct + (d div: sc.size)) * 12)
+        + sc[d % sc.size];
+};
+```
+
+**Morceau integration — refactor the PITCHED morceaux** (`01_hypno_drift` drone,
+`03_acid_line`, `04_acid_storm`, `06_hard_rave` stabs, `07_dub_chords`,
+`08_dub_space` sub) to derive their notes from `~ccNote.(degree)` instead of
+baked-in roots/scales. Each keeps its OWN rhythm and degree SEQUENCE; only
+root/scale/octave/pad come from `~ccHarmony`. The purely percussive morceaux
+(`02_hypno_roll`, `05_hard_pump`) are untouched.
+
+**Harmonic gestures** (register via `~ccGestureAdd`, family `\harmony`):
+| name | detect (intent) | event |
+|------|-----------------|-------|
+| `\stepR` | stepped into screen-right zone (`center.cx > 0.70`), held 0.5 | `~ccHarmony[\root]` += 2 (clamp 33–57) |
+| `\stepL` | screen-left zone (`center.cx < 0.30`), held 0.5 | `~ccHarmony[\root]` -= 2 (clamp) |
+| `\leanFwd` | torso pitched forward (shoulders well above hips: `mean(sh.y) < mean(hip.y) - 0.28`) | `~ccHarmony[\pad] = \bright` (morceau pads read this) |
+| `\leanBack` | upright (`mean(sh.y) > mean(hip.y) - 0.20`) | `~ccHarmony[\pad] = \dark` |
+| `\tilt` | head tilt L or R (`nose.x` vs shoulder-midpoint.x beyond ±0.06), held 0.4 | cycle `~ccHarmony[\scale]` to the next `~ccScales` key |
+
+**Melodic gestures** (family `\melody`):
+| name | detect (intent) | event |
+|------|-----------------|-------|
+| `\armRaise` | exactly one wrist above its shoulder (the other not), held 0.4 | `~ccHarmony[\phrase]` = `(phrase+1) % 4` |
+| `\headUp` | chin up (`nose.y < shoulder.y - 0.30`) | `~ccHarmony[\octave]` = 1 |
+| `\headDown` | chin neutral/down (`nose.y > shoulder.y - 0.18`) | `~ccHarmony[\octave]` = 0 |
+
+`~ccHarmony[\phrase]` (0–3) indexes a small per-morceau table of alternate degree
+sequences (e.g. acid line carries 4 degree patterns and picks by `phrase`); a
+morceau without a phrase table ignores it. `~ccHarmony[\pad]` (`\dark`/`\bright`)
+is read by morceaux with a drone/pad to pick a brighter/darker timbre.
+
 ## Testing
 
 - `.scd` balance (`P:0 B:0`, TLB:1 for `.load` files) + headless load on GrosMac
@@ -119,23 +166,21 @@ learnable and don't depend on the active morceau.
   kick, squat → breakdown sweep + release, spin → stutter, T-pose → swell. Tune
   thresholds by ear.
 
-## Out of scope (Phase 2 — same framework, separate spec)
+## Out of scope (the framework already supports these — add later, no engine change)
 
-- Harmonic triggers: a global `~ccHarmony` (root/scale/pad) that gestures change
-  (step→transpose, lean→pad bright/dark, head-tilt→scale) and the morceaux READ
-  for their chords/pads (a morceau refactor).
-- Melodic triggers: `~ccHarmony[\phrase]` changed by gestures (arm-raise→next
-  phrase, head up/down→octave), morceaux read it for lead/arp notes.
-- Percussion/texture gestures (foot-tap→hat, etc.) — register more `~ccGesture`.
-- Multi-person (per-person gesture layers).
-These all register via `~ccGestureAdd` with no engine change — that is the point
-of the framework.
+- Percussion/texture gestures (foot-tap→hat, knee→tom, arms-spread→reverb open,
+  fast-shake→grain) — register more `~ccGesture`.
+- Multi-person (per-person gesture layers and/or a per-pid `~ccHarmony`).
+Both register via `~ccGestureAdd` with no engine change — the framework's point.
 
 ## Implementation note (for the plan)
 
 Decompose: (1) skeleton data layer (`/pose/skel` + `~poseSkel`) + extend
 `~ccPose` with `skel` and prev-snapshot plumbing. (2) The `~ccGesture` framework
 + engine evaluation loop (validated with a stub gesture). (3) The master event-FX
-layer (master filter + stutter + `\cc_ev_*` synths + routing). (4) The five
-batch gestures, one or two per task, each tested. Each step independently
-testable headless; audio tuned at the live smoke.
+layer (master filter + stutter + `\cc_ev_*` synths + routing into the FX rack).
+(4) The five FX/dramatic gestures (one or two per task). (5) `~ccHarmony` +
+`~ccScales` + `~ccNote` global state. (6) Refactor the pitched morceaux to read
+`~ccNote`/`~ccHarmony[\pad]`/`[\phrase]`. (7) Harmonic gestures (step/lean/tilt).
+(8) Melodic gestures (arm-raise/head). Each step independently testable headless;
+audio tuned at the live smoke.
