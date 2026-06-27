@@ -73,10 +73,15 @@ def _to_annexb(data: bytes) -> bytes:
 
 class IphoneUSBSource:
     def __init__(self, state=None, target_size=(640, 480),
-                 write_hands: bool = True) -> None:
+                 write_hands: bool = True, mirror: bool = True) -> None:
         self.state = state
         self.target_w, self.target_h = target_size
         self._write_hands = write_hands
+        # Mirror the video horizontally so the performer facing the camera
+        # interacts naturally (move right -> goes right; raise right arm ->
+        # the right side responds). Env CONCERT_MIRROR=0 disables it.
+        import os as _os
+        self._mirror = mirror and (_os.environ.get("CONCERT_MIRROR", "1") != "0")
         self._codec = av.codec.CodecContext.create("hevc", "r") if av is not None else None
         self._lock = threading.Lock()
         self._frame = None            # latest BGR np.ndarray
@@ -113,6 +118,8 @@ class IphoneUSBSource:
                                 for fr in self._codec.decode(av.Packet(annexb)):
                                     img = fr.to_ndarray(format="bgr24")
                                     img = cv2.resize(img, (self.target_w, self.target_h))
+                                    if self._mirror:
+                                        img = cv2.flip(img, 1)
                                     with self._lock:
                                         self._frame = img
                             except Exception as e:  # av.AVError is a removal-prone alias
