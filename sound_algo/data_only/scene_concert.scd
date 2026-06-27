@@ -178,6 +178,10 @@
     ~concert[\clock] !? { |c| c.stop };
     ~concert[\clock] = nil;
     ~concert[\running] = false;
+    // restore the master event-FX so a stop mid-squat/spin doesn't leave the
+    // mix muffled / stuttering for the next set
+    ~ccMaster !? { ~ccMaster[\filterTo].(20000) };
+    ~ccStutter !? { |st| st.set(\mix, 0) };
     "[concert] STOPPED".postln;
 };
 

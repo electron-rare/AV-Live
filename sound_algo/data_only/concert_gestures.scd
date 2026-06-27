@@ -23,7 +23,8 @@ var meanY = { |a, b| (((a ? ())[\y] ? 0.5) + ((b ? ())[\y] ? 0.5)) * 0.5 };
 ~ccGestureAdd.((name:\squat, family:\fx, hold:0.6, cooldown:0.2,
     detect: { |pose, prev|
         var s = pose[\skel];
-        s.notNil and: { meanY.(s[\hipL], s[\hipR]) > (meanY.(s[\kneeL], s[\kneeR]) - 0.10) } },
+        (s[\hipL].notNil and: { s[\kneeL].notNil }) and: {
+            meanY.(s[\hipL], s[\hipR]) > (meanY.(s[\kneeL], s[\kneeR]) - 0.10) } },
     fire: { ~ccMaster[\filterTo].(450, 1.0) },
     release: { ~ccMaster[\filterTo].(20000, 1.5) }));
 
