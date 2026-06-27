@@ -10,7 +10,7 @@
 //    4. Charge synthdefs.scd       (10 SynthDefs \\do_*)
 //    5. Charge control/data_feeds.scd  (OSCdef /data/* + ~feeds)
 //    6. Charge scenes.scd          (9 scenes + selecteur ~doScene)
-//    7. Lance la scene \\all
+//    7. Lance la scene \\play (body-play ; \\all et data-web via /control/doScene)
 //
 //  Usage standalone :
 //    sclang /chemin/AV-Live/sound_algo/data_only/boot.scd
@@ -164,8 +164,8 @@ Routine({
     if(~doScene.isNil) {
         "[data-only/boot] ERREUR : ~doScene non defini".warn;
     } {
-        "[data-only/boot] starting scene \\all".postln;
-        ~doScene.(\all);
+        "[data-only/boot] starting scene \\play (body-play)".postln;
+        ~doScene.(\play);
     };
 
     "".postln;
