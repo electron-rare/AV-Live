@@ -308,22 +308,26 @@ class ActionHeadPublisher(threading.Thread):
 
     @staticmethod
     def _kp_list_to_array(body: Any) -> np.ndarray | None:
-        """Best-effort conversion of a body keypoint list to (N, 3) array."""
+        """Best-effort conversion of a body keypoint list to (N, 3) array.
+
+        Handles attribute objects (the Kp3D dataclass exposes .x/.y/.z) and
+        indexable rows. Kp3D is NOT subscriptable, so the index fallback must
+        not be evaluated eagerly (the old `getattr(kp, "x", kp[0])` raised
+        TypeError on Kp3D and silently returned None — breaking the body3d /
+        MediaPipe-only path that feeds action-head when no SMPL-X is present)."""
         if body is None:
             return None
         if isinstance(body, np.ndarray):
             return body
-        try:
-            return np.asarray(
-                [
-                    (
-                        getattr(kp, "x", kp[0]),
-                        getattr(kp, "y", kp[1]),
-                        getattr(kp, "z", kp[2] if len(kp) > 2 else 0.0),
-                    )
-                    for kp in body
-                ],
-                dtype=np.float32,
-            )
-        except (TypeError, IndexError, AttributeError):
+        rows = []
+        for kp in body:
+            if hasattr(kp, "x"):
+                rows.append((kp.x, kp.y, getattr(kp, "z", 0.0)))
+            else:
+                try:
+                    rows.append((kp[0], kp[1], kp[2] if len(kp) > 2 else 0.0))
+                except (TypeError, IndexError):
+                    return None
+        if not rows:
             return None
+        return np.asarray(rows, dtype=np.float32)
