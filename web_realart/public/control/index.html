@@ -59,4 +59,36 @@
     <button data-osc="/control/fx/breakdown" data-arg="0">Breakdown ↑</button>
   </div>
 </section>
+<section><h2>Séquenceurs</h2>
+  <div class="seq-block">
+    <h3>Mélodie</h3>
+    <div class="seq-row">
+      <button data-pad="melseq">Arm Mél</button>
+      <button data-seq="melody" data-seqidx="0" class="sel">M1</button>
+      <button data-seq="melody" data-seqidx="1">M2</button>
+      <button data-seq="melody" data-seqidx="2">M3</button>
+      <button data-seq="melody" data-seqidx="3">M4</button>
+      <button data-seq="melody" data-seqidx="4">M5</button>
+      <button data-seq="melody" data-seqidx="5">M6</button>
+      <button data-seq="melody" data-seqidx="6">M7</button>
+      <button data-seq="melody" data-seqidx="7">M8</button>
+    </div>
+    <input type="range" min="0" max="1.5" step="0.05" value="0.8" data-vol="melseq">
+  </div>
+  <div class="seq-block">
+    <h3>Rythme</h3>
+    <div class="seq-row">
+      <button data-pad="rhythmseq">Arm Rhy</button>
+      <button data-seq="rhythm" data-seqidx="0" class="sel">R1</button>
+      <button data-seq="rhythm" data-seqidx="1">R2</button>
+      <button data-seq="rhythm" data-seqidx="2">R3</button>
+      <button data-seq="rhythm" data-seqidx="3">R4</button>
+      <button data-seq="rhythm" data-seqidx="4">R5</button>
+      <button data-seq="rhythm" data-seqidx="5">R6</button>
+      <button data-seq="rhythm" data-seqidx="6">R7</button>
+      <button data-seq="rhythm" data-seqidx="7">R8</button>
+    </div>
+    <input type="range" min="0" max="1.5" step="0.05" value="0.8" data-vol="rhythmseq">
+  </div>
+</section>
 <script src="control.js"></script></body></html>

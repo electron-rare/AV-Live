@@ -30,4 +30,11 @@ document.addEventListener("DOMContentLoaded", () => {
     armed.clear(); document.querySelectorAll("[data-pad]").forEach((e) => e.classList.remove("armed"));
     send("/launch/clear");
   });
+  document.querySelectorAll("[data-seq]").forEach((el) =>
+    el.addEventListener("click", () => {
+      const group = el.dataset.seq;
+      document.querySelectorAll(`[data-seq="${group}"]`).forEach((b) => b.classList.remove("sel"));
+      el.classList.add("sel");
+      send("/seq/" + group, +el.dataset.seqidx);
+    }));
 });

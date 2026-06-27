@@ -95,6 +95,33 @@ s.sync;
 ~lp[\armed] = ~lp[\armed] ? Set.new;
 ~lp[\vol]   = ~lp[\vol]   ? IdentityDictionary.new;
 
+// melody sequences: 8 varied riffs/arps/phrases, minor/phrygian feel
+// wrapAt allows different lengths to loop cleanly over 16 16th-note steps
+~lp[\melodies] = ~lp[\melodies] ? [
+    [0, 2, 3, 5, 7, 5, 3, 2],
+    [0, 3, 7, 3, 0, -2],
+    [0, 0, 7, 0, 3, 5, 2, 0, 3, 5, 7, 3],
+    [7, 5, 3, 2, 0, -2, 0, 2],
+    [0, 2, 3, 5, 7, 10, 7, 5, 3, 0, 2, 3, 5, 3, 2, 0],
+    [0, 3, 7],
+    [0, 7, 5, 3, 7, 0],
+    [2, 0, -2, 0, 3, 2, 0, -2, 5, 3, 2, 0],
+];
+~lp[\melSel]  = ~lp[\melSel]  ? 0;
+
+// rhythm patterns: 16-step strings (1=hit, 0=rest) for kick / snare / hat
+~lp[\rhythms] = ~lp[\rhythms] ? [
+    (name: "4floor",     k: "1000100010001000", s: "0000100000001000", h: "0010101010101010"),
+    (name: "breakbeat",  k: "1000101010001000", s: "0000100100001001", h: "0101010101010101"),
+    (name: "halftime",   k: "1000000010000000", s: "0000000000001000", h: "0010001001000010"),
+    (name: "psyroll",    k: "1001100110011001", s: "0000100000001000", h: "1111111111111111"),
+    (name: "garage",     k: "1000001010000010", s: "0000100000001000", h: "0101101001011010"),
+    (name: "tribal",     k: "1010100010101000", s: "0000101000001010", h: "1010101010101010"),
+    (name: "industrial", k: "1100110011001100", s: "0011001100110011", h: "0101010101010101"),
+    (name: "jungle",     k: "1000100110001001", s: "0000100100001001", h: "1011101110111011"),
+];
+~lp[\rhySel]  = ~lp[\rhySel]  ? 0;
+
 // clock-sync helper: use concert clock when concert is running
 ~lpClock = {
     (~concert.notNil and: {
@@ -166,19 +193,97 @@ Pdef(\lp_bells, Pbind(\instrument, \lp_bells,
 Pdef(\lp_sweep, Pbind(\instrument, \lp_sweep, \dur, 8,
     \amp, Pfunc { 0.25 * ~lpVol.(\sweep) }, \legato, 1));
 
+// --- melody sequencer: single Pdef, armed via normal /launch path ---
+// reuses \lp_pluck; selects from ~lp[\melodies][~lp[\melSel]] via wrapAt
+Pdef(\lp_melseq, Pbind(
+    \instrument, \lp_pluck,
+    \stepIdx, Pseq((0..15), inf),
+    \degree, Pfunc { |e|
+        var mel = ~lp[\melodies];
+        var sel = ~lp[\melSel] ? 0;
+        (mel.notNil and: { mel.size > 0 }).if({
+            mel[sel.clip(0, mel.size - 1)].wrapAt(e[\stepIdx])
+        }, { 0 })
+    },
+    \freq, Pfunc { |e| ~lpNote.(e[\degree], 1).midicps },
+    \dur, 0.25,
+    \cutoff, 3500,
+    \amp, Pfunc { 0.22 * ~lpVol.(\melseq) },
+    \pan, Pwhite(-0.25, 0.25)
+));
+
+// --- rhythm sub-Pdefs: 3 voices armed together via rhythmseq special-case in ~lpArm ---
+// \type \rest = true rest (no synth), \type \note = hit
+Pdef(\lp_rsk, Pbind(
+    \instrument, \lp_kick,
+    \stepIdx, Pseq((0..15), inf),
+    \dur, 0.25,
+    \type, Pfunc { |e|
+        var pat = ~lp[\rhythms];
+        var sel = ~lp[\rhySel] ? 0;
+        var row;
+        (pat.notNil and: { pat.size > 0 }).if({
+            row = pat[sel.clip(0, pat.size - 1)].at(\k);
+            (row.notNil and: { row.at(e[\stepIdx]) == $1 }).if({ \note }, { \rest })
+        }, { \rest })
+    },
+    \amp, Pfunc { 0.9 * ~lpVol.(\rhythmseq) }
+));
+Pdef(\lp_rss, Pbind(
+    \instrument, \lp_clap,
+    \stepIdx, Pseq((0..15), inf),
+    \dur, 0.25,
+    \type, Pfunc { |e|
+        var pat = ~lp[\rhythms];
+        var sel = ~lp[\rhySel] ? 0;
+        var row;
+        (pat.notNil and: { pat.size > 0 }).if({
+            row = pat[sel.clip(0, pat.size - 1)].at(\s);
+            (row.notNil and: { row.at(e[\stepIdx]) == $1 }).if({ \note }, { \rest })
+        }, { \rest })
+    },
+    \amp, Pfunc { 0.5 * ~lpVol.(\rhythmseq) }
+));
+Pdef(\lp_rsh, Pbind(
+    \instrument, \lp_hat,
+    \stepIdx, Pseq((0..15), inf),
+    \dur, 0.25,
+    \type, Pfunc { |e|
+        var pat = ~lp[\rhythms];
+        var sel = ~lp[\rhySel] ? 0;
+        var row;
+        (pat.notNil and: { pat.size > 0 }).if({
+            row = pat[sel.clip(0, pat.size - 1)].at(\h);
+            (row.notNil and: { row.at(e[\stepIdx]) == $1 }).if({ \note }, { \rest })
+        }, { \rest })
+    },
+    \amp, Pfunc { 0.28 * ~lpVol.(\rhythmseq) }
+));
+
 // arm / disarm a pattern by bare name (e.g. "kick" -> Pdef(\lp_kick))
+// "rhythmseq" special-cases: arms/disarms \lp_rsk, \lp_rss, \lp_rsh together
 ~lpArm = { |name, on|
     var nm  = name.asSymbol;
     var key = ("lp_" ++ name.asString).asSymbol;
-    if(Pdef.all.includesKey(key)) {
+    (name.asString == "rhythmseq").if({
         on.if({
-            Pdef(key).play(~lpClock.value, quant: 1);
+            [\lp_rsk, \lp_rss, \lp_rsh].do { |k| Pdef(k).play(~lpClock.value, quant: 1) };
             ~lp[\armed].add(nm);
         }, {
-            Pdef(key).stop;
+            [\lp_rsk, \lp_rss, \lp_rsh].do { |k| Pdef(k).stop };
             ~lp[\armed].remove(nm);
         });
-    };
+    }, {
+        if(Pdef.all.includesKey(key)) {
+            on.if({
+                Pdef(key).play(~lpClock.value, quant: 1);
+                ~lp[\armed].add(nm);
+            }, {
+                Pdef(key).stop;
+                ~lp[\armed].remove(nm);
+            });
+        };
+    });
 };
 
 OSCdef(\lpLaunch, { |msg|
@@ -216,5 +321,18 @@ OSCdef(\ctlFxBreak, { |msg|
     ~ccMaster !? { ((msg[1] ? 0) > 0).if({ ~ccMaster[\filterTo].(450, 1.0) }, { ~ccMaster[\filterTo].(20000, 1.5) }) };
 }, '/control/fx/breakdown');
 
-"[data-only/launchpad] 16 patterns + clock-sync + vol faders ready".postln;
+OSCdef(\seqMelody, { |msg|
+    ~lp.notNil.if({
+        var n = (msg[1] ? 0).asInteger;
+        ~lp[\melSel] = n.clip(0, ~lp[\melodies].notNil.if({ ~lp[\melodies].size - 1 }, { 0 }));
+    });
+}, '/seq/melody');
+OSCdef(\seqRhythm, { |msg|
+    ~lp.notNil.if({
+        var n = (msg[1] ? 0).asInteger;
+        ~lp[\rhySel] = n.clip(0, ~lp[\rhythms].notNil.if({ ~lp[\rhythms].size - 1 }, { 0 }));
+    });
+}, '/seq/rhythm');
+
+"[data-only/launchpad] 16 patterns + 2 sequencers (melseq+rhythmseq) + clock-sync + vol faders ready".postln;
 )
