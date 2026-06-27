@@ -28,6 +28,8 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 
 const HTTP_PORT    = parseInt(process.env.HTTP_PORT ?? "4400", 10);
 const DATA_PORT_IN = parseInt(process.env.DATA_PORT_IN ?? "57124", 10);
+const SC_HOST      = process.env.AVLIVE_SC_HOST ?? "127.0.0.1";
+const SC_PORT      = parseInt(process.env.AVLIVE_SC_PORT ?? "57121", 10);
 
 const app = express();
 app.use(express.static(join(__dirname, "public")));
@@ -64,6 +66,15 @@ wss.on("connection", (ws) => {
     }
     ws.send(JSON.stringify({ address: "/sync/hello",
                               args: [{ data_port: DATA_PORT_IN }] }));
+    ws.on("message", (data) => {
+        let m; try { m = JSON.parse(data.toString()); } catch (_e) { return; }
+        if (!m || typeof m.address !== "string") return;
+        const args = (Array.isArray(m.args) ? m.args : []).map((a) =>
+            typeof a === "number"
+                ? (Number.isInteger(a) ? { type: "i", value: a } : { type: "f", value: a })
+                : { type: "s", value: String(a) });
+        try { scPort.send({ address: m.address, args }, SC_HOST, SC_PORT); } catch (_e) { /* SC down */ }
+    });
     ws.on("close", () => console.log(`[ws] client deconnecte (total: ${wss.clients.size})`));
 });
 
@@ -88,7 +99,12 @@ dataPort.on("message", (oscMsg) => {
 dataPort.on("error", (err) => console.error("[data] erreur:", err.message));
 dataPort.open();
 
+const scPort = new osc.UDPPort({ localAddress: "127.0.0.1", localPort: 0, metadata: true });
+scPort.on("ready", () => console.log(`[sc] OSC out -> ${SC_HOST}:${SC_PORT}`));
+scPort.open();
+
 httpServer.listen(HTTP_PORT, () => {
+    console.log(`[server] HTTP :${HTTP_PORT} listening`);
     console.log("");
     console.log("=== AV-Live realart ===");
     console.log(`  Landing  : http://localhost:${HTTP_PORT}/`);
@@ -104,6 +120,7 @@ function shutdown() {
     console.log("\n[server] shutdown...");
     wss.close();
     dataPort.close();
+    scPort.close();
     httpServer.close(() => process.exit(0));
 }
 process.on("SIGINT", shutdown);
