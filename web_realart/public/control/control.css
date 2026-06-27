@@ -17,3 +17,27 @@ button.sel { background: #246; border-color: #4af; color: #8cf; }
 .seq-block h3 { font-size: 13px; color: #9af; margin: 8px 0 4px; }
 .seq-row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
 .seq-row button { min-width: 48px; padding: 12px 8px; font-size: 14px; }
+
+/* --- Step editor --- */
+.name-row { margin: 6px 0; }
+.preset-name { background: #1a1a2e; color: #9af; border: 1px solid #335;
+  border-radius: 6px; padding: 6px 10px; font-size: 14px; width: 100%; }
+.preset-name:focus { outline: none; border-color: #4af; }
+
+.step-grid { margin: 8px 0; }
+.step-row { display: flex; align-items: center; gap: 3px; margin: 3px 0; }
+.step-row-label { width: 22px; font-size: 11px; color: #666; text-align: center;
+  flex-shrink: 0; font-weight: 700; letter-spacing: .04em; }
+.step-cell { width: 38px; height: 38px; min-width: 38px; background: #1c1c1c;
+  border: 1px solid #333; border-radius: 4px; cursor: pointer; padding: 0;
+  flex-shrink: 0; transition: background 0.07s; }
+.step-cell:active { opacity: 0.65; }
+.step-cell.on { background: #2b6; border-color: #4d9; }
+
+.mel-steps { display: flex; flex-wrap: wrap; gap: 4px; margin: 8px 0; }
+.mel-cell input[type=number] { width: 46px; height: 40px; background: #1c1c1c; color: #eee;
+  border: 1px solid #333; border-radius: 4px; text-align: center; font-size: 13px;
+  -moz-appearance: textfield; cursor: pointer; }
+.mel-cell input[type=number]::-webkit-inner-spin-button,
+.mel-cell input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+.mel-cell input[type=number]:focus { outline: none; border-color: #4af; background: #1a2030; }

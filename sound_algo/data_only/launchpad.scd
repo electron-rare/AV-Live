@@ -334,5 +334,29 @@ OSCdef(\seqRhythm, { |msg|
     });
 }, '/seq/rhythm');
 
+OSCdef(\seqRhythmSet, { |msg|
+    var sel;
+    ~lp.notNil.if({
+        sel = (~lp[\rhySel] ? 0).clip(0, (~lp[\rhythms].notNil.if({ ~lp[\rhythms].size - 1 }, { 0 })));
+        ~lp[\rhythms][sel] = (
+            name: (~lp[\rhythms][sel][\name] ? "edit"),
+            k: msg[1].asString,
+            s: msg[2].asString,
+            h: msg[3].asString
+        );
+    });
+}, '/seq/rhythm/set');
+
+OSCdef(\seqMelodySet, { |msg|
+    var sel, degs;
+    ~lp.notNil.if({
+        sel = (~lp[\melSel] ? 0).clip(0, (~lp[\melodies].notNil.if({ ~lp[\melodies].size - 1 }, { 0 })));
+        (msg.size > 1).if({
+            degs = (1..(msg.size - 1)).collect { |i| msg[i].asInteger };
+            ~lp[\melodies][sel] = degs;
+        });
+    });
+}, '/seq/melody/set');
+
 "[data-only/launchpad] 16 patterns + 2 sequencers (melseq+rhythmseq) + clock-sync + vol faders ready".postln;
 )
