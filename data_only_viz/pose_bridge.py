@@ -88,8 +88,24 @@ class PoseSoundBridge:
         import os as _os
         _avbody_host = _os.environ.get("AVBODY_HOST", "127.0.0.1")
         self._avbody = SimpleUDPClient(_avbody_host, 57126)
+        # Optional VDMX (VJ) OSC mirror. Off by default; when VDMX_OSC_HOST is
+        # set, the VJ-useful pose signals (hands/kin/center/action/count) are
+        # forwarded to VDMX's OSC input so the body can drive any VDMX param.
+        _vdmx_host = _os.environ.get("VDMX_OSC_HOST")
+        self._vdmx = (
+            SimpleUDPClient(_vdmx_host, int(_os.environ.get("VDMX_OSC_PORT", "1234")))
+            if _vdmx_host else None
+        )
         self._period = 1.0 / max(1.0, throttle_hz)
         self._last_t = 0.0
+
+    def _vj(self, addr: str, args: list) -> None:
+        """Mirror a pose message to VDMX if configured (silent if not)."""
+        if self._vdmx is not None:
+            try:
+                self._vdmx.send_message(addr, args)
+            except OSError:
+                pass
 
     def send(self, persons_body: list, persons_body_ids: list, t_now: float,
              *,
@@ -111,6 +127,7 @@ class PoseSoundBridge:
             self._client.send_message("/pose/count", [int(n)])
             try: self._avbody.send_message("/pose/count", [int(n)])
             except OSError: pass
+            self._vj("/pose/count", [int(n)])
         except OSError:
             return  # SC pas la, on continue silencieusement
 
@@ -141,6 +158,7 @@ class PoseSoundBridge:
         cli.send_message("/pose/center", [pid, float(cx), float(cy)])
         try: self._avbody.send_message("/pose/center", [pid, float(cx), float(cy)])
         except OSError: pass
+        self._vj("/pose/center", [pid, float(cx), float(cy)])
 
         # Nez (visage) — important pour piloter une voix
         if len(body) > NOSE and body[NOSE].c > 0.3:
@@ -307,6 +325,7 @@ class PoseSoundBridge:
             return
         p = [float(probs[0]), float(probs[1]), float(probs[2])]
         self._client.send_message("/pose/action", [int(pid), int(label_idx), *p])
+        self._vj("/pose/action", [int(pid), int(label_idx), *p])
 
     def send_kin(self, pid: int, kin,
                  t_now: float, force: bool = False) -> None:
@@ -316,10 +335,9 @@ class PoseSoundBridge:
         """
         if not force and (t_now - self._last_t) < self._period:
             return
-        self._client.send_message(
-            "/pose/kin",
-            [int(pid), float(kin[0]), float(kin[1]), float(kin[2])],
-        )
+        kin_args = [int(pid), float(kin[0]), float(kin[1]), float(kin[2])]
+        self._client.send_message("/pose/kin", kin_args)
+        self._vj("/pose/kin", kin_args)
 
     @staticmethod
     def _hand_slot(h):
@@ -338,6 +356,7 @@ class PoseSoundBridge:
             self._client.send_message("/pose/hands", args)
         except OSError:
             pass
+        self._vj("/pose/hands", args)
 
     def send_enter(self, pid: int) -> None:
         """Send lifecycle event when person enters frame."""
