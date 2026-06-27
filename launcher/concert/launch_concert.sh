@@ -37,11 +37,12 @@ notify "Demarrage..."
 xcrun devicectl device process launch --device "$DEV" cc.saillant.ARBodyTracker >/dev/null 2>&1
 sleep 3
 
-# 2) SuperCollider engine (boots to body-play; loads concert + gestures + morceaux).
-#    sclang needs a controlling TTY to boot scsynth reliably -> run boot_sc.command
-#    in Terminal via `open` (proven; needs no Automation/TCC permission, unlike
-#    `osascript tell Terminal`). Launched FIRST so the viz can end up frontmost.
-open "$REPO/launcher/concert/boot_sc.command"
+# 2) SuperCollider engine (boots to body-play; loads concert + gestures + morceaux
+#    + launchpad). sclang needs a controlling TTY to boot scsynth reliably -> run it
+#    under `script` (gives a pseudo-TTY), detached via nohup. More reliable than
+#    `open <Terminal .command>` (no Finder/Terminal race, no GUI-session quirks) and
+#    needs no Automation/TCC permission. Log -> /tmp/sc_boot.log.
+( cd "$REPO/sound_algo/data_only" && nohup script -q /tmp/sc_boot.log "$SCLANG" boot.scd >/dev/null 2>&1 & )
 sleep 32
 
 # 3) pose pipeline (iPhone USB HEVC -> MediaPipe -> mirror -> OSC). Launched LAST:
@@ -60,8 +61,15 @@ nohup "$PY" "$REPO/launcher/concert/concert_control.py" > /tmp/concert_control.l
 disown
 sleep 1
 
-# 5) switch to the concert scene
+# 5) web OSC control surface server (browser launches patterns + controls concert).
+#    Only if its deps are installed (cd web_realart && npm install once). Reachable
+#    at http://supra-m1.local:4400/control/ from any LAN device.
+if [ -d "$REPO/web_realart/node_modules" ]; then
+    ( cd "$REPO/web_realart" && PATH=/opt/homebrew/bin:$PATH nohup node server.js > /tmp/websrv.log 2>&1 & )
+fi
+
+# 6) switch to the concert scene
 "$PY" -c "from pythonosc.udp_client import SimpleUDPClient; SimpleUDPClient('127.0.0.1',57121).send_message('/control/doScene','concert')"
 sleep 1
 
-notify "Concert lance. Bouton ou Espace = morceau suivant."
+notify "Concert lance. Bouton/Espace = morceau. Control: supra-m1.local:4400/control/"
