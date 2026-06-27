@@ -175,6 +175,9 @@ Routine({
         "morceaux/06_hard_rave.scd",
         "morceaux/07_dub_chords.scd",
         "morceaux/08_dub_space.scd",
+        "morceaux/09_trance_pluck.scd",
+        "morceaux/10_industrial.scd",
+        "morceaux/11_detroit.scd",
     ].do { |f| (~base ++ f).load; 0.1.wait; };
     s.sync;
 
