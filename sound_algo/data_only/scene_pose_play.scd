@@ -163,7 +163,7 @@
 );
 
 // -- 7) Enregistrement scene -------------------------------------------
-~doScenePlay = { ~bpEngine[\start].() };
+~doScenePlay = { ~bpEngine[\start].(); ~doRegisterPriv.(\play, { ~bpEngine[\stop].() }) };
 
 "[data-only/scene_pose_play] modes + scale ready".postln;
 )
