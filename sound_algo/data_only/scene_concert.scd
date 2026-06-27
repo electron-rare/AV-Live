@@ -10,12 +10,35 @@
 ~ccCrossCool = 3.0;   // cooldown apres declenchement (s)
 
 // -- snapshot pose (premiere personne), tout nil-garde --
+// Wrist-derived hand-features. At full-body (concert) distance MediaPipe can't
+// see the hands (/pose/hands all zero), but the body WRISTS are tracked. We
+// shape the wrists exactly like ~handFeat so every morceau (which reads
+// pose[\hands]) is driven by the arms transparently — no morceau changes.
+// openness -> arm spread ; speed -> per-tick wrist motion (gain'd into a usable
+// range, tune thresholds live).
+~ccWristFeat = {
+    var w = (~poseWrist.notNil.if({ ~poseWrist.values.detect({ |v| v.notNil }) })) ? ();
+    var lx = (w[\lx] ? 0.5); var ly = (w[\ly] ? 0.5);
+    var rx = (w[\rx] ? 0.5); var ry = (w[\ry] ? 0.5);
+    var spread = (rx - lx).abs;
+    var rsp = 0; var lsp = 0; var prev = ~concert[\wprev];
+    if(prev.notNil) {
+        rsp = (((rx - prev[\rx]).squared + (ry - prev[\ry]).squared).sqrt * 8).min(1);
+        lsp = (((lx - prev[\lx]).squared + (ly - prev[\ly]).squared).sqrt * 8).min(1);
+    };
+    ~concert[\wprev] = (lx: lx, ly: ly, rx: rx, ry: ry);
+    (lx: lx, ly: ly, rx: rx, ry: ry,
+     lopen: spread, ropen: spread, lspeed: lsp, rspeed: rsp, dist: spread);
+};
 ~ccPose = {
     var kin = ~poseKin.notNil.if({ ~poseKin.values.detect({ |v| v.notNil }) });
     var st  = ~poseState.notNil.if({ ~poseState.values.detect({ |v| v.notNil }) });
     var ctr = ~poseCenter.notNil.if({ ~poseCenter.values.detect({ |v| v.notNil }) });
+    var hf  = ~handFeat ? ();
+    var handsLive = ((hf[\rx] ? 0) > 0.001) or: { (hf[\lx] ? 0) > 0.001 };
+    var hands = handsLive.if({ hf }, { ~ccWristFeat.value });
     (kin: (kin ? ()), state: (st ? ()), center: (ctr ? ()),
-     hands: (~handFeat ? ()), hasBody: kin.notNil);
+     hands: hands, hasBody: kin.notNil);
 };
 
 // -- registre des morceaux --
