@@ -69,5 +69,23 @@ var meanY = { |a, b| (((a ? ())[\y] ? 0.5) + ((b ? ())[\y] ? 0.5)) * 0.5 };
         var i = keys.indexOf(~ccHarmony[\scale]) ? 0;
         ~ccHarmony[\scale] = keys.wrapAt(i + 1) }));
 
-"[data-only/concert_gestures] fx + harmony gestures registered".postln;
+// --- melody family ---
+~ccGestureAdd.((name:\armRaise, family:\melody, hold:0.4, cooldown:1.0,
+    detect: { |pose, prev|
+        var s=pose[\skel]; var w=~poseWrist.notNil.if({~poseWrist.values.detect({|v| v.notNil})});
+        (s.notNil and: { w.notNil }) and: {
+            var rUp = (w[\ry]?0.5) < (((s[\shR] ? ())[\y]?0.35) - 0.10);
+            var lUp = (w[\ly]?0.5) < (((s[\shL] ? ())[\y]?0.35) - 0.10);
+            rUp != lUp } },                                  // exactly one arm up
+    fire: { ~ccHarmony[\phrase] = (~ccHarmony[\phrase] + 1) % 4 }));
+~ccGestureAdd.((name:\headUp, family:\melody, hold:0.3, cooldown:0.6,
+    detect: { |pose, prev| var s=pose[\skel]; s.notNil and: {
+        ((s[\nose] ? ())[\y]?0.2) < (((((s[\shL] ? ())[\y]?0.4)+((s[\shR] ? ())[\y]?0.4))*0.5) - 0.30) } },
+    fire: { ~ccHarmony[\octave] = 1 }));
+~ccGestureAdd.((name:\headDown, family:\melody, hold:0.3, cooldown:0.6,
+    detect: { |pose, prev| var s=pose[\skel]; s.notNil and: {
+        ((s[\nose] ? ())[\y]?0.2) > (((((s[\shL] ? ())[\y]?0.4)+((s[\shR] ? ())[\y]?0.4))*0.5) - 0.18) } },
+    fire: { ~ccHarmony[\octave] = 0 }));
+
+"[data-only/concert_gestures] fx + harmony + melody gestures registered".postln;
 )
