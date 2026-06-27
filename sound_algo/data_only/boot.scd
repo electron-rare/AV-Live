@@ -165,6 +165,7 @@ Routine({
     0.3.wait;
     [
         "morceaux/01_hypno_drift.scd",
+        "morceaux/02_hypno_roll.scd",
     ].do { |f| (~base ++ f).load; 0.1.wait; };
     s.sync;
 
