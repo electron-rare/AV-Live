@@ -58,10 +58,11 @@
 // geste bras-croises : main D a gauche de main G, a mi-hauteur, maintenu
 ~concert[\detectCross] = { |pose, now|
     var hf = pose[\hands];
+    var ry = (hf[\ry] ? 0); var ly = (hf[\ly] ? 0);
     var crossed = pose[\hasBody] and: {
         ((hf[\rx] ? 0.5) < ((hf[\lx] ? 0.5) - 0.08))
-        and: { (hf[\ry] ? 0).inRange(0.25, 0.75) }
-        and: { (hf[\ly] ? 0).inRange(0.25, 0.75) }
+        and: { (ry >= 0.25) and: { ry <= 0.75 } }
+        and: { (ly >= 0.25) and: { ly <= 0.75 } }
     };
     if(crossed) {
         if(~concert[\crossT] <= 0) { ~concert[\crossT] = now };
