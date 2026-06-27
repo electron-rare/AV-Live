@@ -1,0 +1,51 @@
+<!doctype html><html lang="fr"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>AV-Live — Control</title><link rel="stylesheet" href="control.css"></head>
+<body>
+<header><h1>AV-Live Control</h1><span id="status" class="off"></span></header>
+<section><h2>Patterns</h2>
+  <div class="grid">
+    <button data-pad="kick">Kick</button><button data-pad="hats">Hats</button>
+    <button data-pad="clap">Clap</button><button data-pad="perc">Perc</button>
+    <button data-pad="sub">Sub</button><button data-pad="acid">Acid</button>
+    <button data-pad="arp">Arp</button><button data-pad="lead">Lead</button>
+    <button data-pad="stab">Stab</button><button data-pad="pad">Pad</button>
+  </div>
+  <button id="clear" class="wide">Tout couper</button>
+  <label>Tempo <input id="tempo" type="range" min="60" max="180" value="126"></label>
+</section>
+<section><h2>Concert</h2>
+  <div class="grid">
+    <button data-osc="/control/concertNext" data-arg="1">Morceau suivant</button>
+    <button data-osc="/control/doScene" data-arg="concert">Scène concert</button>
+    <button data-osc="/control/doScene" data-arg="play">Body-play</button>
+  </div>
+</section>
+<section><h2>Harmonie</h2>
+  <div class="grid">
+    <button data-osc="/control/harmony/root" data-arg="-2">Root −</button>
+    <button data-osc="/control/harmony/root" data-arg="2">Root +</button>
+    <button data-osc="/control/harmony/scale" data-arg="minor">Minor</button>
+    <button data-osc="/control/harmony/scale" data-arg="dorian">Dorian</button>
+    <button data-osc="/control/harmony/scale" data-arg="phrygian">Phrygian</button>
+    <button data-osc="/control/harmony/scale" data-arg="penta">Penta</button>
+    <button data-osc="/control/harmony/octave" data-arg="0">Oct 0</button>
+    <button data-osc="/control/harmony/octave" data-arg="1">Oct +1</button>
+    <button data-osc="/control/harmony/phrase" data-arg="0">Phr 0</button>
+    <button data-osc="/control/harmony/phrase" data-arg="1">Phr 1</button>
+    <button data-osc="/control/harmony/phrase" data-arg="2">Phr 2</button>
+    <button data-osc="/control/harmony/phrase" data-arg="3">Phr 3</button>
+  </div>
+</section>
+<section><h2>FX</h2>
+  <label>Filtre <input id="filter" type="range" min="0" max="1" step="0.01" value="1"></label>
+  <div class="grid">
+    <button data-osc="/control/fx/stutter">Stutter</button>
+    <button data-osc="/control/fx/crash">Crash</button>
+    <button data-osc="/control/fx/kick">Kick</button>
+    <button data-osc="/control/fx/swell">Swell</button>
+    <button data-osc="/control/fx/breakdown" data-arg="1">Breakdown ↓</button>
+    <button data-osc="/control/fx/breakdown" data-arg="0">Breakdown ↑</button>
+  </div>
+</section>
+<script src="control.js"></script></body></html>
