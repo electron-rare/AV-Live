@@ -346,9 +346,11 @@ class MultiWorker:
 
         if self.iphone_usb:
             from .iphone_usb_source import IphoneUSBSource  # noqa: PLC0415
-            cap = IphoneUSBSource(self.state)
-            cap.start()
-            LOG.info("multi — iphone USB source")
+            cap = IphoneUSBSource(self.state, write_hands=False)
+            if not cap.start():
+                LOG.error("iphone USB source unavailable (app running? phone unlocked?)")
+                return
+            LOG.info("iphone USB source")
         else:
             cap = cv2.VideoCapture(self.camera_index)
             cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)

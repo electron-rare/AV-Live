@@ -73,6 +73,10 @@ multihmr = [
 # via git submodule third_party/SMPLer-X (fork electron-rare).
 # mmcv-lite suffit pour Config (le repo vendorise sa propre mmpose).
 # Le detector mmdet est remplace par YOLO Ultralytics (extras pose).
+iphone-usb = [
+    "av>=12.0",
+    "opencv-python>=4.10",
+]
 smplerx = [
     "torch>=2.4",
     "torchvision>=0.19",

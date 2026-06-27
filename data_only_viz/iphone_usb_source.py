@@ -5,11 +5,15 @@ State. Substitutes for cv2.VideoCapture in multi.py under --iphone-usb."""
 from __future__ import annotations
 
 import logging
+import socket
 import struct
 import threading
 import time
 
-import av
+try:
+    import av
+except ImportError:  # pragma: no cover — av missing is caught at runtime by caller
+    av = None  # type: ignore[assignment]
 import cv2
 import numpy as np
 
@@ -23,6 +27,7 @@ TAG_HANDS = 4
 LOG = logging.getLogger("iphone_usb_source")
 
 _HAND_BYTES = 1 + 21 * 12   # chirality:u8 + 21 × (x,y,z) × 4 bytes BE f32
+_ARKIT_JOINTS = 91
 
 
 def _make_point(x: float, y: float, z: float) -> PoseKp:
@@ -67,14 +72,17 @@ def _to_annexb(data: bytes) -> bytes:
 
 
 class IphoneUSBSource:
-    def __init__(self, state=None, target_size=(640, 480)) -> None:
+    def __init__(self, state=None, target_size=(640, 480),
+                 write_hands: bool = True) -> None:
         self.state = state
         self.target_w, self.target_h = target_size
-        self._codec = av.codec.CodecContext.create("hevc", "r")
+        self._write_hands = write_hands
+        self._codec = av.codec.CodecContext.create("hevc", "r") if av is not None else None
         self._lock = threading.Lock()
         self._frame = None            # latest BGR np.ndarray
         self._stop = threading.Event()
         self._thread = None
+        self._sock = None             # stored for shutdown() in release()
         self._opened = False
 
     def start(self) -> bool:
@@ -82,6 +90,7 @@ class IphoneUSBSource:
         if sock is None:
             LOG.error("iphone usb: no device / connect failed")
             return False
+        self._sock = sock
         self._opened = True
         self._thread = threading.Thread(
             target=self._run, args=(sock,), name="iphone_usb_src", daemon=True)
@@ -98,27 +107,30 @@ class IphoneUSBSource:
                     break
                 if tag == TAG_VIDEO and len(payload) > 1:
                     annexb = _to_annexb(payload[1:])
-                    try:
-                        for fr in self._codec.decode(av.Packet(annexb)):
-                            img = fr.to_ndarray(format="bgr24")
-                            img = cv2.resize(img, (self.target_w, self.target_h))
-                            with self._lock:
-                                self._frame = img
-                    except av.AVError as e:
-                        LOG.debug("hevc decode: %s", e)
+                    if self._codec is not None and av is not None:
+                        try:
+                            for fr in self._codec.decode(av.Packet(annexb)):
+                                img = fr.to_ndarray(format="bgr24")
+                                img = cv2.resize(img, (self.target_w, self.target_h))
+                                with self._lock:
+                                    self._frame = img
+                        except Exception as e:  # av.AVError is a removal-prone alias
+                            LOG.debug("hevc decode: %s", e)
                 elif tag == TAG_SKELETON and self.state is not None:
                     joints = decode_skeleton(payload)
                     if joints is not None:
-                        arr = np.array(
-                            [[j[0], j[1], j[2]] for j in joints],
-                            dtype=np.float32,
-                        )
                         with self.state.lock():
+                            arr = self.state.persons_arkit_joints.get(pid)
+                            if arr is None or arr.shape != (_ARKIT_JOINTS, 3):
+                                arr = np.zeros((_ARKIT_JOINTS, 3), dtype=np.float32)
+                            for i, (x, y, z, valid) in enumerate(joints):
+                                if valid:
+                                    arr[i] = (x, y, z)
                             self.state.persons_arkit_joints[pid] = arr
                             self.state.persons_arkit_last_t[pid] = time.perf_counter()
-                elif tag == TAG_HANDS and self.state is not None:
+                elif tag == TAG_HANDS:
                     hands = _decode_hands(payload)
-                    if hands is not None:
+                    if hands is not None and self._write_hands and self.state is not None:
                         with self.state.lock():
                             self.state.persons_hands = hands
         except OSError as e:
@@ -132,7 +144,7 @@ class IphoneUSBSource:
 
     def read(self):
         with self._lock:
-            if self._frame is None:
+            if self._frame is None or not self._opened:
                 return False, None
             return True, self._frame.copy()
 
@@ -141,6 +153,11 @@ class IphoneUSBSource:
 
     def release(self) -> None:
         self._stop.set()
+        if self._sock is not None:
+            try:
+                self._sock.shutdown(socket.SHUT_RDWR)
+            except OSError:
+                pass
         if self._thread is not None:
             self._thread.join(timeout=2.0)
         self._opened = False
