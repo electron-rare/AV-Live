@@ -583,8 +583,8 @@ class AppDelegate(NSObject):
         LOG.debug("[key] raw=%r lower=%r", key, k)
         if key == "\x1b":
             NSApp().terminate_(self); return None
-        if key == " ":
-            self._scClient.send_message("/control/doScene", ["stop"])
+        if key == " ":  # espace : morceau suivant (concert)
+            self._scClient.send_message("/control/concertNext", [1])
             return None
         # Cmd+F geree par macOS pour fullscreen ; on garde shift+F en raccourci
         if key == "F":

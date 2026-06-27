@@ -220,6 +220,10 @@ OSCdef(\concertSeq, { |msg|
     ~concert[\seq] = (msg[1] ? 0) > 0;
     ("[concert] seq = " ++ ~concert[\seq]).postln;
 }, '/control/concertSeq');
+// /control/concertNext : avance (touche espace dans data_only_viz).
+OSCdef(\concertNext, { |msg|
+    if(~concert[\running] == true) { ~concert[\next].() };
+}, '/control/concertNext');
 
 "[data-only/scene_concert] engine ready".postln;
 )
