@@ -57,13 +57,17 @@
 
 // geste bras-croises : main D a gauche de main G, a mi-hauteur, maintenu
 ~concert[\detectCross] = { |pose, now|
-    var hf = pose[\hands];
-    var ry = (hf[\ry] ? 0); var ly = (hf[\ly] ? 0);
-    var crossed = pose[\hasBody] and: {
-        ((hf[\rx] ? 0.5) < ((hf[\lx] ? 0.5) - 0.08))
-        and: { (ry >= 0.25) and: { ry <= 0.75 } }
-        and: { (ly >= 0.25) and: { ly <= 0.75 } }
-    };
+    // Detect via BODY WRISTS (skeleton), not hands: at full-body distance the
+    // hands aren't detected and crossing occludes them. Clear X cross = the
+    // right wrist swaps to the LEFT of the left wrist. Require the performer
+    // centered (not at a frame edge) + wrists at chest height.
+    var w = (~poseWrist.notNil.if({ ~poseWrist.values.detect({ |v| v.notNil }) })) ? ();
+    var lx = (w[\lx] ? 0.5); var rx = (w[\rx] ? 0.5);
+    var ly = (w[\ly] ? 0.5); var ry = (w[\ry] ? 0.5);
+    var centered = (lx > 0.15) and: { lx < 0.85 } and: { rx > 0.15 } and: { rx < 0.85 };
+    var midH = (ly > 0.2) and: { ly < 0.85 } and: { ry > 0.2 } and: { ry < 0.85 };
+    var crossed = pose[\hasBody] and: { centered } and: { midH }
+        and: { rx < (lx - 0.10) };
     if(crossed) {
         if(~concert[\crossT] <= 0) { ~concert[\crossT] = now };
         if(((now - ~concert[\crossT]) >= ~ccCrossHold)

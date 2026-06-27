@@ -495,6 +495,7 @@ OSCdef(\poseLeave, { |msg|
     ~poseState.removeAt(pid);
     ~poseKin.removeAt(pid);
     ~poseCenter.removeAt(pid);
+    ~poseWrist !? { ~poseWrist.removeAt(pid) };
 }, '/pose/leave');
 
 OSCdef(\poseHands, { |msg|
@@ -508,6 +509,17 @@ OSCdef(\poseHands, { |msg|
     ~handFeat[\rspeed] = msg[9];
     ~handFeat[\dist]   = msg[10];
 }, '/pose/hands');
+
+// Body wrists (skeleton, tracked even when hands are occluded/too small).
+// /pose/wrist  <pid> <l|r> <x> <y>   (anatomical L/R from MediaPipe pose)
+~poseWrist = ~poseWrist ? Dictionary.new;
+OSCdef(\poseWrist, { |msg|
+    var pid = msg[1].asInteger;
+    var e = ~poseWrist[pid] ? ();
+    if(msg[2].asString[0] == $l) { e[\lx] = msg[3]; e[\ly] = msg[4]; }
+    { e[\rx] = msg[3]; e[\ry] = msg[4]; };
+    ~poseWrist[pid] = e;
+}, '/pose/wrist');
 
 ~poseCenter = ~poseCenter ? Dictionary.new;
 OSCdef(\poseCenter, { |msg|
