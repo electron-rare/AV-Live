@@ -101,7 +101,7 @@ class PoseSoundBridge:
 
     def _vj(self, addr: str, args: list) -> None:
         """Mirror a pose message to VDMX if configured (silent if not)."""
-        if self._vdmx is not None:
+        if getattr(self, "_vdmx", None) is not None:
             try:
                 self._vdmx.send_message(addr, args)
             except OSError:
