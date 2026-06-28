@@ -12,6 +12,8 @@
   <button class="tab-btn active" data-tab="live">LIVE</button>
   <button class="tab-btn" data-tab="fx">FX / HARMONIE / CONCERT</button>
   <button class="tab-btn" data-tab="seq">SÉQUENCEURS</button>
+  <button class="tab-btn" data-tab="sections">SECTIONS</button>
+  <button class="tab-btn" data-tab="matrix">MATRICE</button>
 </nav>
 
 <div class="tab-panel active" id="tab-live">
@@ -122,6 +124,42 @@
     </div>
     <div id="rhy-grid" class="step-grid"></div>
     <input type="range" min="0" max="1.5" step="0.05" value="0.8" data-vol="rhythmseq">
+  </div>
+</section>
+</div>
+<div class="tab-panel" id="tab-sections">
+<section><h2>Sections</h2>
+  <div class="mode-bar">
+    <span class="mode-label">Mode</span>
+    <button class="mode-btn active" data-mode="launch">LANCER</button>
+    <button class="mode-btn" data-mode="save">ENREGISTRER</button>
+    <button class="mode-btn" data-mode="clear">EFFACER</button>
+  </div>
+  <div class="scene-grid">
+    <button class="scene-slot" data-scene="0">1</button>
+    <button class="scene-slot" data-scene="1">2</button>
+    <button class="scene-slot" data-scene="2">3</button>
+    <button class="scene-slot" data-scene="3">4</button>
+    <button class="scene-slot" data-scene="4">5</button>
+    <button class="scene-slot" data-scene="5">6</button>
+    <button class="scene-slot" data-scene="6">7</button>
+    <button class="scene-slot" data-scene="7">8</button>
+  </div>
+  <div class="scene-nav">
+    <button id="scene-prev">&#9664; PREV</button>
+    <button id="scene-next">NEXT &#9654;</button>
+  </div>
+</section>
+</div>
+<div class="tab-panel" id="tab-matrix">
+<section><h2>Matrice</h2>
+  <div class="matrix-transport">
+    <button id="matrix-play">PLAY</button>
+    <button id="matrix-stop">STOP</button>
+    <button id="matrix-clear">CLEAR</button>
+  </div>
+  <div class="matrix-scroll">
+    <div id="matrix-grid"></div>
   </div>
 </section>
 </div>

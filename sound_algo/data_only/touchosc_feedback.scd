@@ -97,7 +97,7 @@ OSCdef(\tosc_sniff_seqmelody, { |msg, time, addr|
         idx  = msg[1].asInteger;
         degs = ~lp[\melodies][idx];
         degs.notNil.if({
-            ~toscSend.valueWithArguments(
+            ~toscSend.valueArray(
                 ["/seq/melody/state"] ++ [idx] ++ degs
             );
         });

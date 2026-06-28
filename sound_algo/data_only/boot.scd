@@ -198,6 +198,12 @@ Routine({
     // -- 6g. TouchOSC feedback bridge -----
     (~base ++ "touchosc_feedback.scd").load; s.sync;
 
+    // -- 6h. Live song-building sections -----
+    (~base ++ "sections.scd").load; s.sync;
+
+    // -- 6i. Matrix arranger -----
+    (~base ++ "matrix.scd").load; s.sync;
+
     // -- 7) Demarre la scene par defaut -----
     if(~doScene.isNil) {
         "[data-only/boot] ERREUR : ~doScene non defini".warn;

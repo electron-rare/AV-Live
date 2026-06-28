@@ -23,7 +23,7 @@ def _addr_list(el):
 # Root / pager
 # ---------------------------------------------------------------------------
 
-def test_root_has_pager_with_three_pages(tmp_path):
+def test_root_has_pager_with_four_pages(tmp_path):
     root = layout.build()
     out = tmp_path / "full.tosc"
     schema.write_tosc(root, str(out))
@@ -31,7 +31,7 @@ def test_root_has_pager_with_three_pages(tmp_path):
     pager = parsed.find(".//node[@type='PAGER']")
     assert pager is not None, "PAGER node not found"
     pages = pager.findall("children/node[@type='GROUP']")
-    assert len(pages) == 3, f"expected 3 pages, got {len(pages)}"
+    assert len(pages) == 4, f"expected 4 pages, got {len(pages)}"
 
 
 def test_sixteen_patterns():
@@ -322,3 +322,72 @@ def test_live_page_pad_groups_carry_armed_receive():
             f"pad GROUP '{grp_name}' must have exactly 1 /armed/* receive msg "
             f"on the GROUP itself, got {len(armed_msgs)}"
         )
+
+
+# ---------------------------------------------------------------------------
+# Page 4 — SECTIONS
+# ---------------------------------------------------------------------------
+
+def test_sections_page_launch_buttons():
+    """SECTIONS page: 8 /scene/launch messages with CONSTANT/INTEGER args 0..7."""
+    page = layout.sections_page()
+    launch_args = []
+    for osc_el in page.findall(".//messages/osc"):
+        path_val = osc_el.find("path/partial/value")
+        if path_val is not None and path_val.text == "/scene/launch":
+            for part in osc_el.findall("arguments/partial"):
+                typ = part.find("type")
+                conv = part.find("conversion")
+                val = part.find("value")
+                if typ is not None and conv is not None and val is not None:
+                    launch_args.append((typ.text, conv.text, val.text))
+    assert len(launch_args) == 8, f"expected 8 /scene/launch arg partials, got {len(launch_args)}"
+    for typ, conv, _ in launch_args:
+        assert typ == "CONSTANT", f"launch arg type must be CONSTANT, got {typ}"
+        assert conv == "INTEGER", f"launch arg conversion must be INTEGER, got {conv}"
+    vals = {v for _, _, v in launch_args}
+    assert vals == {"0", "1", "2", "3", "4", "5", "6", "7"}, (
+        f"expected launch values 0..7, got {vals}"
+    )
+
+
+def test_sections_page_save_buttons():
+    """SECTIONS page: 8 /scene/save messages with CONSTANT/INTEGER args 0..7."""
+    page = layout.sections_page()
+    save_args = []
+    for osc_el in page.findall(".//messages/osc"):
+        path_val = osc_el.find("path/partial/value")
+        if path_val is not None and path_val.text == "/scene/save":
+            for part in osc_el.findall("arguments/partial"):
+                typ = part.find("type")
+                conv = part.find("conversion")
+                val = part.find("value")
+                if typ is not None and conv is not None and val is not None:
+                    save_args.append((typ.text, conv.text, val.text))
+    assert len(save_args) == 8, f"expected 8 /scene/save arg partials, got {len(save_args)}"
+    for typ, conv, _ in save_args:
+        assert typ == "CONSTANT", f"save arg type must be CONSTANT, got {typ}"
+        assert conv == "INTEGER", f"save arg conversion must be INTEGER, got {conv}"
+
+
+def test_sections_page_nav_buttons():
+    """SECTIONS page: /scene/prev and /scene/next present."""
+    page = layout.sections_page()
+    addrs = _addrs(page)
+    assert "/scene/prev" in addrs, "/scene/prev not found on SECTIONS page"
+    assert "/scene/next" in addrs, "/scene/next not found on SECTIONS page"
+
+
+def test_sections_page_state_receive_on_group():
+    """SECTIONS GROUP itself must carry /scene/state receive so sections.lua fires."""
+    page = layout.sections_page()
+    # Direct messages/osc on the top-level GROUP (not descendants)
+    state_msgs = [
+        osc_el for osc_el in page.findall("messages/osc")
+        if osc_el.get("receive") == "1"
+        and osc_el.find("path/partial/value") is not None
+        and osc_el.find("path/partial/value").text == "/scene/state"
+    ]
+    assert len(state_msgs) == 1, (
+        f"SECTIONS GROUP must have exactly 1 /scene/state receive msg, got {len(state_msgs)}"
+    )

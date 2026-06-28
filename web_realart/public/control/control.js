@@ -7,6 +7,15 @@ function send(address, ...args) {
 }
 const armed = new Set();
 const clipState = new Map(); // name -> last-known state int: 0 off, 1 playing, 2 queued-launch, 3 queued-stop
+
+// --- Scene section mode ---
+let sceneMode = "launch"; // "launch" | "save" | "clear"
+function setSceneMode(mode) {
+  sceneMode = mode;
+  document.querySelectorAll(".mode-btn").forEach((b) => {
+    b.classList.toggle("active", b.dataset.mode === mode);
+  });
+}
 function togglePad(el, name) {
   // Use last-known state for toggle direction; fall back to armed Set
   const st = clipState.has(name) ? clipState.get(name) : (armed.has(name) ? 1 : 0);
@@ -107,7 +116,143 @@ ws.addEventListener("message", (ev) => {
     }
     return;
   }
+
+  // /scene/state <cur:int> <fill0:int> ... <fill7:int>
+  if (address === "/scene/state") {
+    const cur = Number(args[0]);
+    document.querySelectorAll("[data-scene]").forEach((btn) => {
+      const n = +btn.dataset.scene;
+      btn.classList.toggle("filled", Number(args[n + 1]) === 1);
+      btn.classList.toggle("current", n === cur);
+    });
+    return;
+  }
+
+  // /matrix/playhead <bar> — advance playhead column highlight
+  if (address === "/matrix/playhead") {
+    const bar = Math.round(Number(args[0]));
+    if (!Number.isFinite(bar) || bar < 0 || bar >= MATRIX_BARS) return;
+    if (matPlayhead >= 0) {
+      for (let vi = 0; vi < MATRIX_VOICES.length; vi++) {
+        const el = cellRefs[matPlayhead][vi];
+        if (el) el.classList.remove("playing");
+      }
+    }
+    matPlayhead = bar;
+    for (let vi = 0; vi < MATRIX_VOICES.length; vi++) {
+      const el = cellRefs[matPlayhead][vi];
+      if (el) el.classList.add("playing");
+    }
+    return;
+  }
+
+  // /matrix/cell <vi> <bar> <color> — cross-surface cell sync
+  if (address === "/matrix/cell") {
+    const vi = Math.round(Number(args[0]));
+    const bar = Math.round(Number(args[1]));
+    const color = Math.round(Number(args[2]));
+    if (vi < 0 || vi >= 16 || bar < 0 || bar >= MATRIX_BARS || color < 0 || color > 6) return;
+    matGrid[vi][bar] = color;
+    saveMatState();
+    const el = cellRefs[bar][vi];
+    if (el) {
+      applyMatCellColor(el, color);
+      if (bar === matPlayhead) el.classList.add("playing");
+    }
+    return;
+  }
 });
+
+// --- Matrix (16-voice x 32-bar song arranger) ---
+const MATRIX_STORAGE_KEY = "avlive.matrix";
+const MATRIX_VOICES = [
+  "kick","hats","clap","perc","sub","acid","arp","lead",
+  "stab","pad","ride","rim","tom","reese","bells","sweep"
+];
+const MATRIX_BARS = 32;
+let matGrid = Array.from({ length: 16 }, () => new Array(32).fill(0));
+// cellRefs[bar][vi] for O(16) playhead column toggle
+const cellRefs = Array.from({ length: 32 }, () => new Array(16).fill(null));
+let matPlayhead = -1;
+
+function loadMatState() {
+  try {
+    const raw = localStorage.getItem(MATRIX_STORAGE_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (
+        Array.isArray(parsed) && parsed.length === 16 &&
+        parsed.every(row => Array.isArray(row) && row.length === 32 &&
+          row.every(v => Number.isInteger(v) && v >= 0 && v <= 6))
+      ) {
+        matGrid = parsed;
+        return;
+      }
+    }
+  } catch (_e) {}
+  matGrid = Array.from({ length: 16 }, () => new Array(32).fill(0));
+}
+
+function saveMatState() {
+  try { localStorage.setItem(MATRIX_STORAGE_KEY, JSON.stringify(matGrid)); } catch (_e) {}
+}
+
+function applyMatCellColor(el, color) {
+  for (let c = 0; c <= 6; c++) el.classList.remove("m" + c);
+  el.classList.add("m" + color);
+  el.dataset.state = color;
+}
+
+function renderMatrix() {
+  const container = document.getElementById("matrix-grid");
+  if (!container) return;
+  container.innerHTML = "";
+
+  // Header row: bar numbers every 4 bars
+  const headerRow = document.createElement("div");
+  headerRow.className = "mrow";
+  const corner = document.createElement("span");
+  corner.className = "mvoice-label";
+  headerRow.appendChild(corner);
+  for (let bar = 0; bar < MATRIX_BARS; bar++) {
+    const num = document.createElement("span");
+    num.className = "mbar-num";
+    num.textContent = (bar % 4 === 0) ? String(bar + 1) : "";
+    headerRow.appendChild(num);
+  }
+  container.appendChild(headerRow);
+
+  // Voice rows
+  for (let vi = 0; vi < MATRIX_VOICES.length; vi++) {
+    const row = document.createElement("div");
+    row.className = "mrow";
+    const label = document.createElement("span");
+    label.className = "mvoice-label";
+    label.textContent = MATRIX_VOICES[vi];
+    row.appendChild(label);
+    for (let bar = 0; bar < MATRIX_BARS; bar++) {
+      const color = matGrid[vi][bar];
+      const cell = document.createElement("button");
+      cell.className = "mcell m" + color;
+      cell.dataset.vi = vi;
+      cell.dataset.bar = bar;
+      cell.dataset.state = color;
+      if (bar === matPlayhead) cell.classList.add("playing");
+      cell.addEventListener("click", () => {
+        const cur = +cell.dataset.state;
+        const next = (cur + 1) % 7;
+        matGrid[vi][bar] = next;
+        saveMatState();
+        applyMatCellColor(cell, next);
+        if (bar === matPlayhead) cell.classList.add("playing");
+        send("/matrix/cell", vi, bar, next);
+      });
+      cellRefs[bar][vi] = cell;
+      row.appendChild(cell);
+    }
+    container.appendChild(row);
+  }
+}
 
 // --- Pattern state (defaults mirror launchpad.scd exactly) ---
 const STORAGE_KEY = "avlive.seq";
@@ -256,6 +401,7 @@ function updateNameInputs() {
 
 document.addEventListener("DOMContentLoaded", () => {
   loadState();
+  loadMatState();
 
   // Tab switching
   document.querySelectorAll(".tab-btn").forEach((btn) => {
@@ -276,6 +422,7 @@ document.addEventListener("DOMContentLoaded", () => {
   updateNameInputs();
   renderRhyGrid();
   renderMelSteps();
+  renderMatrix();
 
   // Name input: rename selected preset and update button labels
   const melName = document.getElementById("mel-name");
@@ -358,4 +505,37 @@ document.addEventListener("DOMContentLoaded", () => {
         send("/seq/melody/set", ...state.melodies[idx].degrees);
       }
     }));
+
+  // Scene mode toggle buttons
+  document.querySelectorAll(".mode-btn").forEach((btn) =>
+    btn.addEventListener("click", () => setSceneMode(btn.dataset.mode)));
+
+  // Scene slot buttons
+  document.querySelectorAll("[data-scene]").forEach((btn) =>
+    btn.addEventListener("click", () => {
+      const i = +btn.dataset.scene;
+      send("/scene/" + sceneMode, i);
+      if (sceneMode === "save" || sceneMode === "clear") {
+        setSceneMode("launch");
+      }
+    }));
+
+  // Scene prev / next
+  const scenePrev = document.getElementById("scene-prev");
+  if (scenePrev) scenePrev.addEventListener("click", () => send("/scene/prev"));
+  const sceneNext = document.getElementById("scene-next");
+  if (sceneNext) sceneNext.addEventListener("click", () => send("/scene/next"));
+
+  // Matrix transport
+  const matPlay = document.getElementById("matrix-play");
+  if (matPlay) matPlay.addEventListener("click", () => send("/matrix/play"));
+  const matStop = document.getElementById("matrix-stop");
+  if (matStop) matStop.addEventListener("click", () => send("/matrix/stop"));
+  const matClear = document.getElementById("matrix-clear");
+  if (matClear) matClear.addEventListener("click", () => {
+    matGrid = Array.from({ length: 16 }, () => new Array(32).fill(0));
+    saveMatState();
+    renderMatrix();
+    send("/matrix/clear");
+  });
 });
