@@ -290,6 +290,17 @@ ws.addEventListener("message", (ev) => {
     }
     return;
   }
+  if (address === "/matrix/poses") {
+    const vi = Math.round(Number(args[0])), n = Math.round(Number(args[1]));
+    if (vi>=0 && vi<16) {
+      matPoses[vi] = [];
+      for (let k=0; k<n; k++) { const b=2+k*3;
+        matPoses[vi].push({poseId:String(args[b]), action:String(args[b+1]), color:Math.round(Number(args[b+2]))}); }
+      saveMatState();
+      if (cdEditVoice===vi && !document.getElementById("colordef-modal").hidden) renderPoses(vi);
+    }
+    return;
+  }
 });
 
 // --- Matrix (16-voice x 32-bar song arranger) ---
@@ -330,6 +341,7 @@ let matColorDefs = Array.from({ length: 16 }, () =>
    {stretch:1.0,octave:-1,amp:1.05,inst:"default",cutoff:-1,pan:-2},
    {stretch:0.5,octave:0,amp:1.2,inst:"default",cutoff:-1,pan:-2}]);
 let matSteps = Array.from({length:16}, () => Array.from({length:7}, () => new Array(16).fill(null)));
+let matPoses = Array.from({length:16}, () => []);
 let cdEditVoice = -1, cdAuditioning = false;
 const MATRIX_BARS = 32;
 let matGrid = Array.from({ length: 16 }, () => new Array(32).fill(0));
@@ -341,7 +353,7 @@ let matLoopEnd = 31;
 
 function saveMatState() {
   try { localStorage.setItem(MATRIX_STORAGE_KEY,
-    JSON.stringify({ grid: matGrid, inst: matInst, mod: matMod, cdef: matColorDefs })); } catch (_e) {}
+    JSON.stringify({ grid: matGrid, inst: matInst, mod: matMod, cdef: matColorDefs, steps: matSteps, pose: matPoses })); } catch (_e) {}
 }
 function loadMatState() {
   try {
@@ -350,6 +362,8 @@ function loadMatState() {
       if (Array.isArray(raw.inst) && raw.inst.length === 16) matInst = raw.inst;
       if (Array.isArray(raw.mod) && raw.mod.length === 16) matMod = raw.mod;
       if (Array.isArray(raw.cdef) && raw.cdef.length === 16) matColorDefs = raw.cdef;
+      if (Array.isArray(raw.steps) && raw.steps.length === 16) matSteps = raw.steps;
+      if (Array.isArray(raw.pose) && raw.pose.length === 16) matPoses = raw.pose;
       return; }
     if (Array.isArray(raw) && raw.length === 16) { matGrid = raw; return; }   // legacy: bare grid
   } catch (_e) {}
@@ -491,6 +505,25 @@ function renderSeq(vi) {
   }
 }
 
+function renderPoses(vi) {
+  const p = document.getElementById("cd-pane-poses"); p.innerHTML = "";
+  const add = document.createElement("div");
+  const id = document.createElement("input"); id.placeholder = "poseId"; id.className = "pose-id";
+  const act = document.createElement("select");
+  ["trigger","gate"].forEach(a=>{const o=document.createElement("option");o.value=a;o.textContent=a;act.appendChild(o);});
+  const col = document.createElement("select");
+  [1,2,3,4,5,6].forEach(c=>{const o=document.createElement("option");o.value=c;o.textContent="color "+c;col.appendChild(o);});
+  const go = document.createElement("button"); go.textContent = "+";
+  go.addEventListener("click", ()=>{
+    if (!id.value) return;
+    matPoses[vi] = matPoses[vi].filter(b=>b.poseId!==id.value).concat([{poseId:id.value, action:act.value, color:+col.value}]);
+    saveMatState(); send("/matrix/posebind", vi, id.value, act.value, +col.value); renderPoses(vi);
+  });
+  [id,act,col,go].forEach(e=>add.appendChild(e)); p.appendChild(add);
+  matPoses[vi].forEach(b=>{ const line=document.createElement("div");
+    line.textContent = `${b.poseId} -> ${b.action} color ${b.color}`; p.appendChild(line); });
+}
+
 function renderInstEdit(vi) {
   // Instrument pane
   const ip = document.getElementById("cd-pane-inst"); ip.innerHTML = "";
@@ -504,6 +537,8 @@ function renderInstEdit(vi) {
   renderColorDefRows(vi);
   // Sequence pane
   renderSeq(vi);
+  // Poses pane
+  renderPoses(vi);
   // Assign pane
   const ap = document.getElementById("cd-pane-assign"); ap.innerHTML = "";
   const src = document.createElement("select");
