@@ -315,6 +315,39 @@ SynthDef(\system100, { |out=0, freq=110, amp=0.3, cutoff=1500, res=0.4, gate=1, 
     Out.ar(out, sig);
     ~doReverbBus.notNil.if({ Out.ar(~doReverbBus, sig * rev) });
 }).add;
+// --- voices for the new matrix tracks (snare / crash / shaker / fx) ---
+SynthDef(\lp_snare, { |out=0, amp=0.5, pan=0, rev=0|
+    var env   = EnvGen.kr(Env.perc(0.001, 0.18, 1, -3), doneAction: 2);
+    var tone  = (SinOsc.ar(180) + SinOsc.ar(330)) * 0.3;
+    var noise = HPF.ar(WhiteNoise.ar, 1500) * 0.7;
+    var sig   = Pan2.ar(((tone + noise) * env).tanh, pan.clip(-1,1)) * amp;
+    Out.ar(out, sig);
+    ~doReverbBus.notNil.if({ Out.ar(~doReverbBus, sig * rev) });
+}).add;
+SynthDef(\lp_crash, { |out=0, amp=0.4, pan=0, rev=0|
+    var env = EnvGen.kr(Env.perc(0.001, 1.5, 1, -4), doneAction: 2);
+    var sig = HPF.ar(WhiteNoise.ar, 5000) + (Mix(Pulse.ar([3001, 4211, 5503, 7019])) * 0.05);
+    sig = HPF.ar(sig, 4000) * env;
+    sig = Pan2.ar(sig, pan.clip(-1,1)) * amp;
+    Out.ar(out, sig);
+    ~doReverbBus.notNil.if({ Out.ar(~doReverbBus, sig * rev) });
+}).add;
+SynthDef(\lp_shaker, { |out=0, amp=0.3, pan=0, rev=0|
+    var env = EnvGen.kr(Env.perc(0.004, 0.06, 1, -2), doneAction: 2);
+    var sig = HPF.ar(BPF.ar(WhiteNoise.ar, 6000, 0.5), 4000) * env * 3;
+    sig = Pan2.ar(sig.tanh, pan.clip(-1,1)) * amp;
+    Out.ar(out, sig);
+    ~doReverbBus.notNil.if({ Out.ar(~doReverbBus, sig * rev) });
+}).add;
+// fx one-shot: slow-attack noise riser sweeping the filter up (len = seconds)
+SynthDef(\lp_fx, { |out=0, amp=0.4, pan=0, rev=0, len=1.5|
+    var env = EnvGen.kr(Env.perc(0.3, len, 1, 2), doneAction: 2);
+    var cut = EnvGen.kr(Env([300, 9000], [len], \exp));
+    var sig = RLPF.ar(WhiteNoise.ar, cut.clip(100, 15000), 0.2) * env;
+    sig = Pan2.ar(sig, pan.clip(-1,1)) * amp * 0.6;
+    Out.ar(out, sig);
+    ~doReverbBus.notNil.if({ Out.ar(~doReverbBus, sig * rev) });
+}).add;
 
 s.sync;
 
@@ -425,6 +458,26 @@ Pdef(\lp_bells, Pbind(\instrument, \lp_bells,
     \amp, Pfunc { 0.22 * ~lpVol.(\bells) }));
 Pdef(\lp_sweep, Pbind(\instrument, \lp_sweep, \dur, 8,
     \amp, Pfunc { 0.25 * ~lpVol.(\sweep) }, \legato, 1));
+
+// --- new matrix tracks: melody / chord / fx / snare / crash / shaker ---
+Pdef(\lp_melody, Pbind(\instrument, \lp_pluck,
+    \dur, Pseq([0.5, 0.5, 1, 0.5, 1.5], inf),
+    \degree, Pseq([0, 3, 5, 7, 5, 3, 2, 0], inf),
+    \freq, Pfunc { |e| ~lpNote.(e[\degree], 1).midicps },
+    \cutoff, 3500, \amp, Pfunc { 0.22 * ~lpVol.(\melody) }, \pan, Pwhite(-0.2, 0.2)));
+Pdef(\lp_chord, Pbind(\instrument, \lp_pad, \dur, 4,
+    \freq, Pfunc { [0, 2, 4].collect { |d| ~lpNote.(d, 0).midicps } },
+    \cutoff, 2000, \amp, Pfunc { 0.3 * ~lpVol.(\chord) }, \legato, 1));
+Pdef(\lp_fx, Pbind(\instrument, \lp_fx, \dur, 8,
+    \amp, Pfunc { 0.3 * ~lpVol.(\fx) }));
+Pdef(\lp_snare, Pbind(\instrument, \lp_snare,
+    \dur, Pseq([Rest(1), 1], inf),
+    \amp, Pfunc { 0.5 * ~lpVol.(\snare) }));
+Pdef(\lp_crash, Pbind(\instrument, \lp_crash, \dur, 8,
+    \amp, Pfunc { 0.4 * ~lpVol.(\crash) }));
+Pdef(\lp_shaker, Pbind(\instrument, \lp_shaker,
+    \dur, Pseq([0.25, 0.25, 0.25, 0.25], inf),
+    \amp, Pfunc { 0.28 * ~lpVol.(\shaker) }));
 
 // --- melody sequencer: single Pdef, armed via normal /launch path ---
 // reuses \lp_pluck; selects from ~lp[\melodies][~lp[\melSel]] via wrapAt
