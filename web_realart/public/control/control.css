@@ -133,3 +133,4 @@ button.queued { animation: queued-blink 600ms ease-in-out infinite alternate; }
 .minst { position: sticky; left: 54px; z-index: 2; width: 78px; font-size: 10px;
   background: #1a1a1a; color: #ccc; border: 1px solid #333; flex-shrink: 0; }
 .kit-btn { flex: 1; padding: 10px 4px; font-size: 11px; }
+.minst-head { width: 78px; flex-shrink: 0; }

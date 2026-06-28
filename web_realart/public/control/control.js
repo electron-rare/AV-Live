@@ -239,7 +239,6 @@ const MATRIX_INST_CHOICES = {
   reese:["lp_reese","lp_sub","do_body_drone","do_weather"],
   bells:["lp_bells","do_strike","do_plane"], sweep:["lp_sweep","do_body_gran","do_drone","do_weather"]
 };
-const MATRIX_KITS = ["default","deep","industrial","acid"];
 let matInst = new Array(16).fill("default");   // per-voice selection (persisted)
 const MATRIX_BARS = 32;
 let matGrid = Array.from({ length: 16 }, () => new Array(32).fill(0));
@@ -254,9 +253,9 @@ function saveMatState() {
 function loadMatState() {
   try {
     const raw = JSON.parse(localStorage.getItem(MATRIX_STORAGE_KEY));
-    if (raw && Array.isArray(raw.grid)) { matGrid = raw.grid;
+    if (raw && Array.isArray(raw.grid) && raw.grid.length === 16) { matGrid = raw.grid;
       if (Array.isArray(raw.inst) && raw.inst.length === 16) matInst = raw.inst; return; }
-    if (Array.isArray(raw)) { matGrid = raw; return; }   // legacy: bare grid
+    if (Array.isArray(raw) && raw.length === 16) { matGrid = raw; return; }   // legacy: bare grid
   } catch (_e) {}
   matGrid = Array.from({ length: 16 }, () => new Array(32).fill(0));
 }
@@ -278,6 +277,9 @@ function renderMatrix() {
   const corner = document.createElement("span");
   corner.className = "mvoice-label";
   headerRow.appendChild(corner);
+  const instHead = document.createElement("span");
+  instHead.className = "minst-head";
+  headerRow.appendChild(instHead);
   for (let bar = 0; bar < MATRIX_BARS; bar++) {
     const num = document.createElement("span");
     num.className = "mbar-num";
