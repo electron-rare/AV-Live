@@ -513,6 +513,35 @@ File.exists(~matDir).not.if({ ("mkdir -p " ++ ~matDir.quote).systemCmd });
     File.exists(up).if({ ~matLoadFile.(up) }, { ~matLoadFile.(pp) })
 };
 
+// -- ~matAudition : preview a voice's 6 colors as a 1-beat-per-step loop --
+// on=true starts a Routine cycling color 1..6 (re-sources the voice's Pdef each
+// step); on=false stops the routine and silences the voice. Preview only — does
+// not move the grid playhead.
+~matAudition = { |vi, on|
+    (vi >= 0 and: { vi < ~matVoices.size }).if({
+        var name = ~matVoices[vi];
+        var key  = ("lp_" ++ name).asSymbol;
+        ~matAudRoutine = ~matAudRoutine ? IdentityDictionary.new;
+        ~matAudRoutine[vi] !? { ~matAudRoutine[vi].stop };
+        on.if({
+            var clock = ~lp[\clock] ? TempoClock.default;
+            ~matAudRoutine[vi] = Routine({
+                var c = 1;
+                loop {
+                    var pat = ~matVariation.(name, c, vi);
+                    pat.notNil.if({ Pdef(key, pat); Pdef(key).play(clock, quant: 1) });
+                    1.wait;
+                    c = (c % 6) + 1;
+                }
+            }).play(clock, quant: 1);
+        }, {
+            ~matAudRoutine[vi] = nil;
+            Pdef.all.includesKey(key).if({ Pdef(key).stop });
+            ~matLastColor[vi] = -1;       // force normal re-source on next grid bar
+        })
+    })
+};
+
 // -- OSCdefs (unique \mat_* keys; register sender for TouchOSC feedback) --
 OSCdef(\mat_cell, { |msg, time, addr|
     ~toscTouch !? { ~toscTouch.(addr) };
@@ -585,6 +614,11 @@ OSCdef(\mat_colordef_get, { |msg, time, addr|
     ~toscTouch !? { ~toscTouch.(addr) };
     ~matColorDefPush.((msg[1] ? 0).asInteger)
 }, '/matrix/colordefs/get');
+
+OSCdef(\mat_audition, { |msg, time, addr|
+    ~toscTouch !? { ~toscTouch.(addr) };
+    ~matAudition.((msg[1] ? 0).asInteger, (msg[2] ? 0) > 0)
+}, '/matrix/audition');
 
 // -- Capture mod source cache (nil-guarded; idempotent reload) --
 ~matModCache   = ~matModCache ? IdentityDictionary.new;

@@ -333,6 +333,12 @@ pass = pass and: { (~matColorDefs[5][3][\bogus]).isNil };
 pass = pass and: { ~matColorDefs[0][1][\inst].isNil };
 ~matSetColorDef.(5, 3, \octave, 0);                  // restore
 
+// --- Color editor: audition (Task 3) ---
+pass = pass and: { ~matAudition.notNil };
+// off when not running must not raise
+try { ~matAudition.(0, false) } { |e| pass = false;
+    ("EXCEPTION matAudition off: " ++ e.class.name).postln };
+
 pass.if(
     { "TEST PASS".postln },
     { "TEST FAIL".postln }
