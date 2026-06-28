@@ -279,16 +279,17 @@ const MATRIX_VOICES = [
   "stab","pad","ride","rim","tom","reese","bells","sweep"
 ];
 // per-voice curated instrument options (must mirror SC ~matInstChoices)
+// note-terminating synths only — the continuous do_ drones never free per-note.
 const MATRIX_INST_CHOICES = {
   kick:["lp_kick","do_kick","do_quake_sub"], hats:["lp_hat","do_hat"],
   clap:["lp_clap","lp_rim","do_hat"], perc:["lp_perc","do_strike","lp_tom"],
-  sub:["lp_sub","lp_reese","do_body_drone","do_quake_sub"],
-  acid:["lp_acid","lp_pluck","do_geo"], arp:["lp_pluck","do_strike","lp_bells"],
-  lead:["lp_pluck","do_plane","do_strike","lp_bells"], stab:["lp_pluck","do_geo","lp_acid"],
-  pad:["lp_pad","do_body_drone","do_drone","lp_reese"], ride:["lp_ride","lp_hat","do_hat"],
+  sub:["lp_sub","lp_reese","do_quake_sub"],
+  acid:["lp_acid","lp_pluck"], arp:["lp_pluck","do_strike","lp_bells"],
+  lead:["lp_pluck","do_plane","do_strike","lp_bells"], stab:["lp_pluck","lp_acid"],
+  pad:["lp_pad","lp_reese","lp_sub"], ride:["lp_ride","lp_hat","do_hat"],
   rim:["lp_rim","lp_clap","do_hat"], tom:["lp_tom","do_strike","do_quake_sub"],
-  reese:["lp_reese","lp_sub","do_body_drone","do_weather"],
-  bells:["lp_bells","do_strike","do_plane"], sweep:["lp_sweep","do_body_gran","do_drone","do_weather"]
+  reese:["lp_reese","lp_sub","lp_pad"],
+  bells:["lp_bells","do_strike","do_plane"], sweep:["lp_sweep","lp_pad","lp_reese"]
 };
 let matInst = new Array(16).fill("default");   // per-voice selection (persisted)
 const MATRIX_MOD_SOURCES = ["none","lHandY","rHandY","lOpen","rOpen","handSpeed","handDist","bodyY","depth"];

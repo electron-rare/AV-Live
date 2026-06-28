@@ -39,6 +39,13 @@ SynthDef(\lp_pluck, { |out=0, freq=220, amp=0.3, cutoff=2500, pan=0|
     var sig = RLPF.ar(Saw.ar(freq.clip(40,2000) * [1, 1.005]), cutoff.clip(200,8000), 0.4);
     Out.ar(out, Pan2.ar(Mix(sig) * env, pan.clip(-1,1)) * amp);
 }).add;
+// sustained lead: gated ASR so notes hold for their full \dur (needs \legato).
+SynthDef(\lp_lead, { |out=0, freq=220, amp=0.3, cutoff=3000, gate=1, pan=0|
+    var env = EnvGen.kr(Env.asr(0.01, 1, 0.3), gate, doneAction: 2);
+    var sig = Mix(Saw.ar(freq.clip(40, 3000) * [0.997, 1.0, 1.005]));
+    sig = RLPF.ar(sig, (cutoff.clip(300, 9000) * (1 + (env * 0.4))).clip(300, 12000), 0.28);
+    Out.ar(out, Pan2.ar(sig * env, pan.clip(-1, 1)) * amp * 0.45);
+}).add;
 SynthDef(\lp_pad, { |out=0, freq=220, amp=0.0, cutoff=1500, gate=1|
     var sig = Mix(Saw.ar(freq.clip(40,1000) * [0.99, 1.0, 1.008, 2.0]));
     sig = RLPF.ar(sig, cutoff.clip(200,6000), 0.4);
@@ -164,10 +171,10 @@ Pdef(\lp_arp, Pbind(\instrument, \lp_pluck, \dur, 0.25,
     \degree, Pseq([0,2,4,7,4,2], inf),
     \freq, Pfunc { |e| ~lpNote.(e[\degree], 1).midicps },
     \cutoff, 3000, \amp, Pfunc { 0.2 * ~lpVol.(\arp) }, \pan, Pwhite(-0.3,0.3)));
-Pdef(\lp_lead, Pbind(\instrument, \lp_pluck, \dur, Pseq([1, 0.5, 0.5, 2], inf),
+Pdef(\lp_lead, Pbind(\instrument, \lp_lead, \dur, Pseq([1, 0.5, 0.5, 2], inf),
     \degree, Pseq([7,5,4,0,2,4], inf),
     \freq, Pfunc { |e| ~lpNote.(e[\degree], 1).midicps },
-    \cutoff, 4000, \amp, Pfunc { 0.24 * ~lpVol.(\lead) }));
+    \cutoff, 4000, \amp, Pfunc { 0.24 * ~lpVol.(\lead) }, \legato, 1));
 Pdef(\lp_stab, Pbind(\instrument, \lp_pluck, \dur, Pseq([Rest(0.5), 0.5], inf),
     \freq, Pfunc { [0,2,4].collect { |d| ~lpNote.(d, 0).midicps } },
     \cutoff, 2200, \amp, Pfunc { 0.2 * ~lpVol.(\stab) }));

@@ -1,10 +1,10 @@
 #!/bin/zsh
-# AV-Live Concert launcher.
-# Boots the full iPhone-USB concert stack in one shot:
+# AV-Live Matrix launcher (runs the matrix arranger, not the concert).
+# Boots the matrix stack in one shot:
 #   iPhone ARBodyTracker (camera + ARKit skeleton over USB)
-#   -> data_only_viz pose pipeline (HEVC decode + MediaPipe + mirror + OSC)
-#   -> SuperCollider engine (body-play boot: concert + 13 gestures + 11 morceaux)
-#   -> switch to the \concert scene.
+#   -> data_only_viz pose pipeline (feeds /pose/* for matrix capture-modulation)
+#   -> SuperCollider engine in MATRIX_ONLY (concert disabled, matrix arranger)
+#   -> web control surface, then load a preset and start the matrix playing.
 # Used as the executable of "AV-Live Concert.app" (double-click to start).
 # Re-running restarts cleanly (it kills any prior stack first).
 set -u
@@ -18,6 +18,9 @@ export POSE_FILTER=median+kalman+lookahead+ik+arkit_fuse
 
 PY="$REPO/data_only_viz/.venv/bin/python"
 SCLANG="/Applications/SuperCollider.app/Contents/MacOS/sclang"
+# matrix preset auto-loaded on boot (a sound_algo/.../matrix_presets/*.matrix name
+# without extension); set MATRIX_PRESET="" to start from an empty grid.
+MATRIX_PRESET="${MATRIX_PRESET:-techno_drive}"
 
 notify() { osascript -e "display notification \"$1\" with title \"AV-Live Concert\"" 2>/dev/null; }
 
@@ -37,39 +40,37 @@ notify "Demarrage..."
 xcrun devicectl device process launch --device "$DEV" cc.saillant.ARBodyTracker >/dev/null 2>&1
 sleep 3
 
-# 2) SuperCollider engine (boots to body-play; loads concert + gestures + morceaux
-#    + launchpad). sclang needs a controlling TTY to boot scsynth reliably -> run it
-#    under `script` (gives a pseudo-TTY), detached via nohup. More reliable than
-#    `open <Terminal .command>` (no Finder/Terminal race, no GUI-session quirks) and
-#    needs no Automation/TCC permission. Log -> /tmp/sc_boot.log.
-( cd "$REPO/sound_algo/data_only" && nohup script -q /tmp/sc_boot.log "$SCLANG" boot.scd >/dev/null 2>&1 & )
+# 2) SuperCollider engine in MATRIX_ONLY (concert/body-play disabled; loads the
+#    matrix arranger + the launchpad voices). sclang needs a controlling TTY to
+#    boot scsynth reliably -> run it under `script` (gives a pseudo-TTY), detached
+#    via nohup. needs no Automation/TCC permission. Log -> /tmp/sc_boot.log.
+( cd "$REPO/sound_algo/data_only" && MATRIX_ONLY=1 nohup script -q /tmp/sc_boot.log "$SCLANG" boot.scd >/dev/null 2>&1 & )
 sleep 32
 
-# 3) pose pipeline (iPhone USB HEVC -> MediaPipe -> mirror -> OSC). Launched LAST:
-#    its window self-activates frontmost + KEY, so its keyboard handler captures
-#    Space = next morceau. (The local NSEvent monitor only fires when this window
-#    is key; the global monitor needs Input Monitoring permission. Keeping the viz
-#    frontmost is the reliable path -- click it to refocus if Space stops working.)
+# 3) pose pipeline (iPhone USB HEVC -> MediaPipe -> OSC). Emits /pose/hands,
+#    /pose/center and /pose/sho_span -> matrix capture-modulation sources, and
+#    shows a live visual of the tracked pose.
 nohup "$PY" -m data_only_viz.main --pose --iphone-usb > /tmp/concert_viz.log 2>&1 &
 disown
 sleep 11
 
-# 4) floating "Morceau suivant" button panel (non-activating: keeps the viz the
-#    key window so Space still works, while the button click changes morceau
-#    regardless of focus).
-nohup "$PY" "$REPO/launcher/concert/concert_control.py" > /tmp/concert_control.log 2>&1 &
-disown
-sleep 1
+# 4) (matrix mode: no "morceau" button — the matrix is driven from the web control
+#    surface below; the floating concert panel is intentionally not started.)
 
-# 5) web OSC control surface server (browser launches patterns + controls concert).
+# 5) web OSC control surface server (browser drives the matrix + patterns).
 #    Only if its deps are installed (cd web_realart && npm install once). Reachable
 #    at http://supra-m1.local:4400/control/ from any LAN device.
 if [ -d "$REPO/web_realart/node_modules" ]; then
     ( cd "$REPO/web_realart" && PATH=/opt/homebrew/bin:$PATH nohup node server.js > /tmp/websrv.log 2>&1 & )
 fi
 
-# 6) switch to the concert scene
-"$PY" -c "from pythonosc.udp_client import SimpleUDPClient; SimpleUDPClient('127.0.0.1',57121).send_message('/control/doScene','concert')"
+# 6) load a matrix preset and start the playhead (the matrix equivalent of
+#    switching to a scene). Skipped if MATRIX_PRESET is empty.
+if [ -n "$MATRIX_PRESET" ]; then
+    "$PY" -c "from pythonosc.udp_client import SimpleUDPClient; SimpleUDPClient('127.0.0.1',57121).send_message('/matrix/load','$MATRIX_PRESET')"
+    sleep 1
+fi
+"$PY" -c "from pythonosc.udp_client import SimpleUDPClient; SimpleUDPClient('127.0.0.1',57121).send_message('/matrix/play',[])"
 sleep 1
 
-notify "Concert lance. Bouton/Espace = morceau. Control: supra-m1.local:4400/control/"
+notify "Matrice lancee ($MATRIX_PRESET). Control: supra-m1.local:4400/control/ (onglet MATRICE)"

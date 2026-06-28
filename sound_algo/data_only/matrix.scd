@@ -71,34 +71,39 @@ File.exists(~matDir).not.if({ ("mkdir -p " ++ ~matDir.quote).systemCmd });
 };
 
 // -- per-voice curated instrument choices (symbol must be a loaded SynthDef) --
+// ONLY note-terminating synths are allowed (perc env + doneAction, or gated ASR).
+// The continuous \do_ drones (do_drone/do_body_drone/do_body_gran/do_weather/
+// do_geo) have NO gate and NO doneAction -> driven per-note by the matrix Pbind
+// they never free and pile up forever, so they are NOT offered. The gated \lp_
+// sustained voices (lp_sub/lp_reese/lp_pad/lp_sweep) cover the drone textures.
 ~matInstChoices = ~matInstChoices ? IdentityDictionary[
     \kick  -> [\lp_kick, \do_kick, \do_quake_sub],
     \hats  -> [\lp_hat,  \do_hat],
     \clap  -> [\lp_clap, \lp_rim, \do_hat],
     \perc  -> [\lp_perc, \do_strike, \lp_tom],
-    \sub   -> [\lp_sub,  \lp_reese, \do_body_drone, \do_quake_sub],
-    \acid  -> [\lp_acid, \lp_pluck, \do_geo],
+    \sub   -> [\lp_sub,  \lp_reese, \do_quake_sub],
+    \acid  -> [\lp_acid, \lp_pluck],
     \arp   -> [\lp_pluck, \do_strike, \lp_bells],
     \lead  -> [\lp_pluck, \do_plane, \do_strike, \lp_bells],
-    \stab  -> [\lp_pluck, \do_geo, \lp_acid],
-    \pad   -> [\lp_pad,  \do_body_drone, \do_drone, \lp_reese],
+    \stab  -> [\lp_pluck, \lp_acid],
+    \pad   -> [\lp_pad,  \lp_reese, \lp_sub],
     \ride  -> [\lp_ride, \lp_hat, \do_hat],
     \rim   -> [\lp_rim,  \lp_clap, \do_hat],
     \tom   -> [\lp_tom,  \do_strike, \do_quake_sub],
-    \reese -> [\lp_reese, \lp_sub, \do_body_drone, \do_weather],
+    \reese -> [\lp_reese, \lp_sub, \lp_pad],
     \bells -> [\lp_bells, \do_strike, \do_plane],
-    \sweep -> [\lp_sweep, \do_body_gran, \do_drone, \do_weather]
+    \sweep -> [\lp_sweep, \lp_pad, \lp_reese]
 ];
 
 // -- fixed kits: kitName -> (voiceName -> instrument). Unlisted voices = default --
 ~matKits = ~matKits ? IdentityDictionary[
     \default -> IdentityDictionary[],
     \deep -> IdentityDictionary[
-        \kick -> \do_kick, \sub -> \do_body_drone, \reese -> \do_body_drone,
-        \pad -> \do_drone, \sweep -> \do_drone ],
+        \kick -> \do_kick, \sub -> \lp_reese, \reese -> \lp_reese,
+        \pad -> \lp_reese, \sweep -> \lp_pad ],
     \industrial -> IdentityDictionary[
         \kick -> \do_quake_sub, \perc -> \do_strike, \tom -> \do_strike,
-        \clap -> \lp_rim, \stab -> \do_geo ],
+        \clap -> \lp_rim, \stab -> \lp_acid ],
     \acid -> IdentityDictionary[
         \lead -> \do_plane, \arp -> \do_strike, \sub -> \lp_reese, \bells -> \do_plane ]
 ];
@@ -159,6 +164,13 @@ File.exists(~matDir).not.if({ ("mkdir -p " ++ ~matDir.quote).systemCmd });
 ~matVariationOverlay = { |name, vi, spec, volOf, instPair, cdPairs|
     var base = ~matBaseFor.(name);
     var mod = ~matMod[vi];
+    // octave colors multiply \freq by 2**octave (main's freqRatio scheme), pitched
+    // voices only — works for voices that set \freq directly via Pfunc.
+    var pitched = [\sub, \acid, \arp, \lead, \stab, \pad, \reese, \bells, \perc, \tom];
+    var freqRatio = 2 ** (spec[\octave] ? 0);
+    var freqPair = (pitched.includes(name) and: { freqRatio != 1.0 }).if({
+        [\freq, Pfunc({ |e| (e[\freq] ? 440) * freqRatio })]
+    }, { [] });
     var modPairs = mod.isNil.if({ [] }, {
         var src = mod[\source], tgt = mod[\target], d = mod[\depth];
         (tgt == \cutoff).if({
@@ -177,9 +189,8 @@ File.exists(~matDir).not.if({ ("mkdir -p " ++ ~matDir.quote).systemCmd });
         Pbind(*([
             \matGlow, Pfunc { |e| ~matEmitTrig.(vi, (e[\amp] ? spec[\amp]).clip(0, 1)); 0 },
             \stretch, spec[\stretch],
-            \octave,  spec[\octave],
             \amp,     Pfunc({ (spec[\amp] ? 1.0) * volOf.value })
-        ] ++ instPair ++ cdPairs ++ modPairs)),
+        ] ++ instPair ++ cdPairs ++ freqPair ++ modPairs)),
         base
     )
 };
@@ -187,10 +198,11 @@ File.exists(~matDir).not.if({ ("mkdir -p " ++ ~matDir.quote).systemCmd });
 // -- ~matVariation : map color 1-6 to a Pchain overlay on the captured base --
 // color 1 = base as-is, 2 = double-time, 3 = octave up, 4 = half-time,
 // 5 = octave down + slight accent, 6 = accent roll (denser + louder).
-// \stretch multiplies event duration; \octave shifts degree-based pitch.
-// NOTE: voices that compute \freq via Pfunc (ignoring \octave) will not respond
-// to the octave variation — acceptable for v1; tune the palette at the live gate.
-// Reads ~matColorDefs[vi][color] so per-voice color tables are editable at runtime.
+// \stretch multiplies event duration; octave colors multiply the base \freq by
+// 2**octave (x2 up, x0.5 down) via Pfunc, so they transpose even voices that set
+// \freq directly (bypassing SC's \octave). Only pitched voices get the \freq
+// multiply — drums keep their pitch. Reads ~matColorDefs[vi][color] so per-voice
+// color tables are editable at runtime (octave field maps to the freq multiply).
 ~matVariation = { |name, color, vi = 0|
     (color == 0).if({ nil }, {
         var base = ~matBaseFor.(name);
