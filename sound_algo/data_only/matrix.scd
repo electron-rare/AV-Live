@@ -58,34 +58,39 @@ File.exists(~matDir).not.if({ ("mkdir -p " ++ ~matDir.quote).systemCmd });
 };
 
 // -- per-voice curated instrument choices (symbol must be a loaded SynthDef) --
+// ONLY note-terminating synths are allowed (perc env + doneAction, or gated ASR).
+// The continuous \do_ drones (do_drone/do_body_drone/do_body_gran/do_weather/
+// do_geo) have NO gate and NO doneAction -> driven per-note by the matrix Pbind
+// they never free and pile up forever, so they are NOT offered. The gated \lp_
+// sustained voices (lp_sub/lp_reese/lp_pad/lp_sweep) cover the drone textures.
 ~matInstChoices = ~matInstChoices ? IdentityDictionary[
     \kick  -> [\lp_kick, \do_kick, \do_quake_sub],
     \hats  -> [\lp_hat,  \do_hat],
     \clap  -> [\lp_clap, \lp_rim, \do_hat],
     \perc  -> [\lp_perc, \do_strike, \lp_tom],
-    \sub   -> [\lp_sub,  \lp_reese, \do_body_drone, \do_quake_sub],
-    \acid  -> [\lp_acid, \lp_pluck, \do_geo],
+    \sub   -> [\lp_sub,  \lp_reese, \do_quake_sub],
+    \acid  -> [\lp_acid, \lp_pluck],
     \arp   -> [\lp_pluck, \do_strike, \lp_bells],
     \lead  -> [\lp_pluck, \do_plane, \do_strike, \lp_bells],
-    \stab  -> [\lp_pluck, \do_geo, \lp_acid],
-    \pad   -> [\lp_pad,  \do_body_drone, \do_drone, \lp_reese],
+    \stab  -> [\lp_pluck, \lp_acid],
+    \pad   -> [\lp_pad,  \lp_reese, \lp_sub],
     \ride  -> [\lp_ride, \lp_hat, \do_hat],
     \rim   -> [\lp_rim,  \lp_clap, \do_hat],
     \tom   -> [\lp_tom,  \do_strike, \do_quake_sub],
-    \reese -> [\lp_reese, \lp_sub, \do_body_drone, \do_weather],
+    \reese -> [\lp_reese, \lp_sub, \lp_pad],
     \bells -> [\lp_bells, \do_strike, \do_plane],
-    \sweep -> [\lp_sweep, \do_body_gran, \do_drone, \do_weather]
+    \sweep -> [\lp_sweep, \lp_pad, \lp_reese]
 ];
 
 // -- fixed kits: kitName -> (voiceName -> instrument). Unlisted voices = default --
 ~matKits = ~matKits ? IdentityDictionary[
     \default -> IdentityDictionary[],
     \deep -> IdentityDictionary[
-        \kick -> \do_kick, \sub -> \do_body_drone, \reese -> \do_body_drone,
-        \pad -> \do_drone, \sweep -> \do_drone ],
+        \kick -> \do_kick, \sub -> \lp_reese, \reese -> \lp_reese,
+        \pad -> \lp_reese, \sweep -> \lp_pad ],
     \industrial -> IdentityDictionary[
         \kick -> \do_quake_sub, \perc -> \do_strike, \tom -> \do_strike,
-        \clap -> \lp_rim, \stab -> \do_geo ],
+        \clap -> \lp_rim, \stab -> \lp_acid ],
     \acid -> IdentityDictionary[
         \lead -> \do_plane, \arp -> \do_strike, \sub -> \lp_reese, \bells -> \do_plane ]
 ];
