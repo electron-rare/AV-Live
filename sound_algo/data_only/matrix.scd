@@ -698,7 +698,7 @@ OSCdef(\mat_steps_get, { |msg, time, addr|
     var pid = poseId.asSymbol;
     ~matVoices.do { |name, vi|
         var key = ("lp_" ++ name).asSymbol;
-        ~matPoseBindings[vi].do { |b|
+        (~matPoseBindings[vi] ? []).do { |b|
             (b[\poseId] == pid).if({
                 (b[\action] == \trigger).if({
                     Pdef.all.includesKey(key).if({

@@ -432,6 +432,12 @@ pass = pass and: { ~matPoseBindings[5].size == 1 };
 // clear all for isolation
 ~matPoseBindings.size.do { |i| ~matPoseBindings[i] = [] };
 
+// gate binding test
+~matSetPoseBind.(3, \poseB, \gate, 2);
+pass = pass and: { ~matPoseBindings[3][0][\action] == \gate };
+pass = pass and: { ~matPoseBindings[3][0][\color] == 2 };
+~matPoseBindings[3] = [];
+
 // --- Pose persistence (Task 4) ---
 ~matSetPoseBind.(5, \poseA, \trigger, 3);
 ~matSave.("pose grid");
