@@ -30,10 +30,11 @@ if(~fpResolveInst.() != \pluck) { ok = false; "FAIL: live inst".postln; };
 ~fpInst = \fm_bell;
 if(~fpResolveInst.() != \fm_bell) { ok = false; "FAIL: pinned inst".postln; };
 
-// modulation tick updates ~fpCut from dist
+// modulation tick updates ~fpCut from dist (one-pole: 0 + 0.2*(1-0) = 0.2)
 ~handFeat[\dist] = 1.0;
 ~fpModTick.();
-if(~fpCut.isNil) { ok = false; "FAIL: fpCut nil".postln; };
+("fpCut after tick = " ++ ~fpCut).postln;
+if(~fpCut.round(0.001) != 0.2) { ok = false; "FAIL: fpCut not updated to 0.2".postln; };
 
 if(ok) { "PASS test_finger_piano".postln } { "TESTS FAILED".postln };
 0.exit;
