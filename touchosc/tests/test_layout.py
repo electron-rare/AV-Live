@@ -250,6 +250,31 @@ def test_seq_page_no_sync_amp():
 
 
 # ---------------------------------------------------------------------------
+# Page 1 — LIVE: quantize selector
+# ---------------------------------------------------------------------------
+
+def test_live_page_quant_buttons():
+    """LIVE page must have 4 /launch/quant buttons with CONSTANT/FLOAT args {0.5,1,4,8}."""
+    page = layout.live_page()
+    quant_args = []
+    for osc_el in page.findall(".//messages/osc"):
+        path_val = osc_el.find("path/partial/value")
+        if path_val is not None and path_val.text == "/launch/quant":
+            for part in osc_el.findall("arguments/partial"):
+                typ = part.find("type")
+                conv = part.find("conversion")
+                val = part.find("value")
+                if typ is not None and conv is not None and val is not None:
+                    quant_args.append((typ.text, conv.text, val.text))
+    assert len(quant_args) == 4, f"expected 4 /launch/quant arg partials, got {len(quant_args)}"
+    for typ, conv, _ in quant_args:
+        assert typ == "CONSTANT", f"quant arg type must be CONSTANT, got {typ}"
+        assert conv == "FLOAT", f"quant arg conversion must be FLOAT, got {conv}"
+    vals = {v for _, _, v in quant_args}
+    assert vals == {"0.5", "1", "4", "8"}, f"expected quant values {{0.5,1,4,8}}, got {vals}"
+
+
+# ---------------------------------------------------------------------------
 # Pad armed receive on GROUP — FIX 1 regression guard
 # ---------------------------------------------------------------------------
 

@@ -138,6 +138,14 @@ def live_page():
         messages=[s.osc("/sync/beat", [s.val()], send=0, receive=1, feedback=1)],
     ))
 
+    # Quantize selector row (send-only momentary): 1/2 beat / 1 beat / 1 bar / 2 bars
+    quant_defs = [("1/2", 0.5), ("1", 1), ("1 BAR", 4), ("2 BAR", 8)]
+    qx_start, qy, qw, qh, qgap = 625, 8, 130, 50, 8
+    for i, (lbl, beats) in enumerate(quant_defs):
+        qx = qx_start + i * (qw + qgap)
+        ch.append(button(lbl, "/launch/quant", qx, qy, qw, qh, args=[s.constf(beats)]))
+    ch.append(label("QUANT", qx_start, 62, 120, 20))
+
     # 4x4 pad grid -----------------------------------------------------------
     gx, gy, pw, ph, gap = 10, 96, 283, 178, 10
     for i, name in enumerate(PATTERNS):
