@@ -509,6 +509,7 @@ OSCdef(\poseHands, { |msg|
     ~handFeat[\ropen]  = msg[8];
     ~handFeat[\rspeed] = msg[9];
     ~handFeat[\dist]   = msg[10];
+    ~fpModTick !? { ~fpModTick.value };   // air-piano modulation continue
 }, '/pose/hands');
 
 // Body wrists (skeleton, tracked even when hands are occluded/too small).

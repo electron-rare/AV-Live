@@ -149,6 +149,7 @@ Routine({
 
     // -- 5) OSCdef des flux data_feeds -----
     (~repoRoot ++ "control/data_feeds.scd").load;
+    (~repoRoot ++ "control/finger_piano.scd").load;
     0.5.wait;
 
     // -- 6) Bibliotheque de scenes -----

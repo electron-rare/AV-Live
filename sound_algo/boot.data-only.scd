@@ -38,6 +38,7 @@ Routine({
 
     "[boot.data-only] loading data_feeds OSCdef...".postln;
     (~base ++ "control/data_feeds.scd").load;
+    (~base ++ "control/finger_piano.scd").load;
     1.0.wait;
 
     "[boot.data-only] loading web_bridge OSCdef + sync push...".postln;

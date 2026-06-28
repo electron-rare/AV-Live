@@ -68,6 +68,9 @@ Toujours répondre en français à l'utilisateur. Code, commentaires de code, co
 | `ICP_LIDAR_HOST` | _(unset)_ | iPhone ARBodyTracker IP when `ICP_FUSION=1` |
 | `ICP_LIDAR_PORT` | `5500` | iPhone ARMesh TCP port |
 | `ICP_LIDAR_EXTRINSIC` | `~/.config/av-live/lidar_extrinsic.json` | extrinsic JSON path |
+| `FINGER_PIANO` | `0` | `1` enables air-piano finger strike emission from data_only_viz |
+| `FINGER_STRIKE_VEL` | `0.02` | downward relative-velocity threshold for a strike (normalized image units/frame) |
+| `FINGER_STRIKE_REFRACTORY_MS` | `120` | min ms between strikes per finger |
 
 ## Conventions globales
 
