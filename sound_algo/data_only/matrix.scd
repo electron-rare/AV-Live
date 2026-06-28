@@ -404,9 +404,7 @@ File.exists(~matDir).not.if({ ("mkdir -p " ++ ~matDir.quote).systemCmd });
             ~matColorDefs[vi][color][field.asSymbol] = v;
             ~matLastColor[vi] = -1;
             (~lp[\matPlaying] and: { ~matApplyBar.notNil }).if({ ~matApplyBar.(~lp[\matBar]) });
-            ~toscSend !? { ~toscSend.("/matrix/colordef", vi, color,
-                field.asSymbol.asString,
-                (field.asSymbol == \inst).if({ (v ? \default).asString }, { v })) }
+            ~matColorDefPush.(vi)
         })
     })
 };

@@ -313,7 +313,18 @@ pass = pass and: { ~matSetColorDef.notNil and: { ~matColorDefPush.notNil } };
 ~toscSend = { |path ...args| ~trigLog = ([path] ++ args) };
 ~matSetColorDef.(5, 3, \octave, -2);                 // acid, color 3
 pass = pass and: { ~matColorDefs[5][3][\octave] == -2 };
-pass = pass and: { ~trigLog[0] == "/matrix/colordef" and: { ~trigLog[1] == 5 } };
+pass = pass and: { ~trigLog[0] == "/matrix/colordefs" and: { ~trigLog[1] == 5 } };
+pass = pass and: { ~trigLog.size == 38 };   // path + vi + 36 values
+
+// direct test of ~matColorDefPush: address, vi, 38 items total, nil pan=-2, nil cutoff=-1
+~trigLog = nil;
+~matColorDefPush.(5);
+pass = pass and: { ~trigLog[0] == "/matrix/colordefs" };
+pass = pass and: { ~trigLog[1] == 5 };
+pass = pass and: { ~trigLog.size == 38 };
+pass = pass and: { ~trigLog[(2 + ((1-1)*6) + 5)] == -2 };   // color 1 pan nil -> -2
+pass = pass and: { ~trigLog[(2 + ((1-1)*6) + 4)] == -1 };   // color 1 cutoff nil -> -1
+
 // invalid field is rejected (state unchanged)
 ~matSetColorDef.(5, 3, \bogus, 9);
 pass = pass and: { (~matColorDefs[5][3][\bogus]).isNil };
