@@ -35,6 +35,19 @@
 ~matModNeutralCut = ~matModNeutralCut ? IdentityDictionary[
     \acid->700, \arp->3000, \lead->4000, \stab->2200, \pad->1500
 ];
+
+// -- default color defs reproduce the historical global variation table --
+~matDefaultColorDefs = {
+    [ nil,
+        (stretch: 1.0, octave:  0, amp: 1.0,  inst: nil, cutoff: nil, pan: nil),
+        (stretch: 0.5, octave:  0, amp: 1.0,  inst: nil, cutoff: nil, pan: nil),
+        (stretch: 1.0, octave:  1, amp: 1.0,  inst: nil, cutoff: nil, pan: nil),
+        (stretch: 2.0, octave:  0, amp: 1.0,  inst: nil, cutoff: nil, pan: nil),
+        (stretch: 1.0, octave: -1, amp: 1.05, inst: nil, cutoff: nil, pan: nil),
+        (stretch: 0.5, octave:  0, amp: 1.2,  inst: nil, cutoff: nil, pan: nil) ]
+};
+~matColorDefs = ~matColorDefs ? Array.fill(~matVoices.size, { ~matDefaultColorDefs.value });
+
 ~lp[\matLoopStart] = ~lp[\matLoopStart] ? 0;
 ~lp[\matLoopEnd]   = ~lp[\matLoopEnd]   ? (~matBars - 1);
 
@@ -139,58 +152,60 @@ File.exists(~matDir).not.if({ ("mkdir -p " ++ ~matDir.quote).systemCmd });
     })
 };
 
+// -- ~matVariationOverlay : assemble the Pchain overlay given a resolved spec --
+// Factored out of ~matVariation so the main function stays readable.
+// cdPairs (static per-color cutoff/pan) come before modPairs so a live capture
+// mod on the same target overrides the static color-def value — intended.
+~matVariationOverlay = { |name, vi, spec, volOf, instPair, cdPairs|
+    var base = ~matBaseFor.(name);
+    var mod = ~matMod[vi];
+    var modPairs = mod.isNil.if({ [] }, {
+        var src = mod[\source], tgt = mod[\target], d = mod[\depth];
+        (tgt == \cutoff).if({
+            var c0 = ~matModNeutralCut[name] ? 1000;
+            [\cutoff, Pfunc { var s = ~matModSourceVal.(src);
+                c0 * (s.linexp(0, 1, 200, 6000) / c0).pow(d) }]
+        }, {
+            (tgt == \pan).if({
+                [\pan, Pfunc { (~matModSourceVal.(src) * 2 - 1) * d }]
+            }, {
+                [\amp, Pfunc { (spec[\amp] * volOf.value) * (1 + (d * (~matModSourceVal.(src) * 2 - 1))).max(0) }]
+            })
+        })
+    });
+    Pchain(
+        Pbind(*([
+            \matGlow, Pfunc { |e| ~matEmitTrig.(vi, (e[\amp] ? spec[\amp]).clip(0, 1)); 0 },
+            \stretch, spec[\stretch],
+            \octave,  spec[\octave],
+            \amp,     Pfunc({ (spec[\amp] ? 1.0) * volOf.value })
+        ] ++ instPair ++ cdPairs ++ modPairs)),
+        base
+    )
+};
+
 // -- ~matVariation : map color 1-6 to a Pchain overlay on the captured base --
 // color 1 = base as-is, 2 = double-time, 3 = octave up, 4 = half-time,
 // 5 = octave down + slight accent, 6 = accent roll (denser + louder).
 // \stretch multiplies event duration; \octave shifts degree-based pitch.
 // NOTE: voices that compute \freq via Pfunc (ignoring \octave) will not respond
 // to the octave variation — acceptable for v1; tune the palette at the live gate.
-// Single function so all variation logic lives in one place.
+// Reads ~matColorDefs[vi][color] so per-voice color tables are editable at runtime.
 ~matVariation = { |name, color, vi = 0|
     (color == 0).if({ nil }, {
         var base = ~matBaseFor.(name);
         base.notNil.if({
-            var spec = [
-                nil,
-                (stretch: 1.0, octave:  0, amp: 1.0),
-                (stretch: 0.5, octave:  0, amp: 1.0),
-                (stretch: 1.0, octave:  1, amp: 1.0),
-                (stretch: 2.0, octave:  0, amp: 1.0),
-                (stretch: 1.0, octave: -1, amp: 1.05),
-                (stretch: 0.5, octave:  0, amp: 1.2)
-            ][color];
+            var spec = ~matColorDefs[vi][color];
             spec.notNil.if({
-                var inst = ~matInstruments[vi];
-                // per-voice volume (mixer fix from main): read live, default 0.8
+                var inst = spec[\inst] ? ~matInstruments[vi];      // per-color wins, else voice default
                 var volOf = { (~lp[\vol].notNil).if({ ~lp[\vol][name.asSymbol] ? 0.8 }, { 0.8 }) };
                 var instPair = inst.notNil.if({ [\instrument, inst] }, { [] });
-                var mod = ~matMod[vi];
-                var modPairs = mod.isNil.if({ [] }, {
-                    var src = mod[\source], tgt = mod[\target], d = mod[\depth];
-                    (tgt == \cutoff).if({
-                        var c0 = ~matModNeutralCut[name] ? 1000;
-                        [\cutoff, Pfunc { var s = ~matModSourceVal.(src);
-                            c0 * (s.linexp(0, 1, 200, 6000) / c0).pow(d) }]
-                    }, {
-                        (tgt == \pan).if({
-                            [\pan, Pfunc { (~matModSourceVal.(src) * 2 - 1) * d }]
-                        }, {  // amp: variation amp x per-voice volume x mod factor
-                            [\amp, Pfunc { (spec[\amp] * volOf.value) * (1 + (d * (~matModSourceVal.(src) * 2 - 1))).max(0) }]
-                        })
-                    })
-                });
-                Pchain(
-                    Pbind(*([
-                        \matGlow, Pfunc { |e|
-                            ~matEmitTrig.(vi, (e[\amp] ? spec[\amp]).clip(0, 1));
-                            0
-                        },
-                        \stretch, spec[\stretch],
-                        \octave,  spec[\octave],
-                        \amp,     Pfunc({ (spec[\amp] ? 1.0) * volOf.value })
-                    ] ++ instPair ++ modPairs)),
-                    base
-                )
+                var cdPairs = [];
+                (spec[\cutoff].notNil and: { (~matModTargets[name] ? []).includes(\cutoff) }).if({
+                    cdPairs = cdPairs ++ [\cutoff, spec[\cutoff]] });
+                (spec[\pan].notNil and: { (~matModTargets[name] ? []).includes(\pan) }).if({
+                    cdPairs = cdPairs ++ [\pan, spec[\pan]] });
+                ~matVariationOverlay.(name, vi, spec, volOf, instPair, cdPairs)
             }, { base })
         }, { nil })
     })
