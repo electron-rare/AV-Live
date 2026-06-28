@@ -205,11 +205,17 @@ Routine({
     (~base ++ "matrix.scd").load; s.sync;
 
     // -- 7) Demarre la scene par defaut -----
+    // MATRIX_ONLY env disables the concert/body-play scene so only the
+    // matrix arranger produces sound (load a preset + /matrix/play).
     if(~doScene.isNil) {
         "[data-only/boot] ERREUR : ~doScene non defini".warn;
     } {
-        "[data-only/boot] starting scene \\play (body-play)".postln;
-        ~doScene.(\play);
+        if("MATRIX_ONLY".getenv.notNil) {
+            "[data-only/boot] MATRIX_ONLY: concert disabled, matrix only".postln;
+        } {
+            "[data-only/boot] starting scene \\play (body-play)".postln;
+            ~doScene.(\play);
+        };
     };
 
     "".postln;
