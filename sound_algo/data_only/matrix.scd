@@ -43,12 +43,12 @@
 // -- default color defs reproduce the historical global variation table --
 ~matDefaultColorDefs = {
     [ nil,
-        (stretch: 1.0, octave:  0, amp: 1.0,  inst: nil, cutoff: nil, pan: nil, steps: Array.fill(16, nil), mod: nil, pose: []),
-        (stretch: 0.5, octave:  0, amp: 1.0,  inst: nil, cutoff: nil, pan: nil, steps: Array.fill(16, nil), mod: nil, pose: []),
-        (stretch: 1.0, octave:  1, amp: 1.0,  inst: nil, cutoff: nil, pan: nil, steps: Array.fill(16, nil), mod: nil, pose: []),
-        (stretch: 2.0, octave:  0, amp: 1.0,  inst: nil, cutoff: nil, pan: nil, steps: Array.fill(16, nil), mod: nil, pose: []),
-        (stretch: 1.0, octave: -1, amp: 1.05, inst: nil, cutoff: nil, pan: nil, steps: Array.fill(16, nil), mod: nil, pose: []),
-        (stretch: 0.5, octave:  0, amp: 1.2,  inst: nil, cutoff: nil, pan: nil, steps: Array.fill(16, nil), mod: nil, pose: []) ]
+        (stretch: 1.0, octave:  0, amp: 1.0,  inst: nil, cutoff: nil, pan: nil, steps: Array.fill(16, nil), mod: nil, pose: Array.new),
+        (stretch: 0.5, octave:  0, amp: 1.0,  inst: nil, cutoff: nil, pan: nil, steps: Array.fill(16, nil), mod: nil, pose: Array.new),
+        (stretch: 1.0, octave:  1, amp: 1.0,  inst: nil, cutoff: nil, pan: nil, steps: Array.fill(16, nil), mod: nil, pose: Array.new),
+        (stretch: 2.0, octave:  0, amp: 1.0,  inst: nil, cutoff: nil, pan: nil, steps: Array.fill(16, nil), mod: nil, pose: Array.new),
+        (stretch: 1.0, octave: -1, amp: 1.05, inst: nil, cutoff: nil, pan: nil, steps: Array.fill(16, nil), mod: nil, pose: Array.new),
+        (stretch: 0.5, octave:  0, amp: 1.2,  inst: nil, cutoff: nil, pan: nil, steps: Array.fill(16, nil), mod: nil, pose: Array.new) ]
 };
 ~matColorDefs = ~matColorDefs ? Array.fill(~matVoices.size, { ~matDefaultColorDefs.value });
 
@@ -703,7 +703,7 @@ OSCdef(\mat_steps_get, { |msg, time, addr|
             ~matColorDefs[vi][color][\pose] = []
         }, {
             ~matColorDefs[vi][color][\pose] = (~matColorDefs[vi][color][\pose] ? [])
-                .reject({ |b| b[\poseId] == pid }) ++ [ (poseId: pid, action: action.asSymbol) ];
+                .reject({ |b| b[\poseId] == pid }) ++ [ (poseId: pid, action: (action ? \trigger).asSymbol) ];
         });
         ~matColorPosePush.(vi, color)
     })

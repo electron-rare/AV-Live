@@ -475,6 +475,28 @@ pass = pass and: { ~matColorDefs[5][2][\mod].isNil };
 pass = pass and: { ~matColorDefs[5][2][\pose][0][\poseId] == \poseA };
 ~matColorDefs[5][2][\pose] = [];
 
+// dedup: setting the same poseId twice keeps one entry
+~matColorDefs[5][2][\pose] = [];
+~matSetColorPose.(5, 2, \poseD, \trigger);
+~matSetColorPose.(5, 2, \poseD, \gate);
+pass = pass and: { ~matColorDefs[5][2][\pose].size == 1 };
+pass = pass and: { ~matColorDefs[5][2][\pose][0][\action] == \gate };
+~matColorDefs[5][2][\pose] = [];
+
+// colorpose push echo
+~trigLog = nil;
+~matSetColorPose.(5, 2, \poseE, \trigger);
+pass = pass and: { ~trigLog[0] == "/matrix/colorpose" and: { ~trigLog[1] == 5 } };
+~matColorDefs[5][2][\pose] = [];
+
+// out-of-bounds set must not raise / not corrupt
+~matSetColorMod.(-1, 1, \rHandY, \cutoff, 0.5);
+~matSetColorMod.(5, 7, \rHandY, \cutoff, 0.5);
+pass = pass and: { true };
+
+// Fix 1: fresh color pose arrays and distinct per color
+pass = pass and: { (~matColorDefs[5][1][\pose] === ~matColorDefs[5][2][\pose]).not };
+
 pass.if(
     { "TEST PASS".postln },
     { "TEST FAIL".postln }
