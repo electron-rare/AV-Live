@@ -183,25 +183,34 @@ Add after the kits:
 - [ ] **Step 6: Inject `\instrument` into the `~matVariation` overlay**
 
 In `~matVariation`, the overlay Pbind (currently the `Pchain(Pbind(\matGlow, ...,
-\amp, spec[\amp]), base)` at ~L66-79) gains an `\instrument` key AFTER `\amp`, read
-from `~matInstruments[vi]` (only when non-nil; nil → no key → base instrument). Keep
-`\matGlow` first. Replace the overlay `Pbind(...)` argument list's end so it reads:
+\amp, spec[\amp]), base)` at ~L66-79) gains an `\instrument` key built
+CONDITIONALLY — included ONLY when `~matInstruments[vi]` is non-nil. Keep `\matGlow`
+first. Build the overlay args with a spread so the instrument pair can be omitted:
 
 ```supercollider
-        Pbind(
-            \matGlow, Pfunc { |e|
-                ~matEmitTrig.(vi, (e[\amp] ? spec[\amp]).clip(0, 1));
-                0
-            },
-            \stretch, spec[\stretch],
-            \octave,  spec[\octave],
-            \amp,     spec[\amp],
-            \instrument, Pfunc { ~matInstruments[vi] }   // nil → base \instrument kept
-        ),
+            var inst = ~matInstruments[vi];
+            var instPair = inst.notNil.if({ [\instrument, inst] }, { [] });
+            Pchain(
+                Pbind(*([
+                    \matGlow, Pfunc { |e|
+                        ~matEmitTrig.(vi, (e[\amp] ? spec[\amp]).clip(0, 1));
+                        0
+                    },
+                    \stretch, spec[\stretch],
+                    \octave,  spec[\octave],
+                    \amp,     spec[\amp]
+                ] ++ instPair)),
+                base
+            )
 ```
 
-Note: a Pbind value of `nil` for `\instrument` leaves the base event's
-`\instrument` untouched (Pchain only overrides keys with non-nil values per event).
+CRITICAL: do NOT use `\instrument, Pfunc { ~matInstruments[vi] }` — a Pbind value
+pattern that yields nil ENDS the stream, so a default (nil-instrument) voice would
+produce zero events (silence). The conditional spread omits the key entirely when
+nil, preserving the base Pdef's instrument. Changing an instrument forces a
+re-source (`~matLastColor[vi] = -1`), so building with the current value is reactive.
+A regression test MUST consume a nil-instrument `~matVariation` stream and assert
+the event is non-nil and carries the base instrument.
 
 - [ ] **Step 7: Add the OSCdefs**
 

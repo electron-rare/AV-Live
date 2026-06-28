@@ -222,12 +222,13 @@ overlay construction so a mod binding contributes its target key:
                 })
             })
         });
+        var inst = ~matInstruments[vi];
+        var instPair = inst.notNil.if({ [\instrument, inst] }, { [] });
         Pchain(
             Pbind(*([
                 \matGlow, Pfunc { |e| ~matEmitTrig.(vi, (e[\amp] ? spec[\amp]).clip(0,1)); 0 },
-                \stretch, spec[\stretch], \octave, spec[\octave], \amp, spec[\amp],
-                \instrument, Pfunc { ~matInstruments[vi] }
-            ] ++ modPairs)),
+                \stretch, spec[\stretch], \octave, spec[\octave], \amp, spec[\amp]
+            ] ++ instPair ++ modPairs)),
             base
         )
 ```
@@ -242,7 +243,7 @@ first and reads the base amp.)
 ```supercollider
 OSCdef(\mat_mod, { |msg, time, addr|
     ~toscTouch !? { ~toscTouch.(addr) };
-    ~matApplyMod.(msg[1].asInteger, (msg[2] ? \none).asSymbol,
+    ~matApplyMod.((msg[1] ? 0).asInteger, (msg[2] ? \none).asSymbol,
         (msg[3] ? \none).asSymbol, (msg[4] ? 0).asFloat)
 }, '/matrix/mod');
 ```

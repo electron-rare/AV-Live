@@ -4,8 +4,8 @@
 // A playhead Routine advances bar-by-bar on the launchpad clock, applying cells.
 // Colors 1-6 map to Pchain overlays (\stretch / \octave / \amp). 0 = Pdef.stop.
 // Loaded after sections.scd (boot step 6i). Idempotent reload, nil-guarded.
-// NOTE: the \amp variation override bypasses ~lpVol per-voice volume; web vol sliders
-//       have no effect while a matrix variation plays — deferred to v2.
+// NOTE: the \amp variation is multiplied by the per-voice fader (~lp[\vol]) so the
+//       web mixer (/launch/vol) controls matrix output in real time.
 (
 
 // -- Env init (nil-guarded; idempotent reload) --
@@ -35,6 +35,8 @@
 ~matModNeutralCut = ~matModNeutralCut ? IdentityDictionary[
     \acid->700, \arp->3000, \lead->4000, \stab->2200, \pad->1500
 ];
+~lp[\matLoopStart] = ~lp[\matLoopStart] ? 0;
+~lp[\matLoopEnd]   = ~lp[\matLoopEnd]   ? (~matBars - 1);
 
 // -- Persistence env init (nil-guarded) --
 ~matDir        = ~matDir        ? "~/.config/av-live/matrices".standardizePath;
@@ -159,6 +161,8 @@ File.exists(~matDir).not.if({ ("mkdir -p " ++ ~matDir.quote).systemCmd });
             ][color];
             spec.notNil.if({
                 var inst = ~matInstruments[vi];
+                // per-voice volume (mixer fix from main): read live, default 0.8
+                var volOf = { (~lp[\vol].notNil).if({ ~lp[\vol][name.asSymbol] ? 0.8 }, { 0.8 }) };
                 var instPair = inst.notNil.if({ [\instrument, inst] }, { [] });
                 var mod = ~matMod[vi];
                 var modPairs = mod.isNil.if({ [] }, {
@@ -170,8 +174,8 @@ File.exists(~matDir).not.if({ ("mkdir -p " ++ ~matDir.quote).systemCmd });
                     }, {
                         (tgt == \pan).if({
                             [\pan, Pfunc { (~matModSourceVal.(src) * 2 - 1) * d }]
-                        }, {  // amp: multiply the variation amp
-                            [\amp, Pfunc { spec[\amp] * (1 + (d * (~matModSourceVal.(src) * 2 - 1))).max(0) }]
+                        }, {  // amp: variation amp x per-voice volume x mod factor
+                            [\amp, Pfunc { (spec[\amp] * volOf.value) * (1 + (d * (~matModSourceVal.(src) * 2 - 1))).max(0) }]
                         })
                     })
                 });
@@ -183,7 +187,7 @@ File.exists(~matDir).not.if({ ("mkdir -p " ++ ~matDir.quote).systemCmd });
                         },
                         \stretch, spec[\stretch],
                         \octave,  spec[\octave],
-                        \amp,     spec[\amp]
+                        \amp,     Pfunc({ (spec[\amp] ? 1.0) * volOf.value })
                     ] ++ instPair ++ modPairs)),
                     base
                 )
@@ -191,6 +195,12 @@ File.exists(~matDir).not.if({ ("mkdir -p " ++ ~matDir.quote).systemCmd });
         }, { nil })
     })
 };
+
+// -- ~matNextBar : compute next playhead bar clipped within the loop region --
+// Wraps nb back to loop start when nb overshoots le or undershoots ls.
+~matNextBar = { var nb = ~lp[\matBar] + 1; var ls = ~lp[\matLoopStart] ? 0; var le = ~lp[\matLoopEnd] ? (~matBars - 1);
+    ((nb > le) or: { nb < ls }).if({ nb = ls });
+    nb.clip(0, ~matBars - 1) };
 
 // -- ~matApplyBar : set each voice's Pdef to its cell color and (re)play or stop --
 // Re-sourcing a playing Pdef updates it at the next quant boundary (smooth for v1).
@@ -233,6 +243,19 @@ File.exists(~matDir).not.if({ ("mkdir -p " ++ ~matDir.quote).systemCmd });
     ~toscSend !? { ~toscSend.("/matrix/trig", vi, amp.clip(0, 1)) }
 };
 
+// -- ~matLoopPush : send current loop region to surfaces --
+~matLoopPush = { ~toscSend !? { ~toscSend.("/matrix/loop", ~lp[\matLoopStart] ? 0, ~lp[\matLoopEnd] ? (~matBars - 1)) } };
+
+// -- ~matSetLoop : set loop region (auto-ordered) and push to surfaces --
+~matSetLoop = { |s, e| var a = s.asInteger.clip(0, ~matBars - 1); var b = e.asInteger.clip(0, ~matBars - 1);
+    (a <= b).if({ ~lp[\matLoopStart] = a; ~lp[\matLoopEnd] = b }, { ~lp[\matLoopStart] = b; ~lp[\matLoopEnd] = a });
+    ~matLoopPush.() };
+
+// -- ~matSeek : jump playhead to bar; re-applies if playing --
+~matSeek = { |bar| ~lp[\matBar] = bar.asInteger.clip(0, ~matBars - 1);
+    ~toscSend !? { ~toscSend.("/matrix/playhead", ~lp[\matBar]) };
+    ~lp[\matPlaying].if({ ~matApplyBar.(~lp[\matBar]) }) };
+
 // -- ~matStop : halt the playhead Routine and silence all matrix voices --
 ~matStop = {
     ~matRoutine !? { ~matRoutine.stop };
@@ -250,13 +273,13 @@ File.exists(~matDir).not.if({ ("mkdir -p " ++ ~matDir.quote).systemCmd });
     var clock = ~lp[\clock] ? TempoClock.default;
     ~matRoutine !? { ~matRoutine.stop };
     ~lp[\matPlaying] = true;
-    ~lp[\matBar]     = 0;
+    ~lp[\matBar]     = ~lp[\matLoopStart] ? 0;
     ~matRoutine = Routine({
         loop {
             ~matApplyBar.(~lp[\matBar]);
             ~toscSend !? { ~toscSend.("/matrix/playhead", ~lp[\matBar]) };
             ~matBeatsPerBar.wait;
-            ~lp[\matBar] = (~lp[\matBar] + 1) % ~matBars
+            ~lp[\matBar] = ~matNextBar.value;
         }
     }).play(clock, quant: ~matBeatsPerBar);
     ~matPush.()
@@ -356,7 +379,8 @@ File.exists(~matDir).not.if({ ("mkdir -p " ++ ~matDir.quote).systemCmd });
 ~matListPush = {
     try {
         var names = (~matNames.(~matPresetDir) ++ ~matNames.(~matDir)).as(Set).asArray.sort;
-        ~toscSend !? { ~toscSend.valueArray(["/matrix/list"] ++ names) }
+        ~toscSend !? { ~toscSend.valueArray(["/matrix/list"] ++ names) };
+        ~matLoopPush.()
     } { |e|
         ("[matrix] listPush err: " ++ e.class.name).postln
     }
@@ -481,6 +505,16 @@ OSCdef(\mat_mod, { |msg, time, addr|
     ~matApplyMod.((msg[1] ? 0).asInteger, (msg[2] ? \none).asSymbol,
         (msg[3] ? \none).asSymbol, (msg[4] ? 0).asFloat)
 }, '/matrix/mod');
+
+OSCdef(\mat_loop, { |msg, time, addr|
+    ~toscTouch !? { ~toscTouch.(addr) };
+    ~matSetLoop.(msg[1].asInteger, msg[2].asInteger)
+}, '/matrix/loop');
+
+OSCdef(\mat_seek, { |msg, time, addr|
+    ~toscTouch !? { ~toscTouch.(addr) };
+    ~matSeek.(msg[1].asInteger)
+}, '/matrix/seek');
 
 // -- Capture mod source cache (nil-guarded; idempotent reload) --
 ~matModCache   = ~matModCache ? IdentityDictionary.new;
