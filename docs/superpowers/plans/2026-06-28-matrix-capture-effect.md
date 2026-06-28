@@ -243,7 +243,7 @@ first and reads the base amp.)
 ```supercollider
 OSCdef(\mat_mod, { |msg, time, addr|
     ~toscTouch !? { ~toscTouch.(addr) };
-    ~matApplyMod.(msg[1].asInteger, (msg[2] ? \none).asSymbol,
+    ~matApplyMod.((msg[1] ? 0).asInteger, (msg[2] ? \none).asSymbol,
         (msg[3] ? \none).asSymbol, (msg[4] ? 0).asFloat)
 }, '/matrix/mod');
 ```
