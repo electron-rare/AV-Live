@@ -142,9 +142,10 @@ File.exists(~matDir).not.if({ ("mkdir -p " ++ ~matDir.quote).systemCmd });
 // -- ~matVariation : map color 1-6 to a Pchain overlay on the captured base --
 // color 1 = base as-is, 2 = double-time, 3 = octave up, 4 = half-time,
 // 5 = octave down + slight accent, 6 = accent roll (denser + louder).
-// \stretch multiplies event duration; \octave shifts degree-based pitch.
-// NOTE: voices that compute \freq via Pfunc (ignoring \octave) will not respond
-// to the octave variation — acceptable for v1; tune the palette at the live gate.
+// \stretch multiplies event duration; octave colors multiply the base \freq
+// (x2 up, x0.5 down) over the base event, so they transpose even voices that set
+// \freq directly via Pfunc (which bypass SC's \octave). Only pitched voices get
+// the \freq multiply — drums keep their pitch (and any instrument override).
 // Single function so all variation logic lives in one place.
 ~matVariation = { |name, color, vi = 0|
     (color == 0).if({ nil }, {
@@ -152,18 +153,26 @@ File.exists(~matDir).not.if({ ("mkdir -p " ++ ~matDir.quote).systemCmd });
         base.notNil.if({
             var spec = [
                 nil,
-                (stretch: 1.0, octave:  0, amp: 1.0),
-                (stretch: 0.5, octave:  0, amp: 1.0),
-                (stretch: 1.0, octave:  1, amp: 1.0),
-                (stretch: 2.0, octave:  0, amp: 1.0),
-                (stretch: 1.0, octave: -1, amp: 1.05),
-                (stretch: 0.5, octave:  0, amp: 1.2)
+                (stretch: 1.0, freqRatio: 1.0, amp: 1.0),
+                (stretch: 0.5, freqRatio: 1.0, amp: 1.0),
+                (stretch: 1.0, freqRatio: 2.0, amp: 1.0),
+                (stretch: 2.0, freqRatio: 1.0, amp: 1.0),
+                (stretch: 1.0, freqRatio: 0.5, amp: 1.05),
+                (stretch: 0.5, freqRatio: 1.0, amp: 1.2)
             ][color];
             spec.notNil.if({
                 var inst = ~matInstruments[vi];
                 // per-voice volume (mixer fix from main): read live, default 0.8
                 var volOf = { (~lp[\vol].notNil).if({ ~lp[\vol][name.asSymbol] ? 0.8 }, { 0.8 }) };
                 var instPair = inst.notNil.if({ [\instrument, inst] }, { [] });
+                // octave colors: multiply the base \freq, pitched voices only.
+                // gating avoids forcing a pitch onto drums (incl. drum voices
+                // remapped to a pitched instrument override).
+                var pitched = [\sub, \acid, \arp, \lead, \stab, \pad, \reese, \bells, \perc, \tom];
+                var freqRatio = spec[\freqRatio] ? 1.0;
+                var freqPair = (pitched.includes(name) and: { freqRatio != 1.0 }).if({
+                    [\freq, Pfunc({ |e| (e[\freq] ? 440) * freqRatio })]
+                }, { [] });
                 var mod = ~matMod[vi];
                 var modPairs = mod.isNil.if({ [] }, {
                     var src = mod[\source], tgt = mod[\target], d = mod[\depth];
@@ -186,9 +195,8 @@ File.exists(~matDir).not.if({ ("mkdir -p " ++ ~matDir.quote).systemCmd });
                             0
                         },
                         \stretch, spec[\stretch],
-                        \octave,  spec[\octave],
                         \amp,     Pfunc({ (spec[\amp] ? 1.0) * volOf.value })
-                    ] ++ instPair ++ modPairs)),
+                    ] ++ freqPair ++ instPair ++ modPairs)),
                     base
                 )
             }, { base })
