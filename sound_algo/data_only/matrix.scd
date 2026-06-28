@@ -24,8 +24,6 @@
 ~matBeatsPerBar = ~matBeatsPerBar ? 4;
 ~matLastColor   = ~matLastColor   ? Array.fill(~matVoices.size, -1);
 ~matInstruments  = ~matInstruments  ? Array.fill(~matVoices.size, nil);
-~matMod          = ~matMod          ? Array.fill(~matVoices.size, nil);
-~matPoseBindings = ~matPoseBindings ? Array.fill(~matVoices.size, { [] });
 ~matModTargets   = ~matModTargets   ? IdentityDictionary[
     \kick->[\amp,\pan,\rev], \hats->[\amp,\pan,\rev], \clap->[\amp,\pan,\rev],
     \perc->[\amp,\cutoff,\pan,\rev],
@@ -138,25 +136,21 @@ File.exists(~matDir).not.if({ ("mkdir -p " ++ ~matDir.quote).systemCmd });
     })
 };
 
-// -- ~matApplyMod : bind (or clear) a mod source→target for voice vi, echo --
-// srcOrNil/tgtOrNil = \none or nil clears the binding.
-// Rejected if: src not in ~matModSources, or tgt not in voice's ~matModTargets.
-~matApplyMod = { |vi, srcOrNil, tgtOrNil, depth|
-    (vi >= 0 and: { vi < ~matVoices.size }).if({
-        var name = ~matVoices[vi];
-        var src = ((srcOrNil == \none) or: { srcOrNil.isNil }).if({ nil }, { srcOrNil.asSymbol });
-        var tgt = ((tgtOrNil == \none) or: { tgtOrNil.isNil }).if({ nil }, { tgtOrNil.asSymbol });
-        var d = (depth ? 0).asFloat.clip(0, 1);
-        var ok = (src.isNil or: tgt.isNil) or: {
-            ~matModSources.includes(src) and: { (~matModTargets[name] ? []).includes(tgt) }
-        };
-        ok.if({
-            ~matMod[vi] = (src.isNil or: tgt.isNil).if({ nil },
-                { (source: src, target: tgt, depth: d) });
-            ~matLastColor[vi] = -1;
-            (~lp[\matPlaying] and: { ~matApplyBar.notNil }).if({ ~matApplyBar.(~lp[\matBar]) });
-            ~toscSend !? { ~toscSend.("/matrix/mod", vi,
-                (src ? \none).asString, (tgt ? \none).asString, d) }
+// -- ~matModPairs : capture-effect keys from the color's own mod (spec[\mod]) --
+// Returns [] when mod is nil (no effect key). Used by both pattern builders.
+~matModPairs = { |name, spec, volOf|
+    var mod = spec[\mod];
+    mod.isNil.if({ [] }, {
+        var src = mod[\source], tgt = mod[\target], d = mod[\depth];
+        (tgt == \cutoff).if({
+            var c0 = ~matModNeutralCut[name] ? 1000;
+            [\cutoff, Pfunc { var s = ~matModSourceVal.(src); c0 * (s.linexp(0,1,200,6000)/c0).pow(d) }]
+        }, {
+            (tgt == \pan).if({
+                [\pan, Pfunc { (~matModSourceVal.(src) * 2 - 1) * d }]
+            }, {
+                [\amp, Pfunc { ((spec[\amp] ? 1.0) * volOf.value) * (1 + (d * (~matModSourceVal.(src) * 2 - 1))).max(0) }]
+            })
         })
     })
 };
@@ -166,7 +160,6 @@ File.exists(~matDir).not.if({ ("mkdir -p " ++ ~matDir.quote).systemCmd });
 // cdPairs (static per-color cutoff/pan) come before modPairs so a live capture
 // mod on the same target overrides the static color-def value — intended.
 ~matVariationOverlay = { |name, vi, spec, volOf, instPair, cdPairs, base|
-    var mod = ~matMod[vi];
     // octave colors multiply \freq by 2**octave (main's freqRatio scheme), pitched
     // voices only — works for voices that set \freq directly via Pfunc.
     var pitched = [\sub, \acid, \arp, \lead, \stab, \pad, \reese, \bells, \perc, \tom];
@@ -174,24 +167,7 @@ File.exists(~matDir).not.if({ ("mkdir -p " ++ ~matDir.quote).systemCmd });
     var freqPair = (pitched.includes(name) and: { freqRatio != 1.0 }).if({
         [\freq, Pfunc({ |e| (e[\freq] ? 440) * freqRatio })]
     }, { [] });
-    var modPairs = mod.isNil.if({ [] }, {
-        var src = mod[\source], tgt = mod[\target], d = mod[\depth];
-        (tgt == \cutoff).if({
-            var c0 = ~matModNeutralCut[name] ? 1000;
-            [\cutoff, Pfunc { var s = ~matModSourceVal.(src);
-                c0 * (s.linexp(0, 1, 200, 6000) / c0).pow(d) }]
-        }, {
-            (tgt == \pan).if({
-                [\pan, Pfunc { (~matModSourceVal.(src) * 2 - 1) * d }]
-            }, {
-                (tgt == \rev).if({  // reverb send 0..1 scaled by depth
-                    [\rev, Pfunc { (~matModSourceVal.(src) * d).clip(0, 1) }]
-                }, {
-                    [\amp, Pfunc { ((spec[\amp] ? 1.0) * volOf.value) * (1 + (d * (~matModSourceVal.(src) * 2 - 1))).max(0) }]
-                })
-            })
-        })
-    });
+    var modPairs = ~matModPairs.(name, spec, volOf);
     Pchain(
         Pbind(*([
             \matGlow, Pfunc { |e| ~matEmitTrig.(vi, (e[\amp] ? spec[\amp]).clip(0, 1)); 0 },
@@ -208,17 +184,7 @@ File.exists(~matDir).not.if({ ("mkdir -p " ++ ~matDir.quote).systemCmd });
 ~matColorStepPattern = { |name, vi, color, spec, volOf, instPair, cdPairs|
     var freqRatio = 2 ** (spec[\octave] ? 0);
     var pitched = [\sub, \acid, \arp, \lead, \stab, \pad, \reese, \bells, \perc, \tom];
-    var mod = ~matMod[vi];
-    var modPairs = mod.isNil.if({ [] }, {
-        var src = mod[\source], tgt = mod[\target], d = mod[\depth];
-        (tgt == \cutoff).if({
-            var c0 = ~matModNeutralCut[name] ? 1000;
-            [\cutoff, Pfunc { var s = ~matModSourceVal.(src); c0 * (s.linexp(0,1,200,6000)/c0).pow(d) }]
-        }, {
-            (tgt == \pan).if({ [\pan, Pfunc { (~matModSourceVal.(src) * 2 - 1) * d }] },
-                { [] })   // amp mod out of scope for v1
-        })
-    });
+    var modPairs = ~matModPairs.(name, spec, volOf);
     var freqPair = pitched.includes(name).if({
         [\freq, Pfunc { |e| (~lpNote.notNil).if({ ~lpNote.(e[\degree], 0).midicps * freqRatio }, { 440 }) }]
     }, { [] });
@@ -528,16 +494,6 @@ OSCdef(\mat_steps_get, { |msg, time, addr|
     (1..6).do { |c| ~matStepsPush.((msg[1] ? 0).asInteger, c) }
 }, '/matrix/steps/get');
 
-// -- ~matModPush : send 16 mod triples (source,target,depth) flattened --
-~matModPush = {
-    ~toscSend !? {
-        ~toscSend.valueArray(["/matrix/mods"] ++ ~matMod.collect({ |m|
-            m.isNil.if({ ["none", "none", 0] },
-                { [m[\source].asString, m[\target].asString, m[\depth]] })
-        }).flatten)
-    }
-};
-
 // -- ~matListPush : send all available preset + user-save names to surfaces --
 ~matListPush = {
     try {
@@ -556,10 +512,7 @@ OSCdef(\mat_steps_get, { |msg, time, addr|
     var payload = (
         grid: ~lp[\matrix],
         instruments: ~matInstruments.collect({ |x| (x ? \default) }),
-        mods: ~matMod.collect({ |m| m.isNil.if({ \none },
-            { [m[\source], m[\target], m[\depth]] }) }),
-        colorDefs: ~matColorDefs.collect({ |defs| (1..6).collect({ |c| defs[c] }) }),
-        poseBindings: ~matPoseBindings
+        colorDefs: ~matColorDefs.collect({ |defs| (1..6).collect({ |c| defs[c] }) })
     );
     File.use(path, "w", { |f| f.write(payload.asCompileString) });
     ~matSavedNames.add(safe.asSymbol);
@@ -586,15 +539,6 @@ OSCdef(\mat_steps_get, { |msg, time, addr|
                 }).if({ nil }, { sym.asSymbol });
             };
             ~matVoices.size.do { |i| ~matLastColor[i] = -1 };
-            // restore mods (validate via ~matApplyMod, which rejects invalid)
-            ~matVoices.size.do { |i| ~matMod[i] = nil };
-            ((raw.isArray.not) and: { raw[\mods].notNil }).if({
-                raw[\mods].do { |m, vi|
-                    (m != \none and: { m.isArray and: { m.size == 3 } }).if({
-                        ~matApplyMod.(vi, m[0], m[1], m[2])
-                    })
-                }
-            });
             // restore color defs (default missing/legacy to the historical table)
             ~matColorDefs = Array.fill(~matVoices.size, { ~matDefaultColorDefs.value });
             ((raw.isArray.not) and: { raw[\colorDefs].notNil }).if({
@@ -610,18 +554,9 @@ OSCdef(\mat_steps_get, { |msg, time, addr|
                     })
                 }
             });
-            // restore pose bindings (default empty; legacy/missing -> empty arrays)
-            ~matPoseBindings = Array.fill(~matVoices.size, { [] });
-            ((raw.isArray.not) and: { raw[\poseBindings].notNil }).if({
-                raw[\poseBindings].do { |list, vi|
-                    (list.isArray and: { vi < ~matVoices.size }).if({ ~matPoseBindings[vi] = list })
-                }
-            });
-            ~matVoices.size.do { |vi| ~matPosesPush.(vi) };
             ~lp[\matPlaying].if({ ~matApplyBar.(~lp[\matBar]) });
             ~matGridPush.();
             ~matInstrPush.();
-            ~matModPush.();
             ~matVoices.size.do { |vi| ~matColorDefPush.(vi) };
             ("[matrix] loaded " ++ path).postln;
             true
@@ -748,76 +683,34 @@ OSCdef(\mat_colorpose_get, { |msg, time, addr|
     (1..6).do { |c| ~matColorModPush.((msg[1] ? 0).asInteger, c); ~matColorPosePush.((msg[1] ? 0).asInteger, c) }
 }, '/matrix/colordefs/get/ext');
 
-// -- ~matPosesPush : send a voice's pose bindings over OSC --
-~matPosesPush = { |vi|
-    ~toscSend !? {
-        var flat = ~matPoseBindings[vi].collect({ |b|
-            [b[\poseId].asString, b[\action].asString, b[\color]] }).flatten;
-        ~toscSend.valueArray(["/matrix/poses", vi, ~matPoseBindings[vi].size] ++ flat)
-    }
-};
-
-// -- ~matSetPoseBind : add/replace a (poseId, action, color) binding for a voice --
-// empty/\none poseId clears all bindings for that voice.
-~matSetPoseBind = { |vi, poseId, action, color|
-    (vi >= 0 and: { vi < ~matVoices.size }).if({
-        var pid = poseId.asSymbol;
-        ((pid == '') or: { pid == \none }).if({
-            ~matPoseBindings[vi] = []
-        }, {
-            // replace any existing binding for this poseId, else append
-            ~matPoseBindings[vi] = ~matPoseBindings[vi].reject({ |b| b[\poseId] == pid })
-                ++ [ (poseId: pid, action: action.asSymbol, color: color.asInteger.clip(1, 6)) ];
-        });
-        ~matPosesPush.(vi)
-    })
-};
-
-// -- ~matPoseFire : run every binding matching poseId across all voices --
-// \trigger re-sources the voice to the bound color; \gate toggles the voice's Pdef.
+// -- ~matPoseFire : run every per-color binding matching poseId across all voices/colors --
+// \trigger re-sources the voice to that color; \gate toggles the voice's Pdef.
 // Unknown poseId -> no-op (no raise).
 ~matPoseFire = { |poseId|
     var pid = poseId.asSymbol;
     ~matVoices.do { |name, vi|
         var key = ("lp_" ++ name).asSymbol;
-        (~matPoseBindings[vi] ? []).do { |b|
-            (b[\poseId] == pid).if({
-                (b[\action] == \trigger).if({
-                    Pdef.all.includesKey(key).if({
-                        var pat = ~matVariation.(name, b[\color], vi);
-                        pat.notNil.if({
-                            Pdef(key, pat);
-                            Pdef(key).play(~lp[\clock] ? TempoClock.default, quant: 1)
+        (1..6).do { |color|
+            ((~matColorDefs[vi][color][\pose]) ? []).do { |b|
+                (b[\poseId] == pid).if({
+                    (b[\action] == \trigger).if({
+                        Pdef.all.includesKey(key).if({
+                            var pat = ~matVariation.(name, color, vi);
+                            pat.notNil.if({ Pdef(key, pat); Pdef(key).play(~lp[\clock] ? TempoClock.default, quant: 1) })
                         })
-                    })
-                });
-                (b[\action] == \gate).if({
-                    Pdef.all.includesKey(key).if({
-                        Pdef(key).isPlaying.if(
-                            { Pdef(key).stop },
-                            { Pdef(key).play(~lp[\clock] ? TempoClock.default, quant: 1) }
-                        )
-                    })
-                });
-            })
+                    });
+                    (b[\action] == \gate).if({
+                        Pdef.all.includesKey(key).if({ Pdef(key).isPlaying.if({ Pdef(key).stop }, { Pdef(key).play(~lp[\clock] ? TempoClock.default, quant: 1) }) })
+                    });
+                })
+            }
         }
     }
 };
 
-OSCdef(\mat_posebind, { |msg, time, addr|
-    ~toscTouch !? { ~toscTouch.(addr) };
-    ~matSetPoseBind.((msg[1] ? 0).asInteger, (msg[2] ? \none).asSymbol,
-        (msg[3] ? \trigger).asSymbol, (msg[4] ? 1).asInteger)
-}, '/matrix/posebind');
-
 OSCdef(\mat_pose, { |msg, time, addr|
     ~matPoseFire.((msg[1] ? \none).asSymbol)
 }, '/matrix/pose');
-
-OSCdef(\mat_poses_get, { |msg, time, addr|
-    ~toscTouch !? { ~toscTouch.(addr) };
-    ~matPosesPush.((msg[1] ? 0).asInteger)
-}, '/matrix/poses/get');
 
 // -- OSCdefs (unique \mat_* keys; register sender for TouchOSC feedback) --
 OSCdef(\mat_cell, { |msg, time, addr|
@@ -864,12 +757,6 @@ OSCdef(\mat_kit, { |msg, time, addr|
     ~toscTouch !? { ~toscTouch.(addr) };
     ~matApplyKit.((msg[1] ? \default).asSymbol)
 }, '/matrix/kit');
-
-OSCdef(\mat_mod, { |msg, time, addr|
-    ~toscTouch !? { ~toscTouch.(addr) };
-    ~matApplyMod.((msg[1] ? 0).asInteger, (msg[2] ? \none).asSymbol,
-        (msg[3] ? \none).asSymbol, (msg[4] ? 0).asFloat)
-}, '/matrix/mod');
 
 OSCdef(\mat_loop, { |msg, time, addr|
     ~toscTouch !? { ~toscTouch.(addr) };

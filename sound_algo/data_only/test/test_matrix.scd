@@ -221,36 +221,8 @@ pass = pass and: { ~matModSourceVal.(\rOpen) == 0.0 };      // clamped to 0
 pass = pass and: { ~matModSourceVal.(\handSpeed) == 0.6 };
 pass = pass and: { ~matModSourceVal.(\unknownKey) == 0.0 }; // safe default
 
-// --- Mod bindings (Task 2) ---
-pass = pass and: { ~matMod.notNil and: { ~matMod.size == 16 } };
-pass = pass and: { ~matMod.every({ |x| x.isNil }) };
+// --- Mod targets still available (capture sources kept) ---
 pass = pass and: { ~matModTargets.notNil };
-
-~trigLog = nil;
-~toscSend = { |path ...args| ~trigLog = ([path] ++ args) };
-~matApplyMod.(5, \rHandY, \cutoff, 0.7);            // acid -> cutoff ok
-pass = pass and: { ~matMod[5].notNil and: { ~matMod[5][\target] == \cutoff } };
-pass = pass and: { ~trigLog[0] == "/matrix/mod" and: { ~trigLog[1] == 5 } };
-
-~matMod[0] = nil;
-~matApplyMod.(0, \rHandY, \cutoff, 0.7);            // kick has no cutoff -> rejected
-pass = pass and: { ~matMod[0].isNil };
-
-~matModCache = IdentityDictionary[ \rHandY -> 1.0 ];
-~matMod[5] = (source: \rHandY, target: \cutoff, depth: 1.0);
-~trigLog2 = ~matVariation.(\acid, 2, 5).asStream.next(());
-pass = pass and: { ~trigLog2[\cutoff].notNil and: { ~trigLog2[\cutoff] > 3000 } };  // hand up opens filter
-~matVoices.size.do { |i| ~matMod[i] = nil };
-
-// --- Mod persistence (Task 3) ---
-pass = pass and: { ~matModPush.notNil };
-~matVoices.size.do { |i| ~matMod[i] = nil };
-~matApplyMod.(5, \rHandY, \cutoff, 0.5);
-~matSave.("mod grid");
-~matVoices.size.do { |i| ~matMod[i] = nil };
-pass = pass and: { ~matLoad.("mod grid") };
-pass = pass and: { ~matMod[5].notNil and: { ~matMod[5][\target] == \cutoff } };
-File.delete(~matDir +/+ "mod_grid.matrix");
 
 // -- Loop region --
 pass = pass and: { ~matNextBar.notNil and: { ~matSetLoop.notNil and: { ~matSeek.notNil } } };
@@ -283,7 +255,6 @@ pass = pass and: { ~lp[\matBar] == 31 };  // clamped to ~matBars - 1
 ~matSetLoop.(0, 31);
 
 // --- Color editor: per-voice color defs (Task 1) ---
-~matVoices.size.do { |i| ~matMod[i] = nil };   // isolate from prior mod-persistence state
 pass = pass and: { ~matColorDefs.notNil and: { ~matColorDefs.size == 16 } };
 // defaults reproduce the current table: color 2 = stretch 0.5, octave 0, amp 1.0
 pass = pass and: { ~matColorDefs[5][2][\stretch] == 0.5 };
@@ -389,7 +360,6 @@ pass = pass and: { (~matColorDefs[5][2][\steps] === ~matColorDefs[5][3][\steps])
 // --- Sequence engine (Task 2) ---
 pass = pass and: { ~matColorStepPattern.notNil };
 // empty steps -> base path unchanged (parity): consuming yields the base-equivalent event
-~matVoices.size.do { |i| ~matMod[i] = nil };
 ~matColorDefs[5][2][\steps] = Array.fill(16, nil);
 ~sv = ~matVariation.(\acid, 2, 5).asStream.next(());
 pass = pass and: { ~sv[\stretch] == 0.5 };       // color 2 stretch, base path
@@ -415,37 +385,6 @@ pass = pass and: { ~matLoad.("sleg") };
 pass = pass and: { ~matStepsEmpty.(~matColorDefs[4][3][\steps]) };
 File.delete(~matDir +/+ "sleg.matrix");
 
-// --- Pose bindings (Task 4) ---
-pass = pass and: { ~matPoseBindings.notNil and: { ~matSetPoseBind.notNil } };
-pass = pass and: { ~matPoseBindings.size == 16 };
-~trigLog = nil;
-~toscSend = { |path ...args| ~trigLog = ([path] ++ args) };
-~matSetPoseBind.(5, \poseA, \trigger, 3);
-pass = pass and: { ~matPoseBindings[5].size == 1 };
-pass = pass and: { ~matPoseBindings[5][0][\poseId] == \poseA };
-pass = pass and: { ~trigLog[0] == "/matrix/poses" and: { ~trigLog[1] == 5 } };
-// firing an unknown pose must not raise
-try { ~matPoseFire.(\nope) } { |e| pass = false; ("EXCEPTION matPoseFire: " ++ e.class.name).postln };
-// same poseId replaces (no duplicate)
-~matSetPoseBind.(5, \poseA, \trigger, 3);
-pass = pass and: { ~matPoseBindings[5].size == 1 };
-// clear all for isolation
-~matPoseBindings.size.do { |i| ~matPoseBindings[i] = [] };
-
-// gate binding test
-~matSetPoseBind.(3, \poseB, \gate, 2);
-pass = pass and: { ~matPoseBindings[3][0][\action] == \gate };
-pass = pass and: { ~matPoseBindings[3][0][\color] == 2 };
-~matPoseBindings[3] = [];
-
-// --- Pose persistence (Task 4) ---
-~matSetPoseBind.(5, \poseA, \trigger, 3);
-~matSave.("pose grid");
-~matPoseBindings = Array.fill(~matVoices.size, { [] });
-pass = pass and: { ~matLoad.("pose grid") };
-pass = pass and: { ~matPoseBindings[5].size == 1 };
-pass = pass and: { ~matPoseBindings[5][0][\poseId] == \poseA };
-File.delete(~matDir +/+ "pose_grid.matrix");
 
 // --- Clamp: ~matSetStep must clip degree to -48..48 ---
 ~matSetStep.(5, 2, 4, 200, 0.5);
@@ -496,6 +435,23 @@ pass = pass and: { true };
 
 // Fix 1: fresh color pose arrays and distinct per color
 pass = pass and: { (~matColorDefs[5][1][\pose] === ~matColorDefs[5][2][\pose]).not };
+
+// --- Engine reads per-color mod + per-color pose fire (Task 2 color-refactor) ---
+pass = pass and: { ~matModPairs.notNil };
+// a color with a cutoff mod -> the produced event has a \cutoff key
+~matModCache = IdentityDictionary[ \rHandY -> 1.0 ];
+~matColorDefs[5][2][\mod] = (source: \rHandY, target: \cutoff, depth: 1.0);
+~ev = ~matVariation.(\acid, 2, 5).asStream.next(());
+pass = pass and: { ~ev[\cutoff].notNil and: { ~ev[\cutoff] > 3000 } };
+~matColorDefs[5][2][\mod] = nil;
+// per-voice ~matMod removed
+pass = pass and: { ~matMod.isNil };
+pass = pass and: { ~matPoseBindings.isNil };
+// per-color pose fire: a binding under a color, firing re-sources (no raise)
+~matColorDefs[5][3][\pose] = [ (poseId: \poseX, action: \trigger) ];
+try { ~matPoseFire.(\poseX) } { |e| pass = false; ("EXC poseFire: " ++ e.class.name).postln };
+try { ~matPoseFire.(\unknown) } { |e| pass = false };
+~matColorDefs[5][3][\pose] = [];
 
 pass.if(
     { "TEST PASS".postln },
