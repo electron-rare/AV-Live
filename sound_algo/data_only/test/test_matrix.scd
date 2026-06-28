@@ -62,6 +62,49 @@ try {
     ("EXCEPTION in ~matStop: " ++ e.class.name).postln
 };
 
+// -- Persistence: save / load round-trip (touches filesystem, valid headless) --
+~matSetCell.(1, 7, 4);
+~matSetCell.(2, 0, 2);
+
+try {
+    ~matSave.("test grid")
+} { |e|
+    pass = false;
+    ("EXCEPTION in ~matSave: " ++ e.class.name).postln
+};
+pass = pass and: {
+    File.exists(~matDir +/+ "test_grid.matrix").if({ true }, {
+        ("FAIL: save file not found at " ++ (~matDir +/+ "test_grid.matrix")).postln;
+        false
+    })
+};
+
+try {
+    ~matClear.()
+} { |e|
+    pass = false;
+    ("EXCEPTION in ~matClear: " ++ e.class.name).postln
+};
+pass = pass and: { ~lp[\matrix][1][7] == 0 };
+
+try {
+    ~matLoad.("test grid")
+} { |e|
+    pass = false;
+    ("EXCEPTION in ~matLoad: " ++ e.class.name).postln
+};
+pass = pass and: { ~lp[\matrix][1][7] == 4 };
+pass = pass and: { ~lp[\matrix][2][0] == 2 };
+pass = pass and: { ~matGridValid.(~lp[\matrix]) };
+pass = pass and: {
+    ~matNames.(~matDir).includes(\test_grid).if({ true }, {
+        "FAIL: test_grid not in matNames".postln;
+        false
+    })
+};
+
+File.delete(~matDir +/+ "test_grid.matrix");
+
 pass.if(
     { "TEST PASS".postln },
     { "TEST FAIL".postln }
