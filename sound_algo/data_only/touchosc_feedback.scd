@@ -101,19 +101,25 @@ OSCdef(\tosc_sniff_seqmelody, { |msg, time, addr|
 
 // -- Master RMS probe (server-only block; skipped when booting headless) --
 // Mirrors the \webRmsProbe recipe from web_bridge.scd, renamed to avoid clash.
+// Wrapped in a Routine so Server.default.sync is a real suspension point
+// both inside boot.scd's Routine AND on a manual IDE reload (where top-level
+// code runs on AppClock and a bare sync would be a no-op, firing Synth.tail
+// before the SynthDef finished compiling).
 Server.default.serverRunning.if({
-    SynthDef(\toscRmsProbe, { |inBus = 0, rate = 20|
-        var sig = Mix.ar(In.ar(inBus, 2)) * 0.5;
-        var amp = Amplitude.kr(sig, 0.01, 0.2);
-        SendReply.kr(Impulse.kr(rate), '/toscRms', [amp]);
-    }).add;
-    ~toscRmsResp  !? { ~toscRmsResp.free };
-    ~toscRmsSynth !? { ~toscRmsSynth.free };
-    Server.default.sync;
-    ~toscRmsSynth = Synth.tail(nil, \toscRmsProbe, [\inBus, 0, \rate, 20]);
-    ~toscRmsResp  = OSCFunc({ |msg|
-        ~toscSend.("/sync/rms", msg[3].asFloat);
-    }, '/toscRms', Server.default.addr);
+    Routine({
+        SynthDef(\toscRmsProbe, { |inBus = 0, rate = 20|
+            var sig = Mix.ar(In.ar(inBus, 2)) * 0.5;
+            var amp = Amplitude.kr(sig, 0.01, 0.2);
+            SendReply.kr(Impulse.kr(rate), '/toscRms', [amp]);
+        }).add;
+        ~toscRmsResp  !? { ~toscRmsResp.free };
+        ~toscRmsSynth !? { ~toscRmsSynth.free };
+        Server.default.sync;
+        ~toscRmsSynth = Synth.tail(nil, \toscRmsProbe, [\inBus, 0, \rate, 20]);
+        ~toscRmsResp  = OSCFunc({ |msg|
+            ~toscSend.("/sync/rms", msg[3].asFloat);
+        }, '/toscRms', Server.default.addr);
+    }).play;
 });
 
 // -- Beat pulse + armed state push on the launchpad clock --

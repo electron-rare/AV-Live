@@ -7,7 +7,10 @@
 // Server.default.serverRunning guard. The Routine is started and immediately
 // stopped — the armed push fires once with ~tosc nil, which must not raise.
 (
-var featureFile = "/Users/electron/Documents/Projets/AV-Live/sound_algo/data_only/touchosc_feedback.scd";
+// Resolve the feature file relative to this test file so it runs on any
+// clone path (e.g. GrosMac and macM1 have different repo roots).
+var featureFile = PathName(thisProcess.nowExecutingPath).pathOnly
+    ++ "../touchosc_feedback.scd";
 var pass = true;
 
 // Build a minimal dummy environment matching the shapes launchpad.scd creates
