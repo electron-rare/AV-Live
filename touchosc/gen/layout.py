@@ -318,6 +318,62 @@ def seq_page():
 
 
 # ---------------------------------------------------------------------------
+# Page 4 — SECTIONS
+# ---------------------------------------------------------------------------
+
+def sections_page():
+    """Page 4: 8 section slots (launch + save), prev/next nav, SC scene feedback.
+
+    The GROUP carries sections.lua and a /scene/state receive message so that
+    onReceiveOSC fires on the GROUP and can color the slot buttons.
+    """
+    page = s.node(
+        "GROUP",
+        [
+            s.prop("name", "SECTIONS", "s"),
+            s.frame(0, 0, *CANVAS),
+            s.script(_lua("sections.lua")),
+        ],
+        messages=[
+            s.osc("/scene/state", [s.val()], send=0, receive=1, feedback=1),
+        ],
+    )
+    ch = page.find("children")
+
+    ch.append(label("SECTIONS", 10, 8, 200, 30))
+
+    gx = 10
+    bw = 138
+    gap = 10
+    step = bw + gap          # 148 px per column
+
+    launch_y, launch_h = 46, 140
+    save_y, save_h = 196, 60
+
+    for i in range(8):
+        x = gx + i * step
+        # Launch button: name=slot{i} so sections.lua can findByName("slot"..i)
+        ch.append(s.node(
+            "BUTTON",
+            [s.prop("name", f"slot{i}", "s"), s.frame(x, launch_y, bw, launch_h)],
+            messages=[s.osc("/scene/launch", [s.consti(i)])],
+        ))
+        # Save button
+        ch.append(s.node(
+            "BUTTON",
+            [s.prop("name", f"S{i + 1}", "s"), s.frame(x, save_y, bw, save_h)],
+            messages=[s.osc("/scene/save", [s.consti(i)])],
+        ))
+
+    # Nav buttons
+    nav_y, nav_h = 272, 80
+    ch.append(button("< PREV", "/scene/prev", 10, nav_y, 200, nav_h, args=[s.vali()]))
+    ch.append(button("NEXT >", "/scene/next", 220, nav_y, 200, nav_h, args=[s.vali()]))
+
+    return page
+
+
+# ---------------------------------------------------------------------------
 # Pager + root
 # ---------------------------------------------------------------------------
 
@@ -335,6 +391,6 @@ def build():
     root = s.node(
         "GROUP",
         [s.prop("name", "av-live-control", "s"), s.frame(0, 0, *CANVAS)],
-        children=[pager([live_page(), fx_page(), seq_page()])],
+        children=[pager([live_page(), fx_page(), seq_page(), sections_page()])],
     )
     return root
