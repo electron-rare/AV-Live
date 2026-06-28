@@ -164,7 +164,7 @@ ws.addEventListener("message", (ev) => {
     const vi = Math.round(Number(args[0]));
     const bar = Math.round(Number(args[1]));
     const color = Math.round(Number(args[2]));
-    if (vi < 0 || vi >= 16 || bar < 0 || bar >= MATRIX_BARS || color < 0 || color > 6) return;
+    if (vi < 0 || vi >= MATRIX_VOICES.length || bar < 0 || bar >= MATRIX_BARS || color < 0 || color > 6) return;
     matGrid[vi][bar] = color;
     saveMatState();
     const el = cellRefs[bar][vi];
@@ -194,10 +194,10 @@ ws.addEventListener("message", (ev) => {
 
   // /matrix/grid <512 ints row-major vi*32+bar> — rebuild grid from loaded preset
   if (address === "/matrix/grid") {
-    if (!Array.isArray(args) || args.length < 512) return;
-    for (let vi = 0; vi < 16; vi++) {
+    if (!Array.isArray(args) || args.length < (MATRIX_VOICES.length * MATRIX_BARS)) return;
+    for (let vi = 0; vi < MATRIX_VOICES.length; vi++) {
       for (let bar = 0; bar < MATRIX_BARS; bar++) {
-        const v = Math.round(Number(args[vi * 32 + bar]));
+        const v = Math.round(Number(args[vi * MATRIX_BARS + bar]));
         matGrid[vi][bar] = (Number.isFinite(v) && v >= 0 && v <= 6) ? v : 0;
       }
     }
@@ -215,7 +215,7 @@ ws.addEventListener("message", (ev) => {
   // /matrix/instrument <vi> <inst> — single-voice instrument echo
   if (address === "/matrix/instrument") {
     const vi = Math.round(Number(args[0])); const v = String(args[1] ?? "default");
-    if (vi >= 0 && vi < 16) {
+    if (vi >= 0 && vi < MATRIX_VOICES.length) {
       matInst[vi] = v; saveMatState();
       const rowSel = document.querySelector(`.minst[data-vi="${vi}"]`);
       if (rowSel) rowSel.value = v;
@@ -224,7 +224,7 @@ ws.addEventListener("message", (ev) => {
   }
   // /matrix/instruments <16 strings> — bulk (preset load / kit)
   if (address === "/matrix/instruments") {
-    for (let vi = 0; vi < 16 && vi < args.length; vi++) {
+    for (let vi = 0; vi < MATRIX_VOICES.length && vi < args.length; vi++) {
       const v = String(args[vi] ?? "default"); matInst[vi] = v;
       const rowSel = document.querySelector(`.minst[data-vi="${vi}"]`);
       if (rowSel) rowSel.value = v;
@@ -234,7 +234,7 @@ ws.addEventListener("message", (ev) => {
   }
   if (address === "/matrix/colordefs") {
     const vi = Math.round(Number(args[0]));
-    if (vi >= 0 && vi < 16) {
+    if (vi >= 0 && vi < MATRIX_VOICES.length) {
       for (let c = 1; c <= 6; c++) {
         const b = 1 + (c - 1) * 6;
         const ex = matColorDefs[vi][c] || {};
@@ -252,7 +252,7 @@ ws.addEventListener("message", (ev) => {
   }
   if (address === "/matrix/steps") {
     const vi = Math.round(Number(args[0])), c = Math.round(Number(args[1]));
-    if (vi>=0 && vi<16 && c>=1 && c<=6 && matColorDefs[vi][c]) {
+    if (vi>=0 && vi<MATRIX_VOICES.length && c>=1 && c<=6 && matColorDefs[vi][c]) {
       if (!matColorDefs[vi][c].steps) matColorDefs[vi][c].steps = new Array(16).fill(null);
       for (let s=0; s<16; s++) {
         const deg = Number(args[2 + s*2]), vel = Number(args[3 + s*2]);
@@ -265,7 +265,7 @@ ws.addEventListener("message", (ev) => {
   }
   if (address === "/matrix/colormod") {
     const vi=Math.round(Number(args[0])), c=Math.round(Number(args[1]));
-    if (vi>=0&&vi<16&&c>=1&&c<=6&&matColorDefs[vi][c]) {
+    if (vi>=0&&vi<MATRIX_VOICES.length&&c>=1&&c<=6&&matColorDefs[vi][c]) {
       const src=String(args[2]??"none");
       matColorDefs[vi][c].mod = (src==="none") ? null : {source:src, target:String(args[3]??"none"), depth:Number(args[4])||0};
       saveMatState();
@@ -275,7 +275,7 @@ ws.addEventListener("message", (ev) => {
   }
   if (address === "/matrix/colorpose") {
     const vi=Math.round(Number(args[0])), c=Math.round(Number(args[1])), n=Math.round(Number(args[2]));
-    if (vi>=0&&vi<16&&c>=1&&c<=6&&matColorDefs[vi][c]) {
+    if (vi>=0&&vi<MATRIX_VOICES.length&&c>=1&&c<=6&&matColorDefs[vi][c]) {
       matColorDefs[vi][c].pose = [];
       for (let k=0;k<n;k++){ const b=3+k*2; matColorDefs[vi][c].pose.push({poseId:String(args[b]),action:String(args[b+1])}); }
       saveMatState();
@@ -289,33 +289,40 @@ ws.addEventListener("message", (ev) => {
 const MATRIX_STORAGE_KEY = "avlive.matrix";
 const MATRIX_VOICES = [
   "kick","hats","clap","perc","sub","acid","arp","lead",
-  "stab","pad","ride","rim","tom","reese","bells","sweep"
+  "stab","pad","ride","rim","tom","reese","bells","sweep",
+  "melody","chord","fx","snare","crash","shaker"
 ];
 // per-voice curated instrument options (must mirror SC ~matInstChoices)
 // note-terminating synths only — the continuous do_ drones never free per-note.
 const MATRIX_INST_CHOICES = {
-  kick:["lp_kick","do_kick","do_quake_sub"], hats:["lp_hat","do_hat"],
-  clap:["lp_clap","lp_rim","do_hat"], perc:["lp_perc","do_strike","lp_tom"],
-  sub:["lp_sub","lp_reese","do_quake_sub"],
-  acid:["lp_acid","lp_pluck"], arp:["lp_pluck","do_strike","lp_bells"],
-  lead:["lp_pluck","do_plane","do_strike","lp_bells"], stab:["lp_pluck","lp_acid"],
-  pad:["lp_pad","lp_reese","lp_sub"], ride:["lp_ride","lp_hat","do_hat"],
-  rim:["lp_rim","lp_clap","do_hat"], tom:["lp_tom","do_strike","do_quake_sub"],
-  reese:["lp_reese","lp_sub","lp_pad"],
-  bells:["lp_bells","do_strike","do_plane"], sweep:["lp_sweep","lp_pad","lp_reese"]
+  kick:["lp_kick","tr909_kick","tr808_kick","sp1200","do_kick","do_quake_sub"], hats:["lp_hat","tr909_hat","tr808_hat","sp1200","do_hat"],
+  clap:["lp_clap","tr909_clap","tr808_clap","sp1200","lp_rim"], perc:["lp_perc","tr808_cowbell","sp1200","akai_s","do_strike"],
+  sub:["lp_sub","sh101","minimoog","system100","lp_reese"],
+  acid:["lp_acid","tb303","ms20","system100","lp_pluck"], arp:["lp_pluck","tb303","supersaw","juno","do_strike"],
+  lead:["lp_pluck","ms20","supersaw","do_plane","sh101"], stab:["lp_pluck","ms20","supersaw","tb303","lp_acid"],
+  pad:["lp_pad","juno","supersaw","ms20","lp_reese"], ride:["lp_ride","tr909_ride","lp_hat","do_hat"],
+  rim:["lp_rim","tr808_cowbell","tr909_clap","sp1200"], tom:["lp_tom","sp1200","do_strike","do_quake_sub"],
+  reese:["lp_reese","ms20","minimoog","system100","supersaw"],
+  bells:["lp_bells","dx7","akai_s","do_plane"], sweep:["lp_sweep","akai_s","lp_pad","lp_reese"],
+  melody:["lp_pluck","supersaw","ms20","sh101","dx7"], chord:["lp_pad","juno","supersaw","ms20"],
+  fx:["lp_fx","akai_s","lp_sweep"], snare:["lp_snare","tr909_clap","tr808_clap","lp_clap"],
+  crash:["lp_crash","tr909_ride","akai_s"], shaker:["lp_shaker","tr909_hat","tr808_hat"]
 };
-let matInst = new Array(16).fill("default");   // per-voice selection (persisted)
+let matInst = new Array(MATRIX_VOICES.length).fill("default");   // per-voice selection (persisted)
 const MATRIX_MOD_SOURCES = ["none","lHandY","rHandY","lHandX","rHandX","lOpen","rOpen","handSpeed","handDist","bodyX","bodyY","depth"];
 const MATRIX_MOD_TARGETS = {
   kick:["none","amp","pan","rev"], hats:["none","amp","pan","rev"], clap:["none","amp","pan","rev"], perc:["none","amp","cutoff","pan","rev"],
   sub:["none","amp","pan","rev"], acid:["none","amp","cutoff","pan","rev"], arp:["none","amp","cutoff","pan","rev"],
   lead:["none","amp","cutoff","pan","rev"], stab:["none","amp","cutoff","pan","rev"], pad:["none","amp","cutoff","pan","rev"],
   ride:["none","amp","pan","rev"], rim:["none","amp","pan","rev"], tom:["none","amp","pan","rev"], reese:["none","amp","cutoff","pan","rev"],
-  bells:["none","amp","pan","rev"], sweep:["none","amp","pan","rev"]
+  bells:["none","amp","pan","rev"], sweep:["none","amp","pan","rev"],
+  melody:["none","amp","cutoff","pan","rev"], chord:["none","amp","cutoff","pan","rev"],
+  fx:["none","amp","pan","rev"], snare:["none","amp","pan","rev"],
+  crash:["none","amp","pan","rev"], shaker:["none","amp","pan","rev"]
 };
 const mkColor = (stretch, octave, amp, inst, cutoff, pan) =>
   ({stretch, octave, amp, inst, cutoff, pan, mod:null, pose:[], steps:new Array(16).fill(null)});
-let matColorDefs = Array.from({ length: 16 }, () =>
+let matColorDefs = Array.from({ length: MATRIX_VOICES.length }, () =>
   [null,
    mkColor(1.0,0,1.0,"default",-1,-2),
    mkColor(0.5,0,1.0,"default",-1,-2),
@@ -324,13 +331,13 @@ let matColorDefs = Array.from({ length: 16 }, () =>
    mkColor(1.0,-1,1.05,"default",-1,-2),
    mkColor(0.5,0,1.2,"default",-1,-2)]);
 let cdEditVoice = -1, cdColor = 1, cdAuditioning = false;
-const MATRIX_BARS = 32;
-let matGrid = Array.from({ length: 16 }, () => new Array(32).fill(0));
+const MATRIX_BARS = 64;
+let matGrid = Array.from({ length: MATRIX_VOICES.length }, () => new Array(MATRIX_BARS).fill(0));
 // cellRefs[bar][vi] for O(16) playhead column toggle
-const cellRefs = Array.from({ length: 32 }, () => new Array(16).fill(null));
+const cellRefs = Array.from({ length: MATRIX_BARS }, () => new Array(MATRIX_VOICES.length).fill(null));
 let matPlayhead = -1;
 let matLoopStart = 0;
-let matLoopEnd = 31;
+let matLoopEnd = MATRIX_BARS - 1;
 
 function saveMatState() {
   try { localStorage.setItem(MATRIX_STORAGE_KEY,
@@ -339,11 +346,11 @@ function saveMatState() {
 function loadMatState() {
   try {
     const raw = JSON.parse(localStorage.getItem(MATRIX_STORAGE_KEY));
-    if (raw && Array.isArray(raw.grid) && raw.grid.length === 16) { matGrid = raw.grid;
-      if (Array.isArray(raw.inst) && raw.inst.length === 16) matInst = raw.inst;
-      if (Array.isArray(raw.cdef) && raw.cdef.length === 16) {
+    if (raw && Array.isArray(raw.grid) && raw.grid.length === MATRIX_VOICES.length) { matGrid = raw.grid;
+      if (Array.isArray(raw.inst) && raw.inst.length === MATRIX_VOICES.length) matInst = raw.inst;
+      if (Array.isArray(raw.cdef) && raw.cdef.length === MATRIX_VOICES.length) {
         matColorDefs = raw.cdef;
-        for (let vi = 0; vi < 16; vi++) {
+        for (let vi = 0; vi < MATRIX_VOICES.length; vi++) {
           for (let c = 1; c <= 6; c++) {
             if (matColorDefs[vi][c]) {
               if (!matColorDefs[vi][c].steps) matColorDefs[vi][c].steps = new Array(16).fill(null);
@@ -354,9 +361,9 @@ function loadMatState() {
         }
       }
       return; }
-    if (Array.isArray(raw) && raw.length === 16) { matGrid = raw; return; }   // legacy: bare grid
+    if (Array.isArray(raw) && raw.length === MATRIX_VOICES.length) { matGrid = raw; return; }   // legacy: bare grid
   } catch (_e) {}
-  matGrid = Array.from({ length: 16 }, () => new Array(32).fill(0));
+  matGrid = Array.from({ length: MATRIX_VOICES.length }, () => new Array(MATRIX_BARS).fill(0));
 }
 
 function applyMatCellColor(el, color) {
@@ -1114,7 +1121,7 @@ document.addEventListener("DOMContentLoaded", () => {
   if (matStop) matStop.addEventListener("click", () => send("/matrix/stop"));
   const matClear = document.getElementById("matrix-clear");
   if (matClear) matClear.addEventListener("click", () => {
-    matGrid = Array.from({ length: 16 }, () => new Array(32).fill(0));
+    matGrid = Array.from({ length: MATRIX_VOICES.length }, () => new Array(MATRIX_BARS).fill(0));
     saveMatState();
     renderMatrix();
     send("/matrix/clear");

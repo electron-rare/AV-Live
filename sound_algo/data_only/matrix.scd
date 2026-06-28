@@ -14,9 +14,10 @@
     \kick, \hats, \clap, \perc,
     \sub,  \acid, \arp,  \lead,
     \stab, \pad,  \ride, \rim,
-    \tom,  \reese, \bells, \sweep
+    \tom,  \reese, \bells, \sweep,
+    \melody, \chord, \fx, \snare, \crash, \shaker
 ];
-~matBars        = ~matBars        ? 32;
+~matBars        = ~matBars        ? 64;
 ~lp[\matrix]    = ~lp[\matrix]    ? Array.fill(~matVoices.size, { Array.fill(~matBars, 0) });
 ~lp[\matBar]    = ~lp[\matBar]    ? 0;
 ~lp[\matPlaying] = ~lp[\matPlaying] ? false;
@@ -31,11 +32,14 @@
     \lead->[\amp,\cutoff,\pan,\rev], \stab->[\amp,\cutoff,\pan,\rev], \pad->[\amp,\cutoff,\pan,\rev],
     \ride->[\amp,\pan,\rev], \rim->[\amp,\pan,\rev], \tom->[\amp,\pan,\rev],
     \reese->[\amp,\cutoff,\pan,\rev],
-    \bells->[\amp,\pan,\rev], \sweep->[\amp,\pan,\rev]
+    \bells->[\amp,\pan,\rev], \sweep->[\amp,\pan,\rev],
+    \melody->[\amp,\cutoff,\pan,\rev], \chord->[\amp,\cutoff,\pan,\rev],
+    \fx->[\amp,\pan,\rev], \snare->[\amp,\pan,\rev],
+    \crash->[\amp,\pan,\rev], \shaker->[\amp,\pan,\rev]
 ];
 ~matModNeutralCut = ~matModNeutralCut ? IdentityDictionary[
     \perc->1260, \acid->700, \arp->3000, \lead->4000, \stab->2200,
-    \pad->1500, \reese->1100
+    \pad->1500, \reese->1100, \melody->3500, \chord->2000
 ];
 
 // -- default color defs reproduce the historical global variation table --
@@ -79,22 +83,28 @@ File.exists(~matDir).not.if({ ("mkdir -p " ++ ~matDir.quote).systemCmd });
 // they never free and pile up forever, so they are NOT offered. The gated \lp_
 // sustained voices (lp_sub/lp_reese/lp_pad/lp_sweep) cover the drone textures.
 ~matInstChoices = ~matInstChoices ? IdentityDictionary[
-    \kick  -> [\lp_kick, \do_kick, \do_quake_sub],
-    \hats  -> [\lp_hat,  \do_hat],
-    \clap  -> [\lp_clap, \lp_rim, \do_hat],
-    \perc  -> [\lp_perc, \do_strike, \lp_tom],
-    \sub   -> [\lp_sub,  \lp_reese, \do_quake_sub],
-    \acid  -> [\lp_acid, \lp_pluck],
-    \arp   -> [\lp_pluck, \do_strike, \lp_bells],
-    \lead  -> [\lp_pluck, \do_plane, \do_strike, \lp_bells],
-    \stab  -> [\lp_pluck, \lp_acid],
-    \pad   -> [\lp_pad,  \lp_reese, \lp_sub],
-    \ride  -> [\lp_ride, \lp_hat, \do_hat],
-    \rim   -> [\lp_rim,  \lp_clap, \do_hat],
-    \tom   -> [\lp_tom,  \do_strike, \do_quake_sub],
-    \reese -> [\lp_reese, \lp_sub, \lp_pad],
-    \bells -> [\lp_bells, \do_strike, \do_plane],
-    \sweep -> [\lp_sweep, \lp_pad, \lp_reese]
+    \kick  -> [\lp_kick, \tr909_kick, \tr808_kick, \sp1200, \do_kick, \do_quake_sub],
+    \hats  -> [\lp_hat,  \tr909_hat, \tr808_hat, \sp1200, \do_hat],
+    \clap  -> [\lp_clap, \tr909_clap, \tr808_clap, \sp1200, \lp_rim],
+    \perc  -> [\lp_perc, \tr808_cowbell, \sp1200, \akai_s, \do_strike],
+    \sub   -> [\lp_sub,  \sh101, \minimoog, \system100, \lp_reese],
+    \acid  -> [\lp_acid, \tb303, \ms20, \system100, \lp_pluck],
+    \arp   -> [\lp_pluck, \tb303, \supersaw, \juno, \do_strike],
+    \lead  -> [\lp_pluck, \ms20, \supersaw, \do_plane, \sh101],
+    \stab  -> [\lp_pluck, \ms20, \supersaw, \tb303, \lp_acid],
+    \pad   -> [\lp_pad,  \juno, \supersaw, \ms20, \lp_reese],
+    \ride  -> [\lp_ride, \tr909_ride, \lp_hat, \do_hat],
+    \rim   -> [\lp_rim,  \tr808_cowbell, \tr909_clap, \sp1200],
+    \tom   -> [\lp_tom,  \sp1200, \do_strike, \do_quake_sub],
+    \reese -> [\lp_reese, \ms20, \minimoog, \system100, \supersaw],
+    \bells -> [\lp_bells, \dx7, \akai_s, \do_plane],
+    \sweep -> [\lp_sweep, \akai_s, \lp_pad, \lp_reese],
+    \melody -> [\lp_pluck, \supersaw, \ms20, \sh101, \dx7],
+    \chord  -> [\lp_pad, \juno, \supersaw, \ms20],
+    \fx     -> [\lp_fx, \akai_s, \lp_sweep],
+    \snare  -> [\lp_snare, \tr909_clap, \tr808_clap, \lp_clap],
+    \crash  -> [\lp_crash, \tr909_ride, \akai_s],
+    \shaker -> [\lp_shaker, \tr909_hat, \tr808_hat]
 ];
 
 // -- fixed kits: kitName -> (voiceName -> instrument). Unlisted voices = default --
@@ -366,6 +376,19 @@ File.exists(~matDir).not.if({ ("mkdir -p " ++ ~matDir.quote).systemCmd });
     }
 };
 
+// -- ~matMigrateGrid : coerce any grid to current ~matVoices.size x ~matBars --
+// Legacy presets (e.g. 16 x 32) get padded to the current voice count (new
+// voices silent) and their bars tiled (wrapAt) to fill ~matBars; cells clipped.
+~matMigrateGrid = { |g|
+    Array.fill(~matVoices.size, { |vi|
+        var src = (g.isArray and: { vi < g.size } and: {
+            g[vi].isArray and: { g[vi].size > 0 } }).if({ g[vi] }, { nil });
+        Array.fill(~matBars, { |bar|
+            src.notNil.if({ (src.wrapAt(bar) ? 0).asInteger.clip(0, 6) }, { 0 })
+        })
+    })
+};
+
 // -- ~matNames : list base names of .matrix files found in a directory --
 // User dir: served from in-memory ~matSavedNames (populated by ~matSave) —
 // avoids filesystem-scan quirks that can fail headless in some SC contexts.
@@ -533,6 +556,7 @@ OSCdef(\mat_steps_get, { |msg, time, addr|
         // legacy: bare grid Array; new: Event (grid:, instruments:)
         grid  = raw.isArray.if({ raw }, { raw[\grid] });
         insts = raw.isArray.if({ nil }, { raw[\instruments] });
+        grid  = grid.isArray.if({ ~matMigrateGrid.(grid) }, { grid });   // pad/tile to current dims
         ~matGridValid.(grid).if({
             ~lp[\matrix] = grid;
             // restore instruments (default nil; validate against choices)

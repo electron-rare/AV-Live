@@ -144,7 +144,7 @@ pass = pass and: { ~trigLog[1] == 5 };
 pass = pass and: { ~trigLog[2] == 1.0 };  // color 2 spec[\amp]=1.0; base has no \amp
 
 // --- Instrument selection (Task 1) ---
-pass = pass and: { ~matInstruments.notNil and: { ~matInstruments.size == 16 } };
+pass = pass and: { ~matInstruments.notNil and: { ~matInstruments.size == ~matVoices.size } };
 pass = pass and: { ~matInstruments.every({ |x| x.isNil }) };          // default nil
 pass = pass and: { ~matInstChoices.notNil and: { ~matKits.notNil } };
 
@@ -249,13 +249,13 @@ pass = pass and: { ~matNextBar.value == 2 };  // below ls -> snap to loop start
 ~matSeek.(7);
 pass = pass and: { ~lp[\matBar] == 7 };
 ~matSeek.(99);
-pass = pass and: { ~lp[\matBar] == 31 };  // clamped to ~matBars - 1
+pass = pass and: { ~lp[\matBar] == (~matBars - 1) };  // clamped to ~matBars - 1
 
 // Reset loop to full range
 ~matSetLoop.(0, 31);
 
 // --- Color editor: per-voice color defs (Task 1) ---
-pass = pass and: { ~matColorDefs.notNil and: { ~matColorDefs.size == 16 } };
+pass = pass and: { ~matColorDefs.notNil and: { ~matColorDefs.size == ~matVoices.size } };
 // defaults reproduce the current table: color 2 = stretch 0.5, octave 0, amp 1.0
 pass = pass and: { ~matColorDefs[5][2][\stretch] == 0.5 };
 pass = pass and: { ~matColorDefs[5][2][\octave] == 0 };
