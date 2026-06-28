@@ -39,12 +39,12 @@
 // -- default color defs reproduce the historical global variation table --
 ~matDefaultColorDefs = {
     [ nil,
-        (stretch: 1.0, octave:  0, amp: 1.0,  inst: nil, cutoff: nil, pan: nil),
-        (stretch: 0.5, octave:  0, amp: 1.0,  inst: nil, cutoff: nil, pan: nil),
-        (stretch: 1.0, octave:  1, amp: 1.0,  inst: nil, cutoff: nil, pan: nil),
-        (stretch: 2.0, octave:  0, amp: 1.0,  inst: nil, cutoff: nil, pan: nil),
-        (stretch: 1.0, octave: -1, amp: 1.05, inst: nil, cutoff: nil, pan: nil),
-        (stretch: 0.5, octave:  0, amp: 1.2,  inst: nil, cutoff: nil, pan: nil) ]
+        (stretch: 1.0, octave:  0, amp: 1.0,  inst: nil, cutoff: nil, pan: nil, steps: Array.fill(16, nil)),
+        (stretch: 0.5, octave:  0, amp: 1.0,  inst: nil, cutoff: nil, pan: nil, steps: Array.fill(16, nil)),
+        (stretch: 1.0, octave:  1, amp: 1.0,  inst: nil, cutoff: nil, pan: nil, steps: Array.fill(16, nil)),
+        (stretch: 2.0, octave:  0, amp: 1.0,  inst: nil, cutoff: nil, pan: nil, steps: Array.fill(16, nil)),
+        (stretch: 1.0, octave: -1, amp: 1.05, inst: nil, cutoff: nil, pan: nil, steps: Array.fill(16, nil)),
+        (stretch: 0.5, octave:  0, amp: 1.2,  inst: nil, cutoff: nil, pan: nil, steps: Array.fill(16, nil)) ]
 };
 ~matColorDefs = ~matColorDefs ? Array.fill(~matVoices.size, { ~matDefaultColorDefs.value });
 
@@ -434,6 +434,48 @@ File.exists(~matDir).not.if({ ("mkdir -p " ++ ~matDir.quote).systemCmd });
         ~toscSend.valueArray(["/matrix/colordefs", vi] ++ flat)
     }
 };
+
+// -- ~matStepsEmpty : true when no step has a note (all rests) --
+~matStepsEmpty = { |steps| steps.isNil or: { steps.every({ |s| s.isNil }) } };
+
+// -- ~matSetStep : write one step (degree \rest/nil clears), re-source, echo --
+~matSetStep = { |vi, color, stepIdx, degree, vel|
+    ((vi >= 0 and: { vi < ~matVoices.size }) and: { color >= 1 and: { color <= 6 } }
+        and: { stepIdx >= 0 and: { stepIdx < 16 } }).if({
+        var steps = ~matColorDefs[vi][color][\steps];
+        ((degree == \rest) or: { degree.isNil }).if({
+            steps[stepIdx] = nil
+        }, {
+            steps[stepIdx] = (degree: degree.asInteger, vel: vel.asFloat.clip(0, 1))
+        });
+        ~matLastColor[vi] = -1;
+        (~lp[\matPlaying] and: { ~matApplyBar.notNil }).if({ ~matApplyBar.(~lp[\matBar]) });
+        ~matStepsPush.(vi, color)
+    })
+};
+
+// -- ~matStepsPush : send one color's 16 steps (degree, vel); rest -> (-99, 0) --
+~matStepsPush = { |vi, color|
+    ~toscSend !? {
+        var flat = ~matColorDefs[vi][color][\steps].collect({ |s|
+            s.isNil.if({ [-99, 0] }, { [s[\degree], s[\vel]] })
+        }).flatten;
+        ~toscSend.valueArray(["/matrix/steps", vi, color] ++ flat)
+    }
+};
+
+OSCdef(\mat_step, { |msg, time, addr|
+    var deg;
+    ~toscTouch !? { ~toscTouch.(addr) };
+    deg = ((msg[4] ? -99) == -99).if({ \rest }, { msg[4] });
+    ~matSetStep.((msg[1] ? 0).asInteger, (msg[2] ? 1).asInteger, (msg[3] ? 0).asInteger,
+        deg, (msg[5] ? 0))
+}, '/matrix/step');
+
+OSCdef(\mat_steps_get, { |msg, time, addr|
+    ~toscTouch !? { ~toscTouch.(addr) };
+    (1..6).do { |c| ~matStepsPush.((msg[1] ? 0).asInteger, c) }
+}, '/matrix/steps/get');
 
 // -- ~matModPush : send 16 mod triples (source,target,depth) flattened --
 ~matModPush = {

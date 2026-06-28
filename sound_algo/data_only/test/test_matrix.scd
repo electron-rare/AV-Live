@@ -365,6 +365,25 @@ pass = pass and: { ~matColorDefs[6][2][\inst] == \do_strike };
 
 pass = pass and: { ~matVariation.(\acid, 1, 5).asStream.next(()).notNil };
 
+// --- Step sequencer state (Task 1) ---
+pass = pass and: { ~matStepsEmpty.notNil and: { ~matSetStep.notNil and: { ~matStepsPush.notNil } } };
+// default: every color's steps is a 16-slot all-nil array -> empty
+pass = pass and: { ~matColorDefs[5][2][\steps].size == 16 };
+pass = pass and: { ~matStepsEmpty.(~matColorDefs[5][2][\steps]) };
+// set a step, then not empty; step holds degree+vel
+~trigLog = nil;
+~toscSend = { |path ...args| ~trigLog = ([path] ++ args) };
+~matSetStep.(5, 2, 3, 7, 0.8);
+pass = pass and: { ~matColorDefs[5][2][\steps][3][\degree] == 7 };
+pass = pass and: { ~matColorDefs[5][2][\steps][3][\vel] == 0.8 };
+pass = pass and: { ~matStepsEmpty.(~matColorDefs[5][2][\steps]).not };
+pass = pass and: { ~trigLog[0] == "/matrix/steps" and: { ~trigLog[1] == 5 } };
+pass = pass and: { ~trigLog.size == 35 };   // path + vi + color + 32 vals
+// rest clears the step
+~matSetStep.(5, 2, 3, \rest, 0);
+pass = pass and: { ~matColorDefs[5][2][\steps][3].isNil };
+pass = pass and: { ~matStepsEmpty.(~matColorDefs[5][2][\steps]) };
+
 pass.if(
     { "TEST PASS".postln },
     { "TEST FAIL".postln }
