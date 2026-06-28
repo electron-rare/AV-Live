@@ -138,9 +138,15 @@ class IphoneUSBSource:
                                 self.state.persons_arkit_last_t[pid] = time.perf_counter()
                     elif tag == TAG_HANDS:
                         hands = _decode_hands(payload)
-                        if hands is not None and self._write_hands and self.state is not None:
+                        if hands is not None and self.state is not None:
                             with self.state.lock():
-                                self.state.persons_hands = hands
+                                # Always expose iPhone Vision hands (stable,
+                                # rotation-invariant) for the air-piano.
+                                self.state.persons_hands_iphone = hands
+                                self.state.persons_hands_iphone_t = \
+                                    time.perf_counter()
+                                if self._write_hands:
+                                    self.state.persons_hands = hands
             except OSError as e:
                 LOG.warning("iphone usb stream error: %s", e)
             finally:

@@ -102,6 +102,11 @@ class State:
     persons_body:  list[list[PoseKp]] = field(default_factory=list)
     persons_face:  list[list[PoseKp]] = field(default_factory=list)
     persons_hands: list[list[PoseKp]] = field(default_factory=list)
+    # iPhone Vision hands (on-device, 21 kp MediaPipe order, .right upright,
+    # y already top-left/down). Stored separately from MediaPipe persons_hands
+    # so the air-piano can prefer this stabler, rotation-invariant source.
+    persons_hands_iphone: list[list[PoseKp]] = field(default_factory=list)
+    persons_hands_iphone_t: float = 0.0
     hand_feats: dict | None = None
     # MediaPipe pose_world_landmarks per person : 33 keypoints in meters,
     # relative to the hip-center. Optional companion of persons_body

@@ -173,14 +173,41 @@ class ActionHeadPublisher(threading.Thread):
         self._finger_det = FingerStrikeDetector(
             vel_thresh=vel, refractory_ms=refr,
         )
+        self._finger_dbg = os.environ.get("FINGER_DEBUG", "0") not in (
+            "0", "", "false", "False",
+        )
+        # auto = iPhone Vision hands if fresh, else MediaPipe. Or force
+        # "iphone" / "mediapipe".
+        self._finger_source = os.environ.get("FINGER_SOURCE", "auto").lower()
+        self._fdbg_n = 0
 
     def _emit_fingers(self, t_now: float) -> None:
-        """Detect finger strikes on persons_hands and emit /pose/finger."""
+        """Detect finger strikes and emit /pose/finger.
+
+        Source: iPhone Vision hands (stable, rotation-invariant) when fresh,
+        else MediaPipe hands from the (possibly rotated) video frame.
+        """
         if not getattr(self, "_finger_enabled", False):
             return
         with self.state.lock():
-            hands = list(getattr(self.state, "persons_hands", None) or [])
-        for ev in self._finger_det.step(hands, t_now):
+            mp_hands = list(getattr(self.state, "persons_hands", None) or [])
+            ip_hands = list(getattr(self.state, "persons_hands_iphone", None) or [])
+            ip_t = getattr(self.state, "persons_hands_iphone_t", 0.0)
+        ip_fresh = bool(ip_hands) and (time.perf_counter() - ip_t) < 0.5
+        src = getattr(self, "_finger_source", "auto")
+        if src == "iphone":
+            hands, used = ip_hands, "iphone"
+        elif src == "mediapipe":
+            hands, used = mp_hands, "mediapipe"
+        else:
+            hands, used = (ip_hands, "iphone") if ip_fresh else (mp_hands, "mediapipe")
+        events = self._finger_det.step(hands, t_now)
+        if getattr(self, "_finger_dbg", False):
+            self._fdbg_n += 1
+            if events or self._fdbg_n % 30 == 0:
+                LOG.info("fingers dbg: src=%s hands=%d strikes=%d (ip_fresh=%s)",
+                         used, len(hands), len(events), ip_fresh)
+        for ev in events:
             self.bridge.send_finger(ev)
 
     def _read_sources(self) -> tuple[
