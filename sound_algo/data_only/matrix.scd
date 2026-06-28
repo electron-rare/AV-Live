@@ -23,6 +23,7 @@
 ~matBase        = ~matBase        ? IdentityDictionary.new;
 ~matBeatsPerBar = ~matBeatsPerBar ? 4;
 ~matLastColor   = ~matLastColor   ? Array.fill(~matVoices.size, -1);
+~matInstruments = ~matInstruments ? Array.fill(~matVoices.size, nil);
 
 // -- Persistence env init (nil-guarded) --
 ~matDir        = ~matDir        ? "~/.config/av-live/matrices".standardizePath;
@@ -41,6 +42,65 @@ File.exists(~matDir).not.if({ ("mkdir -p " ++ ~matDir.quote).systemCmd });
         );
         ~matBase[name]
     }
+};
+
+// -- per-voice curated instrument choices (symbol must be a loaded SynthDef) --
+~matInstChoices = ~matInstChoices ? IdentityDictionary[
+    \kick  -> [\lp_kick, \do_kick, \do_quake_sub],
+    \hats  -> [\lp_hat,  \do_hat],
+    \clap  -> [\lp_clap, \lp_rim, \do_hat],
+    \perc  -> [\lp_perc, \do_strike, \lp_tom],
+    \sub   -> [\lp_sub,  \lp_reese, \do_body_drone, \do_quake_sub],
+    \acid  -> [\lp_acid, \lp_pluck, \do_geo],
+    \arp   -> [\lp_pluck, \do_strike, \lp_bells],
+    \lead  -> [\lp_pluck, \do_plane, \do_strike, \lp_bells],
+    \stab  -> [\lp_pluck, \do_geo, \lp_acid],
+    \pad   -> [\lp_pad,  \do_body_drone, \do_drone, \lp_reese],
+    \ride  -> [\lp_ride, \lp_hat, \do_hat],
+    \rim   -> [\lp_rim,  \lp_clap, \do_hat],
+    \tom   -> [\lp_tom,  \do_strike, \do_quake_sub],
+    \reese -> [\lp_reese, \lp_sub, \do_body_drone, \do_weather],
+    \bells -> [\lp_bells, \do_strike, \do_plane],
+    \sweep -> [\lp_sweep, \do_body_gran, \do_drone, \do_weather]
+];
+
+// -- fixed kits: kitName -> (voiceName -> instrument). Unlisted voices = default --
+~matKits = ~matKits ? IdentityDictionary[
+    \default -> IdentityDictionary[],
+    \deep -> IdentityDictionary[
+        \kick -> \do_kick, \sub -> \do_body_drone, \reese -> \do_body_drone,
+        \pad -> \do_drone, \sweep -> \do_drone ],
+    \industrial -> IdentityDictionary[
+        \kick -> \do_quake_sub, \perc -> \do_strike, \tom -> \do_strike,
+        \clap -> \lp_rim, \stab -> \do_geo ],
+    \acid -> IdentityDictionary[
+        \lead -> \do_plane, \arp -> \do_strike, \sub -> \lp_reese, \bells -> \do_plane ]
+];
+
+// -- ~matApplyInstrument : set voice vi's instrument (nil = default), re-source, echo --
+~matApplyInstrument = { |vi, instOrNil|
+    (vi >= 0 and: { vi < ~matVoices.size }).if({
+        var name = ~matVoices[vi];
+        var inst = ((instOrNil == \default) or: { instOrNil == '' } or: { instOrNil.isNil })
+            .if({ nil }, { instOrNil.asSymbol });
+        var ok = inst.isNil or: { (~matInstChoices[name] ? []).includes(inst) };
+        ok.if({
+            ~matInstruments[vi] = inst;
+            ~matLastColor[vi] = -1;                       // force re-source next bar
+            (~lp[\matPlaying] and: { ~matApplyBar.notNil }).if({ ~matApplyBar.(~lp[\matBar]) });
+            ~toscSend !? { ~toscSend.("/matrix/instrument", vi, (inst ? \default).asString) }
+        })
+    })
+};
+
+// -- ~matApplyKit : apply a fixed kit map to all voices, echo each --
+~matApplyKit = { |name|
+    var kit = ~matKits[name.asSymbol];
+    kit.notNil.if({
+        ~matVoices.do { |vname, vi|
+            ~matApplyInstrument.(vi, kit[vname] ? \default)
+        }
+    })
 };
 
 // -- ~matVariation : map color 1-6 to a Pchain overlay on the captured base --
@@ -72,7 +132,8 @@ File.exists(~matDir).not.if({ ("mkdir -p " ++ ~matDir.quote).systemCmd });
                         },
                         \stretch, spec[\stretch],
                         \octave,  spec[\octave],
-                        \amp,     spec[\amp]
+                        \amp,     spec[\amp],
+                        \instrument, Pfunc { ~matInstruments[vi] }   // nil → base \instrument kept
                     ),
                     base
                 )
@@ -307,6 +368,16 @@ OSCdef(\mat_list, { |msg, time, addr|
     ~toscTouch !? { ~toscTouch.(addr) };
     ~matListPush.()
 }, '/matrix/list');
+
+OSCdef(\mat_inst, { |msg, time, addr|
+    ~toscTouch !? { ~toscTouch.(addr) };
+    ~matApplyInstrument.(msg[1].asInteger, (msg[2] ? \default).asSymbol)
+}, '/matrix/instrument');
+
+OSCdef(\mat_kit, { |msg, time, addr|
+    ~toscTouch !? { ~toscTouch.(addr) };
+    ~matApplyKit.((msg[1] ? \default).asSymbol)
+}, '/matrix/kit');
 
 "[matrix] ready".postln;
 )

@@ -20,6 +20,7 @@ var glowPat   = nil;
 // Define dummy base Pdefs so ~matVariation has something to capture
 Pdef(\lp_kick, Pbind(\dur, 1));
 Pdef(\lp_hats, Pbind(\dur, 0.5));
+Pdef(\lp_arp,  Pbind(\dur, 0.25));   // needed by Task-1 instrument overlay test (vi=6)
 
 // Load the feature file (synchronous; stubs and Pdefs already in place)
 featureFile.load;
@@ -140,6 +141,45 @@ pass = pass and: { ~trigLog.notNil };
 pass = pass and: { ~trigLog[0] == "/matrix/trig" };
 pass = pass and: { ~trigLog[1] == 5 };
 pass = pass and: { ~trigLog[2] == 1.0 };  // color 2 spec[\amp]=1.0; base has no \amp
+
+// --- Instrument selection (Task 1) ---
+pass = pass and: { ~matInstruments.notNil and: { ~matInstruments.size == 16 } };
+pass = pass and: { ~matInstruments.every({ |x| x.isNil }) };          // default nil
+pass = pass and: { ~matInstChoices.notNil and: { ~matKits.notNil } };
+
+// apply a valid instrument echoes /matrix/instrument with vi + symbol string
+~trigLog = nil;
+~toscSend = { |path ...args| ~trigLog = ([path] ++ args) };
+try { ~matApplyInstrument.(7, \do_plane) } { |e| pass = false;
+    ("EXCEPTION matApplyInstrument: " ++ e.class.name).postln };
+pass = pass and: { ~matInstruments[7] == \do_plane };
+pass = pass and: { ~trigLog.notNil and: { ~trigLog[0] == "/matrix/instrument" } };
+pass = pass and: { ~trigLog[1] == 7 };
+pass = pass and: { ~trigLog[2].asString == "do_plane" };
+
+// an instrument not in the voice's choices is rejected (state unchanged)
+~matInstruments[0] = nil;
+try { ~matApplyInstrument.(0, \do_plane) } { |e| pass = false };   // kick can't be do_plane
+pass = pass and: { ~matInstruments[0].isNil };
+
+// empty/"default" clears to nil
+~matInstruments[7] = \do_plane;
+~matApplyInstrument.(7, \default);
+pass = pass and: { ~matInstruments[7].isNil };
+
+// applying a kit sets its voices and leaves others nil
+~matVoices.size.do { |i| ~matInstruments[i] = nil };
+~matApplyKit.(\deep);
+pass = pass and: { ~matInstruments[~matVoices.indexOf(\kick)] == \do_kick };
+pass = pass and: { ~matInstruments[~matVoices.indexOf(\hats)].isNil };
+
+// with an instrument set, consuming a ~matVariation stream carries \instrument
+~matInstruments[6] = \do_strike;
+~trigLog2 = nil;
+try { ~trigLog2 = ~matVariation.(\arp, 2, 6).asStream.next(()) } { |e| pass = false;
+    ("EXCEPTION matVariation inst: " ++ e.class.name).postln };
+pass = pass and: { ~trigLog2.notNil and: { ~trigLog2[\instrument] == \do_strike } };
+~matVoices.size.do { |i| ~matInstruments[i] = nil };   // reset for later tests
 
 pass.if(
     { "TEST PASS".postln },
