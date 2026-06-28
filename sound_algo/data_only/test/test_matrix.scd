@@ -242,6 +242,16 @@ pass = pass and: { ~matMod[0].isNil };
 pass = pass and: { ~trigLog2[\cutoff].notNil and: { ~trigLog2[\cutoff] > 3000 } };  // hand up opens filter
 ~matVoices.size.do { |i| ~matMod[i] = nil };
 
+// --- Mod persistence (Task 3) ---
+pass = pass and: { ~matModPush.notNil };
+~matVoices.size.do { |i| ~matMod[i] = nil };
+~matApplyMod.(5, \rHandY, \cutoff, 0.5);
+~matSave.("mod grid");
+~matVoices.size.do { |i| ~matMod[i] = nil };
+pass = pass and: { ~matLoad.("mod grid") };
+pass = pass and: { ~matMod[5].notNil and: { ~matMod[5][\target] == \cutoff } };
+File.delete(~matDir +/+ "mod_grid.matrix");
+
 pass.if(
     { "TEST PASS".postln },
     { "TEST FAIL".postln }

@@ -342,6 +342,16 @@ File.exists(~matDir).not.if({ ("mkdir -p " ++ ~matDir.quote).systemCmd });
     }
 };
 
+// -- ~matModPush : send 16 mod triples (source,target,depth) flattened --
+~matModPush = {
+    ~toscSend !? {
+        ~toscSend.valueArray(["/matrix/mods"] ++ ~matMod.collect({ |m|
+            m.isNil.if({ ["none", "none", 0] },
+                { [m[\source].asString, m[\target].asString, m[\depth]] })
+        }).flatten)
+    }
+};
+
 // -- ~matListPush : send all available preset + user-save names to surfaces --
 ~matListPush = {
     try {
@@ -358,7 +368,9 @@ File.exists(~matDir).not.if({ ("mkdir -p " ++ ~matDir.quote).systemCmd });
     var path = ~matDir +/+ (safe ++ ".matrix");
     var payload = (
         grid: ~lp[\matrix],
-        instruments: ~matInstruments.collect({ |x| (x ? \default) })
+        instruments: ~matInstruments.collect({ |x| (x ? \default) }),
+        mods: ~matMod.collect({ |m| m.isNil.if({ \none },
+            { [m[\source], m[\target], m[\depth]] }) })
     );
     File.use(path, "w", { |f| f.write(payload.asCompileString) });
     ~matSavedNames.add(safe.asSymbol);
@@ -385,9 +397,19 @@ File.exists(~matDir).not.if({ ("mkdir -p " ++ ~matDir.quote).systemCmd });
                 }).if({ nil }, { sym.asSymbol });
             };
             ~matVoices.size.do { |i| ~matLastColor[i] = -1 };
+            // restore mods (validate via ~matApplyMod, which rejects invalid)
+            ~matVoices.size.do { |i| ~matMod[i] = nil };
+            ((raw.isArray.not) and: { raw[\mods].notNil }).if({
+                raw[\mods].do { |m, vi|
+                    (m != \none and: { m.isArray and: { m.size == 3 } }).if({
+                        ~matApplyMod.(vi, m[0], m[1], m[2])
+                    })
+                }
+            });
             ~lp[\matPlaying].if({ ~matApplyBar.(~lp[\matBar]) });
             ~matGridPush.();
             ~matInstrPush.();
+            ~matModPush.();
             ("[matrix] loaded " ++ path).postln;
             true
         }, {
