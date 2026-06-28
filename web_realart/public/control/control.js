@@ -7,6 +7,15 @@ function send(address, ...args) {
 }
 const armed = new Set();
 const clipState = new Map(); // name -> last-known state int: 0 off, 1 playing, 2 queued-launch, 3 queued-stop
+
+// --- Scene section mode ---
+let sceneMode = "launch"; // "launch" | "save" | "clear"
+function setSceneMode(mode) {
+  sceneMode = mode;
+  document.querySelectorAll(".mode-btn").forEach((b) => {
+    b.classList.toggle("active", b.dataset.mode === mode);
+  });
+}
 function togglePad(el, name) {
   // Use last-known state for toggle direction; fall back to armed Set
   const st = clipState.has(name) ? clipState.get(name) : (armed.has(name) ? 1 : 0);
@@ -105,6 +114,17 @@ ws.addEventListener("message", (ev) => {
     } finally {
       suppressEmit = false;
     }
+    return;
+  }
+
+  // /scene/state <cur:int> <fill0:int> ... <fill7:int>
+  if (address === "/scene/state") {
+    const cur = Number(args[0]);
+    document.querySelectorAll("[data-scene]").forEach((btn) => {
+      const n = +btn.dataset.scene;
+      btn.classList.toggle("filled", Number(args[n + 1]) === 1);
+      btn.classList.toggle("current", n === cur);
+    });
     return;
   }
 });
@@ -358,4 +378,24 @@ document.addEventListener("DOMContentLoaded", () => {
         send("/seq/melody/set", ...state.melodies[idx].degrees);
       }
     }));
+
+  // Scene mode toggle buttons
+  document.querySelectorAll(".mode-btn").forEach((btn) =>
+    btn.addEventListener("click", () => setSceneMode(btn.dataset.mode)));
+
+  // Scene slot buttons
+  document.querySelectorAll("[data-scene]").forEach((btn) =>
+    btn.addEventListener("click", () => {
+      const i = +btn.dataset.scene;
+      send("/scene/" + sceneMode, i);
+      if (sceneMode === "save" || sceneMode === "clear") {
+        setSceneMode("launch");
+      }
+    }));
+
+  // Scene prev / next
+  const scenePrev = document.getElementById("scene-prev");
+  if (scenePrev) scenePrev.addEventListener("click", () => send("/scene/prev"));
+  const sceneNext = document.getElementById("scene-next");
+  if (sceneNext) sceneNext.addEventListener("click", () => send("/scene/next"));
 });

@@ -75,3 +75,19 @@ button.sel { background: #246; border-color: #4af; color: #8cf; }
   to   { opacity: 0.35; }
 }
 button.queued { animation: queued-blink 600ms ease-in-out infinite alternate; }
+
+/* --- Sections tab --- */
+.mode-bar { display: flex; align-items: center; gap: 6px; margin: 8px 0; flex-wrap: wrap; }
+.mode-label { font-size: 13px; color: #888; flex-shrink: 0; }
+.mode-btn { width: auto; padding: 8px 14px; font-size: 14px; flex-shrink: 0; }
+.mode-btn.active { background: #246; color: #8cf; border-color: #4af; font-weight: 700; }
+
+.scene-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin: 12px 0; }
+.scene-slot { background: #1c1c1c; border: 2px solid #333; border-radius: 10px;
+  padding: 24px 10px; font-size: 22px; font-weight: 700; cursor: pointer; width: 100%; color: #666; }
+.scene-slot.filled { background: #1a1a2e; border-color: #446; color: #8cf; }
+.scene-slot.current { background: #2b6; border-color: #4d9; color: #061; font-weight: 900; }
+.scene-slot.filled.current { background: #2b6; border-color: #4d9; color: #fff; }
+
+.scene-nav { display: flex; gap: 8px; margin: 8px 0; }
+.scene-nav button { flex: 1; font-size: 16px; padding: 16px; }
