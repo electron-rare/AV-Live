@@ -200,6 +200,7 @@ File.exists(~matDir).not.if({ ("mkdir -p " ++ ~matDir.quote).systemCmd });
 // colorAmp x stepVel x volOf; \dur = bar/16; inst/cutoff/pan/mod applied like the overlay.
 ~matColorStepPattern = { |name, vi, color, spec, volOf, instPair, cdPairs|
     var freqRatio = 2 ** (spec[\octave] ? 0);
+    var pitched = [\sub, \acid, \arp, \lead, \stab, \pad, \reese, \bells, \perc, \tom];
     var mod = ~matMod[vi];
     var modPairs = mod.isNil.if({ [] }, {
         var src = mod[\source], tgt = mod[\target], d = mod[\depth];
@@ -211,6 +212,9 @@ File.exists(~matDir).not.if({ ("mkdir -p " ++ ~matDir.quote).systemCmd });
                 { [] })   // amp mod out of scope for v1
         })
     });
+    var freqPair = pitched.includes(name).if({
+        [\freq, Pfunc { |e| (~lpNote.notNil).if({ ~lpNote.(e[\degree], 0).midicps * freqRatio }, { 440 }) }]
+    }, { [] });
     Pbind(*([
         \stepIdx, Pseq((0..15), inf),
         \matGlow, Pfunc { |e|
@@ -220,13 +224,12 @@ File.exists(~matDir).not.if({ ("mkdir -p " ++ ~matDir.quote).systemCmd });
         },
         \type, Pfunc { |e| spec[\steps][e[\stepIdx]].isNil.if({ \rest }, { \note }) },
         \degree, Pfunc { |e| var s = spec[\steps][e[\stepIdx]]; s.isNil.if({ 0 }, { s[\degree] }) },
-        \freq, Pfunc { |e| (~lpNote.notNil).if({ ~lpNote.(e[\degree], 0).midicps * freqRatio }, { 440 }) },
         \amp, Pfunc { |e|
             var s = spec[\steps][e[\stepIdx]];
             ((spec[\amp] ? 1.0) * (s.isNil.if({ 0 }, { s[\vel] }))) * volOf.value },
         \stretch, spec[\stretch],
         \dur, ~matBeatsPerBar / 16
-    ] ++ instPair ++ cdPairs ++ modPairs))
+    ] ++ freqPair ++ instPair ++ cdPairs ++ modPairs))
 };
 
 // -- ~matVariation : map color 1-6 to a Pchain overlay on the captured base --
@@ -485,7 +488,7 @@ File.exists(~matDir).not.if({ ("mkdir -p " ++ ~matDir.quote).systemCmd });
         ((degree == \rest) or: { degree.isNil }).if({
             steps[stepIdx] = nil
         }, {
-            steps[stepIdx] = (degree: degree.asInteger, vel: vel.asFloat.clip(0, 1))
+            steps[stepIdx] = (degree: degree.asInteger.clip(-48, 48), vel: vel.asFloat.clip(0, 1))
         });
         ~matLastColor[vi] = -1;
         (~lp[\matPlaying] and: { ~matApplyBar.notNil }).if({ ~matApplyBar.(~lp[\matBar]) });

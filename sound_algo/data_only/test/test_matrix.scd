@@ -447,6 +447,18 @@ pass = pass and: { ~matPoseBindings[5].size == 1 };
 pass = pass and: { ~matPoseBindings[5][0][\poseId] == \poseA };
 File.delete(~matDir +/+ "pose_grid.matrix");
 
+// --- Clamp: ~matSetStep must clip degree to -48..48 ---
+~matSetStep.(5, 2, 4, 200, 0.5);
+pass = pass and: { ~matColorDefs[5][2][\steps][4][\degree] == 48 };
+~matSetStep.(5, 2, 4, \rest, 0);   // restore
+
+// --- Drum \freq.isNil: stepped kick must NOT emit \freq ---
+~kickVi = ~matVoices.indexOf(\kick);
+~matSetStep.(~kickVi, 2, 0, 3, 0.8);
+~ev = ~matVariation.(\kick, 2, ~kickVi).asStream.next(());
+pass = pass and: { ~ev[\freq].isNil };
+~matColorDefs[~kickVi][2][\steps] = Array.fill(16, nil);   // restore
+
 pass.if(
     { "TEST PASS".postln },
     { "TEST FAIL".postln }

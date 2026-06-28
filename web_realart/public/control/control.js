@@ -495,7 +495,7 @@ function renderSeq(vi) {
         if (e.shiftKey) {
           st2.vel = Math.max(0, Math.min(1, st2.vel + (e.deltaY < 0 ? 0.1 : -0.1)));
         } else {
-          st2.degree += (e.deltaY < 0 ? 1 : -1);
+          st2.degree = Math.max(-48, Math.min(48, st2.degree + (e.deltaY < 0 ? 1 : -1)));
         }
         send("/matrix/step", vi, c, s, st2.degree, st2.vel); saveMatState(); renderSeq(vi);
       });
