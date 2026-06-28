@@ -161,8 +161,7 @@ File.exists(~matDir).not.if({ ("mkdir -p " ++ ~matDir.quote).systemCmd });
 // Factored out of ~matVariation so the main function stays readable.
 // cdPairs (static per-color cutoff/pan) come before modPairs so a live capture
 // mod on the same target overrides the static color-def value — intended.
-~matVariationOverlay = { |name, vi, spec, volOf, instPair, cdPairs|
-    var base = ~matBaseFor.(name);
+~matVariationOverlay = { |name, vi, spec, volOf, instPair, cdPairs, base|
     var mod = ~matMod[vi];
     // octave colors multiply \freq by 2**octave (main's freqRatio scheme), pitched
     // voices only — works for voices that set \freq directly via Pfunc.
@@ -181,7 +180,7 @@ File.exists(~matDir).not.if({ ("mkdir -p " ++ ~matDir.quote).systemCmd });
             (tgt == \pan).if({
                 [\pan, Pfunc { (~matModSourceVal.(src) * 2 - 1) * d }]
             }, {
-                [\amp, Pfunc { (spec[\amp] * volOf.value) * (1 + (d * (~matModSourceVal.(src) * 2 - 1))).max(0) }]
+                [\amp, Pfunc { ((spec[\amp] ? 1.0) * volOf.value) * (1 + (d * (~matModSourceVal.(src) * 2 - 1))).max(0) }]
             })
         })
     });
@@ -217,7 +216,7 @@ File.exists(~matDir).not.if({ ("mkdir -p " ++ ~matDir.quote).systemCmd });
                     cdPairs = cdPairs ++ [\cutoff, spec[\cutoff]] });
                 (spec[\pan].notNil and: { (~matModTargets[name] ? []).includes(\pan) }).if({
                     cdPairs = cdPairs ++ [\pan, spec[\pan]] });
-                ~matVariationOverlay.(name, vi, spec, volOf, instPair, cdPairs)
+                ~matVariationOverlay.(name, vi, spec, volOf, instPair, cdPairs, base)
             }, { base })
         }, { nil })
     })
@@ -521,6 +520,7 @@ File.exists(~matDir).not.if({ ("mkdir -p " ++ ~matDir.quote).systemCmd });
             ~matGridPush.();
             ~matInstrPush.();
             ~matModPush.();
+            ~matVoices.size.do { |vi| ~matColorDefPush.(vi) };
             ("[matrix] loaded " ++ path).postln;
             true
         }, {
@@ -555,9 +555,13 @@ File.exists(~matDir).not.if({ ("mkdir -p " ++ ~matDir.quote).systemCmd });
             var clock = ~lp[\clock] ? TempoClock.default;
             ~matAudRoutine[vi] = Routine({
                 var c = 1;
+                var started = false;
                 loop {
                     var pat = ~matVariation.(name, c, vi);
-                    pat.notNil.if({ Pdef(key, pat); Pdef(key).play(clock, quant: 1) });
+                    pat.notNil.if({
+                        Pdef(key, pat);
+                        started.not.if({ Pdef(key).play(clock, quant: 1); started = true });
+                    });
                     1.wait;
                     c = (c % 6) + 1;
                 }
