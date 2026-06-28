@@ -20,8 +20,7 @@
     ~bpm;
 };
 
-// Protection defensive : evite la propagation si le boot reseau echoue
-try { s.waitForBoot {
+s.waitForBoot {
 
     // ----- Acid 303 -----
     // Env ADSR sur l'amp avec doneAction:2 -- garanti pas de fuite
@@ -304,6 +303,6 @@ try { s.waitForBoot {
     //   (charges automatiquement par 00_load.scd > CHARGER TOUT)
 
     "=== setup OK -- lance le bloc PLAY ===".postln;
-} } { |e| ("[engine] avertissement boot serveur : " ++ e.errorString).postln };
+};
 )
 

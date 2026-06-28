@@ -2,7 +2,8 @@
 (
 var ok = true;
 // minimal: ~setTempo only needs TempoClock.default (always exists)
-(thisProcess.nowExecutingPath.dirname.dirname ++ "/engine.scd").load;
+try { (thisProcess.nowExecutingPath.dirname.dirname ++ "/engine.scd").load } { |e|
+    ("[test] engine boot skipped: " ++ e.errorString).postln };
 ~setTempo.(140);
 if(~bpm != 140) { ok = false; "FAIL: bpm".postln };
 if(TempoClock.default.tempo.round(0.0001) != (140/60).round(0.0001)) {
