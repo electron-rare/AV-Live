@@ -15,11 +15,13 @@ var pass = true;
 
 // Build a minimal dummy environment matching the shapes launchpad.scd creates
 ~lp = (
-    clock:    TempoClock.default,
-    armed:    Set[\kick],
-    melodies: [[0, 2, 3, 5]],
-    rhythms:  [(name: "4floor", k: "1000100010001000",
-                s: "0000100000001000", h: "0010101010101010")]
+    clock:     TempoClock.default,
+    armed:     Set[\kick],
+    clipState: IdentityDictionary.new,
+    quant:     4,
+    melodies:  [[0, 2, 3, 5]],
+    rhythms:   [(name: "4floor", k: "1000100010001000",
+                 s: "0000100000001000", h: "0010101010101010")]
 );
 
 // Load the feature file (synchronous; server not booted -> RMS block skipped)
@@ -44,6 +46,13 @@ pass = pass and: { ~toscClients.size == 2 };
 
 // Stop the background Routine so the process can exit cleanly
 ~toscFeedbackRoutine !? { ~toscFeedbackRoutine.stop };
+
+// Assert 4-state clipState is read without raising
+~lp[\clipState][\kick] = 2;  // queued-launch
+try { ~toscArmedPush.() } { |e|
+    pass = false;
+    ("EXCEPTION in ~toscArmedPush (clipState): " ++ e.messageString).postln;
+};
 
 pass.if(
     { "TEST PASS".postln },

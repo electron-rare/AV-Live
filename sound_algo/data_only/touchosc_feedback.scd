@@ -47,14 +47,17 @@
     \tom,  \reese, \bells, \sweep
 ];
 
-// Push armed state for all 16 pads; nil-guarded
+// Push 4-state clip value for all pads + sequencers; nil-guarded.
+// State: 0=off, 1=playing, 2=queued-launch, 3=queued-stop.
+// Prefers fine-grained clipState; falls back to armed membership (0/1)
+// for clips driven by concert logic that bypass ~lpArm.
 ~toscArmedPush = {
-    (~lp.notNil and: { ~lp[\armed].notNil }).if({
-        ~toscPatterns.do { |name|
-            ~toscSend.(
-                "/armed/" ++ name.asString,
-                ~lp[\armed].includes(name).binaryValue
-            );
+    ~lp.notNil.if({
+        var list = ~toscPatterns ++ [\melseq, \rhythmseq];
+        list.do { |nm|
+            var state = (~lp[\clipState] !? { ~lp[\clipState][nm] })
+                ? ((~lp[\armed].notNil and: { ~lp[\armed].includes(nm) }).binaryValue);
+            ~toscSend.("/armed/" ++ nm.asString, state);
         };
     });
 };
