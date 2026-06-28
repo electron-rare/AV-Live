@@ -415,12 +415,31 @@ mod/pose/steps per color); drop the separate `mod`/`steps`/`pose` keys.
 the old top-level mod/steps/pose keys). Default-guard `matColorDefs[vi][c].mod`
 (may be undefined in old cache) in `renderPattern`.
 
-- [ ] **Step 5: CSS + verify**
+- [ ] **Step 5: Restore the per-row LIVE instrument select (left of each matrix row)**
+
+For fast live access, re-add a per-voice instrument `<select>` on the LEFT of each
+matrix row (it was removed when controls moved into the modal). It sets the VOICE
+DEFAULT instrument (`~matInstruments[vi]`, used by any color whose own `inst` is
+nil) — per-color overrides stay in the modal. In `renderMatrix`'s voice-row loop,
+after the `.mvoice-label` (before the `.minst-edit` "..." button), insert:
+
+```javascript
+    const vinst = document.createElement("select");
+    vinst.className = "minst"; vinst.dataset.vi = vi;
+    [["default","default"]].concat((MATRIX_INST_CHOICES[MATRIX_VOICES[vi]]||[]).map(s=>[s,s]))
+      .forEach(([val,txt])=>{const o=document.createElement("option");o.value=val;o.textContent=txt;vinst.appendChild(o);});
+    vinst.value = matInst[vi] || "default";
+    vinst.addEventListener("change", ()=>{ matInst[vi]=vinst.value; saveMatState(); send("/matrix/instrument", vi, vinst.value); });
+    row.appendChild(vinst);
+```
+
+Re-add the header spacer so bar numbers stay aligned: in the header-row build, after
+the voice-label corner, append `const ih=document.createElement("span"); ih.className="minst-head"; headerRow.appendChild(ih);` and restore the `.minst`/`.minst-head` CSS (sticky-left, 78px). Keep `matInst[vi]` in sync from the existing `/matrix/instrument` WS handler (update the row select by `.minst[data-vi]`).
+
+- [ ] **Step 6: CSS + verify**
 
 `.cd-colorsel { display:flex; gap:4px; margin:6px 0; } .cd-colorsel button.on { outline:2px solid #fff; } .cd-pattern { display:flex; flex-direction:column; gap:6px; }`
-plus reuse `.seq-*`, `.cd-*` rules. Run `node --check`. Manual: the color selector
-switches the pattern; editing one color's instrument/variation/sequence/effect/pose
-only affects that color and round-trips; audition cycles colors.
+plus restore `.minst { position:sticky; left:54px; z-index:2; width:78px; font-size:10px; background:#1a1a1a; color:#ccc; border:1px solid #333; flex-shrink:0; }` and `.minst-head { width:78px; flex-shrink:0; }`, and reuse `.seq-*`/`.cd-*` rules. Run `node --check`. Manual: the row-left instrument select changes the voice default live; the color selector switches the pattern; editing a color's instrument/variation/sequence/effect/pose only affects that color and round-trips; audition cycles colors.
 
 - [ ] **Step 6: Commit**
 

@@ -149,7 +149,11 @@ File.exists(~matDir).not.if({ ("mkdir -p " ++ ~matDir.quote).systemCmd });
             (tgt == \pan).if({
                 [\pan, Pfunc { (~matModSourceVal.(src) * 2 - 1) * d }]
             }, {
-                [\amp, Pfunc { ((spec[\amp] ? 1.0) * volOf.value) * (1 + (d * (~matModSourceVal.(src) * 2 - 1))).max(0) }]
+                (tgt == \rev).if({
+                    [\rev, Pfunc { (~matModSourceVal.(src) * d).clip(0, 1) }]
+                }, {
+                    [\amp, Pfunc { ((spec[\amp] ? 1.0) * volOf.value) * (1 + (d * (~matModSourceVal.(src) * 2 - 1))).max(0) }]
+                })
             })
         })
     })

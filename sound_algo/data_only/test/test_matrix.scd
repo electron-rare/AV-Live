@@ -444,6 +444,12 @@ pass = pass and: { ~matModPairs.notNil };
 ~ev = ~matVariation.(\acid, 2, 5).asStream.next(());
 pass = pass and: { ~ev[\cutoff].notNil and: { ~ev[\cutoff] > 3000 } };
 ~matColorDefs[5][2][\mod] = nil;
+// a color with a rev mod -> the produced event has a \rev key
+~matModCache = IdentityDictionary[ \rHandY -> 1.0 ];
+~matColorDefs[0][1][\mod] = (source: \rHandY, target: \rev, depth: 0.5);
+~revEv = ~matVariation.(\kick, 1, 0).asStream.next(());
+pass = pass and: { ~revEv[\rev].notNil };
+~matColorDefs[0][1][\mod] = nil;
 // per-voice ~matMod removed
 pass = pass and: { ~matMod.isNil };
 pass = pass and: { ~matPoseBindings.isNil };
