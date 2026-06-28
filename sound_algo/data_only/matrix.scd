@@ -456,12 +456,14 @@ File.exists(~matDir).not.if({ ("mkdir -p " ++ ~matDir.quote).systemCmd });
 
 // -- ~matStepsPush : send one color's 16 steps (degree, vel); rest -> (-99, 0) --
 ~matStepsPush = { |vi, color|
-    ~toscSend !? {
-        var flat = ~matColorDefs[vi][color][\steps].collect({ |s|
-            s.isNil.if({ [-99, 0] }, { [s[\degree], s[\vel]] })
-        }).flatten;
-        ~toscSend.valueArray(["/matrix/steps", vi, color] ++ flat)
-    }
+    ((vi >= 0 and: { vi < ~matVoices.size }) and: { color >= 1 and: { color <= 6 } }).if({
+        ~toscSend !? {
+            var flat = ~matColorDefs[vi][color][\steps].collect({ |s|
+                s.isNil.if({ [-99, 0] }, { [s[\degree], s[\vel]] })
+            }).flatten;
+            ~toscSend.valueArray(["/matrix/steps", vi, color] ++ flat)
+        }
+    })
 };
 
 OSCdef(\mat_step, { |msg, time, addr|

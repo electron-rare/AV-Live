@@ -383,6 +383,8 @@ pass = pass and: { ~trigLog.size == 35 };   // path + vi + color + 32 vals
 ~matSetStep.(5, 2, 3, \rest, 0);
 pass = pass and: { ~matColorDefs[5][2][\steps][3].isNil };
 pass = pass and: { ~matStepsEmpty.(~matColorDefs[5][2][\steps]) };
+// two colors' steps arrays must be distinct objects (not aliased)
+pass = pass and: { (~matColorDefs[5][2][\steps] === ~matColorDefs[5][3][\steps]).not };
 
 pass.if(
     { "TEST PASS".postln },
