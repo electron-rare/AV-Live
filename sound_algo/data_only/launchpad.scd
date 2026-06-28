@@ -242,6 +242,79 @@ SynthDef(\sh101, { |out=0, freq=55, amp=0.3, cutoff=1500, res=0.3, gate=1, pan=0
     Out.ar(out, sig);
     ~doReverbBus.notNil.if({ Out.ar(~doReverbBus, sig * rev) });
 }).add;
+// --- Minimoog : 3-osc fat bass/lead, Moog ladder LPF (gated) ---
+SynthDef(\minimoog, { |out=0, freq=55, amp=0.3, cutoff=1200, res=0.5, gate=1, pan=0, rev=0|
+    var env = EnvGen.kr(Env.asr(0.005, 1, 0.22), gate, doneAction: 2);
+    var osc = Mix([Saw.ar(freq.clip(20,3000)), Saw.ar(freq.clip(20,3000) * 1.005),
+        Pulse.ar((freq * 0.5).clip(10, 1500), 0.5)]) * 0.4;
+    var sig = MoogFF.ar(osc, cutoff.clip(60, 8000), res.clip(0, 1) * 3.8);
+    sig = Pan2.ar(sig * env, pan.clip(-1, 1)) * amp * 0.5;
+    Out.ar(out, sig);
+    ~doReverbBus.notNil.if({ Out.ar(~doReverbBus, sig * rev) });
+}).add;
+// --- Roland JP-8000 supersaw : 7 detuned saws (trance/progressive lead) ---
+SynthDef(\supersaw, { |out=0, freq=220, amp=0.3, cutoff=6000, res=0.2, detune=0.05, gate=1, pan=0, rev=0|
+    var env  = EnvGen.kr(Env.asr(0.01, 1, 0.3), gate, doneAction: 2);
+    var dets = [-3, -2, -1, 0, 1, 2, 3] * (detune / 3);
+    var osc  = Mix(Saw.ar((freq.clip(20, 4000)) * (1 + dets))) * (1/7) * 2;
+    var sig  = RLPF.ar(osc, cutoff.clip(200, 12000), (1 - res).clip(0.2, 1));
+    sig = Pan2.ar(sig * env, pan.clip(-1, 1)) * amp * 0.7;
+    Out.ar(out, sig);
+    ~doReverbBus.notNil.if({ Out.ar(~doReverbBus, sig * rev) });
+}).add;
+// --- Roland Juno-106 : saw+pulse+sub -> LPF + signature chorus (gated pad) ---
+SynthDef(\juno, { |out=0, freq=110, amp=0.3, cutoff=2500, res=0.2, gate=1, pan=0, rev=0|
+    var env = EnvGen.kr(Env.asr(0.02, 1, 0.4), gate, doneAction: 2);
+    var osc = Saw.ar(freq.clip(20, 3000))
+        + (Pulse.ar(freq.clip(20, 3000), SinOsc.kr(0.3).range(0.3, 0.7)) * 0.6)
+        + (Pulse.ar((freq * 0.5).clip(10, 1500), 0.5) * 0.4);
+    var flt = RLPF.ar(osc * 0.3, cutoff.clip(200, 9000), (1 - res).clip(0.2, 1));
+    var ch  = flt
+        + DelayC.ar(flt, 0.03, SinOsc.kr(0.6, 0, 0.003, 0.008))
+        + DelayC.ar(flt, 0.03, SinOsc.kr(0.5, pi, 0.003, 0.008));
+    var sig = Pan2.ar(ch * 0.5 * env, pan.clip(-1, 1)) * amp * 0.5;
+    Out.ar(out, sig);
+    ~doReverbBus.notNil.if({ Out.ar(~doReverbBus, sig * rev) });
+}).add;
+// --- Yamaha DX7 : 2-operator FM (bass / bell / e-piano) ---
+SynthDef(\dx7, { |out=0, freq=110, amp=0.3, ratio=2.0, index=3, pan=0, rev=0|
+    var env  = EnvGen.kr(Env.perc(0.004, 0.6, 1, -4), doneAction: 2);
+    var menv = EnvGen.kr(Env.perc(0.001, 0.3, 1, -3));
+    var mod  = SinOsc.ar(freq.clip(20, 4000) * ratio) * freq.clip(20, 4000) * ratio * index * menv;
+    var sig  = SinOsc.ar(freq.clip(20, 4000) + mod) * env;
+    sig = Pan2.ar(sig, pan.clip(-1, 1)) * amp * 0.5;
+    Out.ar(out, sig);
+    ~doReverbBus.notNil.if({ Out.ar(~doReverbBus, sig * rev) });
+}).add;
+// --- E-mu SP-1200 : 12-bit / ~26 kHz crunchy drum character ---
+SynthDef(\sp1200, { |out=0, freq=120, amp=0.5, pan=0, rev=0|
+    var env = EnvGen.kr(Env.perc(0.001, 0.3, 1, -4), doneAction: 2);
+    var src = (SinOsc.ar(freq.clip(30, 400)) + (WhiteNoise.ar * 0.5)) * env;
+    var crushed = (Latch.ar(src, Impulse.ar(26040)) * 2048).round / 2048;
+    var sig = Pan2.ar(crushed.tanh, pan.clip(-1, 1)) * amp;
+    Out.ar(out, sig);
+    ~doReverbBus.notNil.if({ Out.ar(~doReverbBus, sig * rev) });
+}).add;
+// --- Akai sampler (S950/S1100-ish) : 12-bit / 22 kHz lo-fi tonal grit ---
+SynthDef(\akai_s, { |out=0, freq=220, amp=0.3, pan=0, rev=0|
+    var env = EnvGen.kr(Env.perc(0.002, 0.5, 1, -3), doneAction: 2);
+    var src = (Saw.ar(freq.clip(20, 3000)) + (Pulse.ar(freq.clip(20, 3000) * 1.5, 0.4) * 0.5)) * 0.4;
+    var crushed = (Latch.ar(src, Impulse.ar(22050)) * 4096).round / 4096;
+    var sig = RLPF.ar(crushed, 6000, 0.6) * env;
+    sig = Pan2.ar(sig, pan.clip(-1, 1)) * amp * 0.6;
+    Out.ar(out, sig);
+    ~doReverbBus.notNil.if({ Out.ar(~doReverbBus, sig * rev) });
+}).add;
+// --- Roland System-100 : semi-modular saw/pulse + Moog-ish LPF (bass/lead) ---
+SynthDef(\system100, { |out=0, freq=110, amp=0.3, cutoff=1500, res=0.4, gate=1, pan=0, rev=0|
+    var env = EnvGen.kr(Env.asr(0.006, 1, 0.2), gate, doneAction: 2);
+    var osc = (Saw.ar(freq.clip(20, 3000)) + Pulse.ar(freq.clip(20, 3000) * 0.999, 0.45)
+        + (Pulse.ar((freq * 0.5).clip(10, 1500), 0.5) * 0.4)) * 0.3;
+    var sig = MoogFF.ar(osc, cutoff.clip(60, 8000), res.clip(0, 1) * 3.6);
+    sig = Pan2.ar(sig * env, pan.clip(-1, 1)) * amp * 0.5;
+    Out.ar(out, sig);
+    ~doReverbBus.notNil.if({ Out.ar(~doReverbBus, sig * rev) });
+}).add;
 
 s.sync;
 
