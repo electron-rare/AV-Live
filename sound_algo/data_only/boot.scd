@@ -190,6 +190,9 @@ Routine({
     // -- 6f. Web OSC launchpad (Pdef bank, armed via /launch) -----
     (~base ++ "launchpad.scd").load; s.sync;
 
+    // -- 6g. TouchOSC feedback bridge -----
+    (~base ++ "touchosc_feedback.scd").load; s.sync;
+
     // -- 7) Demarre la scene par defaut -----
     if(~doScene.isNil) {
         "[data-only/boot] ERREUR : ~doScene non defini".warn;
