@@ -21,6 +21,7 @@ var glowPat   = nil;
 Pdef(\lp_kick, Pbind(\instrument, \lp_kick,  \dur, 1));
 Pdef(\lp_hats, Pbind(\instrument, \lp_hat,   \dur, 0.5));
 Pdef(\lp_arp,  Pbind(\instrument, \lp_pluck, \dur, 0.25));   // needed by Task-1 instrument overlay test (vi=6)
+Pdef(\lp_acid, Pbind(\instrument, \lp_acid,  \dur, 0.5));    // needed by Task-2 mod overlay test (vi=5)
 
 // Load the feature file (synchronous; stubs and Pdefs already in place)
 featureFile.load;
@@ -219,6 +220,27 @@ pass = pass and: { ~matModSourceVal.(\rHandY) == 1.0 };     // clamped to 1
 pass = pass and: { ~matModSourceVal.(\rOpen) == 0.0 };      // clamped to 0
 pass = pass and: { ~matModSourceVal.(\handSpeed) == 0.6 };
 pass = pass and: { ~matModSourceVal.(\unknownKey) == 0.0 }; // safe default
+
+// --- Mod bindings (Task 2) ---
+pass = pass and: { ~matMod.notNil and: { ~matMod.size == 16 } };
+pass = pass and: { ~matMod.every({ |x| x.isNil }) };
+pass = pass and: { ~matModTargets.notNil };
+
+~trigLog = nil;
+~toscSend = { |path ...args| ~trigLog = ([path] ++ args) };
+~matApplyMod.(5, \rHandY, \cutoff, 0.7);            // acid -> cutoff ok
+pass = pass and: { ~matMod[5].notNil and: { ~matMod[5][\target] == \cutoff } };
+pass = pass and: { ~trigLog[0] == "/matrix/mod" and: { ~trigLog[1] == 5 } };
+
+~matMod[0] = nil;
+~matApplyMod.(0, \rHandY, \cutoff, 0.7);            // kick has no cutoff -> rejected
+pass = pass and: { ~matMod[0].isNil };
+
+~matModCache = IdentityDictionary[ \rHandY -> 1.0 ];
+~matMod[5] = (source: \rHandY, target: \cutoff, depth: 1.0);
+~trigLog2 = ~matVariation.(\acid, 2, 5).asStream.next(());
+pass = pass and: { ~trigLog2[\cutoff].notNil and: { ~trigLog2[\cutoff] > 3000 } };  // hand up opens filter
+~matVoices.size.do { |i| ~matMod[i] = nil };
 
 pass.if(
     { "TEST PASS".postln },

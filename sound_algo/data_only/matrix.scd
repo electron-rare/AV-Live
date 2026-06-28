@@ -23,7 +23,18 @@
 ~matBase        = ~matBase        ? IdentityDictionary.new;
 ~matBeatsPerBar = ~matBeatsPerBar ? 4;
 ~matLastColor   = ~matLastColor   ? Array.fill(~matVoices.size, -1);
-~matInstruments = ~matInstruments ? Array.fill(~matVoices.size, nil);
+~matInstruments  = ~matInstruments  ? Array.fill(~matVoices.size, nil);
+~matMod          = ~matMod          ? Array.fill(~matVoices.size, nil);
+~matModTargets   = ~matModTargets   ? IdentityDictionary[
+    \kick->[\amp], \hats->[\amp], \clap->[\amp], \perc->[\amp],
+    \sub->[\amp], \acid->[\amp,\cutoff,\pan], \arp->[\amp,\cutoff,\pan],
+    \lead->[\amp,\cutoff,\pan], \stab->[\amp,\cutoff,\pan], \pad->[\amp,\cutoff],
+    \ride->[\amp], \rim->[\amp], \tom->[\amp], \reese->[\amp],
+    \bells->[\amp], \sweep->[\amp]
+];
+~matModNeutralCut = ~matModNeutralCut ? IdentityDictionary[
+    \acid->700, \arp->3000, \lead->4000, \stab->2200, \pad->1500
+];
 
 // -- Persistence env init (nil-guarded) --
 ~matDir        = ~matDir        ? "~/.config/av-live/matrices".standardizePath;
@@ -103,6 +114,29 @@ File.exists(~matDir).not.if({ ("mkdir -p " ++ ~matDir.quote).systemCmd });
     })
 };
 
+// -- ~matApplyMod : bind (or clear) a mod source→target for voice vi, echo --
+// srcOrNil/tgtOrNil = \none or nil clears the binding.
+// Rejected if: src not in ~matModSources, or tgt not in voice's ~matModTargets.
+~matApplyMod = { |vi, srcOrNil, tgtOrNil, depth|
+    (vi >= 0 and: { vi < ~matVoices.size }).if({
+        var name = ~matVoices[vi];
+        var src = ((srcOrNil == \none) or: { srcOrNil.isNil }).if({ nil }, { srcOrNil.asSymbol });
+        var tgt = ((tgtOrNil == \none) or: { tgtOrNil.isNil }).if({ nil }, { tgtOrNil.asSymbol });
+        var d = (depth ? 0).asFloat.clip(0, 1);
+        var ok = (src.isNil or: tgt.isNil) or: {
+            ~matModSources.includes(src) and: { (~matModTargets[name] ? []).includes(tgt) }
+        };
+        ok.if({
+            ~matMod[vi] = (src.isNil or: tgt.isNil).if({ nil },
+                { (source: src, target: tgt, depth: d) });
+            ~matLastColor[vi] = -1;
+            (~lp[\matPlaying] and: { ~matApplyBar.notNil }).if({ ~matApplyBar.(~lp[\matBar]) });
+            ~toscSend !? { ~toscSend.("/matrix/mod", vi,
+                (src ? \none).asString, (tgt ? \none).asString, d) }
+        })
+    })
+};
+
 // -- ~matVariation : map color 1-6 to a Pchain overlay on the captured base --
 // color 1 = base as-is, 2 = double-time, 3 = octave up, 4 = half-time,
 // 5 = octave down + slight accent, 6 = accent roll (denser + louder).
@@ -126,6 +160,21 @@ File.exists(~matDir).not.if({ ("mkdir -p " ++ ~matDir.quote).systemCmd });
             spec.notNil.if({
                 var inst = ~matInstruments[vi];
                 var instPair = inst.notNil.if({ [\instrument, inst] }, { [] });
+                var mod = ~matMod[vi];
+                var modPairs = mod.isNil.if({ [] }, {
+                    var src = mod[\source], tgt = mod[\target], d = mod[\depth];
+                    (tgt == \cutoff).if({
+                        var c0 = ~matModNeutralCut[name] ? 1000;
+                        [\cutoff, Pfunc { var s = ~matModSourceVal.(src);
+                            c0 * (s.linexp(0, 1, 200, 6000) / c0).pow(d) }]
+                    }, {
+                        (tgt == \pan).if({
+                            [\pan, Pfunc { (~matModSourceVal.(src) * 2 - 1) * d }]
+                        }, {  // amp: multiply the variation amp
+                            [\amp, Pfunc { spec[\amp] * (1 + (d * (~matModSourceVal.(src) * 2 - 1))).max(0) }]
+                        })
+                    })
+                });
                 Pchain(
                     Pbind(*([
                         \matGlow, Pfunc { |e|
@@ -135,7 +184,7 @@ File.exists(~matDir).not.if({ ("mkdir -p " ++ ~matDir.quote).systemCmd });
                         \stretch, spec[\stretch],
                         \octave,  spec[\octave],
                         \amp,     spec[\amp]
-                    ] ++ instPair)),
+                    ] ++ instPair ++ modPairs)),
                     base
                 )
             }, { base })
@@ -404,6 +453,12 @@ OSCdef(\mat_kit, { |msg, time, addr|
     ~toscTouch !? { ~toscTouch.(addr) };
     ~matApplyKit.((msg[1] ? \default).asSymbol)
 }, '/matrix/kit');
+
+OSCdef(\mat_mod, { |msg, time, addr|
+    ~toscTouch !? { ~toscTouch.(addr) };
+    ~matApplyMod.(msg[1].asInteger, (msg[2] ? \none).asSymbol,
+        (msg[3] ? \none).asSymbol, (msg[4] ? 0).asFloat)
+}, '/matrix/mod');
 
 // -- Capture mod source cache (nil-guarded; idempotent reload) --
 ~matModCache   = ~matModCache ? IdentityDictionary.new;
