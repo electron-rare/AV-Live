@@ -6,12 +6,108 @@ function send(address, ...args) {
   if (ws.readyState === 1) ws.send(JSON.stringify({ address, args }));
 }
 const armed = new Set();
+const clipState = new Map(); // name -> last-known state int: 0 off, 1 playing, 2 queued-launch, 3 queued-stop
 function togglePad(el, name) {
-  const on = !armed.has(name);
-  on ? armed.add(name) : armed.delete(name);
-  el.classList.toggle("armed", on);
-  send("/launch", name, on ? 1 : 0);
+  // Use last-known state for toggle direction; fall back to armed Set
+  const st = clipState.has(name) ? clipState.get(name) : (armed.has(name) ? 1 : 0);
+  // launch (1) when off or queued-stop; stop (0) when playing or queued-launch
+  const launch = (st === 0 || st === 3);
+  // optimistic feedback — authoritative update comes from /armed feedback
+  el.classList.add("queued");
+  if (launch) el.classList.add("armed");
+  send("/launch", name, launch ? 1 : 0);
 }
+
+// --- Feedback: engine -> browser ---
+let suppressEmit = false;
+let beatFlashTimer = null;
+
+ws.addEventListener("message", (ev) => {
+  let msg;
+  try { msg = JSON.parse(ev.data); } catch (_e) { return; }
+  if (!msg || typeof msg.address !== "string") return;
+  const { address, args } = msg;
+
+  // /armed/<name> — engine is source of truth; args[0] is a state int 0-3
+  // 0 = off, 1 = playing (solid), 2 = queued-launch (blink), 3 = queued-stop (blink)
+  if (address.startsWith("/armed/")) {
+    const name = address.slice(7); // strip "/armed/"
+    const st = Number(args[0]);
+    clipState.set(name, st);
+    if (st >= 1) armed.add(name); else armed.delete(name);
+    document.querySelectorAll(`[data-pad="${name}"]`).forEach((btn) => {
+      btn.classList.toggle("armed", st >= 1);
+      btn.classList.toggle("queued", st === 2 || st === 3);
+    });
+    return;
+  }
+
+  // /sync/beat — flash beat dot for 80 ms; cancel any pending clear first
+  if (address === "/sync/beat") {
+    const beatDot = document.getElementById("beat-dot");
+    if (!beatDot) return;
+    if (beatFlashTimer !== null) { clearTimeout(beatFlashTimer); beatFlashTimer = null; }
+    beatDot.classList.add("flash");
+    beatFlashTimer = setTimeout(() => {
+      beatDot.classList.remove("flash");
+      beatFlashTimer = null;
+    }, 80);
+    return;
+  }
+
+  // /sync/rms — drive master VU meter width
+  if (address === "/sync/rms") {
+    const raw = Number(args[0]);
+    const rms = Number.isFinite(raw) ? Math.max(0, Math.min(1, raw)) : 0;
+    const bar = document.getElementById("vu-bar");
+    if (bar) bar.style.width = `${rms * 100}%`;
+    return;
+  }
+
+  // /seq/rhythm/state [idx, k, s, h, name]
+  if (address === "/seq/rhythm/state") {
+    if (!state) return;
+    const i = Math.round(Number(args[0]));
+    if (!Number.isFinite(i) || i < 0 || i >= state.rhythms.length) return;
+    if (typeof args[1] === "string") state.rhythms[i].k = args[1];
+    if (typeof args[2] === "string") state.rhythms[i].s = args[2];
+    if (typeof args[3] === "string") state.rhythms[i].h = args[3];
+    if (typeof args[4] === "string") state.rhythms[i].name = args[4];
+    state.rhySel = i;
+    saveState();
+    suppressEmit = true;
+    try {
+      restoreSel("rhythm", i);
+      updateSelLabels("rhythm");
+      updateNameInputs();
+      renderRhyGrid();
+    } finally {
+      suppressEmit = false;
+    }
+    return;
+  }
+
+  // /seq/melody/state [idx, deg0, deg1, ...]
+  if (address === "/seq/melody/state") {
+    if (!state) return;
+    const i = Math.round(Number(args[0]));
+    if (!Number.isFinite(i) || i < 0 || i >= state.melodies.length) return;
+    const degs = args.slice(1).map(Number).filter(Number.isFinite);
+    if (degs.length > 0) state.melodies[i].degrees = degs;
+    state.melSel = i;
+    saveState();
+    suppressEmit = true;
+    try {
+      restoreSel("melody", i);
+      updateSelLabels("melody");
+      updateNameInputs();
+      renderMelSteps();
+    } finally {
+      suppressEmit = false;
+    }
+    return;
+  }
+});
 
 // --- Pattern state (defaults mirror launchpad.scd exactly) ---
 const STORAGE_KEY = "avlive.seq";
@@ -94,6 +190,7 @@ function renderRhyGrid() {
   ).join("");
   container.querySelectorAll(".step-cell").forEach(cell =>
     cell.addEventListener("click", () => {
+      if (suppressEmit) return;
       const voice = cell.dataset.voice;
       const step = +cell.dataset.step;
       const preset = state.rhythms[state.rhySel];
@@ -119,6 +216,7 @@ function renderMelSteps() {
   ).join("");
   container.querySelectorAll("input[type=number]").forEach(inp =>
     inp.addEventListener("change", () => {
+      if (suppressEmit) return;
       const i = +inp.dataset.midx;
       const val = Math.max(-7, Math.min(14, isNaN(+inp.value) ? 0 : +inp.value));
       inp.value = val;
@@ -158,6 +256,17 @@ function updateNameInputs() {
 
 document.addEventListener("DOMContentLoaded", () => {
   loadState();
+
+  // Tab switching
+  document.querySelectorAll(".tab-btn").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      document.querySelectorAll(".tab-btn").forEach((b) => b.classList.remove("active"));
+      document.querySelectorAll(".tab-panel").forEach((p) => p.classList.remove("active"));
+      btn.classList.add("active");
+      const panel = document.getElementById(`tab-${btn.dataset.tab}`);
+      if (panel) panel.classList.add("active");
+    });
+  });
 
   // Render editors from state
   restoreSel("melody", state.melSel);
@@ -209,10 +318,19 @@ document.addEventListener("DOMContentLoaded", () => {
   const filt = document.getElementById("filter");
   filt && filt.addEventListener("input", () => send("/control/fx/filter", +filt.value));
 
+  // Quantize selector
+  document.querySelectorAll(".quant-btn").forEach(btn =>
+    btn.addEventListener("click", () => {
+      document.querySelectorAll(".quant-btn").forEach(b => b.classList.remove("active"));
+      btn.classList.add("active");
+      send("/launch/quant", +btn.dataset.quant);
+    }));
+
   // Clear
   document.getElementById("clear").addEventListener("click", () => {
     armed.clear();
-    document.querySelectorAll("[data-pad]").forEach((e) => e.classList.remove("armed"));
+    clipState.clear();
+    document.querySelectorAll("[data-pad]").forEach((e) => e.classList.remove("armed", "queued"));
     send("/launch/clear");
   });
 

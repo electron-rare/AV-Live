@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<lexml version="3">
+  <node ID="7b287d4a-3ded-435e-96d3-3d7a1fb7d977" type="GROUP">
+    <properties>
+      <property type="s">
+        <key>name</key>
+        <value>root</value>
+      </property>
+    </properties>
+    <values/>
+    <messages/>
+    <children>
+      <node ID="2b908650-d7aa-49be-a3e5-dff646c214f2" type="FADER">
+        <properties>
+          <property type="s">
+            <key>name</key>
+            <value>vol</value>
+          </property>
+          <property type="r">
+            <key>frame</key>
+            <value>
+              <x>10</x>
+              <y>20</y>
+              <w>60</w>
+              <h>200</h>
+            </value>
+          </property>
+        </properties>
+        <values/>
+        <messages>
+          <osc enabled="1" send="1" receive="0" feedback="0" connections="00001">
+            <triggers>
+              <trigger>
+                <var>x</var>
+                <condition>ANY</condition>
+              </trigger>
+            </triggers>
+            <path>
+              <partial>
+                <type>CONSTANT</type>
+                <conversion>STRING</conversion>
+                <value>/launch/vol</value>
+                <scaleMin>0</scaleMin>
+                <scaleMax>1</scaleMax>
+              </partial>
+            </path>
+            <arguments>
+              <partial>
+                <type>CONSTANT</type>
+                <conversion>STRING</conversion>
+                <value>kick</value>
+                <scaleMin>0</scaleMin>
+                <scaleMax>1</scaleMax>
+              </partial>
+              <partial>
+                <type>VALUE</type>
+                <conversion>FLOAT</conversion>
+                <value>x</value>
+                <scaleMin>0</scaleMin>
+                <scaleMax>1</scaleMax>
+              </partial>
+            </arguments>
+          </osc>
+        </messages>
+        <children/>
+      </node>
+    </children>
+  </node>
+</lexml>

@@ -2,7 +2,19 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>AV-Live — Control</title><link rel="stylesheet" href="control.css"></head>
 <body>
-<header><h1>AV-Live Control</h1><span id="status" class="off"></span></header>
+<header>
+  <h1>AV-Live Control</h1>
+  <span id="status" class="off"></span>
+  <span id="beat-dot" class="beat-dot"></span>
+  <div class="vu-wrap"><div id="vu-bar" class="vu-bar"></div></div>
+</header>
+<nav class="tab-bar">
+  <button class="tab-btn active" data-tab="live">LIVE</button>
+  <button class="tab-btn" data-tab="fx">FX / HARMONIE / CONCERT</button>
+  <button class="tab-btn" data-tab="seq">SÉQUENCEURS</button>
+</nav>
+
+<div class="tab-panel active" id="tab-live">
 <section><h2>Patterns</h2>
   <div class="grid">
     <div class="pat-cell"><button data-pad="kick">Kick</button><input type="range" min="0" max="1.5" step="0.05" value="0.8" data-vol="kick"></div>
@@ -24,12 +36,26 @@
   </div>
   <button id="clear" class="wide">Tout couper</button>
   <label>Tempo <input id="tempo" type="range" min="60" max="180" value="126"></label>
+  <div class="quant-bar">
+    <span class="quant-label">Quant</span>
+    <button class="quant-btn" data-quant="0.5">½</button>
+    <button class="quant-btn" data-quant="1">1</button>
+    <button class="quant-btn active" data-quant="4">1 mes</button>
+    <button class="quant-btn" data-quant="8">2 mes</button>
+  </div>
 </section>
-<section><h2>Concert</h2>
+</div>
+
+<div class="tab-panel" id="tab-fx">
+<section><h2>FX</h2>
+  <label>Filtre <input id="filter" type="range" min="0" max="1" step="0.01" value="1"></label>
   <div class="grid">
-    <button data-osc="/control/concertNext" data-arg="1">Morceau suivant</button>
-    <button data-osc="/control/doScene" data-arg="concert">Scène concert</button>
-    <button data-osc="/control/doScene" data-arg="play">Body-play</button>
+    <button data-osc="/control/fx/stutter">Stutter</button>
+    <button data-osc="/control/fx/crash">Crash</button>
+    <button data-osc="/control/fx/kick">Kick</button>
+    <button data-osc="/control/fx/swell">Swell</button>
+    <button data-osc="/control/fx/breakdown" data-arg="1">Breakdown ↓</button>
+    <button data-osc="/control/fx/breakdown" data-arg="0">Breakdown ↑</button>
   </div>
 </section>
 <section><h2>Harmonie</h2>
@@ -48,17 +74,16 @@
     <button data-osc="/control/harmony/phrase" data-arg="3">Phr 3</button>
   </div>
 </section>
-<section><h2>FX</h2>
-  <label>Filtre <input id="filter" type="range" min="0" max="1" step="0.01" value="1"></label>
+<section><h2>Concert</h2>
   <div class="grid">
-    <button data-osc="/control/fx/stutter">Stutter</button>
-    <button data-osc="/control/fx/crash">Crash</button>
-    <button data-osc="/control/fx/kick">Kick</button>
-    <button data-osc="/control/fx/swell">Swell</button>
-    <button data-osc="/control/fx/breakdown" data-arg="1">Breakdown ↓</button>
-    <button data-osc="/control/fx/breakdown" data-arg="0">Breakdown ↑</button>
+    <button data-osc="/control/concertNext" data-arg="1">Morceau suivant</button>
+    <button data-osc="/control/doScene" data-arg="concert">Scène concert</button>
+    <button data-osc="/control/doScene" data-arg="play">Body-play</button>
   </div>
 </section>
+</div>
+
+<div class="tab-panel" id="tab-seq">
 <section><h2>Séquenceurs</h2>
   <div class="seq-block">
     <h3>Mélodie</h3>
@@ -99,4 +124,5 @@
     <input type="range" min="0" max="1.5" step="0.05" value="0.8" data-vol="rhythmseq">
   </div>
 </section>
+</div>
 <script src="control.js"></script></body></html>

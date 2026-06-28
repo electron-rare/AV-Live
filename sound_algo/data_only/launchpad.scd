@@ -93,7 +93,10 @@ s.sync;
 ~lp = ~lp ? ();
 ~lp[\clock] = ~lp[\clock] ? TempoClock(126/60).permanent_(true);
 ~lp[\armed] = ~lp[\armed] ? Set.new;
-~lp[\vol]   = ~lp[\vol]   ? IdentityDictionary.new;
+~lp[\vol]       = ~lp[\vol]       ? IdentityDictionary.new;
+~lp[\quant]     = ~lp[\quant]     ? 4;
+~lp[\clipState] = ~lp[\clipState] ? IdentityDictionary.new;
+~lp[\clipGen]   = ~lp[\clipGen]   ? IdentityDictionary.new;
 
 // melody sequences: 8 varied riffs/arps/phrases, minor/phrygian feel
 // wrapAt allows different lengths to loop cleanly over 16 16th-note steps
@@ -262,27 +265,63 @@ Pdef(\lp_rsh, Pbind(
 
 // arm / disarm a pattern by bare name (e.g. "kick" -> Pdef(\lp_kick))
 // "rhythmseq" special-cases: arms/disarms \lp_rsk, \lp_rss, \lp_rsh together
+// 4-state machine per clip: 0=off, 1=playing, 2=queued-launch, 3=queued-stop
+// Launch and stop are quantized to ~lp[\quant] beats on the TempoClock.
+// A generation counter per clip cancels superseded pending callbacks.
 ~lpArm = { |name, on|
-    var nm  = name.asSymbol;
-    var key = ("lp_" ++ name.asString).asSymbol;
-    (name.asString == "rhythmseq").if({
+    var nm, keys, clock, q, s, gen, isRhythm;
+    nm       = name.asSymbol;
+    isRhythm = (name.asString == "rhythmseq");
+    keys     = isRhythm.if(
+        { [\lp_rsk, \lp_rss, \lp_rsh] },
+        { [("lp_" ++ name.asString).asSymbol] }
+    );
+    (isRhythm or: { Pdef.all.includesKey(keys[0]) }).if({
+        clock = ~lp[\clock] ? (~lpClock.value ? TempoClock.default);
+        q     = ~lp[\quant] ? 4;
+        s     = ~lp[\clipState][nm] ? 0;
         on.if({
-            [\lp_rsk, \lp_rss, \lp_rsh].do { |k| Pdef(k).play(~lpClock.value, quant: 1) };
-            ~lp[\armed].add(nm);
-        }, {
-            [\lp_rsk, \lp_rss, \lp_rsh].do { |k| Pdef(k).stop };
-            ~lp[\armed].remove(nm);
-        });
-    }, {
-        if(Pdef.all.includesKey(key)) {
-            on.if({
-                Pdef(key).play(~lpClock.value, quant: 1);
+            // launch tap
+            (s == 0).if({
+                gen = (~lp[\clipGen][nm] ? 0) + 1; ~lp[\clipGen][nm] = gen;
+                ~lp[\clipState][nm] = 2;
                 ~lp[\armed].add(nm);
-            }, {
-                Pdef(key).stop;
+                keys.do { |k| Pdef(k).play(clock, quant: q) };
+                clock.schedAbs(clock.nextTimeOnGrid(q), {
+                    (~lp[\clipGen][nm] == gen).if({ ~lp[\clipState][nm] = 1 });
+                    nil
+                });
+            });
+            (s == 3).if({
+                gen = (~lp[\clipGen][nm] ? 0) + 1; ~lp[\clipGen][nm] = gen;
+                // queued-stop cancelled: clip still playing, revert to 1
+                ~lp[\clipState][nm] = 1;
+                ~lp[\armed].add(nm);
+            });
+            // s == 1 or s == 2: no-op (pending closure preserved)
+        }, {
+            // stop tap
+            (s == 1).if({
+                gen = (~lp[\clipGen][nm] ? 0) + 1; ~lp[\clipGen][nm] = gen;
+                ~lp[\clipState][nm] = 3;
+                ~lp[\armed].remove(nm);
+                clock.schedAbs(clock.nextTimeOnGrid(q), {
+                    (~lp[\clipGen][nm] == gen).if({
+                        keys.do { |k| Pdef(k).stop };
+                        ~lp[\clipState][nm] = 0;
+                    });
+                    nil
+                });
+            });
+            (s == 2).if({
+                gen = (~lp[\clipGen][nm] ? 0) + 1; ~lp[\clipGen][nm] = gen;
+                // queued-launch cancelled: stop before it fires
+                keys.do { |k| Pdef(k).stop };
+                ~lp[\clipState][nm] = 0;
                 ~lp[\armed].remove(nm);
             });
-        };
+            // s == 0 or s == 3: no-op (pending closure preserved)
+        });
     });
 };
 
@@ -300,6 +339,9 @@ OSCdef(\lpClear, { |msg|
 OSCdef(\lpVol, { |msg|
     ~lp[\vol][(msg[1] ? \nil).asSymbol] = (msg[2] ? 0.8).clip(0, 1.5);
 }, '/launch/vol');
+OSCdef(\lpQuant, { |msg|
+    ~lp[\quant] = (msg[1] ? 4).asFloat.clip(0.125, 64);
+}, '/launch/quant');
 
 OSCdef(\ctlHarmRoot, { |msg|
     ~ccHarmony !? { ~ccHarmony[\root] = (~ccHarmony[\root] + (msg[1] ? 0)).clip(33, 57) };
