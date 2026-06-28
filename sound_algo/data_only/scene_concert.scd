@@ -4,6 +4,23 @@
 //  Active via ~doScene.(\concert). Les morceaux s'enregistrent via
 //  ~concertAdd depuis morceaux/NN_*.scd (charges apres ce fichier).
 // =====================================================================
+
+// ----- NAMESPACE ~cc* (concert) vs ~cc (live) : clarification --------
+// Ce fichier definit des variables ~cc* : ~ccCtlDur, ~ccCrossHold,
+// ~ccCrossCool, ~ccWristFeat, ~ccPose, ~ccNote, ~ccHarmony, ~ccMaster,
+// ~ccFire, ~ccGestures, ~ccCtlDur...
+// Ces variables constituent le NAMESPACE DU CONCERT (mode data-only).
+//
+// A ne pas confondre avec ~cc du systeme LIVE (alias de ~ch, le
+// dictionnaire des chains : ~chIntro, ~chDrop, ~chBreakdown, etc.,
+// definis dans live/chains.scd et documentes dans live/CLAUDE.md).
+//
+// Ces deux namespaces ne coexistent JAMAIS dans la meme instance sclang :
+//   - data_only/boot.scd  -->  charge ~cc* concert (pas live/_load.scd)
+//   - boot.scd / live/_load.scd  -->  charge ~cc alias chains (pas ~cc*)
+// Les points d'entree boot sont mutuellement exclusifs (cf. Boot modes
+// dans sound_algo/CLAUDE.md).
+// ---------------------------------------------------------------------
 (
 ~ccCtlDur   = 0.05;   // periode du tick de controle, en BEATS
 ~ccCrossHold = 1.5;   // duree de maintien du geste bras-croises (s)

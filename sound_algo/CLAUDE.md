@@ -13,6 +13,25 @@ Live-coding SuperCollider system. Always communicate in French with the user.
 
 Voir `README.md` pour l'arborescence et les helpers principaux.
 
+Note namespaces : `~cc` = alias de `~ch` (chains, LIVE only, live/chains.scd) ;
+`~cc*` (ex. `~ccNote`, `~ccMaster`, `~ccFire`) = namespace concert (data-only,
+data_only/scene_concert.scd). Ces deux namespaces ne coexistent jamais.
+
+## Boot modes
+
+Trois points d'entree independants — ne PAS les mixer dans une meme instance sclang
+(SynthDefs, etat ~bpm et scenes entrent en collision) :
+
+| Fichier | Mode | Description |
+|---------|------|-------------|
+| `boot.scd` | **LIVE** | Performance IDE/launcher. Charge `live/_load.scd` (SynthDefs complets, 345 tracks, web bridge, Pdef sequencers). |
+| `data_only/boot.scd` | **Concert / data-only** | Autonome, sans dependance sur live/. Charge son propre engine.scd + synthdefs.scd + data_feeds.scd + scenes.scd. Demarre la scene `\play`. Definit les variables `~cc*`. |
+| `boot.data-only.scd` | **Hybride (legacy)** | Charge d'abord `live/_load.scd`, puis superpose `control/data_feeds.scd` + `live/data_only_program.scd`. Permet /control/dataScene via le systeme live complet. |
+
+> ATTENTION : charger plus d'un de ces points d'entree dans la meme instance sclang
+> corrompt l'etat : les SynthDefs live et data-only partagent des noms (`\do_*`),
+> `~bpm` et les scenes se marchent dessus.
+
 ## Validation
 
 Après toute modification :
