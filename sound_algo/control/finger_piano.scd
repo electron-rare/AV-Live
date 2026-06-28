@@ -19,7 +19,9 @@
 ~fpEnabled   = ~fpEnabled   ? false;
 ~fpDebug     = ~fpDebug     ? false;      // postln chaque frappe recue
 ~fpInst      = ~fpInst      ? \live;      // \live = suit ~melodyInst
-~fpScaleArr  = ~fpScaleArr  ? ~scaleMinorPent;
+// Fallback embarque : en mode data-only, palette/scales.scd n'est pas
+// charge, donc ~scaleMinorPent est nil. On garantit une gamme valide.
+~fpScaleArr  = ~fpScaleArr  ? (~scaleMinorPent ? [60, 63, 65, 67, 70, 72, 75, 79]);
 ~fpMap       = ~fpMap       ? [[0,1,2,3,4], [0,1,2,3,4]];  // [L, R] degres
 ~fpHandOct   = ~fpHandOct   ? [0, 12];    // L octave basse, R +1 octave
 ~fpBaseOct   = ~fpBaseOct   ? 0;          // octaves globales en plus
@@ -38,10 +40,16 @@ if(~fpCutBus.isNil and: { s.serverRunning }) {
 };
 
 // Gammes nommees accessibles via ~fpScale_
+// Gammes nommees (fallback embarque si palette/scales.scd absent).
 ~fpScales = (
-    minorPent: ~scaleMinorPent, minor: ~scaleMinor, dorian: ~scaleDorian,
-    phrygian: ~scalePhrygian, blues: ~scaleBlues, japanese: ~scaleJapanese,
-    hijaz: ~scaleHijaz, hirajoshi: ~scaleHirajoshi
+    minorPent: ~scaleMinorPent ? [60, 63, 65, 67, 70, 72, 75, 79],
+    minor:     ~scaleMinor     ? [60, 62, 63, 65, 67, 68, 70, 72],
+    dorian:    ~scaleDorian    ? [60, 62, 63, 65, 67, 69, 70, 72],
+    phrygian:  ~scalePhrygian  ? [60, 61, 63, 65, 67, 68, 70, 72],
+    blues:     ~scaleBlues     ? [60, 63, 65, 66, 67, 70, 72, 75],
+    japanese:  ~scaleJapanese  ? [60, 62, 65, 67, 69, 72, 74, 77],
+    hijaz:     ~scaleHijaz     ? [60, 61, 64, 65, 67, 68, 70, 72],
+    hirajoshi: ~scaleHirajoshi ? [60, 62, 63, 67, 68, 72, 74, 75]
 );
 
 // ---------- RESOLUTION (pure, testable) ---------------------------------
@@ -57,7 +65,8 @@ if(~fpCutBus.isNil and: { s.serverRunning }) {
     // x autour de 0.5 -> +/- ~fpOctSpan octaves
     octFromX = ((handX - 0.5) * 2 * ~fpOctSpan).round(1.0).asInteger;
     transpose = (~fpHandOct[hand] ? 0) + (~fpBaseOct * 12) + (octFromX * 12);
-    note = (~fpScaleArr.wrapAt(deg) + transpose).asInteger;
+    note = ((~fpScaleArr ? [60, 63, 65, 67, 70, 72, 75, 79]).wrapAt(deg)
+        + transpose).asInteger;
     vel = if(~fpVelSource == \z) { z } { strikeSpeed };
     amp = (~fpAmp * (0.25 + (0.75 * vel)) * ~fpSens).clip(0.0, 1.0);
     (note: note, freq: note.midicps, amp: amp, inst: ~fpResolveInst.());
