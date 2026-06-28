@@ -198,7 +198,6 @@ File.exists(~matDir).not.if({ ("mkdir -p " ++ ~matDir.quote).systemCmd });
 // \matGlow first; \degree/\type from steps; \freq via ~lpNote x 2**octave; \amp =
 // colorAmp x stepVel x volOf; \dur = bar/16; inst/cutoff/pan/mod applied like the overlay.
 ~matColorStepPattern = { |name, vi, color, spec, volOf, instPair, cdPairs|
-    var steps = spec[\steps];
     var freqRatio = 2 ** (spec[\octave] ? 0);
     var mod = ~matMod[vi];
     var modPairs = mod.isNil.if({ [] }, {
@@ -208,17 +207,21 @@ File.exists(~matDir).not.if({ ("mkdir -p " ++ ~matDir.quote).systemCmd });
             [\cutoff, Pfunc { var s = ~matModSourceVal.(src); c0 * (s.linexp(0,1,200,6000)/c0).pow(d) }]
         }, {
             (tgt == \pan).if({ [\pan, Pfunc { (~matModSourceVal.(src) * 2 - 1) * d }] },
-                { [] })   // amp mod handled in the \amp Pfunc below
+                { [] })   // amp mod out of scope for v1
         })
     });
     Pbind(*([
-        \matGlow, Pfunc { |e| ~matEmitTrig.(vi, (e[\amp] ? 0).clip(0, 1)); 0 },
         \stepIdx, Pseq((0..15), inf),
-        \type, Pfunc { |e| steps[e[\stepIdx]].isNil.if({ \rest }, { \note }) },
-        \degree, Pfunc { |e| var s = steps[e[\stepIdx]]; s.isNil.if({ 0 }, { s[\degree] }) },
+        \matGlow, Pfunc { |e|
+            var s = spec[\steps][e[\stepIdx]];
+            ~matEmitTrig.(vi, s.isNil.if({ 0 }, { ((spec[\amp] ? 1.0) * s[\vel]).clip(0, 1) }));
+            0
+        },
+        \type, Pfunc { |e| spec[\steps][e[\stepIdx]].isNil.if({ \rest }, { \note }) },
+        \degree, Pfunc { |e| var s = spec[\steps][e[\stepIdx]]; s.isNil.if({ 0 }, { s[\degree] }) },
         \freq, Pfunc { |e| (~lpNote.notNil).if({ ~lpNote.(e[\degree], 0).midicps * freqRatio }, { 440 }) },
         \amp, Pfunc { |e|
-            var s = steps[e[\stepIdx]];
+            var s = spec[\steps][e[\stepIdx]];
             ((spec[\amp] ? 1.0) * (s.isNil.if({ 0 }, { s[\vel] }))) * volOf.value },
         \stretch, spec[\stretch],
         \dur, ~matBeatsPerBar / 16
