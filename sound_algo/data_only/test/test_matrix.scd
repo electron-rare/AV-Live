@@ -191,6 +191,27 @@ pass = pass and: { ~regEv[\instrument] == \lp_kick };   // base instrument prese
 pass = pass and: { ~regEv2[\instrument] == \do_kick };
 ~matInstruments[0] = nil;
 
+// --- Instrument persistence round-trip (Task 2) ---
+pass = pass and: { ~matInstrPush.notNil };
+~matVoices.size.do { |i| ~matInstruments[i] = nil };
+~matSetCell.(1, 7, 4);
+~matApplyInstrument.(7, \do_plane);                 // lead -> do_plane
+~matSave.("inst grid");
+~matVoices.size.do { |i| ~matInstruments[i] = nil };
+~matClear.();
+pass = pass and: { ~matLoad.("inst grid") };
+pass = pass and: { ~lp[\matrix][1][7] == 4 };       // grid restored
+pass = pass and: { ~matInstruments[7] == \do_plane }; // instrument restored
+File.delete(~matDir +/+ "inst_grid.matrix");
+
+// legacy grid-only file still loads (instruments default nil)
+File.use(~matDir +/+ "legacy.matrix", "w", { |f|
+    f.write(Array.fill(16, { Array.fill(32, 0) }).asCompileString) });
+~matInstruments[3] = \do_strike;
+pass = pass and: { ~matLoad.("legacy") };
+pass = pass and: { ~matInstruments.every({ |x| x.isNil }) };  // defaulted
+File.delete(~matDir +/+ "legacy.matrix");
+
 pass.if(
     { "TEST PASS".postln },
     { "TEST FAIL".postln }

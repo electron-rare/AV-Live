@@ -285,6 +285,14 @@ File.exists(~matDir).not.if({ ("mkdir -p " ++ ~matDir.quote).systemCmd });
     ~toscSend !? { ~toscSend.valueArray(["/matrix/grid"] ++ ~lp[\matrix].flatten) }
 };
 
+// -- ~matInstrPush : send 16 instrument names (or "default") to surfaces --
+~matInstrPush = {
+    ~toscSend !? {
+        ~toscSend.valueArray(["/matrix/instruments"]
+            ++ ~matInstruments.collect({ |x| (x ? \default).asString }))
+    }
+};
+
 // -- ~matListPush : send all available preset + user-save names to surfaces --
 ~matListPush = {
     try {
@@ -295,25 +303,42 @@ File.exists(~matDir).not.if({ ("mkdir -p " ++ ~matDir.quote).systemCmd });
     }
 };
 
-// -- ~matSave : persist current grid to ~/.config/av-live/matrices/<name>.matrix --
+// -- ~matSave : persist current grid + instruments to ~/.config/av-live/matrices/<name>.matrix --
 ~matSave = { |name|
     var safe = ~matSafeName.(name);
     var path = ~matDir +/+ (safe ++ ".matrix");
-    File.use(path, "w", { |f| f.write(~lp[\matrix].asCompileString) });
+    var payload = (
+        grid: ~lp[\matrix],
+        instruments: ~matInstruments.collect({ |x| (x ? \default) })
+    );
+    File.use(path, "w", { |f| f.write(payload.asCompileString) });
     ~matSavedNames.add(safe.asSymbol);
     ("[matrix] saved " ++ path).postln;
     ~matListPush.();
 };
 
 // -- ~matLoadFile : load and validate a grid from an absolute path --
+// Accepts both legacy bare Array (grid only) and new Event (grid: + instruments:).
 ~matLoadFile = { |path|
-    var g;
+    var raw, grid, insts;
     File.exists(path).if({
-        g = File.use(path, "r", { |f| f.readAllString }).interpret;
-        ~matGridValid.(g).if({
-            ~lp[\matrix] = g;
+        raw = File.use(path, "r", { |f| f.readAllString }).interpret;
+        // legacy: bare grid Array; new: Event (grid:, instruments:)
+        grid  = raw.isArray.if({ raw }, { raw[\grid] });
+        insts = raw.isArray.if({ nil }, { raw[\instruments] });
+        ~matGridValid.(grid).if({
+            ~lp[\matrix] = grid;
+            // restore instruments (default nil; validate against choices)
+            ~matVoices.do { |name, vi|
+                var sym = (insts.notNil).if({ insts[vi] }, { \default });
+                ~matInstruments[vi] = ((sym.isNil) or: { sym == \default } or: {
+                    (~matInstChoices[name] ? []).includes(sym.asSymbol).not
+                }).if({ nil }, { sym.asSymbol });
+            };
+            ~matVoices.size.do { |i| ~matLastColor[i] = -1 };
             ~lp[\matPlaying].if({ ~matApplyBar.(~lp[\matBar]) });
             ~matGridPush.();
+            ~matInstrPush.();
             ("[matrix] loaded " ++ path).postln;
             true
         }, {
