@@ -166,8 +166,12 @@ button.queued { animation: queued-blink 600ms ease-in-out infinite alternate; }
 .mix-label { font-size: 10px; color: #9af; text-align: center; word-break: break-all; }
 
 /* --- Color def modal --- */
-.minst-edit { position: sticky; left: 132px; z-index: 2; width: 22px; font-size: 11px;
+.minst-edit { position: sticky; left: 54px; z-index: 2; width: 22px; font-size: 11px;
   background: #222; color: #ccc; border: 1px solid #333; flex-shrink: 0; }
+.cd-tabs { display:flex; gap:4px; margin:6px 0; }
+.cd-tab { width: auto; padding: 6px 10px; font-size: 12px; }
+.cd-tab.on { background:#2b6; color:#fff; }
+.cd-pane[hidden] { display:none; }
 .cd-modal { position: fixed; inset: 0; background: rgba(0,0,0,0.6); display: flex;
   align-items: center; justify-content: center; z-index: 50; }
 .cd-modal[hidden] { display: none; }
