@@ -188,3 +188,12 @@ button.queued { animation: queued-blink 600ms ease-in-out infinite alternate; }
 .cd-row.m4 { border-left-color: #990; }
 .cd-row.m5 { border-left-color: #c60; }
 .cd-row.m6 { border-left-color: #82a; }
+.seq-row { display:flex; gap:1px; margin-bottom:1px; }
+.seq-cell { width:20px; height:20px; font-size:9px; background:#1a1a1a; color:#ccc; border:1px solid #333; padding:0; }
+.seq-cell.on { background:#4c8; color:#000; }
+.seq-row.m1 .seq-cell.on { background:#c22; color:#fff; }
+.seq-row.m2 .seq-cell.on { background:#1a8; color:#fff; }
+.seq-row.m3 .seq-cell.on { background:#25b; color:#fff; }
+.seq-row.m4 .seq-cell.on { background:#990; color:#fff; }
+.seq-row.m5 .seq-cell.on { background:#c60; color:#fff; }
+.seq-row.m6 .seq-cell.on { background:#82a; color:#fff; }

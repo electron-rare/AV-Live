@@ -278,6 +278,18 @@ ws.addEventListener("message", (ev) => {
     }
     return;
   }
+  if (address === "/matrix/steps") {
+    const vi = Math.round(Number(args[0])), c = Math.round(Number(args[1]));
+    if (vi>=0 && vi<16 && c>=1 && c<=6) {
+      for (let s=0; s<16; s++) {
+        const deg = Number(args[2 + s*2]), vel = Number(args[3 + s*2]);
+        matSteps[vi][c][s] = (deg === -99) ? null : {degree:deg, vel:vel};
+      }
+      saveMatState();
+      if (cdEditVoice===vi && !document.getElementById("colordef-modal").hidden) renderSeq(vi);
+    }
+    return;
+  }
 });
 
 // --- Matrix (16-voice x 32-bar song arranger) ---
@@ -317,6 +329,7 @@ let matColorDefs = Array.from({ length: 16 }, () =>
    {stretch:2.0,octave:0,amp:1.0,inst:"default",cutoff:-1,pan:-2},
    {stretch:1.0,octave:-1,amp:1.05,inst:"default",cutoff:-1,pan:-2},
    {stretch:0.5,octave:0,amp:1.2,inst:"default",cutoff:-1,pan:-2}]);
+let matSteps = Array.from({length:16}, () => Array.from({length:7}, () => new Array(16).fill(null)));
 let cdEditVoice = -1, cdAuditioning = false;
 const MATRIX_BARS = 32;
 let matGrid = Array.from({ length: 16 }, () => new Array(32).fill(0));
@@ -449,6 +462,35 @@ function renderColorDefRows(vi) {
   }
 }
 
+function renderSeq(vi) {
+  const p = document.getElementById("cd-pane-seq"); p.innerHTML = "";
+  for (let c = 1; c <= 6; c++) {
+    const row = document.createElement("div"); row.className = "seq-row m" + c;
+    for (let s = 0; s < 16; s++) {
+      const cell = document.createElement("button"); cell.className = "seq-cell";
+      const st = matSteps[vi][c][s];
+      cell.textContent = st ? st.degree : "";
+      if (st) cell.classList.add("on");
+      cell.addEventListener("click", () => {
+        if (matSteps[vi][c][s]) { matSteps[vi][c][s] = null; send("/matrix/step", vi, c, s, -99, 0); }
+        else { matSteps[vi][c][s] = {degree:0, vel:0.8}; send("/matrix/step", vi, c, s, 0, 0.8); }
+        saveMatState(); renderSeq(vi);
+      });
+      cell.addEventListener("wheel", (e) => {
+        e.preventDefault(); const st2 = matSteps[vi][c][s]; if (!st2) return;
+        if (e.shiftKey) {
+          st2.vel = Math.max(0, Math.min(1, st2.vel + (e.deltaY < 0 ? 0.1 : -0.1)));
+        } else {
+          st2.degree += (e.deltaY < 0 ? 1 : -1);
+        }
+        send("/matrix/step", vi, c, s, st2.degree, st2.vel); saveMatState(); renderSeq(vi);
+      });
+      row.appendChild(cell);
+    }
+    p.appendChild(row);
+  }
+}
+
 function renderInstEdit(vi) {
   // Instrument pane
   const ip = document.getElementById("cd-pane-inst"); ip.innerHTML = "";
@@ -460,6 +502,8 @@ function renderInstEdit(vi) {
   ip.appendChild(sel);
   // Colors pane: reuse renderColorDefRows but target #cd-pane-colors
   renderColorDefRows(vi);
+  // Sequence pane
+  renderSeq(vi);
   // Assign pane
   const ap = document.getElementById("cd-pane-assign"); ap.innerHTML = "";
   const src = document.createElement("select");
