@@ -144,7 +144,7 @@ pass = pass and: { ~trigLog[1] == 5 };
 pass = pass and: { ~trigLog[2] == 1.0 };  // color 2 spec[\amp]=1.0; base has no \amp
 
 // --- Instrument selection (Task 1) ---
-pass = pass and: { ~matInstruments.notNil and: { ~matInstruments.size == 16 } };
+pass = pass and: { ~matInstruments.notNil and: { ~matInstruments.size == ~matVoices.size } };
 pass = pass and: { ~matInstruments.every({ |x| x.isNil }) };          // default nil
 pass = pass and: { ~matInstChoices.notNil and: { ~matKits.notNil } };
 
@@ -222,7 +222,7 @@ pass = pass and: { ~matModSourceVal.(\handSpeed) == 0.6 };
 pass = pass and: { ~matModSourceVal.(\unknownKey) == 0.0 }; // safe default
 
 // --- Mod bindings (Task 2) ---
-pass = pass and: { ~matMod.notNil and: { ~matMod.size == 16 } };
+pass = pass and: { ~matMod.notNil and: { ~matMod.size == ~matVoices.size } };
 pass = pass and: { ~matMod.every({ |x| x.isNil }) };
 pass = pass and: { ~matModTargets.notNil };
 
@@ -277,14 +277,14 @@ pass = pass and: { ~matNextBar.value == 2 };  // below ls -> snap to loop start
 ~matSeek.(7);
 pass = pass and: { ~lp[\matBar] == 7 };
 ~matSeek.(99);
-pass = pass and: { ~lp[\matBar] == 31 };  // clamped to ~matBars - 1
+pass = pass and: { ~lp[\matBar] == (~matBars - 1) };  // clamped to ~matBars - 1
 
 // Reset loop to full range
 ~matSetLoop.(0, 31);
 
 // --- Color editor: per-voice color defs (Task 1) ---
 ~matVoices.size.do { |i| ~matMod[i] = nil };   // isolate from prior mod-persistence state
-pass = pass and: { ~matColorDefs.notNil and: { ~matColorDefs.size == 16 } };
+pass = pass and: { ~matColorDefs.notNil and: { ~matColorDefs.size == ~matVoices.size } };
 // defaults reproduce the current table: color 2 = stretch 0.5, octave 0, amp 1.0
 pass = pass and: { ~matColorDefs[5][2][\stretch] == 0.5 };
 pass = pass and: { ~matColorDefs[5][2][\octave] == 0 };
@@ -417,7 +417,7 @@ File.delete(~matDir +/+ "sleg.matrix");
 
 // --- Pose bindings (Task 4) ---
 pass = pass and: { ~matPoseBindings.notNil and: { ~matSetPoseBind.notNil } };
-pass = pass and: { ~matPoseBindings.size == 16 };
+pass = pass and: { ~matPoseBindings.size == ~matVoices.size };
 ~trigLog = nil;
 ~toscSend = { |path ...args| ~trigLog = ([path] ++ args) };
 ~matSetPoseBind.(5, \poseA, \trigger, 3);
