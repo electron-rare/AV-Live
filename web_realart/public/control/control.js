@@ -320,6 +320,9 @@ function renderMatrix() {
     num.textContent = (bar % 4 === 0) ? String(bar + 1) : "";
     headerRow.appendChild(num);
   }
+  const modHead = document.createElement("span");
+  modHead.className = "mmod-head";
+  headerRow.appendChild(modHead);
   container.appendChild(headerRow);
 
   // Voice rows
