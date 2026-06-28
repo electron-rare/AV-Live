@@ -339,6 +339,21 @@ pass = pass and: { ~matAudition.notNil };
 try { ~matAudition.(0, false) } { |e| pass = false;
     ("EXCEPTION matAudition off: " ++ e.class.name).postln };
 
+// --- Color editor: persistence (Task 4) ---
+~matColorDefs[4][3][\amp] = 0.42;                    // sub, color 3
+~matSave.("cdef grid");
+~matColorDefs = Array.fill(~matVoices.size, { ~matDefaultColorDefs.value });
+pass = pass and: { ~matLoad.("cdef grid") };
+pass = pass and: { ~matColorDefs[4][3][\amp] == 0.42 };
+File.delete(~matDir +/+ "cdef_grid.matrix");
+// legacy grid-only file loads with default color defs
+File.use(~matDir +/+ "cleg.matrix", "w", { |f|
+    f.write(Array.fill(16, { Array.fill(32, 0) }).asCompileString) });
+~matColorDefs[4][3][\amp] = 0.9;
+pass = pass and: { ~matLoad.("cleg") };
+pass = pass and: { ~matColorDefs[4][3][\amp] == 1.0 };   // defaulted (color 3 amp default)
+File.delete(~matDir +/+ "cleg.matrix");
+
 pass.if(
     { "TEST PASS".postln },
     { "TEST FAIL".postln }

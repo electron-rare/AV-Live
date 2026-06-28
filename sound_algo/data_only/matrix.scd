@@ -453,7 +453,8 @@ File.exists(~matDir).not.if({ ("mkdir -p " ++ ~matDir.quote).systemCmd });
         grid: ~lp[\matrix],
         instruments: ~matInstruments.collect({ |x| (x ? \default) }),
         mods: ~matMod.collect({ |m| m.isNil.if({ \none },
-            { [m[\source], m[\target], m[\depth]] }) })
+            { [m[\source], m[\target], m[\depth]] }) }),
+        colorDefs: ~matColorDefs.collect({ |defs| (1..6).collect({ |c| defs[c] }) })
     );
     File.use(path, "w", { |f| f.write(payload.asCompileString) });
     ~matSavedNames.add(safe.asSymbol);
@@ -486,6 +487,21 @@ File.exists(~matDir).not.if({ ("mkdir -p " ++ ~matDir.quote).systemCmd });
                 raw[\mods].do { |m, vi|
                     (m != \none and: { m.isArray and: { m.size == 3 } }).if({
                         ~matApplyMod.(vi, m[0], m[1], m[2])
+                    })
+                }
+            });
+            // restore color defs (default missing/legacy to the historical table)
+            ~matColorDefs = Array.fill(~matVoices.size, { ~matDefaultColorDefs.value });
+            ((raw.isArray.not) and: { raw[\colorDefs].notNil }).if({
+                raw[\colorDefs].do { |voiceDefs, vi|
+                    (voiceDefs.isArray and: { vi < ~matVoices.size }).if({
+                        voiceDefs.do { |d, ci|
+                            (d.isKindOf(Event)).if({
+                                [\stretch, \octave, \amp, \inst, \cutoff, \pan].do { |f|
+                                    d[f].notNil.if({ ~matColorDefs[vi][ci + 1][f] = d[f] })
+                                }
+                            })
+                        }
                     })
                 }
             });
