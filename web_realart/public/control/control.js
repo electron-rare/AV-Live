@@ -198,6 +198,27 @@ ws.addEventListener("message", (ev) => {
     triggerGlow(Math.round(Number(args[0])), Number(args[1]));
     return;
   }
+
+  // /matrix/instrument <vi> <inst> — single-voice instrument echo
+  if (address === "/matrix/instrument") {
+    const vi = Math.round(Number(args[0])); const v = String(args[1] ?? "default");
+    if (vi >= 0 && vi < 16) {
+      matInst[vi] = v; saveMatState();
+      const sel = document.querySelector(`.minst[data-vi="${vi}"]`);
+      if (sel) sel.value = v;
+    }
+    return;
+  }
+  // /matrix/instruments <16 strings> — bulk (preset load / kit)
+  if (address === "/matrix/instruments") {
+    for (let vi = 0; vi < 16 && vi < args.length; vi++) {
+      const v = String(args[vi] ?? "default"); matInst[vi] = v;
+      const sel = document.querySelector(`.minst[data-vi="${vi}"]`);
+      if (sel) sel.value = v;
+    }
+    saveMatState();
+    return;
+  }
 });
 
 // --- Matrix (16-voice x 32-bar song arranger) ---
@@ -206,32 +227,38 @@ const MATRIX_VOICES = [
   "kick","hats","clap","perc","sub","acid","arp","lead",
   "stab","pad","ride","rim","tom","reese","bells","sweep"
 ];
+// per-voice curated instrument options (must mirror SC ~matInstChoices)
+const MATRIX_INST_CHOICES = {
+  kick:["lp_kick","do_kick","do_quake_sub"], hats:["lp_hat","do_hat"],
+  clap:["lp_clap","lp_rim","do_hat"], perc:["lp_perc","do_strike","lp_tom"],
+  sub:["lp_sub","lp_reese","do_body_drone","do_quake_sub"],
+  acid:["lp_acid","lp_pluck","do_geo"], arp:["lp_pluck","do_strike","lp_bells"],
+  lead:["lp_pluck","do_plane","do_strike","lp_bells"], stab:["lp_pluck","do_geo","lp_acid"],
+  pad:["lp_pad","do_body_drone","do_drone","lp_reese"], ride:["lp_ride","lp_hat","do_hat"],
+  rim:["lp_rim","lp_clap","do_hat"], tom:["lp_tom","do_strike","do_quake_sub"],
+  reese:["lp_reese","lp_sub","do_body_drone","do_weather"],
+  bells:["lp_bells","do_strike","do_plane"], sweep:["lp_sweep","do_body_gran","do_drone","do_weather"]
+};
+const MATRIX_KITS = ["default","deep","industrial","acid"];
+let matInst = new Array(16).fill("default");   // per-voice selection (persisted)
 const MATRIX_BARS = 32;
 let matGrid = Array.from({ length: 16 }, () => new Array(32).fill(0));
 // cellRefs[bar][vi] for O(16) playhead column toggle
 const cellRefs = Array.from({ length: 32 }, () => new Array(16).fill(null));
 let matPlayhead = -1;
 
+function saveMatState() {
+  try { localStorage.setItem(MATRIX_STORAGE_KEY,
+    JSON.stringify({ grid: matGrid, inst: matInst })); } catch (_e) {}
+}
 function loadMatState() {
   try {
-    const raw = localStorage.getItem(MATRIX_STORAGE_KEY);
-    if (raw) {
-      const parsed = JSON.parse(raw);
-      if (
-        Array.isArray(parsed) && parsed.length === 16 &&
-        parsed.every(row => Array.isArray(row) && row.length === 32 &&
-          row.every(v => Number.isInteger(v) && v >= 0 && v <= 6))
-      ) {
-        matGrid = parsed;
-        return;
-      }
-    }
+    const raw = JSON.parse(localStorage.getItem(MATRIX_STORAGE_KEY));
+    if (raw && Array.isArray(raw.grid)) { matGrid = raw.grid;
+      if (Array.isArray(raw.inst) && raw.inst.length === 16) matInst = raw.inst; return; }
+    if (Array.isArray(raw)) { matGrid = raw; return; }   // legacy: bare grid
   } catch (_e) {}
   matGrid = Array.from({ length: 16 }, () => new Array(32).fill(0));
-}
-
-function saveMatState() {
-  try { localStorage.setItem(MATRIX_STORAGE_KEY, JSON.stringify(matGrid)); } catch (_e) {}
 }
 
 function applyMatCellColor(el, color) {
@@ -267,6 +294,21 @@ function renderMatrix() {
     label.className = "mvoice-label";
     label.textContent = MATRIX_VOICES[vi];
     row.appendChild(label);
+    const inst = document.createElement("select");
+    inst.className = "minst";
+    inst.dataset.vi = vi;
+    [["default","default"]].concat(
+      (MATRIX_INST_CHOICES[MATRIX_VOICES[vi]] || []).map(s => [s, s])
+    ).forEach(([val, txt]) => {
+      const o = document.createElement("option"); o.value = val; o.textContent = txt;
+      inst.appendChild(o);
+    });
+    inst.value = matInst[vi] || "default";
+    inst.addEventListener("change", () => {
+      matInst[vi] = inst.value; saveMatState();
+      send("/matrix/instrument", vi, inst.value);
+    });
+    row.appendChild(inst);
     for (let bar = 0; bar < MATRIX_BARS; bar++) {
       const color = matGrid[vi][bar];
       const cell = document.createElement("button");
@@ -283,6 +325,13 @@ function renderMatrix() {
         applyMatCellColor(cell, next);
         if (bar === matPlayhead) cell.classList.add("playing");
         send("/matrix/cell", vi, bar, next);
+      });
+      cell.addEventListener("contextmenu", (e) => {
+        e.preventDefault();
+        matGrid[vi][bar] = 0; saveMatState();
+        applyMatCellColor(cell, 0);
+        if (bar === matPlayhead) cell.classList.add("playing");
+        send("/matrix/cell", vi, bar, 0);
       });
       cellRefs[bar][vi] = cell;
       row.appendChild(cell);
@@ -630,6 +679,10 @@ document.addEventListener("DOMContentLoaded", () => {
     saveMatState();
     renderMatrix();
     send("/matrix/clear");
+  });
+
+  document.querySelectorAll(".kit-btn").forEach((b) => {
+    b.addEventListener("click", () => send("/matrix/kit", b.dataset.kit));
   });
 
   // Matrix persistence bar
