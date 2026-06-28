@@ -266,7 +266,7 @@ ws.addEventListener("message", (ev) => {
           cutoff:Number(args[b+4]), pan:Number(args[b+5]) };
       }
       saveMatState();
-      if (cdEditVoice === vi && !document.getElementById("colordef-modal").hidden) openColorDef(vi);
+      if (cdEditVoice === vi && !document.getElementById("colordef-modal").hidden) renderColorDefRows(vi);
     }
     return;
   }
@@ -354,6 +354,9 @@ function renderMatrix() {
   const instHead = document.createElement("span");
   instHead.className = "minst-head";
   headerRow.appendChild(instHead);
+  const editHead = document.createElement("span");
+  editHead.className = "minst-edit-head";
+  headerRow.appendChild(editHead);
   for (let bar = 0; bar < MATRIX_BARS; bar++) {
     const num = document.createElement("span");
     num.className = "mbar-num";
@@ -440,8 +443,7 @@ function renderMatrix() {
 }
 
 // --- Color def modal ---
-function openColorDef(vi) {
-  cdEditVoice = vi;
+function renderColorDefRows(vi) {
   document.getElementById("cd-title").textContent = MATRIX_VOICES[vi];
   const rows = document.getElementById("cd-rows");
   rows.innerHTML = "";
@@ -473,6 +475,12 @@ function openColorDef(vi) {
       pan.value = d.pan >= -1 ? d.pan : 0; pan.addEventListener("change", () => setCD(c, "pan", +pan.value)); r.appendChild(mk("pan", pan)); }
     rows.appendChild(r);
   }
+}
+
+function openColorDef(vi) {
+  cdEditVoice = vi;
+  document.getElementById("cd-audition").classList.toggle("on", cdAuditioning);
+  renderColorDefRows(vi);
   document.getElementById("colordef-modal").hidden = false;
   send("/matrix/colordefs/get", vi);
 }
@@ -486,6 +494,7 @@ function setCD(color, field, value) {
 
 function closeColorDef() {
   if (cdAuditioning && cdEditVoice >= 0) { send("/matrix/audition", cdEditVoice, 0); cdAuditioning = false; }
+  document.getElementById("cd-audition").classList.remove("on");
   document.getElementById("colordef-modal").hidden = true;
   cdEditVoice = -1;
 }
