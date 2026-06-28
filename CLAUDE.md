@@ -72,6 +72,11 @@ Toujours répondre en français à l'utilisateur. Code, commentaires de code, co
 | `FINGER_PIANO` | `0` | `1` enables air-piano finger strike emission from data_only_viz |
 | `FINGER_STRIKE_VEL` | `0.02` | downward relative-velocity threshold for a strike (normalized image units/frame) |
 | `FINGER_STRIKE_REFRACTORY_MS` | `120` | min ms between strikes per finger |
+| `FINGER_SOURCE` | `auto` | hand source for finger gestures: `auto` (iPhone Vision hands if fresh, else MediaPipe), `iphone`, `mediapipe` |
+| `FINGER_DEBUG` | `0` | `1` logs each detected strike/pinch (hand, finger) — for threshold tuning |
+| `PINCH_RATIO_ON` | `0.45` | thumb-to-finger distance / hand size below which a pinch engages (clip toggle) |
+| `PINCH_RATIO_OFF` | `0.65` | distance/size above which the pinch re-arms (hysteresis) |
+| `PINCH_REFRACTORY_MS` | `250` | min ms between pinches per finger |
 
 ## Conventions globales
 
