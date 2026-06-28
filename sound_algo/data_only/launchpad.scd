@@ -331,9 +331,7 @@ OSCdef(\lpLaunch, { |msg|
     ~lpArm.((msg[1] ? \nil).asString, (msg[2] ? 0) > 0);
 }, '/launch');
 OSCdef(\lpTempo, { |msg|
-    var t = ((msg[1] ? 126).clip(60, 200)) / 60;
-    ~lp[\clock].tempo = t;
-    ~concert !? { ~concert[\clock] !? { |c| c.tempo = t } };
+    ~setTempo.((msg[1] ? 126).clip(60, 200));
 }, '/launch/tempo');
 OSCdef(\lpClear, { |msg|
     ~lp[\armed].copy.do { |nm| ~lpArm.(nm, false) };

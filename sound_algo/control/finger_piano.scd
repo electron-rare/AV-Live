@@ -168,7 +168,7 @@ OSCdef(\fpCtl, { |msg|
     { cmd == \clipsoff }{ ~fpStopClips.value; }
     { cmd == \reload } { ~fpSelfPath !? { |p| p.load;
                          ("[fp] reloaded " ++ p).postln }; }
-    { cmd == \bpm }    { ~lp !? { ~lp[\clock].tempo = msg[2] / 60 };
+    { cmd == \bpm }    { ~setTempo.(msg[2]);
                          ("[fp] bpm = " ++ msg[2]).postln; }
     { true }           { ("[fp] cmd OSC inconnue: " ++ cmd).postln; };
 }, '/control/fp');

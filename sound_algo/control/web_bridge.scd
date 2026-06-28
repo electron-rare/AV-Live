@@ -95,9 +95,7 @@
 
 ~applyTempo = { |bpm|
     ~webState[\tempo] = bpm;
-    if(TempoClock.default.notNil) {
-        TempoClock.default.tempo_(bpm / 60.0);
-    };
+    ~setTempo.(bpm);
 };
 
 ~applyXY = {
