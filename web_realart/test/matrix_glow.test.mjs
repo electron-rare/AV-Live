@@ -19,7 +19,7 @@ test("level at or below GLOW_MIN snaps to 0", () => {
   assert.strictEqual(nextGlow(GLOW_MIN / 2, 1000 / 60), 0);
 });
 
-test("a full level decays to 0 within ~300 ms", () => {
+test("a full level decays to 0 within ~450 ms", () => {
   let lvl = 1;
   for (let t = 0; t < 450; t += 1000 / 60) lvl = nextGlow(lvl, 1000 / 60);
   assert.strictEqual(lvl, 0);
