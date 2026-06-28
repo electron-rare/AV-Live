@@ -256,6 +256,20 @@ ws.addEventListener("message", (ev) => {
     saveMatState();
     return;
   }
+  if (address === "/matrix/colordefs") {
+    const vi = Math.round(Number(args[0]));
+    if (vi >= 0 && vi < 16) {
+      for (let c = 1; c <= 6; c++) {
+        const b = 1 + (c - 1) * 6;
+        matColorDefs[vi][c] = { stretch:Number(args[b]), octave:Math.round(Number(args[b+1])),
+          amp:Number(args[b+2]), inst:String(args[b+3] ?? "default"),
+          cutoff:Number(args[b+4]), pan:Number(args[b+5]) };
+      }
+      saveMatState();
+      if (cdEditVoice === vi && !document.getElementById("colordef-modal").hidden) renderColorDefRows(vi);
+    }
+    return;
+  }
 });
 
 // --- Matrix (16-voice x 32-bar song arranger) ---
@@ -287,6 +301,15 @@ const MATRIX_MOD_TARGETS = {
   bells:["none","amp"], sweep:["none","amp"]
 };
 let matMod = Array.from({length:16}, () => ({source:"none", target:"none", depth:0.5}));
+let matColorDefs = Array.from({ length: 16 }, () =>
+  [null,
+   {stretch:1.0,octave:0,amp:1.0,inst:"default",cutoff:-1,pan:-2},
+   {stretch:0.5,octave:0,amp:1.0,inst:"default",cutoff:-1,pan:-2},
+   {stretch:1.0,octave:1,amp:1.0,inst:"default",cutoff:-1,pan:-2},
+   {stretch:2.0,octave:0,amp:1.0,inst:"default",cutoff:-1,pan:-2},
+   {stretch:1.0,octave:-1,amp:1.05,inst:"default",cutoff:-1,pan:-2},
+   {stretch:0.5,octave:0,amp:1.2,inst:"default",cutoff:-1,pan:-2}]);
+let cdEditVoice = -1, cdAuditioning = false;
 const MATRIX_BARS = 32;
 let matGrid = Array.from({ length: 16 }, () => new Array(32).fill(0));
 // cellRefs[bar][vi] for O(16) playhead column toggle
@@ -297,14 +320,16 @@ let matLoopEnd = 31;
 
 function saveMatState() {
   try { localStorage.setItem(MATRIX_STORAGE_KEY,
-    JSON.stringify({ grid: matGrid, inst: matInst, mod: matMod })); } catch (_e) {}
+    JSON.stringify({ grid: matGrid, inst: matInst, mod: matMod, cdef: matColorDefs })); } catch (_e) {}
 }
 function loadMatState() {
   try {
     const raw = JSON.parse(localStorage.getItem(MATRIX_STORAGE_KEY));
     if (raw && Array.isArray(raw.grid) && raw.grid.length === 16) { matGrid = raw.grid;
       if (Array.isArray(raw.inst) && raw.inst.length === 16) matInst = raw.inst;
-      if (Array.isArray(raw.mod) && raw.mod.length === 16) matMod = raw.mod; return; }
+      if (Array.isArray(raw.mod) && raw.mod.length === 16) matMod = raw.mod;
+      if (Array.isArray(raw.cdef) && raw.cdef.length === 16) matColorDefs = raw.cdef;
+      return; }
     if (Array.isArray(raw) && raw.length === 16) { matGrid = raw; return; }   // legacy: bare grid
   } catch (_e) {}
   matGrid = Array.from({ length: 16 }, () => new Array(32).fill(0));
@@ -330,6 +355,9 @@ function renderMatrix() {
   const instHead = document.createElement("span");
   instHead.className = "minst-head";
   headerRow.appendChild(instHead);
+  const editHead = document.createElement("span");
+  editHead.className = "minst-edit-head";
+  headerRow.appendChild(editHead);
   for (let bar = 0; bar < MATRIX_BARS; bar++) {
     const num = document.createElement("span");
     num.className = "mbar-num";
@@ -364,6 +392,10 @@ function renderMatrix() {
       send("/matrix/instrument", vi, inst.value);
     });
     row.appendChild(inst);
+    const edit = document.createElement("button");
+    edit.className = "minst-edit"; edit.textContent = "..."; edit.dataset.vi = vi;
+    edit.addEventListener("click", () => openColorDef(vi));
+    row.appendChild(edit);
     for (let bar = 0; bar < MATRIX_BARS; bar++) {
       const color = matGrid[vi][bar];
       const cell = document.createElement("button");
@@ -409,6 +441,63 @@ function renderMatrix() {
     row.appendChild(mod);
     container.appendChild(row);
   }
+}
+
+// --- Color def modal ---
+function renderColorDefRows(vi) {
+  document.getElementById("cd-title").textContent = MATRIX_VOICES[vi];
+  const rows = document.getElementById("cd-rows");
+  rows.innerHTML = "";
+  const targets = MATRIX_MOD_TARGETS[MATRIX_VOICES[vi]] || ["none","amp"];
+  const hasCut = targets.includes("cutoff"), hasPan = targets.includes("pan");
+  for (let c = 1; c <= 6; c++) {
+    const d = matColorDefs[vi][c];
+    const r = document.createElement("div"); r.className = "cd-row m" + c;
+    const mk = (label, el) => { const w = document.createElement("label");
+      w.className = "cd-field"; w.textContent = label; w.appendChild(el); return w; };
+    const inst = document.createElement("select"); inst.className = "cd-inst";
+    [["default","default"]].concat((MATRIX_INST_CHOICES[MATRIX_VOICES[vi]]||[]).map(s=>[s,s]))
+      .forEach(([v,t]) => { const o=document.createElement("option"); o.value=v; o.textContent=t; inst.appendChild(o); });
+    inst.value = d.inst || "default";
+    inst.addEventListener("change", () => setCD(c, "inst", inst.value));
+    const stretch = document.createElement("select"); stretch.className = "cd-str";
+    [0.5,1.0,2.0].forEach(v => { const o=document.createElement("option"); o.value=v; o.textContent=v+"x"; stretch.appendChild(o); });
+    stretch.value = d.stretch; stretch.addEventListener("change", () => setCD(c, "stretch", +stretch.value));
+    const oct = document.createElement("select"); oct.className = "cd-oct";
+    [-1,0,1].forEach(v => { const o=document.createElement("option"); o.value=v; o.textContent=v; oct.appendChild(o); });
+    oct.value = d.octave; oct.addEventListener("change", () => setCD(c, "octave", +oct.value));
+    const amp = document.createElement("input"); amp.type="range"; amp.min=0; amp.max=1.5; amp.step=0.01;
+    amp.value = d.amp; amp.addEventListener("change", () => setCD(c, "amp", +amp.value));
+    r.appendChild(mk("inst", inst)); r.appendChild(mk("stretch", stretch));
+    r.appendChild(mk("oct", oct)); r.appendChild(mk("amp", amp));
+    if (hasCut) { const cut = document.createElement("input"); cut.type="range"; cut.min=200; cut.max=6000; cut.step=10;
+      cut.value = d.cutoff > 0 ? d.cutoff : 1000; cut.addEventListener("change", () => setCD(c, "cutoff", +cut.value)); r.appendChild(mk("cutoff", cut)); }
+    if (hasPan) { const pan = document.createElement("input"); pan.type="range"; pan.min=-1; pan.max=1; pan.step=0.01;
+      pan.value = d.pan >= -1 ? d.pan : 0; pan.addEventListener("change", () => setCD(c, "pan", +pan.value)); r.appendChild(mk("pan", pan)); }
+    rows.appendChild(r);
+  }
+}
+
+function openColorDef(vi) {
+  cdEditVoice = vi;
+  document.getElementById("cd-audition").classList.toggle("on", cdAuditioning);
+  renderColorDefRows(vi);
+  document.getElementById("colordef-modal").hidden = false;
+  send("/matrix/colordefs/get", vi);
+}
+
+function setCD(color, field, value) {
+  if (cdEditVoice < 0) return;
+  matColorDefs[cdEditVoice][color][field] = value;
+  saveMatState();
+  send("/matrix/colordef", cdEditVoice, color, field, value);
+}
+
+function closeColorDef() {
+  if (cdAuditioning && cdEditVoice >= 0) { send("/matrix/audition", cdEditVoice, 0); cdAuditioning = false; }
+  document.getElementById("cd-audition").classList.remove("on");
+  document.getElementById("colordef-modal").hidden = true;
+  cdEditVoice = -1;
 }
 
 // --- Matrix timeline: 32-bar loop region + playhead ---
@@ -803,6 +892,14 @@ document.addEventListener("DOMContentLoaded", () => {
   renderTimeline();
   initTimelinePointer();
   renderMixer();
+
+  document.getElementById("cd-close").addEventListener("click", closeColorDef);
+  document.getElementById("cd-audition").addEventListener("click", () => {
+    if (cdEditVoice < 0) return;
+    cdAuditioning = !cdAuditioning;
+    send("/matrix/audition", cdEditVoice, cdAuditioning ? 1 : 0);
+    document.getElementById("cd-audition").classList.toggle("on", cdAuditioning);
+  });
 
   // Name input: rename selected preset and update button labels
   const melName = document.getElementById("mel-name");

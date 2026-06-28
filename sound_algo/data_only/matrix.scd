@@ -35,6 +35,19 @@
 ~matModNeutralCut = ~matModNeutralCut ? IdentityDictionary[
     \acid->700, \arp->3000, \lead->4000, \stab->2200, \pad->1500
 ];
+
+// -- default color defs reproduce the historical global variation table --
+~matDefaultColorDefs = {
+    [ nil,
+        (stretch: 1.0, octave:  0, amp: 1.0,  inst: nil, cutoff: nil, pan: nil),
+        (stretch: 0.5, octave:  0, amp: 1.0,  inst: nil, cutoff: nil, pan: nil),
+        (stretch: 1.0, octave:  1, amp: 1.0,  inst: nil, cutoff: nil, pan: nil),
+        (stretch: 2.0, octave:  0, amp: 1.0,  inst: nil, cutoff: nil, pan: nil),
+        (stretch: 1.0, octave: -1, amp: 1.05, inst: nil, cutoff: nil, pan: nil),
+        (stretch: 0.5, octave:  0, amp: 1.2,  inst: nil, cutoff: nil, pan: nil) ]
+};
+~matColorDefs = ~matColorDefs ? Array.fill(~matVoices.size, { ~matDefaultColorDefs.value });
+
 ~lp[\matLoopStart] = ~lp[\matLoopStart] ? 0;
 ~lp[\matLoopEnd]   = ~lp[\matLoopEnd]   ? (~matBars - 1);
 
@@ -144,66 +157,67 @@ File.exists(~matDir).not.if({ ("mkdir -p " ++ ~matDir.quote).systemCmd });
     })
 };
 
+// -- ~matVariationOverlay : assemble the Pchain overlay given a resolved spec --
+// Factored out of ~matVariation so the main function stays readable.
+// cdPairs (static per-color cutoff/pan) come before modPairs so a live capture
+// mod on the same target overrides the static color-def value — intended.
+~matVariationOverlay = { |name, vi, spec, volOf, instPair, cdPairs|
+    var base = ~matBaseFor.(name);
+    var mod = ~matMod[vi];
+    // octave colors multiply \freq by 2**octave (main's freqRatio scheme), pitched
+    // voices only — works for voices that set \freq directly via Pfunc.
+    var pitched = [\sub, \acid, \arp, \lead, \stab, \pad, \reese, \bells, \perc, \tom];
+    var freqRatio = 2 ** (spec[\octave] ? 0);
+    var freqPair = (pitched.includes(name) and: { freqRatio != 1.0 }).if({
+        [\freq, Pfunc({ |e| (e[\freq] ? 440) * freqRatio })]
+    }, { [] });
+    var modPairs = mod.isNil.if({ [] }, {
+        var src = mod[\source], tgt = mod[\target], d = mod[\depth];
+        (tgt == \cutoff).if({
+            var c0 = ~matModNeutralCut[name] ? 1000;
+            [\cutoff, Pfunc { var s = ~matModSourceVal.(src);
+                c0 * (s.linexp(0, 1, 200, 6000) / c0).pow(d) }]
+        }, {
+            (tgt == \pan).if({
+                [\pan, Pfunc { (~matModSourceVal.(src) * 2 - 1) * d }]
+            }, {
+                [\amp, Pfunc { (spec[\amp] * volOf.value) * (1 + (d * (~matModSourceVal.(src) * 2 - 1))).max(0) }]
+            })
+        })
+    });
+    Pchain(
+        Pbind(*([
+            \matGlow, Pfunc { |e| ~matEmitTrig.(vi, (e[\amp] ? spec[\amp]).clip(0, 1)); 0 },
+            \stretch, spec[\stretch],
+            \amp,     Pfunc({ (spec[\amp] ? 1.0) * volOf.value })
+        ] ++ instPair ++ cdPairs ++ freqPair ++ modPairs)),
+        base
+    )
+};
+
 // -- ~matVariation : map color 1-6 to a Pchain overlay on the captured base --
 // color 1 = base as-is, 2 = double-time, 3 = octave up, 4 = half-time,
 // 5 = octave down + slight accent, 6 = accent roll (denser + louder).
-// \stretch multiplies event duration; octave colors multiply the base \freq
-// (x2 up, x0.5 down) over the base event, so they transpose even voices that set
-// \freq directly via Pfunc (which bypass SC's \octave). Only pitched voices get
-// the \freq multiply — drums keep their pitch (and any instrument override).
-// Single function so all variation logic lives in one place.
+// \stretch multiplies event duration; octave colors multiply the base \freq by
+// 2**octave (x2 up, x0.5 down) via Pfunc, so they transpose even voices that set
+// \freq directly (bypassing SC's \octave). Only pitched voices get the \freq
+// multiply — drums keep their pitch. Reads ~matColorDefs[vi][color] so per-voice
+// color tables are editable at runtime (octave field maps to the freq multiply).
 ~matVariation = { |name, color, vi = 0|
     (color == 0).if({ nil }, {
         var base = ~matBaseFor.(name);
         base.notNil.if({
-            var spec = [
-                nil,
-                (stretch: 1.0, freqRatio: 1.0, amp: 1.0),
-                (stretch: 0.5, freqRatio: 1.0, amp: 1.0),
-                (stretch: 1.0, freqRatio: 2.0, amp: 1.0),
-                (stretch: 2.0, freqRatio: 1.0, amp: 1.0),
-                (stretch: 1.0, freqRatio: 0.5, amp: 1.05),
-                (stretch: 0.5, freqRatio: 1.0, amp: 1.2)
-            ][color];
+            var spec = ~matColorDefs[vi][color];
             spec.notNil.if({
-                var inst = ~matInstruments[vi];
-                // per-voice volume (mixer fix from main): read live, default 0.8
+                var inst = spec[\inst] ? ~matInstruments[vi];      // per-color wins, else voice default
                 var volOf = { (~lp[\vol].notNil).if({ ~lp[\vol][name.asSymbol] ? 0.8 }, { 0.8 }) };
                 var instPair = inst.notNil.if({ [\instrument, inst] }, { [] });
-                // octave colors: multiply the base \freq, pitched voices only.
-                // gating avoids forcing a pitch onto drums (incl. drum voices
-                // remapped to a pitched instrument override).
-                var pitched = [\sub, \acid, \arp, \lead, \stab, \pad, \reese, \bells, \perc, \tom];
-                var freqRatio = spec[\freqRatio] ? 1.0;
-                var freqPair = (pitched.includes(name) and: { freqRatio != 1.0 }).if({
-                    [\freq, Pfunc({ |e| (e[\freq] ? 440) * freqRatio })]
-                }, { [] });
-                var mod = ~matMod[vi];
-                var modPairs = mod.isNil.if({ [] }, {
-                    var src = mod[\source], tgt = mod[\target], d = mod[\depth];
-                    (tgt == \cutoff).if({
-                        var c0 = ~matModNeutralCut[name] ? 1000;
-                        [\cutoff, Pfunc { var s = ~matModSourceVal.(src);
-                            c0 * (s.linexp(0, 1, 200, 6000) / c0).pow(d) }]
-                    }, {
-                        (tgt == \pan).if({
-                            [\pan, Pfunc { (~matModSourceVal.(src) * 2 - 1) * d }]
-                        }, {  // amp: variation amp x per-voice volume x mod factor
-                            [\amp, Pfunc { (spec[\amp] * volOf.value) * (1 + (d * (~matModSourceVal.(src) * 2 - 1))).max(0) }]
-                        })
-                    })
-                });
-                Pchain(
-                    Pbind(*([
-                        \matGlow, Pfunc { |e|
-                            ~matEmitTrig.(vi, (e[\amp] ? spec[\amp]).clip(0, 1));
-                            0
-                        },
-                        \stretch, spec[\stretch],
-                        \amp,     Pfunc({ (spec[\amp] ? 1.0) * volOf.value })
-                    ] ++ freqPair ++ instPair ++ modPairs)),
-                    base
-                )
+                var cdPairs = [];
+                (spec[\cutoff].notNil and: { (~matModTargets[name] ? []).includes(\cutoff) }).if({
+                    cdPairs = cdPairs ++ [\cutoff, spec[\cutoff]] });
+                (spec[\pan].notNil and: { (~matModTargets[name] ? []).includes(\pan) }).if({
+                    cdPairs = cdPairs ++ [\pan, spec[\pan]] });
+                ~matVariationOverlay.(name, vi, spec, volOf, instPair, cdPairs)
             }, { base })
         }, { nil })
     })
@@ -378,6 +392,50 @@ File.exists(~matDir).not.if({ ("mkdir -p " ++ ~matDir.quote).systemCmd });
     }
 };
 
+// -- ~matSetColorDef : set one field of one voice/color, validate, re-source, echo --
+~matSetColorDef = { |vi, color, field, value|
+    var fields = [\stretch, \octave, \amp, \inst, \cutoff, \pan];
+    ((vi >= 0 and: { vi < ~matVoices.size }) and: { color >= 1 and: { color <= 6 } }
+        and: { fields.includes(field.asSymbol) }).if({
+        var name = ~matVoices[vi];
+        var ok = true;
+        var v = value;
+        (field.asSymbol == \inst).if({
+            v = ((value.asSymbol == \default) or: { value.isNil }).if({ nil }, { value.asSymbol });
+            ok = v.isNil or: { (~matInstChoices[name] ? []).includes(v) };
+        });
+        ((field.asSymbol == \cutoff) or: { field.asSymbol == \pan }).if({
+            ok = (~matModTargets[name] ? []).includes(field.asSymbol);
+            v = value.asFloat;
+        });
+        ((field.asSymbol == \stretch) or: { field.asSymbol == \octave }
+            or: { field.asSymbol == \amp }).if({
+            v = (field.asSymbol == \octave).if({ value.asInteger }, { value.asFloat });
+        });
+        ok.if({
+            ~matColorDefs[vi][color][field.asSymbol] = v;
+            ~matLastColor[vi] = -1;
+            (~lp[\matPlaying] and: { ~matApplyBar.notNil }).if({ ~matApplyBar.(~lp[\matBar]) });
+            ~matColorDefPush.(vi)
+        })
+    })
+};
+
+// -- ~matColorDefPush : send one voice's 6 color defs flattened to surfaces --
+// flat layout per color (1..6): stretch, octave, amp, inst(str), cutoff(-1=nil), pan(-2=nil)
+// Distinct OUTBOUND address (plural) so it never collides with the 4-arg inbound
+// /matrix/colordef set (mirrors /matrix/instrument vs /matrix/instruments).
+~matColorDefPush = { |vi|
+    ~toscSend !? {
+        var flat = (1..6).collect({ |c|
+            var d = ~matColorDefs[vi][c];
+            [ d[\stretch], d[\octave], d[\amp], (d[\inst] ? \default).asString,
+              d[\cutoff] ? -1, d[\pan] ? -2 ]
+        }).flatten;
+        ~toscSend.valueArray(["/matrix/colordefs", vi] ++ flat)
+    }
+};
+
 // -- ~matModPush : send 16 mod triples (source,target,depth) flattened --
 ~matModPush = {
     ~toscSend !? {
@@ -407,7 +465,8 @@ File.exists(~matDir).not.if({ ("mkdir -p " ++ ~matDir.quote).systemCmd });
         grid: ~lp[\matrix],
         instruments: ~matInstruments.collect({ |x| (x ? \default) }),
         mods: ~matMod.collect({ |m| m.isNil.if({ \none },
-            { [m[\source], m[\target], m[\depth]] }) })
+            { [m[\source], m[\target], m[\depth]] }) }),
+        colorDefs: ~matColorDefs.collect({ |defs| (1..6).collect({ |c| defs[c] }) })
     );
     File.use(path, "w", { |f| f.write(payload.asCompileString) });
     ~matSavedNames.add(safe.asSymbol);
@@ -443,6 +502,21 @@ File.exists(~matDir).not.if({ ("mkdir -p " ++ ~matDir.quote).systemCmd });
                     })
                 }
             });
+            // restore color defs (default missing/legacy to the historical table)
+            ~matColorDefs = Array.fill(~matVoices.size, { ~matDefaultColorDefs.value });
+            ((raw.isArray.not) and: { raw[\colorDefs].notNil }).if({
+                raw[\colorDefs].do { |voiceDefs, vi|
+                    (voiceDefs.isArray and: { vi < ~matVoices.size }).if({
+                        voiceDefs.do { |d, ci|
+                            (d.isKindOf(Event)).if({
+                                [\stretch, \octave, \amp, \inst, \cutoff, \pan].do { |f|
+                                    d[f].notNil.if({ ~matColorDefs[vi][ci + 1][f] = d[f] })
+                                }
+                            })
+                        }
+                    })
+                }
+            });
             ~lp[\matPlaying].if({ ~matApplyBar.(~lp[\matBar]) });
             ~matGridPush.();
             ~matInstrPush.();
@@ -465,6 +539,35 @@ File.exists(~matDir).not.if({ ("mkdir -p " ++ ~matDir.quote).systemCmd });
     var up   = ~matDir       +/+ (safe ++ ".matrix");
     var pp   = ~matPresetDir +/+ (safe ++ ".matrix");
     File.exists(up).if({ ~matLoadFile.(up) }, { ~matLoadFile.(pp) })
+};
+
+// -- ~matAudition : preview a voice's 6 colors as a 1-beat-per-step loop --
+// on=true starts a Routine cycling color 1..6 (re-sources the voice's Pdef each
+// step); on=false stops the routine and silences the voice. Preview only — does
+// not move the grid playhead.
+~matAudition = { |vi, on|
+    (vi >= 0 and: { vi < ~matVoices.size }).if({
+        var name = ~matVoices[vi];
+        var key  = ("lp_" ++ name).asSymbol;
+        ~matAudRoutine = ~matAudRoutine ? IdentityDictionary.new;
+        ~matAudRoutine[vi] !? { ~matAudRoutine[vi].stop };
+        on.if({
+            var clock = ~lp[\clock] ? TempoClock.default;
+            ~matAudRoutine[vi] = Routine({
+                var c = 1;
+                loop {
+                    var pat = ~matVariation.(name, c, vi);
+                    pat.notNil.if({ Pdef(key, pat); Pdef(key).play(clock, quant: 1) });
+                    1.wait;
+                    c = (c % 6) + 1;
+                }
+            }).play(clock, quant: 1);
+        }, {
+            ~matAudRoutine[vi] = nil;
+            Pdef.all.includesKey(key).if({ Pdef(key).stop });
+            ~matLastColor[vi] = -1;       // force normal re-source on next grid bar
+        })
+    })
 };
 
 // -- OSCdefs (unique \mat_* keys; register sender for TouchOSC feedback) --
@@ -528,6 +631,22 @@ OSCdef(\mat_seek, { |msg, time, addr|
     ~toscTouch !? { ~toscTouch.(addr) };
     ~matSeek.(msg[1].asInteger)
 }, '/matrix/seek');
+
+OSCdef(\mat_colordef, { |msg, time, addr|
+    ~toscTouch !? { ~toscTouch.(addr) };
+    ~matSetColorDef.((msg[1] ? 0).asInteger, (msg[2] ? 1).asInteger,
+        (msg[3] ? \amp).asSymbol, msg[4])
+}, '/matrix/colordef');
+
+OSCdef(\mat_colordef_get, { |msg, time, addr|
+    ~toscTouch !? { ~toscTouch.(addr) };
+    ~matColorDefPush.((msg[1] ? 0).asInteger)
+}, '/matrix/colordefs/get');
+
+OSCdef(\mat_audition, { |msg, time, addr|
+    ~toscTouch !? { ~toscTouch.(addr) };
+    ~matAudition.((msg[1] ? 0).asInteger, (msg[2] ? 0) > 0)
+}, '/matrix/audition');
 
 // -- Capture mod source cache (nil-guarded; idempotent reload) --
 ~matModCache   = ~matModCache ? IdentityDictionary.new;

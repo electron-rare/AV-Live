@@ -282,6 +282,87 @@ pass = pass and: { ~lp[\matBar] == 31 };  // clamped to ~matBars - 1
 // Reset loop to full range
 ~matSetLoop.(0, 31);
 
+// --- Color editor: per-voice color defs (Task 1) ---
+~matVoices.size.do { |i| ~matMod[i] = nil };   // isolate from prior mod-persistence state
+pass = pass and: { ~matColorDefs.notNil and: { ~matColorDefs.size == 16 } };
+// defaults reproduce the current table: color 2 = stretch 0.5, octave 0, amp 1.0
+pass = pass and: { ~matColorDefs[5][2][\stretch] == 0.5 };
+pass = pass and: { ~matColorDefs[5][2][\octave] == 0 };
+pass = pass and: { ~matColorDefs[5][2][\amp] == 1.0 };
+pass = pass and: { ~matColorDefs[5][5][\amp] == 1.05 };   // color 5 default amp
+pass = pass and: { ~matColorDefs[0][1][\inst].isNil };    // inst default nil
+// ~matVariation reads the def: editing the def changes the produced event
+~matColorDefs[5][2][\stretch] = 0.25;
+~tv = ~matVariation.(\acid, 2, 5).asStream.next(());
+pass = pass and: { ~tv[\stretch] == 0.25 };
+~matColorDefs[5][2][\stretch] = 0.5;                      // restore default
+// per-color cutoff applies for a filter voice (acid supports cutoff)
+~matColorDefs[5][2][\cutoff] = 1234;
+~tv2 = ~matVariation.(\acid, 2, 5).asStream.next(());
+pass = pass and: { ~tv2[\cutoff] == 1234 };
+~matColorDefs[5][2][\cutoff] = nil;
+// per-color inst overrides the per-voice default
+~matColorDefs[6][2][\inst] = \do_strike;                 // arp supports do_strike
+~tv3 = ~matVariation.(\arp, 2, 6).asStream.next(());
+pass = pass and: { ~tv3[\instrument] == \do_strike };
+~matColorDefs[6][2][\inst] = nil;
+
+// --- Color editor: set + push (Task 2) ---
+pass = pass and: { ~matSetColorDef.notNil and: { ~matColorDefPush.notNil } };
+~trigLog = nil;
+~toscSend = { |path ...args| ~trigLog = ([path] ++ args) };
+~matSetColorDef.(5, 3, \octave, -2);                 // acid, color 3
+pass = pass and: { ~matColorDefs[5][3][\octave] == -2 };
+pass = pass and: { ~trigLog[0] == "/matrix/colordefs" and: { ~trigLog[1] == 5 } };
+pass = pass and: { ~trigLog.size == 38 };   // path + vi + 36 values
+
+// direct test of ~matColorDefPush: address, vi, 38 items total, nil pan=-2, nil cutoff=-1
+~trigLog = nil;
+~matColorDefPush.(5);
+pass = pass and: { ~trigLog[0] == "/matrix/colordefs" };
+pass = pass and: { ~trigLog[1] == 5 };
+pass = pass and: { ~trigLog.size == 38 };
+pass = pass and: { ~trigLog[(2 + ((1-1)*6) + 5)] == -2 };   // color 1 pan nil -> -2
+pass = pass and: { ~trigLog[(2 + ((1-1)*6) + 4)] == -1 };   // color 1 cutoff nil -> -1
+
+// invalid field is rejected (state unchanged)
+~matSetColorDef.(5, 3, \bogus, 9);
+pass = pass and: { (~matColorDefs[5][3][\bogus]).isNil };
+// invalid inst for the voice is rejected
+~matSetColorDef.(0, 1, \inst, \do_plane);            // kick can't be do_plane
+pass = pass and: { ~matColorDefs[0][1][\inst].isNil };
+~matSetColorDef.(5, 3, \octave, 0);                  // restore
+
+// --- Color editor: audition (Task 3) ---
+pass = pass and: { ~matAudition.notNil };
+// off when not running must not raise
+try { ~matAudition.(0, false) } { |e| pass = false;
+    ("EXCEPTION matAudition off: " ++ e.class.name).postln };
+
+// --- Color editor: persistence (Task 4) ---
+~matColorDefs[4][3][\amp] = 0.42;                    // sub, color 3
+~matSave.("cdef grid");
+~matColorDefs = Array.fill(~matVoices.size, { ~matDefaultColorDefs.value });
+pass = pass and: { ~matLoad.("cdef grid") };
+pass = pass and: { ~matColorDefs[4][3][\amp] == 0.42 };
+File.delete(~matDir +/+ "cdef_grid.matrix");
+// legacy grid-only file loads with default color defs
+File.use(~matDir +/+ "cleg.matrix", "w", { |f|
+    f.write(Array.fill(16, { Array.fill(32, 0) }).asCompileString) });
+~matColorDefs[4][3][\amp] = 0.9;
+pass = pass and: { ~matLoad.("cleg") };
+pass = pass and: { ~matColorDefs[4][3][\amp] == 1.0 };   // defaulted (color 3 amp default)
+File.delete(~matDir +/+ "cleg.matrix");
+
+// REGRESSION: clear a per-color instrument to default via the STRING "default" (web path)
+~matColorDefs[6][2][\inst] = \do_strike;            // arp, color 2 (do_strike is a valid arp choice)
+~matSetColorDef.(6, 2, \inst, "default");           // String, as OSC delivers it
+pass = pass and: { ~matColorDefs[6][2][\inst].isNil };   // cleared
+// valid inst as a String also works
+~matSetColorDef.(6, 2, \inst, "do_strike");
+pass = pass and: { ~matColorDefs[6][2][\inst] == \do_strike };
+~matColorDefs[6][2][\inst] = nil;                   // restore
+
 pass.if(
     { "TEST PASS".postln },
     { "TEST FAIL".postln }

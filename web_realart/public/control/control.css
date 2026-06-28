@@ -134,6 +134,7 @@ button.queued { animation: queued-blink 600ms ease-in-out infinite alternate; }
   background: #1a1a1a; color: #ccc; border: 1px solid #333; flex-shrink: 0; }
 .kit-btn { flex: 1; padding: 10px 4px; font-size: 11px; }
 .minst-head { width: 78px; flex-shrink: 0; }
+.minst-edit-head { width: 22px; flex-shrink: 0; }
 .mmod-head { width: 192px; flex-shrink: 0; }
 .mmod { position: sticky; right: 0; z-index: 2; background: #111;
   display: flex; gap: 2px; align-items: center; flex-shrink: 0; padding-left: 4px; }
@@ -163,3 +164,23 @@ button.queued { animation: queued-blink 600ms ease-in-out infinite alternate; }
 .mix-mute { width: auto; padding: 4px 6px; font-size: 11px; }
 .mix-mute.on { background: #622; border-color: #c44; color: #f88; font-weight: 700; }
 .mix-label { font-size: 10px; color: #9af; text-align: center; word-break: break-all; }
+
+/* --- Color def modal --- */
+.minst-edit { position: sticky; left: 132px; z-index: 2; width: 22px; font-size: 11px;
+  background: #222; color: #ccc; border: 1px solid #333; flex-shrink: 0; }
+.cd-modal { position: fixed; inset: 0; background: rgba(0,0,0,0.6); display: flex;
+  align-items: center; justify-content: center; z-index: 50; }
+.cd-modal[hidden] { display: none; }
+.cd-panel { background: #161616; border: 1px solid #333; border-radius: 6px;
+  padding: 12px; max-height: 90vh; overflow-y: auto; min-width: 320px; }
+.cd-head { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; }
+.cd-aud.on { background: #2b6; color: #fff; }
+.cd-row { display: flex; gap: 6px; align-items: center; padding: 4px; border-radius: 3px;
+  border-left: 4px solid; margin-bottom: 3px; }
+.cd-field { font-size: 9px; color: #999; display: flex; flex-direction: column; }
+.cd-row.m1 { border-left-color: #c22; }
+.cd-row.m2 { border-left-color: #1a8; }
+.cd-row.m3 { border-left-color: #25b; }
+.cd-row.m4 { border-left-color: #990; }
+.cd-row.m5 { border-left-color: #c60; }
+.cd-row.m6 { border-left-color: #82a; }
