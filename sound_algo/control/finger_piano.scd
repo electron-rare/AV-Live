@@ -17,7 +17,10 @@
 (
 // ---------- ETAT / CONFIG (idempotent : ne reset pas si deja defini) ----
 ~fpEnabled   = ~fpEnabled   ? false;
-~fpDebug     = ~fpDebug     ? false;      // postln chaque frappe recue
+~fpDebug     = ~fpDebug     ? false;      // postln chaque frappe/pincement
+~fpMode      = ~fpMode      ? \clips;     // \clips | \piano | \both
+// Chemin du fichier pour /control/fp reload (iteration clips sans reboot SC).
+if(~repoRoot.notNil) { ~fpSelfPath = ~repoRoot ++ "control/finger_piano.scd" };
 ~fpInst      = ~fpInst      ? \live;      // \live = suit ~melodyInst
 // Fallback embarque : en mode data-only, palette/scales.scd n'est pas
 // charge, donc ~scaleMinorPent est nil. On garantit une gamme valide.
@@ -91,7 +94,7 @@ if(~fpCutBus.isNil and: { s.serverRunning }) {
 // ---------- OSC : declenchement note ------------------------------------
 OSCdef(\poseFinger, { |msg|
     var ev, syn;
-    if(~fpEnabled == true) {
+    if((~fpEnabled == true) and: { (~fpMode == \piano) or: { ~fpMode == \both } }) {
         // msg = [/pose/finger, pid, hand, finger, strikeSpeed, z, tipx, tipy]
         ev = ~fpResolve.(msg[2].asInteger, msg[3].asInteger,
                          msg[4], msg[5], msg[6], msg[7]);
@@ -106,9 +109,48 @@ OSCdef(\poseFinger, { |msg|
     };
 }, '/pose/finger');
 
+// ---------- CLIPS : pincement pouce+doigt -> arme un pattern launchpad ---
+// Reutilise les patterns concert de launchpad.scd (sons soignes, sync
+// horloge concert, volumes par voie, feedback surface) via ~lpArm, au lieu
+// de reinventer des boucles. 8 clips = 2 mains x 4 doigts (index..auric.).
+// ~lpArm / ~lp sont definis dans launchpad.scd (charge APRES ce fichier) :
+// la reference est runtime, nil-guardee.
+~fpClipMap = ~fpClipMap ? [
+    [\kick, \hats, \clap, \sub],    // main G : fondation rythmique
+    [\acid, \arp,  \lead, \pad]     // main D : mouvement / harmonie
+];
+
+~fpStopClips = {
+    if(~lp.notNil and: { ~lpArm.notNil }) {
+        ~lp[\armed].copy.do { |nm| ~lpArm.(nm, false) };
+        "[fp] all clips OFF".postln;
+    };
+};
+
+~fpToggleClip = { |hand, finger|
+    var name = (~fpClipMap[hand] ? []).at(finger - 1);
+    if(name.notNil and: { ~lpArm.notNil and: { ~lp.notNil } }) {
+        var on = ~lp[\armed].includes(name.asSymbol).not;   // toggle
+        ~lpArm.(name, on);
+        ("[fp] clip " ++ name ++ on.if({ " ON" }, { " OFF" })).postln;
+    } {
+        ("[fp] launchpad absent (h" ++ hand ++ " f" ++ finger ++ ")").postln;
+    };
+};
+
+OSCdef(\posePinch, { |msg|
+    // msg = [/pose/pinch, pid, hand, finger(1..4)]
+    if((~fpEnabled == true) and: { (~fpMode == \clips) or: { ~fpMode == \both } }) {
+        if(~fpDebug == true) {
+            ("[fp] pinch h" ++ msg[2].asInteger ++ " f" ++ msg[3].asInteger).postln;
+        };
+        ~fpToggleClip.(msg[2].asInteger, msg[3].asInteger);
+    };
+}, '/pose/pinch');
+
 // ---------- API LIVE (env-direct wrappers) ------------------------------
 ~fpOn        = { ~fpEnabled = true;  "[fp] air-piano ON".postln; };
-~fpOff       = { ~fpEnabled = false; "[fp] air-piano OFF".postln; };
+~fpOff       = { ~fpEnabled = false; ~fpStopClips.value; "[fp] OFF".postln; };
 // ATTENTION : choisir un SynthDef gate/doneAction:2 (ex \pluck, \lead).
 // Un SynthDef sans gate ne sera jamais libere par le gate=0 differe -> note bloquee.
 ~fpInst_     = { |sym| ~fpInst = sym; ("[fp] inst = " ++ sym).postln; };
@@ -135,9 +177,16 @@ OSCdef(\fpCtl, { |msg|
     { cmd == \sens }   { ~fpSens = msg[2]; }
     { cmd == \octave } { ~fpBaseOct = msg[2].asInteger; }
     { cmd == \velsrc } { ~fpVelSource = msg[2].asSymbol; }
+    { cmd == \mode }   { ~fpMode = msg[2].asSymbol;
+                         ("[fp] mode = " ++ ~fpMode).postln; }
+    { cmd == \clipsoff }{ ~fpStopClips.value; }
+    { cmd == \reload } { ~fpSelfPath !? { |p| p.load;
+                         ("[fp] reloaded " ++ p).postln }; }
+    { cmd == \bpm }    { ~lp !? { ~lp[\clock].tempo = msg[2] / 60 };
+                         ("[fp] bpm = " ++ msg[2]).postln; }
     { true }           { ("[fp] cmd OSC inconnue: " ++ cmd).postln; };
 }, '/control/fp');
 
-"[OK] finger_piano : ~fpOn / ~fpScale_(\\dorian) / ~fpInst_(\\fm_bell)".postln;
-"[OK] finger_piano OSC : /control/fp on|off|debug 1|scale <n>|inst <n>".postln;
+"[OK] finger_piano : mode=clips, pincement pouce+doigt -> toggle boucle".postln;
+"[OK] finger_piano OSC : /control/fp on|off|mode clips|piano|both|bpm <n>|clipsoff".postln;
 )

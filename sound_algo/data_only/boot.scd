@@ -150,6 +150,9 @@ Routine({
     // -- 5) OSCdef des flux data_feeds -----
     (~repoRoot ++ "control/data_feeds.scd").load;
     (~repoRoot ++ "control/finger_piano.scd").load;
+    // En data-only ~melodyInst n'existe pas et \pluck n'est pas charge :
+    // pointe l'air-piano vers un SynthDef present ici (\bp_lead).
+    ~fpInst = \bp_lead;
     0.5.wait;
 
     // -- 6) Bibliotheque de scenes -----
