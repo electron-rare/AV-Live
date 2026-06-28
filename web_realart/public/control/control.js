@@ -219,6 +219,30 @@ ws.addEventListener("message", (ev) => {
     saveMatState();
     return;
   }
+  if (address === "/matrix/mod") {
+    const vi = Math.round(Number(args[0]));
+    if (vi >= 0 && vi < 16) {
+      matMod[vi] = { source:String(args[1]??"none"), target:String(args[2]??"none"), depth:Number(args[3])||0 };
+      const r = document.querySelector(`.mmod-src[data-vi="${vi}"]`);
+      if (r) { r.value = matMod[vi].source;
+        document.querySelector(`.mmod-tgt[data-vi="${vi}"]`).value = matMod[vi].target;
+        document.querySelector(`.mmod-dep[data-vi="${vi}"]`).value = matMod[vi].depth; }
+      saveMatState();
+    }
+    return;
+  }
+  if (address === "/matrix/mods") {   // 16 triples flattened = 48 values
+    for (let vi = 0; vi < 16; vi++) {
+      const b = vi*3;
+      matMod[vi] = { source:String(args[b]??"none"), target:String(args[b+1]??"none"), depth:Number(args[b+2])||0 };
+      const r = document.querySelector(`.mmod-src[data-vi="${vi}"]`);
+      if (r) { r.value=matMod[vi].source;
+        document.querySelector(`.mmod-tgt[data-vi="${vi}"]`).value=matMod[vi].target;
+        document.querySelector(`.mmod-dep[data-vi="${vi}"]`).value=matMod[vi].depth; }
+    }
+    saveMatState();
+    return;
+  }
 });
 
 // --- Matrix (16-voice x 32-bar song arranger) ---
@@ -240,6 +264,15 @@ const MATRIX_INST_CHOICES = {
   bells:["lp_bells","do_strike","do_plane"], sweep:["lp_sweep","do_body_gran","do_drone","do_weather"]
 };
 let matInst = new Array(16).fill("default");   // per-voice selection (persisted)
+const MATRIX_MOD_SOURCES = ["none","lHandY","rHandY","lOpen","rOpen","handSpeed","handDist","bodyY","depth"];
+const MATRIX_MOD_TARGETS = {
+  kick:["none","amp"], hats:["none","amp"], clap:["none","amp"], perc:["none","amp"],
+  sub:["none","amp"], acid:["none","amp","cutoff","pan"], arp:["none","amp","cutoff","pan"],
+  lead:["none","amp","cutoff","pan"], stab:["none","amp","cutoff","pan"], pad:["none","amp","cutoff"],
+  ride:["none","amp"], rim:["none","amp"], tom:["none","amp"], reese:["none","amp"],
+  bells:["none","amp"], sweep:["none","amp"]
+};
+let matMod = Array.from({length:16}, () => ({source:"none", target:"none", depth:0.5}));
 const MATRIX_BARS = 32;
 let matGrid = Array.from({ length: 16 }, () => new Array(32).fill(0));
 // cellRefs[bar][vi] for O(16) playhead column toggle
@@ -248,13 +281,14 @@ let matPlayhead = -1;
 
 function saveMatState() {
   try { localStorage.setItem(MATRIX_STORAGE_KEY,
-    JSON.stringify({ grid: matGrid, inst: matInst })); } catch (_e) {}
+    JSON.stringify({ grid: matGrid, inst: matInst, mod: matMod })); } catch (_e) {}
 }
 function loadMatState() {
   try {
     const raw = JSON.parse(localStorage.getItem(MATRIX_STORAGE_KEY));
     if (raw && Array.isArray(raw.grid) && raw.grid.length === 16) { matGrid = raw.grid;
-      if (Array.isArray(raw.inst) && raw.inst.length === 16) matInst = raw.inst; return; }
+      if (Array.isArray(raw.inst) && raw.inst.length === 16) matInst = raw.inst;
+      if (Array.isArray(raw.mod) && raw.mod.length === 16) matMod = raw.mod; return; }
     if (Array.isArray(raw) && raw.length === 16) { matGrid = raw; return; }   // legacy: bare grid
   } catch (_e) {}
   matGrid = Array.from({ length: 16 }, () => new Array(32).fill(0));
@@ -338,6 +372,22 @@ function renderMatrix() {
       cellRefs[bar][vi] = cell;
       row.appendChild(cell);
     }
+    const mod = document.createElement("span");
+    mod.className = "mmod";
+    const src = document.createElement("select"); src.className = "mmod-src"; src.dataset.vi = vi;
+    MATRIX_MOD_SOURCES.forEach(s => { const o=document.createElement("option"); o.value=s; o.textContent=s; src.appendChild(o); });
+    const tgt = document.createElement("select"); tgt.className = "mmod-tgt"; tgt.dataset.vi = vi;
+    (MATRIX_MOD_TARGETS[MATRIX_VOICES[vi]]||["none","amp"]).forEach(t => { const o=document.createElement("option"); o.value=t; o.textContent=t; tgt.appendChild(o); });
+    const dep = document.createElement("input"); dep.type="range"; dep.min=0; dep.max=1; dep.step=0.01;
+    dep.className = "mmod-dep"; dep.dataset.vi = vi;
+    src.value = matMod[vi].source; tgt.value = matMod[vi].target; dep.value = matMod[vi].depth;
+    const sendMod = () => { matMod[vi] = {source:src.value, target:tgt.value, depth:+dep.value};
+      saveMatState(); send("/matrix/mod", vi, src.value, tgt.value, +dep.value); };
+    src.addEventListener("change", sendMod);
+    tgt.addEventListener("change", sendMod);
+    dep.addEventListener("change", sendMod);
+    mod.appendChild(src); mod.appendChild(tgt); mod.appendChild(dep);
+    row.appendChild(mod);
     container.appendChild(row);
   }
 }
