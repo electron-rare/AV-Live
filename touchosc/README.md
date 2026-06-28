@@ -93,3 +93,7 @@ Feedback (SC → surface, port 9000, all created by `touchosc_feedback.scd`):
   voices to bus 0, so per-voice live levels are not producible without
   re-routing the audio. The master RMS VU + beat + per-pad armed reflection
   cover the live-feedback need.
+- **Sequencer playhead / step-index highlight** (spec §2/§4/§7) is
+  **deferred**: the data-only engine does not emit a step index over OSC, so
+  adding column-highlight requires a new SC step-emit plus a layout
+  column-highlight receiver. Not built in this pass.

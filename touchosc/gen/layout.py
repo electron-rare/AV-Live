@@ -82,7 +82,6 @@ def _pad_cell(name, x, y, w, h):
         [s.prop("name", name, "s"), s.frame(0, 0, w - 20, btn_h)],
         messages=[
             s.osc("/launch", [s.const(name), s.vali()]),
-            s.osc(f"/armed/{name}", [s.val()], send=0, receive=1, feedback=1),
         ],
     )
     vol_fader = s.node(
@@ -99,6 +98,7 @@ def _pad_cell(name, x, y, w, h):
             s.script(_lua("pad.lua")),
         ],
         children=[arm_btn, vol_fader, name_label],
+        messages=[s.osc(f"/armed/{name}", [s.val()], send=0, receive=1, feedback=1)],
     )
 
 
@@ -126,8 +126,7 @@ def live_page():
     # Master VU fader (receive-only /sync/rms)
     ch.append(s.node(
         "FADER",
-        [s.prop("name", "rms", "s"), s.frame(490, 8, 40, 72),
-         s.script(_lua("feedback.lua"))],
+        [s.prop("name", "rms", "s"), s.frame(490, 8, 40, 72)],
         messages=[s.osc("/sync/rms", [s.val()], send=0, receive=1, feedback=1)],
     ))
 

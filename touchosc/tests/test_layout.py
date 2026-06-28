@@ -247,3 +247,53 @@ def test_seq_page_no_sync_amp():
     page = layout.seq_page()
     addrs = _addrs(page)
     assert "/sync/amp" not in addrs, "/sync/amp found — per-voice VU was supposed to be omitted"
+
+
+# ---------------------------------------------------------------------------
+# Pad armed receive on GROUP — FIX 1 regression guard
+# ---------------------------------------------------------------------------
+
+def test_live_page_pad_groups_carry_armed_receive():
+    """Each pad GROUP (carrying pad.lua) must have the /armed/<name> receive
+    message on itself — not only on the child arm BUTTON.  pad.lua fires via
+    onReceiveOSC on the node that owns the matching receive message; if the
+    message lives only on the child BUTTON, the GROUP script never fires and
+    armed-state color reflection is dead."""
+    page = layout.live_page()
+
+    # Collect GROUP nodes that carry a script property (= pad GROUPs with pad.lua).
+    # The top-level LIVE GROUP has no script, so this selects exactly the 16 pads.
+    pad_groups = []
+    for grp in page.findall(".//node[@type='GROUP']"):
+        for prop_el in grp.findall("properties/property"):
+            key_el = prop_el.find("key")
+            if key_el is not None and key_el.text == "script":
+                pad_groups.append(grp)
+                break
+
+    assert len(pad_groups) == 16, (
+        f"expected 16 pad GROUPs with a script property, got {len(pad_groups)}"
+    )
+
+    for grp in pad_groups:
+        # Resolve the pad name from its name property for a readable failure msg.
+        grp_name = "?"
+        for prop_el in grp.findall("properties/property"):
+            k = prop_el.find("key")
+            if k is not None and k.text == "name":
+                v = prop_el.find("value")
+                grp_name = v.text if v is not None else "?"
+                break
+
+        # The GROUP's direct <messages> block (not descendants) must contain
+        # exactly one osc element with receive="1" whose path starts /armed/.
+        armed_msgs = [
+            osc_el for osc_el in grp.findall("messages/osc")
+            if osc_el.get("receive") == "1"
+            and osc_el.find("path/partial/value") is not None
+            and (osc_el.find("path/partial/value").text or "").startswith("/armed/")
+        ]
+        assert len(armed_msgs) == 1, (
+            f"pad GROUP '{grp_name}' must have exactly 1 /armed/* receive msg "
+            f"on the GROUP itself, got {len(armed_msgs)}"
+        )

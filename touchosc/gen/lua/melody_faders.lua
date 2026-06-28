@@ -2,6 +2,7 @@
 -- On value change: read all 8 step faders (m0..m7) -> /seq/melody/set.
 -- API verified on GrosMac at fidelity gate.
 local LO, HI = -7, 14
+local unpack = table.unpack or unpack  -- Lua 5.1 / LuaJIT compat
 
 function onValueChanged(key)
   if key ~= "x" then return end
@@ -12,5 +13,5 @@ function onValueChanged(key)
     local fx = (f and f.values and f.values.x) or 0
     degs[i] = math.floor(LO + (HI - LO) * fx + 0.5)
   end
-  sendOSC("/seq/melody/set", table.unpack(degs))
+  sendOSC("/seq/melody/set", unpack(degs))
 end
