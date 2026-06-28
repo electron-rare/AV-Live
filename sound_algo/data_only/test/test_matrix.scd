@@ -141,6 +141,36 @@ pass = pass and: { ~trigLog[0] == "/matrix/trig" };
 pass = pass and: { ~trigLog[1] == 5 };
 pass = pass and: { ~trigLog[2] == 1.0 };  // color 2 spec[\amp]=1.0; base has no \amp
 
+// -- Loop region --
+pass = pass and: { ~matNextBar.notNil and: { ~matSetLoop.notNil and: { ~matSeek.notNil } } };
+
+~matSetLoop.(4, 8);
+pass = pass and: { ~lp[\matLoopStart] == 4 };
+pass = pass and: { ~lp[\matLoopEnd] == 8 };
+
+// Swapped args must auto-order
+~matSetLoop.(10, 6);
+pass = pass and: { ~lp[\matLoopStart] == 6 };
+pass = pass and: { ~lp[\matLoopEnd] == 10 };
+
+// Wrap: loop 2..4
+~matSetLoop.(2, 4);
+~lp[\matBar] = 4;
+pass = pass and: { ~matNextBar.value == 2 };  // at le -> wraps to loop start
+~lp[\matBar] = 2;
+pass = pass and: { ~matNextBar.value == 3 };  // inside region -> advances
+~lp[\matBar] = 0;
+pass = pass and: { ~matNextBar.value == 2 };  // below ls -> snap to loop start
+
+// Seek
+~matSeek.(7);
+pass = pass and: { ~lp[\matBar] == 7 };
+~matSeek.(99);
+pass = pass and: { ~lp[\matBar] == 31 };  // clamped to ~matBars - 1
+
+// Reset loop to full range
+~matSetLoop.(0, 31);
+
 pass.if(
     { "TEST PASS".postln },
     { "TEST FAIL".postln }

@@ -23,6 +23,8 @@
 ~matBase        = ~matBase        ? IdentityDictionary.new;
 ~matBeatsPerBar = ~matBeatsPerBar ? 4;
 ~matLastColor   = ~matLastColor   ? Array.fill(~matVoices.size, -1);
+~lp[\matLoopStart] = ~lp[\matLoopStart] ? 0;
+~lp[\matLoopEnd]   = ~lp[\matLoopEnd]   ? (~matBars - 1);
 
 // -- Persistence env init (nil-guarded) --
 ~matDir        = ~matDir        ? "~/.config/av-live/matrices".standardizePath;
@@ -81,6 +83,12 @@ File.exists(~matDir).not.if({ ("mkdir -p " ++ ~matDir.quote).systemCmd });
     })
 };
 
+// -- ~matNextBar : compute next playhead bar clipped within the loop region --
+// Wraps nb back to loop start when nb overshoots le or undershoots ls.
+~matNextBar = { var nb = ~lp[\matBar] + 1; var ls = ~lp[\matLoopStart] ? 0; var le = ~lp[\matLoopEnd] ? (~matBars - 1);
+    ((nb > le) or: { nb < ls }).if({ nb = ls });
+    nb.clip(0, ~matBars - 1) };
+
 // -- ~matApplyBar : set each voice's Pdef to its cell color and (re)play or stop --
 // Re-sourcing a playing Pdef updates it at the next quant boundary (smooth for v1).
 ~matApplyBar = { |bar|
@@ -122,6 +130,19 @@ File.exists(~matDir).not.if({ ("mkdir -p " ++ ~matDir.quote).systemCmd });
     ~toscSend !? { ~toscSend.("/matrix/trig", vi, amp.clip(0, 1)) }
 };
 
+// -- ~matLoopPush : send current loop region to surfaces --
+~matLoopPush = { ~toscSend !? { ~toscSend.("/matrix/loop", ~lp[\matLoopStart] ? 0, ~lp[\matLoopEnd] ? (~matBars - 1)) } };
+
+// -- ~matSetLoop : set loop region (auto-ordered) and push to surfaces --
+~matSetLoop = { |s, e| var a = s.asInteger.clip(0, ~matBars - 1); var b = e.asInteger.clip(0, ~matBars - 1);
+    (a <= b).if({ ~lp[\matLoopStart] = a; ~lp[\matLoopEnd] = b }, { ~lp[\matLoopStart] = b; ~lp[\matLoopEnd] = a });
+    ~matLoopPush.() };
+
+// -- ~matSeek : jump playhead to bar; re-applies if playing --
+~matSeek = { |bar| ~lp[\matBar] = bar.asInteger.clip(0, ~matBars - 1);
+    ~toscSend !? { ~toscSend.("/matrix/playhead", ~lp[\matBar]) };
+    ~lp[\matPlaying].if({ ~matApplyBar.(~lp[\matBar]) }) };
+
 // -- ~matStop : halt the playhead Routine and silence all matrix voices --
 ~matStop = {
     ~matRoutine !? { ~matRoutine.stop };
@@ -139,13 +160,13 @@ File.exists(~matDir).not.if({ ("mkdir -p " ++ ~matDir.quote).systemCmd });
     var clock = ~lp[\clock] ? TempoClock.default;
     ~matRoutine !? { ~matRoutine.stop };
     ~lp[\matPlaying] = true;
-    ~lp[\matBar]     = 0;
+    ~lp[\matBar]     = ~lp[\matLoopStart] ? 0;
     ~matRoutine = Routine({
         loop {
             ~matApplyBar.(~lp[\matBar]);
             ~toscSend !? { ~toscSend.("/matrix/playhead", ~lp[\matBar]) };
             ~matBeatsPerBar.wait;
-            ~lp[\matBar] = (~lp[\matBar] + 1) % ~matBars
+            ~lp[\matBar] = ~matNextBar.value;
         }
     }).play(clock, quant: ~matBeatsPerBar);
     ~matPush.()
@@ -227,7 +248,8 @@ File.exists(~matDir).not.if({ ("mkdir -p " ++ ~matDir.quote).systemCmd });
 ~matListPush = {
     try {
         var names = (~matNames.(~matPresetDir) ++ ~matNames.(~matDir)).as(Set).asArray.sort;
-        ~toscSend !? { ~toscSend.valueArray(["/matrix/list"] ++ names) }
+        ~toscSend !? { ~toscSend.valueArray(["/matrix/list"] ++ names) };
+        ~matLoopPush.()
     } { |e|
         ("[matrix] listPush err: " ++ e.class.name).postln
     }
@@ -307,6 +329,16 @@ OSCdef(\mat_list, { |msg, time, addr|
     ~toscTouch !? { ~toscTouch.(addr) };
     ~matListPush.()
 }, '/matrix/list');
+
+OSCdef(\mat_loop, { |msg, time, addr|
+    ~toscTouch !? { ~toscTouch.(addr) };
+    ~matSetLoop.(msg[1].asInteger, msg[2].asInteger)
+}, '/matrix/loop');
+
+OSCdef(\mat_seek, { |msg, time, addr|
+    ~toscTouch !? { ~toscTouch.(addr) };
+    ~matSeek.(msg[1].asInteger)
+}, '/matrix/seek');
 
 "[matrix] ready".postln;
 )
