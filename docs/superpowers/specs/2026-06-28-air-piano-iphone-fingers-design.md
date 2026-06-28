@@ -148,8 +148,9 @@ Contents:
   5. Trigger the instrument `~fpInst` as a one-shot
      (`Synth(~fpInst, [\freq, f, \amp, vel, \gate, 1, ...])` with its own
      envelope `doneAction: 2`, or play through the existing melody instrument
-     path). Default instrument: an existing pleasant lead/keys SynthDef; no new
-     SynthDef unless the user later wants a dedicated piano timbre.
+     path). Default instrument follows the current live melody instrument
+     (`~melodyInst`) via the `\live` sentinel, reassignable to any SynthDef
+     (`~fpInst_.(\fm_bell)`); no new SynthDef.
 - **Continuous modulation hook:** extend `data_feeds.scd`'s `\poseHands` OSCdef
   with a single call to `~fpModTick.value` (defined in `finger_piano.scd`, a
   no-op stub if the file is not loaded). `~fpModTick`:
