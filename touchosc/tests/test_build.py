@@ -22,6 +22,8 @@ def test_scripts_embedded(tmp_path):
     assert 'sendOSC("/seq/rhythm/set"' in joined, "rhythm grid Lua not embedded"
     assert "/armed/" in joined, "pad Lua not embedded"
     assert "/sync/beat" in joined, "feedback Lua not embedded"
+    assert 'sendOSC("/seq/melody/set"' in joined, "melody_faders Lua not embedded"
+    assert "findByName" in joined, "preset_select Lua not embedded"
 
 
 def test_schema_partial_helpers():
@@ -37,6 +39,7 @@ def test_schema_partial_helpers():
     assert el_ci.find("type").text == "CONSTANT"
 
     el_cf = cf.to_el()
+    assert el_cf.find("type").text == "CONSTANT"
     assert el_cf.find("conversion").text == "FLOAT"
     assert el_cf.find("value").text == "3.14"
 

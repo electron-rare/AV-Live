@@ -35,9 +35,12 @@ def test_root_has_pager_with_three_pages(tmp_path):
 
 
 def test_sixteen_patterns():
-    assert len(layout.PATTERNS) == 16
-    assert layout.PATTERNS[0] == "kick"
-    assert layout.PATTERNS[1] == "hats"
+    assert layout.PATTERNS == [
+        "kick", "hats", "clap", "perc",
+        "sub", "acid", "arp", "lead",
+        "stab", "pad", "ride", "rim",
+        "tom", "reese", "bells", "sweep",
+    ]
 
 
 # ---------------------------------------------------------------------------
@@ -148,6 +151,48 @@ def test_fx_page_harmony_octave_absolute():
     assert len(octave_args) == 3, f"expected 3 octave buttons, got {len(octave_args)}"
     vals = {v for _, v in octave_args}
     assert vals == {"0", "1", "2"}, f"expected octave values 0,1,2, got {vals}"
+
+
+def test_fx_page_breakdown_constant_integer():
+    """breakdown buttons must send CONSTANT/INTEGER args with values {0, 1}."""
+    page = layout.fx_page()
+    breakdown_args = []
+    for osc_el in page.findall(".//messages/osc"):
+        path_val = osc_el.find("path/partial/value")
+        if path_val is not None and path_val.text == "/control/fx/breakdown":
+            for part in osc_el.findall("arguments/partial"):
+                typ = part.find("type")
+                conv = part.find("conversion")
+                val = part.find("value")
+                if typ is not None and conv is not None and val is not None:
+                    breakdown_args.append((typ.text, conv.text, val.text))
+    assert len(breakdown_args) == 2, f"expected 2 breakdown arg partials, got {len(breakdown_args)}"
+    for typ, conv, _ in breakdown_args:
+        assert typ == "CONSTANT", f"breakdown arg type must be CONSTANT, got {typ}"
+        assert conv == "INTEGER", f"breakdown arg conversion must be INTEGER, got {conv}"
+    vals = {v for _, _, v in breakdown_args}
+    assert vals == {"0", "1"}, f"expected breakdown values {{0,1}}, got {vals}"
+
+
+def test_fx_page_harmony_root_constant_integer():
+    """root buttons must send CONSTANT/INTEGER args with values {-2, 2}."""
+    page = layout.fx_page()
+    root_args = []
+    for osc_el in page.findall(".//messages/osc"):
+        path_val = osc_el.find("path/partial/value")
+        if path_val is not None and path_val.text == "/control/harmony/root":
+            for part in osc_el.findall("arguments/partial"):
+                typ = part.find("type")
+                conv = part.find("conversion")
+                val = part.find("value")
+                if typ is not None and conv is not None and val is not None:
+                    root_args.append((typ.text, conv.text, val.text))
+    assert len(root_args) == 2, f"expected 2 root arg partials, got {len(root_args)}"
+    for typ, conv, _ in root_args:
+        assert typ == "CONSTANT", f"root arg type must be CONSTANT, got {typ}"
+        assert conv == "INTEGER", f"root arg conversion must be INTEGER, got {conv}"
+    vals = {v for _, _, v in root_args}
+    assert vals == {"-2", "2"}, f"expected root values {{-2,2}}, got {vals}"
 
 
 # ---------------------------------------------------------------------------
