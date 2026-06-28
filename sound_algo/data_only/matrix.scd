@@ -43,12 +43,12 @@
 // -- default color defs reproduce the historical global variation table --
 ~matDefaultColorDefs = {
     [ nil,
-        (stretch: 1.0, octave:  0, amp: 1.0,  inst: nil, cutoff: nil, pan: nil, steps: Array.fill(16, nil)),
-        (stretch: 0.5, octave:  0, amp: 1.0,  inst: nil, cutoff: nil, pan: nil, steps: Array.fill(16, nil)),
-        (stretch: 1.0, octave:  1, amp: 1.0,  inst: nil, cutoff: nil, pan: nil, steps: Array.fill(16, nil)),
-        (stretch: 2.0, octave:  0, amp: 1.0,  inst: nil, cutoff: nil, pan: nil, steps: Array.fill(16, nil)),
-        (stretch: 1.0, octave: -1, amp: 1.05, inst: nil, cutoff: nil, pan: nil, steps: Array.fill(16, nil)),
-        (stretch: 0.5, octave:  0, amp: 1.2,  inst: nil, cutoff: nil, pan: nil, steps: Array.fill(16, nil)) ]
+        (stretch: 1.0, octave:  0, amp: 1.0,  inst: nil, cutoff: nil, pan: nil, steps: Array.fill(16, nil), mod: nil, pose: []),
+        (stretch: 0.5, octave:  0, amp: 1.0,  inst: nil, cutoff: nil, pan: nil, steps: Array.fill(16, nil), mod: nil, pose: []),
+        (stretch: 1.0, octave:  1, amp: 1.0,  inst: nil, cutoff: nil, pan: nil, steps: Array.fill(16, nil), mod: nil, pose: []),
+        (stretch: 2.0, octave:  0, amp: 1.0,  inst: nil, cutoff: nil, pan: nil, steps: Array.fill(16, nil), mod: nil, pose: []),
+        (stretch: 1.0, octave: -1, amp: 1.05, inst: nil, cutoff: nil, pan: nil, steps: Array.fill(16, nil), mod: nil, pose: []),
+        (stretch: 0.5, octave:  0, amp: 1.2,  inst: nil, cutoff: nil, pan: nil, steps: Array.fill(16, nil), mod: nil, pose: []) ]
 };
 ~matColorDefs = ~matColorDefs ? Array.fill(~matVoices.size, { ~matDefaultColorDefs.value });
 
@@ -675,6 +675,78 @@ OSCdef(\mat_steps_get, { |msg, time, addr|
         })
     })
 };
+
+// -- ~matSetColorMod : set/clear a color's capture effect; validate; re-source; echo --
+~matSetColorMod = { |vi, color, source, target, depth|
+    ((vi >= 0 and: { vi < ~matVoices.size }) and: { color >= 1 and: { color <= 6 } }).if({
+        var name = ~matVoices[vi];
+        var src = ((source == \none) or: { source.isNil }).if({ nil }, { source.asSymbol });
+        var tgt = ((target == \none) or: { target.isNil }).if({ nil }, { target.asSymbol });
+        var d = (depth ? 0).asFloat.clip(0, 1);
+        var ok = (src.isNil or: tgt.isNil) or: {
+            ~matModSources.includes(src) and: { (~matModTargets[name] ? []).includes(tgt) } };
+        ok.if({
+            ~matColorDefs[vi][color][\mod] = (src.isNil or: tgt.isNil).if({ nil },
+                { (source: src, target: tgt, depth: d) });
+            ~matLastColor[vi] = -1;
+            (~lp[\matPlaying] and: { ~matApplyBar.notNil }).if({ ~matApplyBar.(~lp[\matBar]) });
+            ~matColorModPush.(vi, color)
+        })
+    })
+};
+
+// -- ~matSetColorPose : add/replace a pose binding in a color (dedup poseId; empty clears) --
+~matSetColorPose = { |vi, color, poseId, action|
+    ((vi >= 0 and: { vi < ~matVoices.size }) and: { color >= 1 and: { color <= 6 } }).if({
+        var pid = poseId.asSymbol;
+        ((pid == '') or: { pid == \none }).if({
+            ~matColorDefs[vi][color][\pose] = []
+        }, {
+            ~matColorDefs[vi][color][\pose] = (~matColorDefs[vi][color][\pose] ? [])
+                .reject({ |b| b[\poseId] == pid }) ++ [ (poseId: pid, action: action.asSymbol) ];
+        });
+        ~matColorPosePush.(vi, color)
+    })
+};
+
+// -- ~matColorModPush : send one color's mod binding to surfaces --
+~matColorModPush = { |vi, color|
+    ((vi >= 0 and: { vi < ~matVoices.size }) and: { color >= 1 and: { color <= 6 } }).if({
+        ~toscSend !? {
+            var m = ~matColorDefs[vi][color][\mod];
+            ~toscSend.("/matrix/colormod", vi, color,
+                (m.isNil).if({ "none" }, { m[\source].asString }),
+                (m.isNil).if({ "none" }, { m[\target].asString }),
+                (m.isNil).if({ 0 }, { m[\depth] }))
+        }
+    })
+};
+
+// -- ~matColorPosePush : send one color's pose bindings to surfaces --
+~matColorPosePush = { |vi, color|
+    ((vi >= 0 and: { vi < ~matVoices.size }) and: { color >= 1 and: { color <= 6 } }).if({
+        ~toscSend !? {
+            var list = ~matColorDefs[vi][color][\pose] ? [];
+            var flat = list.collect({ |b| [b[\poseId].asString, b[\action].asString] }).flatten;
+            ~toscSend.valueArray(["/matrix/colorpose", vi, color, list.size] ++ flat)
+        }
+    })
+};
+
+OSCdef(\mat_colormod, { |msg, time, addr|
+    ~toscTouch !? { ~toscTouch.(addr) };
+    ~matSetColorMod.((msg[1] ? 0).asInteger, (msg[2] ? 1).asInteger,
+        (msg[3] ? \none).asSymbol, (msg[4] ? \none).asSymbol, (msg[5] ? 0).asFloat)
+}, '/matrix/colormod');
+OSCdef(\mat_colorpose, { |msg, time, addr|
+    ~toscTouch !? { ~toscTouch.(addr) };
+    ~matSetColorPose.((msg[1] ? 0).asInteger, (msg[2] ? 1).asInteger,
+        (msg[3] ? \none).asSymbol, (msg[4] ? \trigger).asSymbol)
+}, '/matrix/colorpose');
+OSCdef(\mat_colorpose_get, { |msg, time, addr|
+    ~toscTouch !? { ~toscTouch.(addr) };
+    (1..6).do { |c| ~matColorModPush.((msg[1] ? 0).asInteger, c); ~matColorPosePush.((msg[1] ? 0).asInteger, c) }
+}, '/matrix/colordefs/get/ext');
 
 // -- ~matPosesPush : send a voice's pose bindings over OSC --
 ~matPosesPush = { |vi|

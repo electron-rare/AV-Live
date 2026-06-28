@@ -459,6 +459,22 @@ pass = pass and: { ~matColorDefs[5][2][\steps][4][\degree] == 48 };
 pass = pass and: { ~ev[\freq].isNil };
 ~matColorDefs[~kickVi][2][\steps] = Array.fill(16, nil);   // restore
 
+// --- Per-color mod + pose state (Task 1) ---
+pass = pass and: { ~matColorDefs[5][2][\mod].isNil };               // default no effect
+pass = pass and: { ~matColorDefs[5][2][\pose].isArray and: { ~matColorDefs[5][2][\pose].isEmpty } };
+pass = pass and: { ~matSetColorMod.notNil and: { ~matSetColorPose.notNil } };
+~trigLog = nil; ~toscSend = { |path ...args| ~trigLog = ([path] ++ args) };
+~matSetColorMod.(5, 2, \rHandY, \cutoff, 0.7);                      // acid supports cutoff
+pass = pass and: { ~matColorDefs[5][2][\mod][\target] == \cutoff };
+pass = pass and: { ~trigLog[0] == "/matrix/colormod" and: { ~trigLog[1] == 5 } };
+~matSetColorMod.(0, 1, \rHandY, \cutoff, 0.7);                      // kick has no cutoff -> reject
+pass = pass and: { ~matColorDefs[0][1][\mod].isNil };
+~matSetColorMod.(5, 2, \none, \none, 0);                            // clears
+pass = pass and: { ~matColorDefs[5][2][\mod].isNil };
+~matSetColorPose.(5, 2, \poseA, \trigger);
+pass = pass and: { ~matColorDefs[5][2][\pose][0][\poseId] == \poseA };
+~matColorDefs[5][2][\pose] = [];
+
 pass.if(
     { "TEST PASS".postln },
     { "TEST FAIL".postln }
