@@ -136,7 +136,9 @@ s.sync;
 ~lpVol = { |nm| (~lp[\vol][nm] ? 0.8).clip(0, 1.5) };
 
 // note helper (nil-guards ~ccNote)
-~lpNote = { |deg, oct=0| (~ccNote.notNil).if({ ~ccNote.(deg, oct) }, { 45 + (oct*12) + ([0,2,3,5,7,8,10][deg % 7]) }) };
+~lpNote = { |deg, oct=0|
+    ~ccNote.notNil.if({ ~ccNote.(deg, oct) }, { ~noteFor.(deg, \minor, 45, oct) })
+};
 
 // --- 10 original Pdefs (all \amp wrapped with ~lpVol) ---
 Pdef(\lp_kick, Pbind(\instrument, \lp_kick, \dur, 1,
