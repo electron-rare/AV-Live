@@ -187,7 +187,9 @@ pass = pass and: { ~matSetColorDef.notNil and: { ~matColorDefPush.notNil } };
 ~toscSend = { |path ...args| ~trigLog = ([path] ++ args) };
 ~matSetColorDef.(5, 3, \octave, -2);                 // acid, color 3
 pass = pass and: { ~matColorDefs[5][3][\octave] == -2 };
-pass = pass and: { ~trigLog[0] == "/matrix/colordef" and: { ~trigLog[1] == 5 } };
+// ~matSetColorDef echoes via ~matColorDefPush -> PLURAL /matrix/colordefs (vi + 36 vals)
+pass = pass and: { ~trigLog[0] == "/matrix/colordefs" and: { ~trigLog[1] == 5 } };
+pass = pass and: { ~trigLog.size == 38 };
 // invalid field is rejected (state unchanged)
 ~matSetColorDef.(5, 3, \bogus, 9);
 pass = pass and: { (~matColorDefs[5][3][\bogus]).isNil };
@@ -558,10 +560,24 @@ web->SC set only and has no web handler:
           cutoff:Number(args[b+4]), pan:Number(args[b+5]) };
       }
       saveMatState();
-      if (cdEditVoice === vi && !document.getElementById("colordef-modal").hidden) openColorDef(vi);
+      if (cdEditVoice === vi && !document.getElementById("colordef-modal").hidden) renderColorDefRows(vi);
     }
     return;
   }
+```
+
+CRITICAL: the WS handler calls `renderColorDefRows(vi)` (row-render only), NOT
+`openColorDef(vi)`. `openColorDef` sends `/matrix/colordefs/get`, which makes SC push
+`/matrix/colordefs` again — calling `openColorDef` from the push handler creates an
+infinite get/push loop. Factor the row-building out of `openColorDef` into a separate
+`renderColorDefRows(vi)`; `openColorDef` = set state + `renderColorDefRows(vi)` +
+unhide + send the get ONCE; the WS handler calls only `renderColorDefRows(vi)`.
+
+Also: the per-row edit button is a 3rd sticky-left column (22px after label+select),
+so the HEADER row needs a matching 22px spacer (`.minst-edit-head`) appended right
+after the `.minst-head` spacer — otherwise bar numbers misalign with bar cells (same
+class as `.minst-head`/`.mmod-head`).
+```javascript
 ```
 
 - [ ] **Step 5: Extend persistence + CSS**
