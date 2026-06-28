@@ -63,7 +63,7 @@ pass = pass and: { ~matColorDefs[5][2][\steps][3][\degree] == 7 };
 pass = pass and: { ~matColorDefs[5][2][\steps][3][\vel] == 0.8 };
 pass = pass and: { ~matStepsEmpty.(~matColorDefs[5][2][\steps]).not };
 pass = pass and: { ~trigLog[0] == "/matrix/steps" and: { ~trigLog[1] == 5 } };
-pass = pass and: { ~trigLog.size == 36 };   // path + vi + color + 32 vals
+pass = pass and: { ~trigLog.size == 35 };   // path + vi + color + 32 vals = 35
 // rest clears the step
 ~matSetStep.(5, 2, 3, \rest, 0);
 pass = pass and: { ~matColorDefs[5][2][\steps][3].isNil };

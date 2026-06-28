@@ -323,13 +323,13 @@ const MATRIX_INST_CHOICES = {
   bells:["lp_bells","do_strike","do_plane"], sweep:["lp_sweep","lp_pad","lp_reese"]
 };
 let matInst = new Array(16).fill("default");   // per-voice selection (persisted)
-const MATRIX_MOD_SOURCES = ["none","lHandY","rHandY","lOpen","rOpen","handSpeed","handDist","bodyY","depth"];
+const MATRIX_MOD_SOURCES = ["none","lHandY","rHandY","lHandX","rHandX","lOpen","rOpen","handSpeed","handDist","bodyX","bodyY","depth"];
 const MATRIX_MOD_TARGETS = {
-  kick:["none","amp"], hats:["none","amp"], clap:["none","amp"], perc:["none","amp"],
-  sub:["none","amp"], acid:["none","amp","cutoff","pan"], arp:["none","amp","cutoff","pan"],
-  lead:["none","amp","cutoff","pan"], stab:["none","amp","cutoff","pan"], pad:["none","amp","cutoff"],
-  ride:["none","amp"], rim:["none","amp"], tom:["none","amp"], reese:["none","amp"],
-  bells:["none","amp"], sweep:["none","amp"]
+  kick:["none","amp","pan","rev"], hats:["none","amp","pan","rev"], clap:["none","amp","pan","rev"], perc:["none","amp","cutoff","pan","rev"],
+  sub:["none","amp","pan","rev"], acid:["none","amp","cutoff","pan","rev"], arp:["none","amp","cutoff","pan","rev"],
+  lead:["none","amp","cutoff","pan","rev"], stab:["none","amp","cutoff","pan","rev"], pad:["none","amp","cutoff","pan","rev"],
+  ride:["none","amp","pan","rev"], rim:["none","amp","pan","rev"], tom:["none","amp","pan","rev"], reese:["none","amp","cutoff","pan","rev"],
+  bells:["none","amp","pan","rev"], sweep:["none","amp","pan","rev"]
 };
 let matMod = Array.from({length:16}, () => ({source:"none", target:"none", depth:0.5}));
 let matColorDefs = Array.from({ length: 16 }, () =>

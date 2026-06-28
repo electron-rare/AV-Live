@@ -5,94 +5,132 @@
 // ~lpClock.value (concert clock when running, else ~lp[\clock]) and route
 // Out.ar(0) through the FX rack.
 (
-SynthDef(\lp_kick, { |out=0, amp=0.9|
+// All voices take \pan and \rev (reverb send to ~doReverbBus) so the matrix
+// capture-modulation can drive them. \rev defaults to 0 (no extra send; the
+// master FX rack still applies its own reverb on bus 0). The send is only wired
+// when ~doReverbBus exists (engine loaded first; nil-safe for standalone tests).
+SynthDef(\lp_kick, { |out=0, amp=0.9, pan=0, rev=0|
     var env = EnvGen.kr(Env.perc(0.001, 0.32), doneAction: 2);
     var fenv = EnvGen.kr(Env([180, 45], [0.06], \exp));
-    Out.ar(out, Pan2.ar((SinOsc.ar(fenv) * env * 2).tanh, 0) * amp);
+    var sig = Pan2.ar((SinOsc.ar(fenv) * env * 2).tanh, pan.clip(-1,1)) * amp;
+    Out.ar(out, sig);
+    ~doReverbBus.notNil.if({ Out.ar(~doReverbBus, sig * rev) });
 }).add;
-SynthDef(\lp_hat, { |out=0, amp=0.3|
+SynthDef(\lp_hat, { |out=0, amp=0.3, pan=0, rev=0|
     var env = EnvGen.kr(Env.perc(0.001, 0.045), doneAction: 2);
-    Out.ar(out, Pan2.ar(HPF.ar(WhiteNoise.ar, 8000) * env, 0) * amp);
+    var sig = Pan2.ar(HPF.ar(WhiteNoise.ar, 8000) * env, pan.clip(-1,1)) * amp;
+    Out.ar(out, sig);
+    ~doReverbBus.notNil.if({ Out.ar(~doReverbBus, sig * rev) });
 }).add;
-SynthDef(\lp_clap, { |out=0, amp=0.5|
+SynthDef(\lp_clap, { |out=0, amp=0.5, pan=0, rev=0|
     var env = EnvGen.kr(Env.perc(0.004, 0.18), doneAction: 2);
-    Out.ar(out, Pan2.ar(BPF.ar(WhiteNoise.ar, 1500, 0.6) * env, 0) * amp);
+    var sig = Pan2.ar(BPF.ar(WhiteNoise.ar, 1500, 0.6) * env, pan.clip(-1,1)) * amp;
+    Out.ar(out, sig);
+    ~doReverbBus.notNil.if({ Out.ar(~doReverbBus, sig * rev) });
 }).add;
-SynthDef(\lp_perc, { |out=0, amp=0.4, freq=420|
+// \cutoff=0 keeps the original freq-tracking timbre; >0 (mod) sets it directly.
+SynthDef(\lp_perc, { |out=0, amp=0.4, freq=420, cutoff=0, pan=0.3, rev=0|
     var env = EnvGen.kr(Env.perc(0.001, 0.12), doneAction: 2);
-    Out.ar(out, Pan2.ar(RLPF.ar(Saw.ar(freq.clip(80,2000)), (freq*3).clip(200,8000), 0.3) * env, 0.3) * amp);
+    var cut = Select.kr(cutoff > 0, [(freq * 3), cutoff]).clip(200, 8000);
+    var sig = Pan2.ar(RLPF.ar(Saw.ar(freq.clip(80,2000)), cut, 0.3) * env, pan.clip(-1,1)) * amp;
+    Out.ar(out, sig);
+    ~doReverbBus.notNil.if({ Out.ar(~doReverbBus, sig * rev) });
 }).add;
 
-SynthDef(\lp_sub, { |out=0, freq=55, amp=0.0, gate=1|
+SynthDef(\lp_sub, { |out=0, freq=55, amp=0.0, gate=1, pan=0, rev=0|
     var sig = SinOsc.ar(freq.clip(20, 120)) * 0.9 + (Saw.ar(freq.clip(20,120)) * 0.1);
     sig = sig * EnvGen.kr(Env.asr(0.05, 1, 0.3), gate, doneAction: 2);
-    Out.ar(out, Pan2.ar(sig, 0) * amp.lag(0.1));
+    sig = Pan2.ar(sig, pan.clip(-1,1)) * amp.lag(0.1);
+    Out.ar(out, sig);
+    ~doReverbBus.notNil.if({ Out.ar(~doReverbBus, sig * rev) });
 }).add;
-SynthDef(\lp_acid, { |out=0, freq=110, amp=0.3, cutoff=800, res=0.3, pan=0|
+SynthDef(\lp_acid, { |out=0, freq=110, amp=0.3, cutoff=800, res=0.3, pan=0, rev=0|
     var env = EnvGen.kr(Env.perc(0.005, 0.22), doneAction: 2);
     var sig = Saw.ar(freq.clip(30, 1200));
     sig = RLPF.ar(sig, (cutoff * (1 + (env*2))).clip(80, 6000), res.clip(0.05, 0.9));
-    Out.ar(out, Pan2.ar(sig.tanh * env, pan.clip(-1,1)) * amp);
+    sig = Pan2.ar(sig.tanh * env, pan.clip(-1,1)) * amp;
+    Out.ar(out, sig);
+    ~doReverbBus.notNil.if({ Out.ar(~doReverbBus, sig * rev) });
 }).add;
-SynthDef(\lp_pluck, { |out=0, freq=220, amp=0.3, cutoff=2500, pan=0|
+SynthDef(\lp_pluck, { |out=0, freq=220, amp=0.3, cutoff=2500, pan=0, rev=0|
     var env = EnvGen.kr(Env.perc(0.002, 0.25), doneAction: 2);
     var sig = RLPF.ar(Saw.ar(freq.clip(40,2000) * [1, 1.005]), cutoff.clip(200,8000), 0.4);
-    Out.ar(out, Pan2.ar(Mix(sig) * env, pan.clip(-1,1)) * amp);
+    sig = Pan2.ar(Mix(sig) * env, pan.clip(-1,1)) * amp;
+    Out.ar(out, sig);
+    ~doReverbBus.notNil.if({ Out.ar(~doReverbBus, sig * rev) });
 }).add;
 // sustained lead: gated ASR so notes hold for their full \dur (needs \legato).
-SynthDef(\lp_lead, { |out=0, freq=220, amp=0.3, cutoff=3000, gate=1, pan=0|
+SynthDef(\lp_lead, { |out=0, freq=220, amp=0.3, cutoff=3000, gate=1, pan=0, rev=0|
     var env = EnvGen.kr(Env.asr(0.01, 1, 0.3), gate, doneAction: 2);
     var sig = Mix(Saw.ar(freq.clip(40, 3000) * [0.997, 1.0, 1.005]));
     sig = RLPF.ar(sig, (cutoff.clip(300, 9000) * (1 + (env * 0.4))).clip(300, 12000), 0.28);
-    Out.ar(out, Pan2.ar(sig * env, pan.clip(-1, 1)) * amp * 0.45);
+    sig = Pan2.ar(sig * env, pan.clip(-1, 1)) * amp * 0.45;
+    Out.ar(out, sig);
+    ~doReverbBus.notNil.if({ Out.ar(~doReverbBus, sig * rev) });
 }).add;
-SynthDef(\lp_pad, { |out=0, freq=220, amp=0.0, cutoff=1500, gate=1|
+SynthDef(\lp_pad, { |out=0, freq=220, amp=0.0, cutoff=1500, gate=1, pan=0, rev=0|
     var sig = Mix(Saw.ar(freq.clip(40,1000) * [0.99, 1.0, 1.008, 2.0]));
     sig = RLPF.ar(sig, cutoff.clip(200,6000), 0.4);
     sig = sig * EnvGen.kr(Env.asr(1.5, 1, 2.0), gate, doneAction: 2);
-    Out.ar(out, Pan2.ar(sig, 0) * amp.lag(0.5) * 0.25);
+    sig = Pan2.ar(sig, pan.clip(-1,1)) * amp.lag(0.5) * 0.25;
+    Out.ar(out, sig);
+    ~doReverbBus.notNil.if({ Out.ar(~doReverbBus, sig * rev) });
 }).add;
 
 // --- new drums ---
-SynthDef(\lp_ride, { |out=0, amp=0.25|
+SynthDef(\lp_ride, { |out=0, amp=0.25, pan=0, rev=0|
     var env   = EnvGen.kr(Env.perc(0.001, 0.42), doneAction: 2);
     var noise = HPF.ar(WhiteNoise.ar, 7000) * env;
     var ring  = Ringz.ar(Impulse.ar(0), 3100, 0.08) * 0.35;
-    Out.ar(out, Pan2.ar((noise + ring) * amp, 0));
+    var sig = Pan2.ar((noise + ring) * amp, pan.clip(-1,1));
+    Out.ar(out, sig);
+    ~doReverbBus.notNil.if({ Out.ar(~doReverbBus, sig * rev) });
 }).add;
-SynthDef(\lp_rim, { |out=0, amp=0.35|
+SynthDef(\lp_rim, { |out=0, amp=0.35, pan=0, rev=0|
     var env = EnvGen.kr(Env.perc(0.001, 0.055), doneAction: 2);
     var sig = (BPF.ar(WhiteNoise.ar, 2000, 0.8) + (SinOsc.ar(400) * 0.4)).tanh;
-    Out.ar(out, Pan2.ar(sig * env * amp, 0));
+    sig = Pan2.ar(sig * env * amp, pan.clip(-1,1));
+    Out.ar(out, sig);
+    ~doReverbBus.notNil.if({ Out.ar(~doReverbBus, sig * rev) });
 }).add;
-SynthDef(\lp_tom, { |out=0, amp=0.4, freq=160|
+SynthDef(\lp_tom, { |out=0, amp=0.4, freq=160, pan=0, rev=0|
     var fenv = EnvGen.kr(Env([freq, freq * 0.5], [0.07], \exp));
     var env  = EnvGen.kr(Env.perc(0.003, 0.26), doneAction: 2);
-    Out.ar(out, Pan2.ar(SinOsc.ar(fenv.clip(30, 600)) * env * amp, 0));
+    var sig = Pan2.ar(SinOsc.ar(fenv.clip(30, 600)) * env * amp, pan.clip(-1,1));
+    Out.ar(out, sig);
+    ~doReverbBus.notNil.if({ Out.ar(~doReverbBus, sig * rev) });
 }).add;
 
 // --- new pitched / textural ---
-SynthDef(\lp_reese, { |out=0, freq=55, amp=0.0, gate=1|
+// \cutoff=0 keeps the original freq-tracking filter; >0 (mod) sets it directly.
+SynthDef(\lp_reese, { |out=0, freq=55, amp=0.0, gate=1, cutoff=0, pan=0, rev=0|
     var move = LFNoise2.kr(0.4).range(0.88, 1.12);
+    var cut  = Select.kr(cutoff > 0, [(freq.clip(20, 200) * 5), cutoff]) * move;
     var sig  = Mix(Saw.ar(freq.clip(20, 200) * [0.999, 1.0, 1.013]));
-    sig = RLPF.ar(sig, (freq.clip(20, 200) * 5 * move).clip(80, 3000), 0.35);
+    sig = RLPF.ar(sig, cut.clip(80, 3000), 0.35);
     sig = sig * EnvGen.kr(Env.asr(0.05, 1, 0.2), gate, doneAction: 2);
-    Out.ar(out, Pan2.ar(sig, 0) * amp.lag(0.1));
+    sig = Pan2.ar(sig, pan.clip(-1,1)) * amp.lag(0.1);
+    Out.ar(out, sig);
+    ~doReverbBus.notNil.if({ Out.ar(~doReverbBus, sig * rev) });
 }).add;
-SynthDef(\lp_bells, { |out=0, freq=440, amp=0.3|
+SynthDef(\lp_bells, { |out=0, freq=440, amp=0.3, pan=0, rev=0|
     var env = EnvGen.kr(Env.perc(0.001, 1.8, curve: -4), doneAction: 2);
     var f   = freq.clip(200, 4000);
     var sig = (SinOsc.ar(f)       * 0.55) +
               (SinOsc.ar(f * 2.0) * 0.28) +
               (SinOsc.ar(f * 3.0) * 0.12) +
               (SinOsc.ar(f * 4.1) * 0.05);
-    Out.ar(out, Pan2.ar(sig * env * amp, 0));
+    sig = Pan2.ar(sig * env * amp, pan.clip(-1,1));
+    Out.ar(out, sig);
+    ~doReverbBus.notNil.if({ Out.ar(~doReverbBus, sig * rev) });
 }).add;
-SynthDef(\lp_sweep, { |out=0, amp=0.0, gate=1|
+SynthDef(\lp_sweep, { |out=0, amp=0.0, gate=1, pan=0, rev=0|
     var env    = EnvGen.kr(Env.asr(3.0, 1, 2.0), gate, doneAction: 2);
-    var cutoff = EnvGen.kr(Env([200, 6000], [10.0], \exp));
-    var sig    = RLPF.ar(WhiteNoise.ar, cutoff.clip(80, 14000), 0.12);
-    Out.ar(out, Pan2.ar(sig * env * amp.lag(0.5) * 0.6, 0));
+    var fcut   = EnvGen.kr(Env([200, 6000], [10.0], \exp));
+    var sig    = RLPF.ar(WhiteNoise.ar, fcut.clip(80, 14000), 0.12);
+    sig = Pan2.ar(sig * env * amp.lag(0.5) * 0.6, pan.clip(-1,1));
+    Out.ar(out, sig);
+    ~doReverbBus.notNil.if({ Out.ar(~doReverbBus, sig * rev) });
 }).add;
 
 s.sync;
