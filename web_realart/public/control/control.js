@@ -506,6 +506,7 @@ function renderSeq(vi) {
 }
 
 function renderPoses(vi) {
+  if (!Array.isArray(matPoses[vi])) matPoses[vi] = [];
   const p = document.getElementById("cd-pane-poses"); p.innerHTML = "";
   const add = document.createElement("div");
   const id = document.createElement("input"); id.placeholder = "poseId"; id.className = "pose-id";
