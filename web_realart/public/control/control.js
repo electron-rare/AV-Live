@@ -265,7 +265,7 @@ ws.addEventListener("message", (ev) => {
   }
   if (address === "/matrix/colormod") {
     const vi=Math.round(Number(args[0])), c=Math.round(Number(args[1]));
-    if (vi>=0&&vi<16&&c>=1&&c<=6) {
+    if (vi>=0&&vi<16&&c>=1&&c<=6&&matColorDefs[vi][c]) {
       const src=String(args[2]??"none");
       matColorDefs[vi][c].mod = (src==="none") ? null : {source:src, target:String(args[3]??"none"), depth:Number(args[4])||0};
       saveMatState();
@@ -275,7 +275,7 @@ ws.addEventListener("message", (ev) => {
   }
   if (address === "/matrix/colorpose") {
     const vi=Math.round(Number(args[0])), c=Math.round(Number(args[1])), n=Math.round(Number(args[2]));
-    if (vi>=0&&vi<16&&c>=1&&c<=6) {
+    if (vi>=0&&vi<16&&c>=1&&c<=6&&matColorDefs[vi][c]) {
       matColorDefs[vi][c].pose = [];
       for (let k=0;k<n;k++){ const b=3+k*2; matColorDefs[vi][c].pose.push({poseId:String(args[b]),action:String(args[b+1])}); }
       saveMatState();
