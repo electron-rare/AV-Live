@@ -143,6 +143,19 @@ ws.addEventListener("message", (ev) => {
       const el = cellRefs[matPlayhead][vi];
       if (el) el.classList.add("playing");
     }
+    updateTimelineHead(bar);
+    return;
+  }
+
+  // /matrix/loop <start> <end> — loop region feedback
+  if (address === "/matrix/loop") {
+    const s = Math.round(Number(args[0]));
+    const e = Math.round(Number(args[1]));
+    if (Number.isFinite(s) && Number.isFinite(e) && s >= 0 && e < MATRIX_BARS) {
+      matLoopStart = Math.min(s, e);
+      matLoopEnd = Math.max(s, e);
+      updateTimelineLoop();
+    }
     return;
   }
 
@@ -211,6 +224,8 @@ let matGrid = Array.from({ length: 16 }, () => new Array(32).fill(0));
 // cellRefs[bar][vi] for O(16) playhead column toggle
 const cellRefs = Array.from({ length: 32 }, () => new Array(16).fill(null));
 let matPlayhead = -1;
+let matLoopStart = 0;
+let matLoopEnd = 31;
 
 function loadMatState() {
   try {
@@ -289,6 +304,107 @@ function renderMatrix() {
     }
     container.appendChild(row);
   }
+}
+
+// --- Matrix timeline: 32-bar loop region + playhead ---
+function renderTimeline() {
+  const tl = document.getElementById("matrix-timeline");
+  if (!tl) return;
+  tl.innerHTML = "";
+  const spacer = document.createElement("span");
+  spacer.className = "tl-spacer";
+  tl.appendChild(spacer);
+  for (let bar = 0; bar < MATRIX_BARS; bar++) {
+    const cell = document.createElement("span");
+    cell.className = "tl-bar";
+    cell.dataset.bar = bar;
+    if (bar % 4 === 0) cell.textContent = String(bar + 1);
+    if (bar >= matLoopStart && bar <= matLoopEnd) cell.classList.add("in-loop");
+    if (bar === matPlayhead) cell.classList.add("tl-head");
+    tl.appendChild(cell);
+  }
+}
+
+function updateTimelineLoop() {
+  const tl = document.getElementById("matrix-timeline");
+  if (!tl) return;
+  tl.querySelectorAll(".tl-bar").forEach((cell) => {
+    const b = +cell.dataset.bar;
+    cell.classList.toggle("in-loop", b >= matLoopStart && b <= matLoopEnd);
+  });
+}
+
+function updateTimelineHead(bar) {
+  const tl = document.getElementById("matrix-timeline");
+  if (!tl) return;
+  const prev = tl.querySelector(".tl-head");
+  if (prev) prev.classList.remove("tl-head");
+  const next = tl.querySelector(`.tl-bar[data-bar="${bar}"]`);
+  if (next) next.classList.add("tl-head");
+}
+
+function initTimelinePointer() {
+  const tl = document.getElementById("matrix-timeline");
+  if (!tl) return;
+  let dragStart = -1;
+  let dragging = false;
+
+  function barFromPoint(x, y) {
+    const el = document.elementFromPoint(x, y);
+    if (!el) return -1;
+    const barEl = el.classList && el.classList.contains("tl-bar")
+      ? el
+      : (el.closest ? el.closest(".tl-bar") : null);
+    if (!barEl) return -1;
+    const b = +barEl.dataset.bar;
+    return (Number.isFinite(b) && b >= 0 && b < MATRIX_BARS) ? b : -1;
+  }
+
+  function previewLoop(start, end) {
+    const lo = Math.min(start, end);
+    const hi = Math.max(start, end);
+    tl.querySelectorAll(".tl-bar").forEach((cell) => {
+      const b = +cell.dataset.bar;
+      cell.classList.toggle("in-loop", b >= lo && b <= hi);
+    });
+  }
+
+  tl.addEventListener("pointerdown", (e) => {
+    const bar = barFromPoint(e.clientX, e.clientY);
+    if (bar < 0) return;
+    e.preventDefault();
+    tl.setPointerCapture(e.pointerId);
+    dragStart = bar;
+    dragging = true;
+  });
+
+  tl.addEventListener("pointermove", (e) => {
+    if (!dragging) return;
+    const cur = barFromPoint(e.clientX, e.clientY);
+    if (cur >= 0) previewLoop(dragStart, cur);
+  });
+
+  tl.addEventListener("pointerup", (e) => {
+    if (!dragging) return;
+    dragging = false;
+    tl.releasePointerCapture(e.pointerId);
+    const end = barFromPoint(e.clientX, e.clientY);
+    const validEnd = end >= 0 ? end : dragStart;
+    if (validEnd === dragStart) {
+      send("/matrix/seek", dragStart);
+    } else {
+      const lo = Math.min(dragStart, validEnd);
+      const hi = Math.max(dragStart, validEnd);
+      send("/matrix/loop", lo, hi);
+    }
+    dragStart = -1;
+  });
+
+  tl.addEventListener("pointercancel", () => {
+    dragging = false;
+    dragStart = -1;
+    updateTimelineLoop();
+  });
 }
 
 // --- Matrix audio-reactive glow (trigger envelope; math in matrix_glow.js) ---
@@ -516,6 +632,8 @@ document.addEventListener("DOMContentLoaded", () => {
   renderRhyGrid();
   renderMelSteps();
   renderMatrix();
+  renderTimeline();
+  initTimelinePointer();
 
   // Name input: rename selected preset and update button labels
   const melName = document.getElementById("mel-name");
@@ -618,6 +736,10 @@ document.addEventListener("DOMContentLoaded", () => {
   if (scenePrev) scenePrev.addEventListener("click", () => send("/scene/prev"));
   const sceneNext = document.getElementById("scene-next");
   if (sceneNext) sceneNext.addEventListener("click", () => send("/scene/next"));
+
+  // Matrix loop full reset
+  const matLoopFull = document.getElementById("matrix-loop-full");
+  if (matLoopFull) matLoopFull.addEventListener("click", () => send("/matrix/loop", 0, MATRIX_BARS - 1));
 
   // Matrix transport
   const matPlay = document.getElementById("matrix-play");
