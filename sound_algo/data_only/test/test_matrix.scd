@@ -307,6 +307,21 @@ pass = pass and: { ~tv2[\cutoff] == 1234 };
 pass = pass and: { ~tv3[\instrument] == \do_strike };
 ~matColorDefs[6][2][\inst] = nil;
 
+// --- Color editor: set + push (Task 2) ---
+pass = pass and: { ~matSetColorDef.notNil and: { ~matColorDefPush.notNil } };
+~trigLog = nil;
+~toscSend = { |path ...args| ~trigLog = ([path] ++ args) };
+~matSetColorDef.(5, 3, \octave, -2);                 // acid, color 3
+pass = pass and: { ~matColorDefs[5][3][\octave] == -2 };
+pass = pass and: { ~trigLog[0] == "/matrix/colordef" and: { ~trigLog[1] == 5 } };
+// invalid field is rejected (state unchanged)
+~matSetColorDef.(5, 3, \bogus, 9);
+pass = pass and: { (~matColorDefs[5][3][\bogus]).isNil };
+// invalid inst for the voice is rejected
+~matSetColorDef.(0, 1, \inst, \do_plane);            // kick can't be do_plane
+pass = pass and: { ~matColorDefs[0][1][\inst].isNil };
+~matSetColorDef.(5, 3, \octave, 0);                  // restore
+
 pass.if(
     { "TEST PASS".postln },
     { "TEST FAIL".postln }

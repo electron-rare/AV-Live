@@ -380,6 +380,52 @@ File.exists(~matDir).not.if({ ("mkdir -p " ++ ~matDir.quote).systemCmd });
     }
 };
 
+// -- ~matSetColorDef : set one field of one voice/color, validate, re-source, echo --
+~matSetColorDef = { |vi, color, field, value|
+    var fields = [\stretch, \octave, \amp, \inst, \cutoff, \pan];
+    ((vi >= 0 and: { vi < ~matVoices.size }) and: { color >= 1 and: { color <= 6 } }
+        and: { fields.includes(field.asSymbol) }).if({
+        var name = ~matVoices[vi];
+        var ok = true;
+        var v = value;
+        (field.asSymbol == \inst).if({
+            v = ((value == \default) or: { value.isNil }).if({ nil }, { value.asSymbol });
+            ok = v.isNil or: { (~matInstChoices[name] ? []).includes(v) };
+        });
+        ((field.asSymbol == \cutoff) or: { field.asSymbol == \pan }).if({
+            ok = (~matModTargets[name] ? []).includes(field.asSymbol);
+            v = value.asFloat;
+        });
+        ((field.asSymbol == \stretch) or: { field.asSymbol == \octave }
+            or: { field.asSymbol == \amp }).if({
+            v = (field.asSymbol == \octave).if({ value.asInteger }, { value.asFloat });
+        });
+        ok.if({
+            ~matColorDefs[vi][color][field.asSymbol] = v;
+            ~matLastColor[vi] = -1;
+            (~lp[\matPlaying] and: { ~matApplyBar.notNil }).if({ ~matApplyBar.(~lp[\matBar]) });
+            ~toscSend !? { ~toscSend.("/matrix/colordef", vi, color,
+                field.asSymbol.asString,
+                (field.asSymbol == \inst).if({ (v ? \default).asString }, { v })) }
+        })
+    })
+};
+
+// -- ~matColorDefPush : send one voice's 6 color defs flattened to surfaces --
+// flat layout per color (1..6): stretch, octave, amp, inst(str), cutoff(-1=nil), pan(-2=nil)
+// Distinct OUTBOUND address (plural) so it never collides with the 4-arg inbound
+// /matrix/colordef set (mirrors /matrix/instrument vs /matrix/instruments).
+~matColorDefPush = { |vi|
+    ~toscSend !? {
+        var flat = (1..6).collect({ |c|
+            var d = ~matColorDefs[vi][c];
+            [ d[\stretch], d[\octave], d[\amp], (d[\inst] ? \default).asString,
+              d[\cutoff] ? -1, d[\pan] ? -2 ]
+        }).flatten;
+        ~toscSend.valueArray(["/matrix/colordefs", vi] ++ flat)
+    }
+};
+
 // -- ~matModPush : send 16 mod triples (source,target,depth) flattened --
 ~matModPush = {
     ~toscSend !? {
@@ -530,6 +576,17 @@ OSCdef(\mat_seek, { |msg, time, addr|
     ~toscTouch !? { ~toscTouch.(addr) };
     ~matSeek.(msg[1].asInteger)
 }, '/matrix/seek');
+
+OSCdef(\mat_colordef, { |msg, time, addr|
+    ~toscTouch !? { ~toscTouch.(addr) };
+    ~matSetColorDef.((msg[1] ? 0).asInteger, (msg[2] ? 1).asInteger,
+        (msg[3] ? \amp).asSymbol, msg[4])
+}, '/matrix/colordef');
+
+OSCdef(\mat_colordef_get, { |msg, time, addr|
+    ~toscTouch !? { ~toscTouch.(addr) };
+    ~matColorDefPush.((msg[1] ? 0).asInteger)
+}, '/matrix/colordefs/get');
 
 // -- Capture mod source cache (nil-guarded; idempotent reload) --
 ~matModCache   = ~matModCache ? IdentityDictionary.new;
