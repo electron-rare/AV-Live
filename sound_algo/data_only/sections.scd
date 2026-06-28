@@ -10,6 +10,7 @@
 ~lp[\sceneN]   = ~lp[\sceneN]   ? 8;
 ~lp[\scenes]   = ~lp[\scenes]   ? Array.fill(~lp[\sceneN], nil);
 ~lp[\sceneCur] = ~lp[\sceneCur] ? -1;
+~lp[\armed]    = ~lp[\armed]    ? Set.new;  // guard isolated reload (launchpad sets it too)
 
 // 16 clip symbols (same order as ~toscPatterns) ++ the two sequencers
 ~scenePatterns = ~scenePatterns ? [
@@ -50,11 +51,13 @@
     var sc = ~lp[\scenes][i];
     sc.notNil.if({
         var target = sc[\armed];
-        ~scenePatterns.do { |nm|
-            var want = target.includes(nm);
-            var have = ~lp[\armed].includes(nm);
-            (want and: { have.not }).if({ ~lpArm.(nm.asString, true) });
-            (want.not and: { have }).if({ ~lpArm.(nm.asString, false) });
+        ~lpArm !? {
+            ~scenePatterns.do { |nm|
+                var want = target.includes(nm);
+                var have = ~lp[\armed].includes(nm);
+                (want and: { have.not }).if({ ~lpArm.(nm.asString, true) });
+                (want.not and: { have }).if({ ~lpArm.(nm.asString, false) });
+            };
         };
         ~lp[\melSel] = sc[\melSel] ? ~lp[\melSel];
         ~lp[\rhySel] = sc[\rhySel] ? ~lp[\rhySel];
@@ -105,9 +108,11 @@
 
 // -- ~sceneClear : clear slot i; reset ~sceneCur if it was the active scene --
 ~sceneClear = ~sceneClear ? { |i|
-    ~lp[\scenes][i] = nil;
-    (~lp[\sceneCur] == i).if({ ~lp[\sceneCur] = -1 });
-    ~scenePush.();
+    (i >= 0 and: { i < (~lp[\sceneN] ? 8) }).if({
+        ~lp[\scenes][i] = nil;
+        (~lp[\sceneCur] == i).if({ ~lp[\sceneCur] = -1 });
+        ~scenePush.();
+    });
 };
 
 // -- OSCdefs (unique keys with \scene_ prefix; call ~toscTouch for feedback) --
