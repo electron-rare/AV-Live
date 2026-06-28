@@ -386,6 +386,20 @@ pass = pass and: { ~matStepsEmpty.(~matColorDefs[5][2][\steps]) };
 // two colors' steps arrays must be distinct objects (not aliased)
 pass = pass and: { (~matColorDefs[5][2][\steps] === ~matColorDefs[5][3][\steps]).not };
 
+// --- Sequence engine (Task 2) ---
+pass = pass and: { ~matColorStepPattern.notNil };
+// empty steps -> base path unchanged (parity): consuming yields the base-equivalent event
+~matVoices.size.do { |i| ~matMod[i] = nil };
+~matColorDefs[5][2][\steps] = Array.fill(16, nil);
+~sv = ~matVariation.(\acid, 2, 5).asStream.next(());
+pass = pass and: { ~sv[\stretch] == 0.5 };       // color 2 stretch, base path
+// non-empty steps -> stepped pattern; first non-rest step degree shows up
+~matColorDefs[5][2][\steps][0] = (degree: 4, vel: 0.9);
+~sv2 = ~matVariation.(\acid, 2, 5).asStream.next(());
+pass = pass and: { ~sv2[\degree] == 4 };          // step 0 degree
+pass = pass and: { ~sv2[\dur] == (~matBeatsPerBar / 16) };
+~matColorDefs[5][2][\steps] = Array.fill(16, nil);  // restore empty
+
 pass.if(
     { "TEST PASS".postln },
     { "TEST FAIL".postln }

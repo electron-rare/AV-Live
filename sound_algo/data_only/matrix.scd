@@ -194,6 +194,37 @@ File.exists(~matDir).not.if({ ("mkdir -p " ++ ~matDir.quote).systemCmd });
     )
 };
 
+// -- ~matColorStepPattern : 16-step note+vel sequence (replaces base) --
+// \matGlow first; \degree/\type from steps; \freq via ~lpNote x 2**octave; \amp =
+// colorAmp x stepVel x volOf; \dur = bar/16; inst/cutoff/pan/mod applied like the overlay.
+~matColorStepPattern = { |name, vi, color, spec, volOf, instPair, cdPairs|
+    var steps = spec[\steps];
+    var freqRatio = 2 ** (spec[\octave] ? 0);
+    var mod = ~matMod[vi];
+    var modPairs = mod.isNil.if({ [] }, {
+        var src = mod[\source], tgt = mod[\target], d = mod[\depth];
+        (tgt == \cutoff).if({
+            var c0 = ~matModNeutralCut[name] ? 1000;
+            [\cutoff, Pfunc { var s = ~matModSourceVal.(src); c0 * (s.linexp(0,1,200,6000)/c0).pow(d) }]
+        }, {
+            (tgt == \pan).if({ [\pan, Pfunc { (~matModSourceVal.(src) * 2 - 1) * d }] },
+                { [] })   // amp mod handled in the \amp Pfunc below
+        })
+    });
+    Pbind(*([
+        \matGlow, Pfunc { |e| ~matEmitTrig.(vi, (e[\amp] ? 0).clip(0, 1)); 0 },
+        \stepIdx, Pseq((0..15), inf),
+        \type, Pfunc { |e| steps[e[\stepIdx]].isNil.if({ \rest }, { \note }) },
+        \degree, Pfunc { |e| var s = steps[e[\stepIdx]]; s.isNil.if({ 0 }, { s[\degree] }) },
+        \freq, Pfunc { |e| (~lpNote.notNil).if({ ~lpNote.(e[\degree], 0).midicps * freqRatio }, { 440 }) },
+        \amp, Pfunc { |e|
+            var s = steps[e[\stepIdx]];
+            ((spec[\amp] ? 1.0) * (s.isNil.if({ 0 }, { s[\vel] }))) * volOf.value },
+        \stretch, spec[\stretch],
+        \dur, ~matBeatsPerBar / 16
+    ] ++ instPair ++ cdPairs ++ modPairs))
+};
+
 // -- ~matVariation : map color 1-6 to a Pchain overlay on the captured base --
 // color 1 = base as-is, 2 = double-time, 3 = octave up, 4 = half-time,
 // 5 = octave down + slight accent, 6 = accent roll (denser + louder).
@@ -216,7 +247,11 @@ File.exists(~matDir).not.if({ ("mkdir -p " ++ ~matDir.quote).systemCmd });
                     cdPairs = cdPairs ++ [\cutoff, spec[\cutoff]] });
                 (spec[\pan].notNil and: { (~matModTargets[name] ? []).includes(\pan) }).if({
                     cdPairs = cdPairs ++ [\pan, spec[\pan]] });
-                ~matVariationOverlay.(name, vi, spec, volOf, instPair, cdPairs, base)
+                (~matStepsEmpty.(spec[\steps]).not).if({
+                    ~matColorStepPattern.(name, vi, color, spec, volOf, instPair, cdPairs)
+                }, {
+                    ~matVariationOverlay.(name, vi, spec, volOf, instPair, cdPairs, base)
+                })
             }, { base })
         }, { nil })
     })
