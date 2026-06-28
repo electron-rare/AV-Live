@@ -91,3 +91,26 @@ button.queued { animation: queued-blink 600ms ease-in-out infinite alternate; }
 
 .scene-nav { display: flex; gap: 8px; margin: 8px 0; }
 .scene-nav button { flex: 1; font-size: 16px; padding: 16px; }
+
+/* --- Matrix arranger (16x32) --- */
+.matrix-transport { display: flex; gap: 8px; margin: 10px 0; }
+.matrix-transport button { flex: 1; padding: 14px 10px; font-size: 14px; }
+.matrix-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.mrow { display: flex; align-items: center; }
+.mvoice-label { width: 54px; font-size: 10px; color: #888; text-align: right;
+  padding-right: 6px; flex-shrink: 0; white-space: nowrap; overflow: hidden;
+  text-overflow: ellipsis; }
+.mbar-num { width: 22px; font-size: 9px; color: #555; text-align: center;
+  flex-shrink: 0; height: 14px; line-height: 14px; }
+.mcell { width: 22px; height: 22px; min-width: 22px; border: 1px solid;
+  border-radius: 2px; cursor: pointer; padding: 0; flex-shrink: 0; }
+.mcell:active { opacity: 0.65; }
+.mcell.m0 { background: #1a1a1a; border-color: #2a2a2a; }
+.mcell.m1 { background: #c22;   border-color: #e44; }
+.mcell.m2 { background: #1a8;   border-color: #2da; }
+.mcell.m3 { background: #25b;   border-color: #46e; }
+.mcell.m4 { background: #990;   border-color: #cc0; }
+.mcell.m5 { background: #c60;   border-color: #e80; }
+.mcell.m6 { background: #82a;   border-color: #a4d; }
+.mcell.playing { box-shadow: 0 0 0 2px rgba(255,255,255,0.28),
+  inset 0 0 0 1px rgba(255,255,255,0.40); }
