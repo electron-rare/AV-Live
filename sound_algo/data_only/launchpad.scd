@@ -280,11 +280,10 @@ Pdef(\lp_rsh, Pbind(
         clock = ~lp[\clock] ? (~lpClock.value ? TempoClock.default);
         q     = ~lp[\quant] ? 4;
         s     = ~lp[\clipState][nm] ? 0;
-        gen   = (~lp[\clipGen][nm] ? 0) + 1;
-        ~lp[\clipGen][nm] = gen;
         on.if({
             // launch tap
             (s == 0).if({
+                gen = (~lp[\clipGen][nm] ? 0) + 1; ~lp[\clipGen][nm] = gen;
                 ~lp[\clipState][nm] = 2;
                 ~lp[\armed].add(nm);
                 keys.do { |k| Pdef(k).play(clock, quant: q) };
@@ -294,14 +293,16 @@ Pdef(\lp_rsh, Pbind(
                 });
             });
             (s == 3).if({
+                gen = (~lp[\clipGen][nm] ? 0) + 1; ~lp[\clipGen][nm] = gen;
                 // queued-stop cancelled: clip still playing, revert to 1
                 ~lp[\clipState][nm] = 1;
                 ~lp[\armed].add(nm);
             });
-            // s == 1 or s == 2: no-op
+            // s == 1 or s == 2: no-op (pending closure preserved)
         }, {
             // stop tap
             (s == 1).if({
+                gen = (~lp[\clipGen][nm] ? 0) + 1; ~lp[\clipGen][nm] = gen;
                 ~lp[\clipState][nm] = 3;
                 ~lp[\armed].remove(nm);
                 clock.schedAbs(clock.nextTimeOnGrid(q), {
@@ -313,12 +314,13 @@ Pdef(\lp_rsh, Pbind(
                 });
             });
             (s == 2).if({
+                gen = (~lp[\clipGen][nm] ? 0) + 1; ~lp[\clipGen][nm] = gen;
                 // queued-launch cancelled: stop before it fires
                 keys.do { |k| Pdef(k).stop };
                 ~lp[\clipState][nm] = 0;
                 ~lp[\armed].remove(nm);
             });
-            // s == 0 or s == 3: no-op
+            // s == 0 or s == 3: no-op (pending closure preserved)
         });
     });
 };
@@ -338,7 +340,7 @@ OSCdef(\lpVol, { |msg|
     ~lp[\vol][(msg[1] ? \nil).asSymbol] = (msg[2] ? 0.8).clip(0, 1.5);
 }, '/launch/vol');
 OSCdef(\lpQuant, { |msg|
-    ~lp[\quant] = (msg[1] ? 4).asFloat.max(0.125);
+    ~lp[\quant] = (msg[1] ? 4).asFloat.clip(0.125, 64);
 }, '/launch/quant');
 
 OSCdef(\ctlHarmRoot, { |msg|
