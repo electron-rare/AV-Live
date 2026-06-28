@@ -60,7 +60,7 @@ MIDIIn.connectAll;
 ~midiFuncs.add(MIDIFunc.cc({ |val| ~melodyDrive  = val.linlin(0,127, 0.5,5.0);   ~debouncedReload.() }, 33));
 ~midiFuncs.add(MIDIFunc.cc({ |val| ~acidDrive    = val.linlin(0,127, 0.5,5.0);   ~debouncedReload.() }, 34));
 ~midiFuncs.add(MIDIFunc.cc({ |val| ~melodyBoost  = val.linlin(0,127, 0.5,3.0);   ~debouncedReload.() }, 35));
-~midiFuncs.add(MIDIFunc.cc({ |val| TempoClock.default.tempo = val.linlin(0,127, 60,200) / 60 }, 36));
+~midiFuncs.add(MIDIFunc.cc({ |val| ~setTempo.(val.linlin(0,127, 60,200)) }, 36));
 
 // CC 49-56 = potards rangée 3 (wobble / sidechain)
 ~midiFuncs.add(MIDIFunc.cc({ |val| ~melodyWobbleRate  = val.linexp(0,127, 0.5,32);   ~debouncedReload.() }, 49));

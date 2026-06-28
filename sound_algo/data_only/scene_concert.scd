@@ -167,7 +167,8 @@
 ~concert[\stop] = {
     ~concert[\routine] !? { |r| r.stop };
     ~concert[\stopMorceau].();
-    ~concert[\clock] !? { |c| c.stop };
+    // NE PAS stopper l'horloge : elle alias TempoClock.default (Lot C) et la
+    // Routine est deja stoppee. La stopper figerait tout le systeme.
     ~concert[\clock] = nil;
     ~concert[\running] = false;
     // restore the master event-FX so a stop mid-squat/spin doesn't leave the

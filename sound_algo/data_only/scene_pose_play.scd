@@ -156,7 +156,8 @@
     stop: {
         ~bpEngine[\routine] !? { |r| r.stop };
         ~bpEngine[\pad] !? { |p| p.set(\gate, 0) };
-        ~bpEngine[\clock] !? { |c| c.stop };
+        // NE PAS stopper l'horloge : alias TempoClock.default (Lot C),
+        // Routine deja stoppee. La stopper figerait tout le systeme.
         ~bpEngine[\clock] = nil;
         ~bpEngine[\running] = false;
         "[bp] STOPPED".postln;
