@@ -1,6 +1,6 @@
 const ws = new WebSocket(`ws://${location.host}/ws`);
 const dot = () => document.getElementById("status");
-ws.addEventListener("open", () => dot().className = "on");
+ws.addEventListener("open", () => { dot().className = "on"; send("/matrix/list"); });
 ws.addEventListener("close", () => dot().className = "off");
 function send(address, ...args) {
   if (ws.readyState === 1) ws.send(JSON.stringify({ address, args }));
@@ -161,6 +161,38 @@ ws.addEventListener("message", (ev) => {
     }
     return;
   }
+
+  // /matrix/list <name1> <name2> ... — populate saved/preset dropdown
+  if (address === "/matrix/list") {
+    const sel = document.getElementById("matrix-list");
+    if (!sel) return;
+    const prev = sel.value;
+    sel.innerHTML = "";
+    args.forEach(name => {
+      const opt = document.createElement("option");
+      opt.value = String(name);
+      opt.textContent = String(name);
+      sel.appendChild(opt);
+    });
+    // Preserve prior selection if still present
+    if (args.map(String).includes(prev)) sel.value = prev;
+    return;
+  }
+
+  // /matrix/grid <512 ints row-major vi*32+bar> — rebuild grid from loaded preset
+  if (address === "/matrix/grid") {
+    if (!Array.isArray(args) || args.length < 512) return;
+    for (let vi = 0; vi < 16; vi++) {
+      for (let bar = 0; bar < MATRIX_BARS; bar++) {
+        const v = Math.round(Number(args[vi * 32 + bar]));
+        matGrid[vi][bar] = (Number.isFinite(v) && v >= 0 && v <= 6) ? v : 0;
+      }
+    }
+    saveMatState();
+    renderMatrix();
+    return;
+  }
+
   // /matrix/trig <vi> <amp> — per-note pulse: glow the active cell of voice vi
   if (address === "/matrix/trig") {
     triggerGlow(Math.round(Number(args[0])), Number(args[1]));
@@ -599,4 +631,18 @@ document.addEventListener("DOMContentLoaded", () => {
     renderMatrix();
     send("/matrix/clear");
   });
+
+  // Matrix persistence bar
+  const matSave = document.getElementById("matrix-save");
+  if (matSave) matSave.addEventListener("click", () => {
+    const n = (document.getElementById("matrix-name").value || "").trim();
+    if (n) { send("/matrix/save", n); send("/matrix/list"); }
+  });
+  const matLoad = document.getElementById("matrix-load");
+  if (matLoad) matLoad.addEventListener("click", () => {
+    const n = document.getElementById("matrix-list").value;
+    if (n) send("/matrix/load", n);
+  });
+  const matRefresh = document.getElementById("matrix-refresh");
+  if (matRefresh) matRefresh.addEventListener("click", () => send("/matrix/list"));
 });

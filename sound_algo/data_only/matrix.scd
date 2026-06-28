@@ -24,6 +24,12 @@
 ~matBeatsPerBar = ~matBeatsPerBar ? 4;
 ~matLastColor   = ~matLastColor   ? Array.fill(~matVoices.size, -1);
 
+// -- Persistence env init (nil-guarded) --
+~matDir        = ~matDir        ? "~/.config/av-live/matrices".standardizePath;
+~matPresetDir  = ~matPresetDir  ? (PathName(thisProcess.nowExecutingPath).pathOnly ++ "matrix_presets");
+~matSavedNames = ~matSavedNames ? Set.new;
+File.exists(~matDir).not.if({ ("mkdir -p " ++ ~matDir.quote).systemCmd });
+
 // -- ~matBaseFor : capture base Pdef source once (lazy, per voice name symbol) --
 // Returns nil when the Pdef is missing (safe for partial environments).
 ~matBaseFor = { |name|
@@ -160,6 +166,112 @@
     ~matPush.()
 };
 
+// -- ~matSafeName : sanitize a name to a safe filename (alphanumeric, -, _, space→_) --
+~matSafeName = { |name|
+    var s = name.asString.select({ |c| c.isAlphaNum or: { "-_ ".includes(c) } }).replace(" ", "_");
+    (s.size > 0).if({ s }, { "untitled" })
+};
+
+// -- ~matGridValid : confirm a grid is 16 x matBars with integer cells 0..6 --
+~matGridValid = { |g|
+    g.isArray and: {
+        g.size == ~matVoices.size and: {
+            g.every({ |row|
+                row.isArray and: {
+                    row.size == ~matBars and: {
+                        row.every({ |v| v.isInteger and: { v >= 0 and: { v <= 6 } } })
+                    }
+                }
+            })
+        }
+    }
+};
+
+// -- ~matNames : list base names of .matrix files found in a directory --
+// User dir: served from in-memory ~matSavedNames (populated by ~matSave) —
+// avoids filesystem-scan quirks that can fail headless in some SC contexts.
+// Other dirs (e.g. shipped presets): scan via ls+tmpfile (systemCmd is
+// synchronous and works headless; pathMatch/Pipe.getLine are unreliable).
+~matNames = { |dir|
+    (dir == ~matDir).if({
+        ~matSavedNames.asArray
+    }, {
+        var ext = ".matrix";
+        var result = [];
+        File.exists(dir).if({
+            var tmp = "/tmp/_av_live_matnames_.txt";
+            ("ls -1 '" ++ dir ++ "' > '" ++ tmp ++ "' 2>/dev/null").systemCmd;
+            File.exists(tmp).if({
+                var content = File.use(tmp, "r", { |f| f.readAllString });
+                ("rm -f '" ++ tmp ++ "'").systemCmd;
+                content.split($\n).do({ |fn|
+                    (fn.size > ext.size and: {
+                        fn.copyRange(fn.size - ext.size, fn.size - 1) == ext
+                    }).if({
+                        result = result.add(fn.copyRange(0, fn.size - ext.size - 1).asSymbol)
+                    })
+                })
+            })
+        });
+        result
+    })
+};
+
+// -- ~matGridPush : send full 512-int grid row-major to surfaces --
+// index = vi * 32 + bar  (voice-major, flatten concatenates rows in order)
+~matGridPush = {
+    ~toscSend !? { ~toscSend.valueArray(["/matrix/grid"] ++ ~lp[\matrix].flatten) }
+};
+
+// -- ~matListPush : send all available preset + user-save names to surfaces --
+~matListPush = {
+    try {
+        var names = (~matNames.(~matPresetDir) ++ ~matNames.(~matDir)).as(Set).asArray.sort;
+        ~toscSend !? { ~toscSend.valueArray(["/matrix/list"] ++ names) }
+    } { |e|
+        ("[matrix] listPush err: " ++ e.class.name).postln
+    }
+};
+
+// -- ~matSave : persist current grid to ~/.config/av-live/matrices/<name>.matrix --
+~matSave = { |name|
+    var safe = ~matSafeName.(name);
+    var path = ~matDir +/+ (safe ++ ".matrix");
+    File.use(path, "w", { |f| f.write(~lp[\matrix].asCompileString) });
+    ~matSavedNames.add(safe.asSymbol);
+    ("[matrix] saved " ++ path).postln;
+    ~matListPush.();
+};
+
+// -- ~matLoadFile : load and validate a grid from an absolute path --
+~matLoadFile = { |path|
+    var g;
+    File.exists(path).if({
+        g = File.use(path, "r", { |f| f.readAllString }).interpret;
+        ~matGridValid.(g).if({
+            ~lp[\matrix] = g;
+            ~lp[\matPlaying].if({ ~matApplyBar.(~lp[\matBar]) });
+            ~matGridPush.();
+            ("[matrix] loaded " ++ path).postln;
+            true
+        }, {
+            ("[matrix] invalid grid in " ++ path).warn;
+            false
+        })
+    }, {
+        ("[matrix] not found " ++ path).warn;
+        false
+    })
+};
+
+// -- ~matLoad : load by name; user save wins over shipped preset --
+~matLoad = { |name|
+    var safe = ~matSafeName.(name);
+    var up   = ~matDir       +/+ (safe ++ ".matrix");
+    var pp   = ~matPresetDir +/+ (safe ++ ".matrix");
+    File.exists(up).if({ ~matLoadFile.(up) }, { ~matLoadFile.(pp) })
+};
+
 // -- OSCdefs (unique \mat_* keys; register sender for TouchOSC feedback) --
 OSCdef(\mat_cell, { |msg, time, addr|
     ~toscTouch !? { ~toscTouch.(addr) };
@@ -180,6 +292,21 @@ OSCdef(\mat_clear, { |msg, time, addr|
     ~toscTouch !? { ~toscTouch.(addr) };
     ~matClear.()
 }, '/matrix/clear');
+
+OSCdef(\mat_save, { |msg, time, addr|
+    ~toscTouch !? { ~toscTouch.(addr) };
+    ~matSave.(msg[1].asString)
+}, '/matrix/save');
+
+OSCdef(\mat_load, { |msg, time, addr|
+    ~toscTouch !? { ~toscTouch.(addr) };
+    ~matLoad.(msg[1].asString)
+}, '/matrix/load');
+
+OSCdef(\mat_list, { |msg, time, addr|
+    ~toscTouch !? { ~toscTouch.(addr) };
+    ~matListPush.()
+}, '/matrix/list');
 
 "[matrix] ready".postln;
 )
