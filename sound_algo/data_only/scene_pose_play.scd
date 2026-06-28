@@ -87,6 +87,7 @@
         if(~bpEngine[\running]) { "[bp] deja en cours".postln } {
             ~bpEngine[\running] = true;
             ~bpEngine[\clock] = TempoClock.default;   // horloge unique (Lot C)
+            ~setTempo.(100);                           // tempo de base body-play
             ~bpEngine[\pad] = Synth(\bp_pad, [\freq, ~bpModes[\pulse][\root].midicps, \amp, 0.0]);
             ~bpEngine[\routine] = Routine({
                 var beatCount = 0;

@@ -34,7 +34,7 @@ SynthDef(\cc_acid_kick, { |out=0, amp=0.6|
         ctx[\cut] = (1 - (hf[\ry] ? 1)).clip(0, 1).linexp(0, 1, 200, 4000);
         ctx[\res] = (hf[\ropen] ? 0.3).clip(0, 1);
         ctx[\oct] = ((hf[\ly] ? 0.5) < 0.4).if({ 1 }, { 0 });   // octave up
-        ~concert[\clock] !? { |c| c.tempo = speed.linlin(0, 0.6, 124, 140).clip(124, 140) / 60 };
+        ~setTempo.(speed.linlin(0, 0.6, 124, 140).clip(124, 140));
     },
     tick: { |ctx, pose, beat|
         var sixteenth = (0.25 / ~ccCtlDur).round.max(1);
@@ -52,7 +52,7 @@ SynthDef(\cc_acid_kick, { |out=0, amp=0.6|
             };
         };
     },
-    stop: { |ctx| ~concert[\clock] !? { |c| c.tempo = 126/60 } },
+    stop: { |ctx| ~setTempo.(126) },
 ));
 "[morceau] Acid Line loaded".postln;
 )

@@ -54,7 +54,7 @@ SynthDef(\cc_punk_lead, { |out=0, freq=440, amp=0.22, pan=0|
         ctx[\drv]  = 2.0;
         ctx[\cut]  = 2500.0;
         ctx[\dens] = 2;
-        ~concert[\clock] !? { |c| c.tempo = 156 / 60 };
+        ~setTempo.(156);
     },
     update: { |ctx, pose|
         var hf    = pose[\hands];
@@ -95,7 +95,7 @@ SynthDef(\cc_punk_lead, { |out=0, freq=440, amp=0.22, pan=0|
         };
     },
     stop: { |ctx|
-        ~concert[\clock] !? { |c| c.tempo = 126 / 60 };
+        ~setTempo.(126);
     },
 ));
 "[morceau] Punkcore loaded".postln;

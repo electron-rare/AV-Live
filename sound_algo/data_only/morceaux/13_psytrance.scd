@@ -46,7 +46,7 @@ SynthDef(\cc_psy_zap, { |out=0, freq=440, amp=0.18, pan=0|
         ctx[\cut]     = 800.0;
         ctx[\res]     = 0.25;
         ctx[\zapRate] = 16;
-        ~concert[\clock] !? { |c| c.tempo = 145 / 60 };
+        ~setTempo.(145);
     },
     update: { |ctx, pose|
         var hf    = pose[\hands];
@@ -84,7 +84,7 @@ SynthDef(\cc_psy_zap, { |out=0, freq=440, amp=0.18, pan=0|
         };
     },
     stop: { |ctx|
-        ~concert[\clock] !? { |c| c.tempo = 126 / 60 };
+        ~setTempo.(126);
     },
 ));
 "[morceau] Psytrance loaded".postln;

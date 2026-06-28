@@ -57,7 +57,7 @@ SynthDef(\cc_trance_pad, { |out=0, freq1=110, freq2=138, freq3=165, cutoff=1200,
         ctx[\dens] = 2;
         ctx[\pad]  = Synth(\cc_trance_pad, [\freq1, f1, \freq2, f2, \freq3, f3,
             \cutoff, 1200, \amp, 0.28]);
-        ~concert[\clock] !? { |c| c.tempo = 138 / 60 };
+        ~setTempo.(138);
     },
     update: { |ctx, pose|
         var hf      = pose[\hands];
@@ -92,7 +92,7 @@ SynthDef(\cc_trance_pad, { |out=0, freq1=110, freq2=138, freq3=165, cutoff=1200,
     },
     stop: { |ctx|
         ctx[\pad] !? { |s| s.set(\gate, 0) };
-        ~concert[\clock] !? { |c| c.tempo = 126 / 60 };
+        ~setTempo.(126);
     },
 ));
 "[morceau] Trance loaded".postln;

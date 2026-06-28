@@ -138,6 +138,7 @@
             ~concert[\idx] = 0;
             ~ccGState = IdentityDictionary.new;
             ~concert[\clock] = TempoClock.default;   // horloge unique (Lot C)
+            ~setTempo.(126);                          // tempo de base concert
             ~concert[\startMorceau].(0);
             ~concert[\routine] = Routine({
                 var beat = 0;
