@@ -1024,6 +1024,10 @@ document.addEventListener("DOMContentLoaded", () => {
     b.addEventListener("click", () => send("/matrix/kit", b.dataset.kit));
   });
 
+  window.addEventListener("beforeunload", () => {
+    if (cdAuditioning && cdEditVoice >= 0) send("/matrix/audition", cdEditVoice, 0);
+  });
+
   // Matrix persistence bar
   const matSave = document.getElementById("matrix-save");
   if (matSave) matSave.addEventListener("click", () => {

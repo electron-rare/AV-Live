@@ -363,6 +363,8 @@ pass = pass and: { ~matColorDefs[6][2][\inst].isNil };   // cleared
 pass = pass and: { ~matColorDefs[6][2][\inst] == \do_strike };
 ~matColorDefs[6][2][\inst] = nil;                   // restore
 
+pass = pass and: { ~matVariation.(\acid, 1, 5).asStream.next(()).notNil };
+
 pass.if(
     { "TEST PASS".postln },
     { "TEST FAIL".postln }
