@@ -17,6 +17,7 @@
 (
 // ---------- ETAT / CONFIG (idempotent : ne reset pas si deja defini) ----
 ~fpEnabled   = ~fpEnabled   ? false;
+~fpDebug     = ~fpDebug     ? false;      // postln chaque frappe recue
 ~fpInst      = ~fpInst      ? \live;      // \live = suit ~melodyInst
 ~fpScaleArr  = ~fpScaleArr  ? ~scaleMinorPent;
 ~fpMap       = ~fpMap       ? [[0,1,2,3,4], [0,1,2,3,4]];  // [L, R] degres
@@ -85,6 +86,10 @@ OSCdef(\poseFinger, { |msg|
         // msg = [/pose/finger, pid, hand, finger, strikeSpeed, z, tipx, tipy]
         ev = ~fpResolve.(msg[2].asInteger, msg[3].asInteger,
                          msg[4], msg[5], msg[6], msg[7]);
+        if(~fpDebug == true) {
+            ("[fp] strike h" ++ msg[2].asInteger ++ " f" ++ msg[3].asInteger
+                ++ " -> note " ++ ev[\note] ++ " amp " ++ ev[\amp].round(0.01)).postln;
+        };
         if(s.serverRunning) {
             syn = Synth(ev[\inst], [\freq, ev[\freq], \amp, ev[\amp], \gate, 1]);
             SystemClock.sched(~fpHold, { syn.set(\gate, 0); nil });
@@ -106,5 +111,24 @@ OSCdef(\poseFinger, { |msg|
 ~fpOctave_   = { |n| ~fpBaseOct = n; };
 ~fpVelSource_ = { |sym| ~fpVelSource = sym; };
 
+// ---------- CONTROLE OSC DISTANT (concert / sclang headless) ------------
+// /control/fp <cmd> [arg] : on, off, debug 0|1, scale <nom>, inst <nom>,
+//   sens <f>, octave <n>, velsrc <strike|z>
+OSCdef(\fpCtl, { |msg|
+    var cmd = msg[1].asSymbol;
+    case
+    { cmd == \on }     { ~fpEnabled = true;  "[fp] ON (osc)".postln; }
+    { cmd == \off }    { ~fpEnabled = false; "[fp] OFF (osc)".postln; }
+    { cmd == \debug }  { ~fpDebug = (msg[2] ? 1) > 0;
+                         ("[fp] debug = " ++ ~fpDebug).postln; }
+    { cmd == \scale }  { ~fpScale_.(msg[2].asSymbol); }
+    { cmd == \inst }   { ~fpInst_.(msg[2].asSymbol); }
+    { cmd == \sens }   { ~fpSens = msg[2]; }
+    { cmd == \octave } { ~fpBaseOct = msg[2].asInteger; }
+    { cmd == \velsrc } { ~fpVelSource = msg[2].asSymbol; }
+    { true }           { ("[fp] cmd OSC inconnue: " ++ cmd).postln; };
+}, '/control/fp');
+
 "[OK] finger_piano : ~fpOn / ~fpScale_(\\dorian) / ~fpInst_(\\fm_bell)".postln;
+"[OK] finger_piano OSC : /control/fp on|off|debug 1|scale <n>|inst <n>".postln;
 )
