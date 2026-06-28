@@ -68,11 +68,14 @@ ws.addEventListener("message", (ev) => {
     state.rhySel = i;
     saveState();
     suppressEmit = true;
-    restoreSel("rhythm", i);
-    updateSelLabels("rhythm");
-    updateNameInputs();
-    renderRhyGrid();
-    suppressEmit = false;
+    try {
+      restoreSel("rhythm", i);
+      updateSelLabels("rhythm");
+      updateNameInputs();
+      renderRhyGrid();
+    } finally {
+      suppressEmit = false;
+    }
     return;
   }
 
@@ -86,11 +89,14 @@ ws.addEventListener("message", (ev) => {
     state.melSel = i;
     saveState();
     suppressEmit = true;
-    restoreSel("melody", i);
-    updateSelLabels("melody");
-    updateNameInputs();
-    renderMelSteps();
-    suppressEmit = false;
+    try {
+      restoreSel("melody", i);
+      updateSelLabels("melody");
+      updateNameInputs();
+      renderMelSteps();
+    } finally {
+      suppressEmit = false;
+    }
     return;
   }
 });
