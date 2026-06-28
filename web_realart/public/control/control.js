@@ -329,7 +329,8 @@ document.addEventListener("DOMContentLoaded", () => {
   // Clear
   document.getElementById("clear").addEventListener("click", () => {
     armed.clear();
-    document.querySelectorAll("[data-pad]").forEach((e) => e.classList.remove("armed"));
+    clipState.clear();
+    document.querySelectorAll("[data-pad]").forEach((e) => e.classList.remove("armed", "queued"));
     send("/launch/clear");
   });
 
