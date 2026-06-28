@@ -64,6 +64,7 @@ Toujours répondre en français à l'utilisateur. Code, commentaires de code, co
 |-----|---------|--------|
 | `POSE_FILTER` | `median+kalman+lookahead+ik` | filter chain stages — extra: `one_euro_joints` (joint-space CHI 2012 One Euro, inserted before kalman), `one_euro_bones` (bone-vector One Euro applied after SMPL-X fusion in multi.py), `arkit_fuse` (overrides 14 body slots with ARKit ARSkeleton3D from the iOS app, expects /body3d/kp on :57128) |
 | `IPHONE_OSC_PORT` | `57128` | UDP port the iPhone ARBodyTracker app pushes /body3d/kp to (always-on listener in data_only_viz) |
+| `VIDEO_ROTATE` | `none` | rotate the source video frame before MediaPipe + display: `none`/`ccw`/`cw`/`180`. Applied at multi.py read; pose detection + skeleton overlay stay aligned. ARKit 3D joints (gravity-aligned world) are unaffected |
 | `ICP_FUSION` | `0` | `1` to enable LiDAR↔SMPL-X ICP fusion (cf. `docs/ICP_FUSION.md`) |
 | `ICP_LIDAR_HOST` | _(unset)_ | iPhone ARBodyTracker IP when `ICP_FUSION=1` |
 | `ICP_LIDAR_PORT` | `5500` | iPhone ARMesh TCP port |

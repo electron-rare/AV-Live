@@ -19,6 +19,8 @@ import time
 import urllib.request
 from pathlib import Path
 
+import numpy as np
+
 from .action_head_pub import ActionHeadPublisher
 from .euro_filter import SkeletonFilter
 from .pose_bridge import PoseSoundBridge
@@ -28,6 +30,25 @@ from .state import Kp3D, PoseKp, State
 from .tracker import IoUTracker
 
 LOG = logging.getLogger("multi")
+
+# Rotation cosmetique + detection de la frame video (env VIDEO_ROTATE).
+# Appliquee AVANT MediaPipe : la detection tourne sur l'image redressee et
+# l'overlay reste aligne. Les joints ARKit (monde 3D, gravity-aligned) sont
+# invariants a l'orientation du device, donc non concernes.
+_ROTATE_K = {"none": 0, "ccw": 1, "180": 2, "cw": 3}
+
+
+def _apply_video_rotate(frame, mode: str):
+    """Rotate a BGR frame by mode (none/ccw/cw/180) via numpy rot90.
+
+    Returns a C-contiguous array (MediaPipe / cv2 need contiguous input).
+    Unknown modes are treated as 'none' (no rotation).
+    """
+    k = _ROTATE_K.get(mode, 0)
+    if k == 0:
+        return frame
+    return np.ascontiguousarray(np.rot90(frame, k))
+
 
 MODELS = {
     "pose": (
@@ -314,6 +335,8 @@ class MultiWorker:
                   else BaseOptions.Delegate.CPU)
         LOG.info("MediaPipe delegate = %s (env MEDIAPIPE_DELEGATE)",
                  _deleg.name)
+        _rot = _os.environ.get("VIDEO_ROTATE", "none").lower()
+        LOG.info("video rotate = %s (env VIDEO_ROTATE: none/ccw/cw/180)", _rot)
         pose = PoseLandmarker.create_from_options(PoseLandmarkerOptions(
             base_options=BaseOptions(model_asset_path=str(pose_p),
                                      delegate=_deleg),
@@ -367,6 +390,9 @@ class MultiWorker:
             if not ok or frame_bgr is None:
                 time.sleep(self.period)
                 continue
+            # Redresse la frame (iPhone tourne physiquement) AVANT MediaPipe
+            # et l'encodage JPEG : detection + overlay + affichage coherents.
+            frame_bgr = _apply_video_rotate(frame_bgr, _rot)
             h, w = frame_bgr.shape[:2]
             # MediaPipe GPU delegate on macOS uploads via CVPixelBuffer
             # which only accepts 4-channel formats. SRGB (3ch) crashes
