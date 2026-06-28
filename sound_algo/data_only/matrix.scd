@@ -4,8 +4,8 @@
 // A playhead Routine advances bar-by-bar on the launchpad clock, applying cells.
 // Colors 1-6 map to Pchain overlays (\stretch / \octave / \amp). 0 = Pdef.stop.
 // Loaded after sections.scd (boot step 6i). Idempotent reload, nil-guarded.
-// NOTE: the \amp variation override bypasses ~lpVol per-voice volume; web vol sliders
-//       have no effect while a matrix variation plays — deferred to v2.
+// NOTE: the \amp variation is multiplied by the per-voice fader (~lp[\vol]) so the
+//       web mixer (/launch/vol) controls matrix output in real time.
 (
 
 // -- Env init (nil-guarded; idempotent reload) --
@@ -74,7 +74,7 @@ File.exists(~matDir).not.if({ ("mkdir -p " ++ ~matDir.quote).systemCmd });
                         },
                         \stretch, spec[\stretch],
                         \octave,  spec[\octave],
-                        \amp,     spec[\amp]
+                        \amp,     Pfunc({ (spec[\amp] ? 1.0) * ((~lp[\vol].notNil).if({ ~lp[\vol][name.asSymbol] ? 0.8 }, { 0.8 })) })
                     ),
                     base
                 )
