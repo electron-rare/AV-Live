@@ -389,7 +389,7 @@ File.exists(~matDir).not.if({ ("mkdir -p " ++ ~matDir.quote).systemCmd });
         var ok = true;
         var v = value;
         (field.asSymbol == \inst).if({
-            v = ((value == \default) or: { value.isNil }).if({ nil }, { value.asSymbol });
+            v = ((value.asSymbol == \default) or: { value.isNil }).if({ nil }, { value.asSymbol });
             ok = v.isNil or: { (~matInstChoices[name] ? []).includes(v) };
         });
         ((field.asSymbol == \cutoff) or: { field.asSymbol == \pan }).if({

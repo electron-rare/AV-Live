@@ -354,6 +354,15 @@ pass = pass and: { ~matLoad.("cleg") };
 pass = pass and: { ~matColorDefs[4][3][\amp] == 1.0 };   // defaulted (color 3 amp default)
 File.delete(~matDir +/+ "cleg.matrix");
 
+// REGRESSION: clear a per-color instrument to default via the STRING "default" (web path)
+~matColorDefs[6][2][\inst] = \do_strike;            // arp, color 2 (do_strike is a valid arp choice)
+~matSetColorDef.(6, 2, \inst, "default");           // String, as OSC delivers it
+pass = pass and: { ~matColorDefs[6][2][\inst].isNil };   // cleared
+// valid inst as a String also works
+~matSetColorDef.(6, 2, \inst, "do_strike");
+pass = pass and: { ~matColorDefs[6][2][\inst] == \do_strike };
+~matColorDefs[6][2][\inst] = nil;                   // restore
+
 pass.if(
     { "TEST PASS".postln },
     { "TEST FAIL".postln }
