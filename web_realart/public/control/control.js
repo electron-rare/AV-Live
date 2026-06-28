@@ -13,6 +13,88 @@ function togglePad(el, name) {
   send("/launch", name, on ? 1 : 0);
 }
 
+// --- Feedback: engine -> browser ---
+let suppressEmit = false;
+let beatFlashTimer = null;
+
+ws.addEventListener("message", (ev) => {
+  let msg;
+  try { msg = JSON.parse(ev.data); } catch (_e) { return; }
+  if (!msg || typeof msg.address !== "string") return;
+  const { address, args } = msg;
+
+  // /armed/<name> — engine is source of truth for arm state
+  if (address.startsWith("/armed/")) {
+    const name = address.slice(7); // strip "/armed/"
+    const isArmed = args[0] === 1;
+    if (isArmed) armed.add(name); else armed.delete(name);
+    document.querySelectorAll(`[data-pad="${name}"]`).forEach((btn) => {
+      btn.classList.toggle("armed", isArmed);
+    });
+    return;
+  }
+
+  // /sync/beat — flash beat dot for 80 ms; cancel any pending clear first
+  if (address === "/sync/beat") {
+    const beatDot = document.getElementById("beat-dot");
+    if (!beatDot) return;
+    if (beatFlashTimer !== null) { clearTimeout(beatFlashTimer); beatFlashTimer = null; }
+    beatDot.classList.add("flash");
+    beatFlashTimer = setTimeout(() => {
+      beatDot.classList.remove("flash");
+      beatFlashTimer = null;
+    }, 80);
+    return;
+  }
+
+  // /sync/rms — drive master VU meter width
+  if (address === "/sync/rms") {
+    const raw = Number(args[0]);
+    const rms = Number.isFinite(raw) ? Math.max(0, Math.min(1, raw)) : 0;
+    const bar = document.getElementById("vu-bar");
+    if (bar) bar.style.width = `${rms * 100}%`;
+    return;
+  }
+
+  // /seq/rhythm/state [idx, k, s, h, name]
+  if (address === "/seq/rhythm/state") {
+    if (!state) return;
+    const i = Math.round(Number(args[0]));
+    if (!Number.isFinite(i) || i < 0 || i >= state.rhythms.length) return;
+    if (typeof args[1] === "string") state.rhythms[i].k = args[1];
+    if (typeof args[2] === "string") state.rhythms[i].s = args[2];
+    if (typeof args[3] === "string") state.rhythms[i].h = args[3];
+    if (typeof args[4] === "string") state.rhythms[i].name = args[4];
+    state.rhySel = i;
+    saveState();
+    suppressEmit = true;
+    restoreSel("rhythm", i);
+    updateSelLabels("rhythm");
+    updateNameInputs();
+    renderRhyGrid();
+    suppressEmit = false;
+    return;
+  }
+
+  // /seq/melody/state [idx, deg0, deg1, ...]
+  if (address === "/seq/melody/state") {
+    if (!state) return;
+    const i = Math.round(Number(args[0]));
+    if (!Number.isFinite(i) || i < 0 || i >= state.melodies.length) return;
+    const degs = args.slice(1).map(Number).filter(Number.isFinite);
+    if (degs.length > 0) state.melodies[i].degrees = degs;
+    state.melSel = i;
+    saveState();
+    suppressEmit = true;
+    restoreSel("melody", i);
+    updateSelLabels("melody");
+    updateNameInputs();
+    renderMelSteps();
+    suppressEmit = false;
+    return;
+  }
+});
+
 // --- Pattern state (defaults mirror launchpad.scd exactly) ---
 const STORAGE_KEY = "avlive.seq";
 
@@ -94,6 +176,7 @@ function renderRhyGrid() {
   ).join("");
   container.querySelectorAll(".step-cell").forEach(cell =>
     cell.addEventListener("click", () => {
+      if (suppressEmit) return;
       const voice = cell.dataset.voice;
       const step = +cell.dataset.step;
       const preset = state.rhythms[state.rhySel];
@@ -119,6 +202,7 @@ function renderMelSteps() {
   ).join("");
   container.querySelectorAll("input[type=number]").forEach(inp =>
     inp.addEventListener("change", () => {
+      if (suppressEmit) return;
       const i = +inp.dataset.midx;
       const val = Math.max(-7, Math.min(14, isNaN(+inp.value) ? 0 : +inp.value));
       inp.value = val;
@@ -158,6 +242,17 @@ function updateNameInputs() {
 
 document.addEventListener("DOMContentLoaded", () => {
   loadState();
+
+  // Tab switching
+  document.querySelectorAll(".tab-btn").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      document.querySelectorAll(".tab-btn").forEach((b) => b.classList.remove("active"));
+      document.querySelectorAll(".tab-panel").forEach((p) => p.classList.remove("active"));
+      btn.classList.add("active");
+      const panel = document.getElementById(`tab-${btn.dataset.tab}`);
+      if (panel) panel.classList.add("active");
+    });
+  });
 
   // Render editors from state
   restoreSel("melody", state.melSel);

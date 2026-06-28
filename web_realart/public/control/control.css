@@ -1,8 +1,8 @@
 * { box-sizing: border-box; } body { margin: 0; background: #111; color: #eee;
   font: 16px/1.3 -apple-system, system-ui, sans-serif; padding: 12px; }
-header { display: flex; align-items: center; gap: 10px; }
+header { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; min-height: 36px; }
 h1 { font-size: 18px; margin: 4px 0; } h2 { font-size: 14px; color: #9af; margin: 16px 0 8px; text-transform: uppercase; letter-spacing: .06em; }
-#status { width: 12px; height: 12px; border-radius: 50%; display: inline-block; }
+#status { width: 12px; height: 12px; border-radius: 50%; display: inline-block; flex-shrink: 0; }
 #status.on { background: #4c8; } #status.off { background: #c44; }
 .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 8px; }
 button { background: #222; color: #eee; border: 1px solid #333; border-radius: 10px;
@@ -41,3 +41,24 @@ button.sel { background: #246; border-color: #4af; color: #8cf; }
 .mel-cell input[type=number]::-webkit-inner-spin-button,
 .mel-cell input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
 .mel-cell input[type=number]:focus { outline: none; border-color: #4af; background: #1a2030; }
+
+/* --- Tab bar --- */
+.tab-bar { display: flex; gap: 4px; margin: 10px 0 6px; }
+.tab-btn { background: #1a1a1a; color: #888; border: 1px solid #333; border-radius: 8px;
+  padding: 10px 8px; font-size: 13px; cursor: pointer; flex: 1; text-transform: uppercase;
+  letter-spacing: .04em; width: auto; }
+.tab-btn.active { background: #246; color: #8cf; border-color: #4af; font-weight: 700; }
+.tab-btn:active { background: #1c2a40; }
+.tab-panel { display: none; }
+.tab-panel.active { display: block; }
+
+/* --- Beat flash dot --- */
+.beat-dot { width: 14px; height: 14px; border-radius: 50%; background: #333;
+  display: inline-block; flex-shrink: 0; }
+.beat-dot.flash { background: #f90; }
+
+/* --- Master VU meter --- */
+.vu-wrap { flex: 1; max-width: 200px; height: 14px; background: #222;
+  border: 1px solid #333; border-radius: 4px; overflow: hidden; }
+.vu-bar { height: 100%; width: 0%; background: linear-gradient(to right, #2b6, #9d4, #fa0);
+  border-radius: 4px; transition: width 0.08s linear; }
