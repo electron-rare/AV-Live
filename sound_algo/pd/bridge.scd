@@ -48,7 +48,7 @@
 
 // --- transport -----------------------------------------------------
 ~pd[\defs].add(OSCdef(\pdPlay, {
-    TempoClock.default.tempo = (~bpm ? 128) / 60;
+    ~setTempo.(~bpm ? 128);
     ~reload !? { ~reload.value };
     [\kickSeq, \hatSeq, \snareSeq, \clapSeq, \percSeq, \acidSeq, \melodySeq, \harmonySeq]
         .do { |k| Pdef(k).play };
@@ -99,7 +99,7 @@
 // --- tweaks parametriques ------------------------------------------
 ~pd[\defs].add(OSCdef(\pdTweakMelCut, { |msg| ~melodyCutoff = msg[1].asFloat; ~reload.value }, '/tweak/melodyCutoff'));
 ~pd[\defs].add(OSCdef(\pdTweakAcidCut,{ |msg| ~acidCutoff   = msg[1].asFloat; ~reload.value }, '/tweak/acidCutoff'));
-~pd[\defs].add(OSCdef(\pdTweakBpm,    { |msg| ~bpm = msg[1].asFloat; TempoClock.default.tempo = ~bpm/60 }, '/tweak/bpm'));
+~pd[\defs].add(OSCdef(\pdTweakBpm,    { |msg| ~setTempo.(msg[1].asFloat) }, '/tweak/bpm'));
 ~pd[\defs].add(OSCdef(\pdTweakMelRq,  { |msg| ~melodyRq = msg[1].asFloat; ~reload.value }, '/tweak/melodyRq'));
 ~pd[\defs].add(OSCdef(\pdTweakAcidRq, { |msg| ~acidRq   = msg[1].asFloat; ~reload.value }, '/tweak/acidRq'));
 ~pd[\defs].add(OSCdef(\pdTweakDrive,  { |msg| ~melodyDrive = msg[1].asFloat; ~reload.value }, '/tweak/melodyDrive'));

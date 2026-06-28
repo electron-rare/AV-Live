@@ -173,8 +173,7 @@ thisProcess.openUDPPort(~webBridgeIn);
 
 // ---------- Transport ------------------------------------------------
 ~webBridgeAdd.("/control/bpm", { |msg|
-    ~bpm = msg[1];
-    TempoClock.default.tempo = ~bpm / 60;
+    ~setTempo.(msg[1]);
     // Debounce reload : evite de reload a chaque tick du slider
     ~webDebounce.(\webBpmReloadTask, 0.2, { ~reload.value });
     ~webBroadcast.value("/sync/bpm", ~bpm);

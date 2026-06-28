@@ -58,7 +58,7 @@
     } {
         scene.keysValuesDo { |k, v|
             if (k == \bpm) {
-                TempoClock.default.tempo = v / 60;
+                ~setTempo.(v);
             } {
                 currentEnvironment.put(k, v);
             };
