@@ -124,17 +124,18 @@ File.exists(~matDir).not.if({ ("mkdir -p " ++ ~matDir.quote).systemCmd });
                 (stretch: 0.5, octave:  0, amp: 1.2)
             ][color];
             spec.notNil.if({
+                var inst = ~matInstruments[vi];
+                var instPair = inst.notNil.if({ [\instrument, inst] }, { [] });
                 Pchain(
-                    Pbind(
+                    Pbind(*([
                         \matGlow, Pfunc { |e|
                             ~matEmitTrig.(vi, (e[\amp] ? spec[\amp]).clip(0, 1));
                             0
                         },
                         \stretch, spec[\stretch],
                         \octave,  spec[\octave],
-                        \amp,     spec[\amp],
-                        \instrument, Pfunc { ~matInstruments[vi] }   // nil → base \instrument kept
-                    ),
+                        \amp,     spec[\amp]
+                    ] ++ instPair)),
                     base
                 )
             }, { base })
@@ -371,7 +372,7 @@ OSCdef(\mat_list, { |msg, time, addr|
 
 OSCdef(\mat_inst, { |msg, time, addr|
     ~toscTouch !? { ~toscTouch.(addr) };
-    ~matApplyInstrument.(msg[1].asInteger, (msg[2] ? \default).asSymbol)
+    ~matApplyInstrument.((msg[1] ? 0).asInteger, (msg[2] ? \default).asSymbol)
 }, '/matrix/instrument');
 
 OSCdef(\mat_kit, { |msg, time, addr|

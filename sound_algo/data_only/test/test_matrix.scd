@@ -18,9 +18,9 @@ var glowPat   = nil;
 ~toscTouch = { |addr| };          // stub
 
 // Define dummy base Pdefs so ~matVariation has something to capture
-Pdef(\lp_kick, Pbind(\dur, 1));
-Pdef(\lp_hats, Pbind(\dur, 0.5));
-Pdef(\lp_arp,  Pbind(\dur, 0.25));   // needed by Task-1 instrument overlay test (vi=6)
+Pdef(\lp_kick, Pbind(\instrument, \lp_kick,  \dur, 1));
+Pdef(\lp_hats, Pbind(\instrument, \lp_hat,   \dur, 0.5));
+Pdef(\lp_arp,  Pbind(\instrument, \lp_pluck, \dur, 0.25));   // needed by Task-1 instrument overlay test (vi=6)
 
 // Load the feature file (synchronous; stubs and Pdefs already in place)
 featureFile.load;
@@ -180,6 +180,16 @@ try { ~trigLog2 = ~matVariation.(\arp, 2, 6).asStream.next(()) } { |e| pass = fa
     ("EXCEPTION matVariation inst: " ++ e.class.name).postln };
 pass = pass and: { ~trigLog2.notNil and: { ~trigLog2[\instrument] == \do_strike } };
 ~matVoices.size.do { |i| ~matInstruments[i] = nil };   // reset for later tests
+
+// REGRESSION: a nil-instrument (default) voice must still produce a sounding event
+~matInstruments[0] = nil;                          // kick = default
+~regEv = ~matVariation.(\kick, 2, 0).asStream.next(());
+pass = pass and: { ~regEv.notNil };                // NOT stream-ended
+pass = pass and: { ~regEv[\instrument] == \lp_kick };   // base instrument preserved
+~matInstruments[0] = \do_kick;                     // override
+~regEv2 = ~matVariation.(\kick, 2, 0).asStream.next(());
+pass = pass and: { ~regEv2[\instrument] == \do_kick };
+~matInstruments[0] = nil;
 
 pass.if(
     { "TEST PASS".postln },
