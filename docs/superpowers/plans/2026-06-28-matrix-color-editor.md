@@ -213,7 +213,9 @@ pass = pass and: { ~matColorDefs[0][1][\inst].isNil };
         var ok = true;
         var v = value;
         (field.asSymbol == \inst).if({
-            v = ((value == \default) or: { value.isNil }).if({ nil }, { value.asSymbol });
+            // coerce BEFORE comparing: over the web->OSC path `value` is the STRING
+            // "default", and "default" == \default is FALSE in SC (String != Symbol).
+            v = ((value.asSymbol == \default) or: { value.isNil }).if({ nil }, { value.asSymbol });
             ok = v.isNil or: { (~matInstChoices[name] ? []).includes(v) };
         });
         ((field.asSymbol == \cutoff) or: { field.asSymbol == \pan }).if({
