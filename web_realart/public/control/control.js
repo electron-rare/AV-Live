@@ -312,14 +312,14 @@ const MATRIX_VOICES = [
 // per-voice curated instrument options (must mirror SC ~matInstChoices)
 // note-terminating synths only — the continuous do_ drones never free per-note.
 const MATRIX_INST_CHOICES = {
-  kick:["lp_kick","do_kick","do_quake_sub"], hats:["lp_hat","do_hat"],
-  clap:["lp_clap","lp_rim","do_hat"], perc:["lp_perc","do_strike","lp_tom"],
-  sub:["lp_sub","lp_reese","do_quake_sub"],
-  acid:["lp_acid","lp_pluck"], arp:["lp_pluck","do_strike","lp_bells"],
-  lead:["lp_pluck","do_plane","do_strike","lp_bells"], stab:["lp_pluck","lp_acid"],
-  pad:["lp_pad","lp_reese","lp_sub"], ride:["lp_ride","lp_hat","do_hat"],
-  rim:["lp_rim","lp_clap","do_hat"], tom:["lp_tom","do_strike","do_quake_sub"],
-  reese:["lp_reese","lp_sub","lp_pad"],
+  kick:["lp_kick","tr909_kick","tr808_kick","do_kick","do_quake_sub"], hats:["lp_hat","tr909_hat","tr808_hat","do_hat"],
+  clap:["lp_clap","tr909_clap","tr808_clap","lp_rim","do_hat"], perc:["lp_perc","tr808_cowbell","do_strike","lp_tom"],
+  sub:["lp_sub","sh101","tr808_kick","lp_reese","do_quake_sub"],
+  acid:["lp_acid","tb303","ms20","lp_pluck"], arp:["lp_pluck","tb303","do_strike","lp_bells"],
+  lead:["lp_pluck","ms20","sh101","do_plane","do_strike"], stab:["lp_pluck","ms20","tb303","lp_acid"],
+  pad:["lp_pad","ms20","lp_reese","lp_sub"], ride:["lp_ride","tr909_ride","lp_hat","do_hat"],
+  rim:["lp_rim","tr808_cowbell","tr909_clap","do_hat"], tom:["lp_tom","do_strike","do_quake_sub"],
+  reese:["lp_reese","ms20","sh101","lp_sub"],
   bells:["lp_bells","do_strike","do_plane"], sweep:["lp_sweep","lp_pad","lp_reese"]
 };
 let matInst = new Array(16).fill("default");   // per-voice selection (persisted)

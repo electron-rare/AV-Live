@@ -133,6 +133,116 @@ SynthDef(\lp_sweep, { |out=0, amp=0.0, gate=1, pan=0, rev=0|
     ~doReverbBus.notNil.if({ Out.ar(~doReverbBus, sig * rev) });
 }).add;
 
+// ===================================================================
+//  Classic-machine emulations — extra matrix instrument choices.
+//  All note-terminating (perc env + doneAction, or gated ASR) so they
+//  are Pbind-safe; all take \pan + \rev like the lp_ voices. Standard
+//  UGens only (no sc3-plugins). Tune by ear at the live gate.
+// ===================================================================
+// --- Roland TR-909 ---
+SynthDef(\tr909_kick, { |out=0, amp=0.9, pan=0, rev=0|
+    var fenv  = EnvGen.kr(Env([300, 54], [0.045], \exp));
+    var aenv  = EnvGen.kr(Env.perc(0.001, 0.42, 1, -4), doneAction: 2);
+    var click = HPF.ar(WhiteNoise.ar, 700) * EnvGen.kr(Env.perc(0.0003, 0.008)) * 0.5;
+    var body  = SinOsc.ar(fenv) * aenv;
+    var sig   = Pan2.ar(((body * 1.3) + click).tanh, pan.clip(-1,1)) * amp;
+    Out.ar(out, sig);
+    ~doReverbBus.notNil.if({ Out.ar(~doReverbBus, sig * rev) });
+}).add;
+SynthDef(\tr909_clap, { |out=0, amp=0.5, pan=0, rev=0|
+    var env = EnvGen.ar(Env([0, 1, 0.4, 1, 0.3, 1, 0, 0.7, 0],
+        [0.001, 0.009, 0.001, 0.009, 0.001, 0.009, 0.001, 0.16]), doneAction: 2);
+    var sig = BPF.ar(WhiteNoise.ar, 1050, 0.75) * env * 2.2;
+    sig = Pan2.ar(sig.tanh, pan.clip(-1,1)) * amp;
+    Out.ar(out, sig);
+    ~doReverbBus.notNil.if({ Out.ar(~doReverbBus, sig * rev) });
+}).add;
+SynthDef(\tr909_hat, { |out=0, amp=0.3, pan=0, rev=0, dur=0.06|
+    var env = EnvGen.kr(Env.perc(0.001, dur, 1, -8), doneAction: 2);
+    var osc = Mix(Pulse.ar([2003, 3079, 4111, 5519, 6883, 8087] * 0.5)) * 0.15;
+    var sig = HPF.ar(osc, 7000) * env;
+    sig = Pan2.ar(sig, pan.clip(-1,1)) * amp;
+    Out.ar(out, sig);
+    ~doReverbBus.notNil.if({ Out.ar(~doReverbBus, sig * rev) });
+}).add;
+SynthDef(\tr909_ride, { |out=0, amp=0.3, pan=0, rev=0|
+    var env  = EnvGen.kr(Env.perc(0.001, 0.7, 1, -5), doneAction: 2);
+    var osc  = Mix(Pulse.ar([1047, 1571, 2003, 3079, 4111])) * 0.1;
+    var ring = Ringz.ar(Impulse.ar(0), 4200, 0.1) * 0.3;
+    var sig  = (HPF.ar(osc, 3000) + ring) * env;
+    sig = Pan2.ar(sig, pan.clip(-1,1)) * amp;
+    Out.ar(out, sig);
+    ~doReverbBus.notNil.if({ Out.ar(~doReverbBus, sig * rev) });
+}).add;
+// --- Roland TR-808 ---
+SynthDef(\tr808_kick, { |out=0, amp=0.9, freq=52, pan=0, rev=0|
+    var fenv  = EnvGen.kr(Env([freq * 2.6, freq], [0.06], \exp));
+    var aenv  = EnvGen.kr(Env.perc(0.001, 0.95, 1, -5), doneAction: 2);
+    var click = SinOsc.ar(1800) * EnvGen.kr(Env.perc(0.0003, 0.006)) * 0.25;
+    var body  = SinOsc.ar(fenv.clip(20, 400)) * aenv;
+    var sig   = Pan2.ar((body + click).tanh, pan.clip(-1,1)) * amp;
+    Out.ar(out, sig);
+    ~doReverbBus.notNil.if({ Out.ar(~doReverbBus, sig * rev) });
+}).add;
+SynthDef(\tr808_clap, { |out=0, amp=0.5, pan=0, rev=0|
+    var env = EnvGen.ar(Env([0, 1, 0.3, 1, 0.2, 1, 0, 0.5, 0],
+        [0.001, 0.011, 0.001, 0.011, 0.001, 0.011, 0.001, 0.22]), doneAction: 2);
+    var sig = BPF.ar(WhiteNoise.ar, 980, 0.9) * env * 2;
+    sig = Pan2.ar(sig.tanh, pan.clip(-1,1)) * amp;
+    Out.ar(out, sig);
+    ~doReverbBus.notNil.if({ Out.ar(~doReverbBus, sig * rev) });
+}).add;
+SynthDef(\tr808_hat, { |out=0, amp=0.3, pan=0, rev=0, dur=0.05|
+    var env = EnvGen.kr(Env.perc(0.001, dur, 1, -8), doneAction: 2);
+    var osc = Mix(Pulse.ar([2063, 3013, 4759, 5503, 6817, 8243] * 0.5)) * 0.14;
+    var sig = HPF.ar(osc, 8000) * env;
+    sig = Pan2.ar(sig, pan.clip(-1,1)) * amp;
+    Out.ar(out, sig);
+    ~doReverbBus.notNil.if({ Out.ar(~doReverbBus, sig * rev) });
+}).add;
+SynthDef(\tr808_cowbell, { |out=0, amp=0.4, pan=0, rev=0|
+    var env = EnvGen.kr(Env.perc(0.001, 0.32, 1, -4), doneAction: 2);
+    var osc = (Pulse.ar(540, 0.5) + Pulse.ar(800, 0.5)) * 0.5;
+    var sig = BPF.ar(osc, 2640, 0.6) * env * 3;
+    sig = Pan2.ar(sig.tanh, pan.clip(-1,1)) * amp;
+    Out.ar(out, sig);
+    ~doReverbBus.notNil.if({ Out.ar(~doReverbBus, sig * rev) });
+}).add;
+// --- Roland TB-303 (acid) : saw -> env-swept resonant LPF + drive ---
+SynthDef(\tb303, { |out=0, freq=110, amp=0.32, cutoff=500, res=0.82, fenvamt=2.6, pan=0, rev=0|
+    var aenv = EnvGen.kr(Env.perc(0.004, 0.45, 1, -3), doneAction: 2);
+    var fenv = EnvGen.kr(Env.perc(0.004, 0.32, 1, -4)) * fenvamt;
+    var rq   = res.clip(0, 1).linexp(0, 1, 1.0, 0.04);
+    var cut  = (cutoff * (1 + fenv)).clip(60, 6500);
+    var sig  = RLPF.ar(Saw.ar(freq.clip(20, 2000)), cut, rq);
+    sig = (sig * 1.6).tanh * aenv;
+    sig = Pan2.ar(sig, pan.clip(-1,1)) * amp;
+    Out.ar(out, sig);
+    ~doReverbBus.notNil.if({ Out.ar(~doReverbBus, sig * rev) });
+}).add;
+// --- Korg MS-20 (screaming resonant, gated lead/bass) ---
+SynthDef(\ms20, { |out=0, freq=110, amp=0.3, cutoff=1200, res=0.8, gate=1, pan=0, rev=0|
+    var env = EnvGen.kr(Env.asr(0.005, 1, 0.14), gate, doneAction: 2);
+    var osc = Saw.ar(freq.clip(20, 3000)) + Pulse.ar(freq.clip(20, 3000) * 1.004, 0.35);
+    var rq  = res.clip(0, 1).linexp(0, 1, 1.0, 0.05);
+    var sig = RLPF.ar(osc, cutoff.clip(60, 8000), rq);
+    sig = (sig * 2.2).tanh;
+    sig = Pan2.ar(sig * env, pan.clip(-1, 1)) * amp * 0.5;
+    Out.ar(out, sig);
+    ~doReverbBus.notNil.if({ Out.ar(~doReverbBus, sig * rev) });
+}).add;
+// --- Roland SH-101 (mono saw+pulse+sub bass/lead, gated) ---
+SynthDef(\sh101, { |out=0, freq=55, amp=0.3, cutoff=1500, res=0.3, gate=1, pan=0, rev=0|
+    var env = EnvGen.kr(Env.asr(0.006, 1, 0.2), gate, doneAction: 2);
+    var sub = Pulse.ar((freq * 0.5).clip(10, 1000), 0.5) * 0.5;
+    var osc = Saw.ar(freq.clip(20, 2000)) + (Pulse.ar(freq.clip(20, 2000), 0.45) * 0.5) + sub;
+    var rq  = res.clip(0, 1).linexp(0, 1, 1.0, 0.1);
+    var sig = RLPF.ar(osc, cutoff.clip(60, 7000), rq);
+    sig = Pan2.ar(sig * env, pan.clip(-1, 1)) * amp * 0.4;
+    Out.ar(out, sig);
+    ~doReverbBus.notNil.if({ Out.ar(~doReverbBus, sig * rev) });
+}).add;
+
 s.sync;
 
 ~lp = ~lp ? ();
