@@ -148,6 +148,7 @@ Routine({
     s.sync;
 
     // -- 5) OSCdef des flux data_feeds -----
+    (~repoRoot ++ "palette/note.scd").load;
     (~repoRoot ++ "control/data_feeds.scd").load;
     (~repoRoot ++ "control/finger_piano.scd").load;
     // En data-only ~melodyInst n'existe pas et \pluck n'est pas charge :

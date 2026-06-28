@@ -34,6 +34,7 @@ Routine({
         (~base ++ "engine.scd").load;
         (~base ++ "synth/_index.scd").load;
         (~base ++ "fx/_index.scd").load;
+        (~base ++ "palette/note.scd").load;
         (~base ++ "palette/scales.scd").load;
         (~base ++ "palette/melodies/index.scd").load;
         (~base ++ "palette/harmonics/index.scd").load;

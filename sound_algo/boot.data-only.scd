@@ -37,6 +37,7 @@ Routine({
     };
 
     "[boot.data-only] loading data_feeds OSCdef...".postln;
+    (~base ++ "palette/note.scd").load;
     (~base ++ "control/data_feeds.scd").load;
     (~base ++ "control/finger_piano.scd").load;
     1.0.wait;
