@@ -20,21 +20,23 @@
 (
 
 // -- Port + address init --
-~toscPort = ~toscPort ? 9000;
-~tosc     = ~tosc;  // nil on first load, preserved on reload
+~toscPort    = ~toscPort ? 9000;
+~toscClients = ~toscClients ? Dictionary.new;
 
-// Refresh the target NetAddr when a control message arrives from the surface
+// Add / refresh a client entry when a control message arrives from the surface.
+// Keyed by ip String so the same host always maps to one NetAddr (dedup).
+// Logs only when a NEW ip is first seen.
 ~toscTouch = { |addr|
     var ip = addr.ip;
-    (~tosc.isNil or: { ~tosc.ip != ip }).if({
-        ~tosc = NetAddr(ip, ~toscPort);
+    ~toscClients[ip].isNil.if({
+        ~toscClients[ip] = NetAddr(ip, ~toscPort);
         ("[touchosc] client -> " ++ ip ++ ":" ++ ~toscPort.asString).postln;
     });
 };
 
-// Send an OSC message to the surface, silently if ~tosc not yet known
+// Send an OSC message to all known clients; no-op when none connected
 ~toscSend = { |path ...args|
-    ~tosc !? { ~tosc.sendMsg(path, *args) };
+    ~toscClients.values.do { |dest| dest.sendMsg(path, *args) };
 };
 
 // Canonical pad name order (16 pads in grid order, matches the surface layout)

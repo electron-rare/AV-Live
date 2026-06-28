@@ -30,12 +30,17 @@ pass = pass and: { ~toscSend.notNil };
 pass = pass and: { ~toscTouch.notNil };
 pass = pass and: { ~toscArmedPush.notNil };
 
-// Calling ~toscArmedPush.() with ~tosc nil must not raise
-// (~toscSend nil-guards via !? so no OSC is actually sent)
+// Calling ~toscArmedPush.() with no clients must not raise
+// (~toscSend iterates an empty dictionary -> no-op, no OSC sent)
 try { ~toscArmedPush.() } { |e|
     pass = false;
     ("EXCEPTION in ~toscArmedPush: " ++ e.messageString).postln;
 };
+
+// Assert multicast set grows with distinct IPs
+~toscTouch.(NetAddr("127.0.0.1", 0));
+~toscTouch.(NetAddr("10.0.0.9", 0));
+pass = pass and: { ~toscClients.size == 2 };
 
 // Stop the background Routine so the process can exit cleanly
 ~toscFeedbackRoutine !? { ~toscFeedbackRoutine.stop };
