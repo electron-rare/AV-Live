@@ -552,9 +552,29 @@ OSCdef(\mat_steps_get, { |msg, time, addr|
                             (d.isKindOf(Event)).if({
                                 [\stretch, \octave, \amp, \inst, \cutoff, \pan].do { |f|
                                     d[f].notNil.if({ ~matColorDefs[vi][ci + 1][f] = d[f] })
-                                }; (d[\steps].notNil and: { d[\steps].isArray }).if({ ~matColorDefs[vi][ci + 1][\steps] = d[\steps] })
+                                }; (d[\steps].notNil and: { d[\steps].isArray }).if({ ~matColorDefs[vi][ci + 1][\steps] = d[\steps] });
+                                (d[\mod].notNil).if({ ~matColorDefs[vi][ci + 1][\mod] = d[\mod] });
+                                (d[\pose].notNil and: { d[\pose].isArray }).if({ ~matColorDefs[vi][ci + 1][\pose] = d[\pose] });
                             })
                         }
+                    })
+                }
+            });
+            // migrate legacy per-voice mods -> all colors; poseBindings -> their color
+            ((raw.isArray.not) and: { raw[\mods].notNil }).if({
+                raw[\mods].do { |m, vi|
+                    (m != \none and: { m.isArray and: { m.size == 3 } and: { vi < ~matVoices.size } }).if({
+                        (1..6).do { |c| ~matColorDefs[vi][c][\mod] = (source: m[0], target: m[1], depth: m[2]) }
+                    })
+                }
+            });
+            ((raw.isArray.not) and: { raw[\poseBindings].notNil }).if({
+                raw[\poseBindings].do { |list, vi|
+                    (list.isArray and: { vi < ~matVoices.size }).if({
+                        list.do { |b| (b.isArray and: { b.size == 3 }).if({
+                            var c = b[2].asInteger.clip(1, 6);
+                            ~matColorDefs[vi][c][\pose] = ~matColorDefs[vi][c][\pose] ++ [ (poseId: b[0], action: b[1]) ]
+                        }) }
                     })
                 }
             });

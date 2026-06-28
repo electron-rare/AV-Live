@@ -459,6 +459,27 @@ try { ~matPoseFire.(\poseX) } { |e| pass = false; ("EXC poseFire: " ++ e.class.n
 try { ~matPoseFire.(\unknown) } { |e| pass = false };
 ~matColorDefs[5][3][\pose] = [];
 
+// --- Per-color mod/pose persistence + migration (Task 3) ---
+~matSetColorMod.(4, 3, \rHandY, \amp, 0.5);
+~matSetColorPose.(4, 3, \poseM, \gate);
+~matSave.("cp grid");
+~matColorDefs = Array.fill(~matVoices.size, { ~matDefaultColorDefs.value });
+pass = pass and: { ~matLoad.("cp grid") };
+pass = pass and: { ~matColorDefs[4][3][\mod][\target] == \amp };
+pass = pass and: { ~matColorDefs[4][3][\pose][0][\poseId] == \poseM };
+File.delete(~matDir +/+ "cp_grid.matrix");
+// legacy migration: a saved Event with top-level mods + poseBindings
+~matColorDefs = Array.fill(~matVoices.size, { ~matDefaultColorDefs.value });
+File.use(~matDir +/+ "legc.matrix", "w", { |f| f.write((
+    grid: Array.fill(16, { Array.fill(32, 0) }),
+    mods: Array.fill(16, \none).put(4, [\rHandY, \cutoff, 0.6]),
+    poseBindings: Array.fill(16, []).put(4, [ [\poseL, \trigger, 3] ])
+).asCompileString) });
+pass = pass and: { ~matLoad.("legc") };
+pass = pass and: { ~matColorDefs[4][1][\mod][\target] == \cutoff };   // voice mod -> all colors
+pass = pass and: { ~matColorDefs[4][3][\pose][0][\poseId] == \poseL }; // pose -> its color
+File.delete(~matDir +/+ "legc.matrix");
+
 pass.if(
     { "TEST PASS".postln },
     { "TEST FAIL".postln }
