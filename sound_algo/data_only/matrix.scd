@@ -26,14 +26,17 @@
 ~matInstruments  = ~matInstruments  ? Array.fill(~matVoices.size, nil);
 ~matMod          = ~matMod          ? Array.fill(~matVoices.size, nil);
 ~matModTargets   = ~matModTargets   ? IdentityDictionary[
-    \kick->[\amp], \hats->[\amp], \clap->[\amp], \perc->[\amp],
-    \sub->[\amp], \acid->[\amp,\cutoff,\pan], \arp->[\amp,\cutoff,\pan],
-    \lead->[\amp,\cutoff,\pan], \stab->[\amp,\cutoff,\pan], \pad->[\amp,\cutoff],
-    \ride->[\amp], \rim->[\amp], \tom->[\amp], \reese->[\amp],
-    \bells->[\amp], \sweep->[\amp]
+    \kick->[\amp,\pan,\rev], \hats->[\amp,\pan,\rev], \clap->[\amp,\pan,\rev],
+    \perc->[\amp,\cutoff,\pan,\rev],
+    \sub->[\amp,\pan,\rev], \acid->[\amp,\cutoff,\pan,\rev], \arp->[\amp,\cutoff,\pan,\rev],
+    \lead->[\amp,\cutoff,\pan,\rev], \stab->[\amp,\cutoff,\pan,\rev], \pad->[\amp,\cutoff,\pan,\rev],
+    \ride->[\amp,\pan,\rev], \rim->[\amp,\pan,\rev], \tom->[\amp,\pan,\rev],
+    \reese->[\amp,\cutoff,\pan,\rev],
+    \bells->[\amp,\pan,\rev], \sweep->[\amp,\pan,\rev]
 ];
 ~matModNeutralCut = ~matModNeutralCut ? IdentityDictionary[
-    \acid->700, \arp->3000, \lead->4000, \stab->2200, \pad->1500
+    \perc->1260, \acid->700, \arp->3000, \lead->4000, \stab->2200,
+    \pad->1500, \reese->1100
 ];
 
 // -- default color defs reproduce the historical global variation table --
@@ -180,7 +183,11 @@ File.exists(~matDir).not.if({ ("mkdir -p " ++ ~matDir.quote).systemCmd });
             (tgt == \pan).if({
                 [\pan, Pfunc { (~matModSourceVal.(src) * 2 - 1) * d }]
             }, {
-                [\amp, Pfunc { ((spec[\amp] ? 1.0) * volOf.value) * (1 + (d * (~matModSourceVal.(src) * 2 - 1))).max(0) }]
+                (tgt == \rev).if({  // reverb send 0..1 scaled by depth
+                    [\rev, Pfunc { (~matModSourceVal.(src) * d).clip(0, 1) }]
+                }, {
+                    [\amp, Pfunc { ((spec[\amp] ? 1.0) * volOf.value) * (1 + (d * (~matModSourceVal.(src) * 2 - 1))).max(0) }]
+                })
             })
         })
     });
@@ -655,7 +662,8 @@ OSCdef(\mat_audition, { |msg, time, addr|
 // -- Capture mod source cache (nil-guarded; idempotent reload) --
 ~matModCache   = ~matModCache ? IdentityDictionary.new;
 ~matModSources = ~matModSources ?
-    [\lHandY, \rHandY, \lOpen, \rOpen, \handSpeed, \handDist, \bodyY, \depth];
+    [\lHandY, \rHandY, \lHandX, \rHandX, \lOpen, \rOpen, \handSpeed, \handDist,
+     \bodyX, \bodyY, \depth];
 
 // reader: clamp to 0..1, default 0 when absent
 ~matModSourceVal = { |key| (~matModCache[key] ? 0).clip(0, 1) };
@@ -664,6 +672,8 @@ OSCdef(\mat_audition, { |msg, time, addr|
 OSCdef(\mat_mod_hands, { |msg|
     ~matModCache[\lHandY]    = 1 - (msg[3] ? 0.5);   // image y top-down -> up=1
     ~matModCache[\rHandY]    = 1 - (msg[7] ? 0.5);
+    ~matModCache[\lHandX]    = msg[2] ? 0.5;          // image x left->right
+    ~matModCache[\rHandX]    = msg[6] ? 0.5;
     ~matModCache[\lOpen]     = msg[4] ? 0;
     ~matModCache[\rOpen]     = msg[8] ? 0;
     ~matModCache[\handSpeed] = ((msg[5] ? 0) max: (msg[9] ? 0));
@@ -671,7 +681,8 @@ OSCdef(\mat_mod_hands, { |msg|
 }, '/pose/hands');
 
 OSCdef(\mat_mod_center, { |msg|
-    ~matModCache[\bodyY] = 1 - (msg[3] ? 0.5);       // /pose/center [pid, cx, cy]
+    ~matModCache[\bodyX] = msg[2] ? 0.5;             // /pose/center [pid, cx, cy]
+    ~matModCache[\bodyY] = 1 - (msg[3] ? 0.5);
 }, '/pose/center');
 
 OSCdef(\mat_mod_span, { |msg|
