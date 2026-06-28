@@ -22,9 +22,8 @@
 // Chemin du fichier pour /control/fp reload (iteration clips sans reboot SC).
 if(~repoRoot.notNil) { ~fpSelfPath = ~repoRoot ++ "control/finger_piano.scd" };
 ~fpInst      = ~fpInst      ? \live;      // \live = suit ~melodyInst
-// Fallback embarque : en mode data-only, palette/scales.scd n'est pas
-// charge, donc ~scaleMinorPent est nil. On garantit une gamme valide.
-~fpScaleArr  = ~fpScaleArr  ? (~scaleMinorPent ? [60, 63, 65, 67, 70, 72, 75, 79]);
+~fpScaleName = ~fpScaleName ? \minorPent; // nom de gamme dans ~scales
+~fpRoot      = ~fpRoot      ? 60;         // fondamentale MIDI
 ~fpMap       = ~fpMap       ? [[0,1,2,3,4], [0,1,2,3,4]];  // [L, R] degres
 ~fpHandOct   = ~fpHandOct   ? [0, 12];    // L octave basse, R +1 octave
 ~fpBaseOct   = ~fpBaseOct   ? 0;          // octaves globales en plus
@@ -42,18 +41,6 @@ if(~fpCutBus.isNil and: { s.serverRunning }) {
     ~fpFxBus  = Bus.control(s, 1);
 };
 
-// Gammes nommees accessibles via ~fpScale_
-// Gammes nommees (fallback embarque si palette/scales.scd absent).
-~fpScales = (
-    minorPent: ~scaleMinorPent ? [60, 63, 65, 67, 70, 72, 75, 79],
-    minor:     ~scaleMinor     ? [60, 62, 63, 65, 67, 68, 70, 72],
-    dorian:    ~scaleDorian    ? [60, 62, 63, 65, 67, 69, 70, 72],
-    phrygian:  ~scalePhrygian  ? [60, 61, 63, 65, 67, 68, 70, 72],
-    blues:     ~scaleBlues     ? [60, 63, 65, 66, 67, 70, 72, 75],
-    japanese:  ~scaleJapanese  ? [60, 62, 65, 67, 69, 72, 74, 77],
-    hijaz:     ~scaleHijaz     ? [60, 61, 64, 65, 67, 68, 70, 72],
-    hirajoshi: ~scaleHirajoshi ? [60, 62, 63, 67, 68, 72, 74, 75]
-);
 
 // ---------- RESOLUTION (pure, testable) ---------------------------------
 ~fpResolveInst = {
@@ -68,8 +55,7 @@ if(~fpCutBus.isNil and: { s.serverRunning }) {
     // x autour de 0.5 -> +/- ~fpOctSpan octaves
     octFromX = ((handX - 0.5) * 2 * ~fpOctSpan).round(1.0).asInteger;
     transpose = (~fpHandOct[hand] ? 0) + (~fpBaseOct * 12) + (octFromX * 12);
-    note = ((~fpScaleArr ? [60, 63, 65, 67, 70, 72, 75, 79]).wrapAt(deg)
-        + transpose).asInteger;
+    note = ~noteFor.(deg, ~fpScaleName, ~fpRoot, transpose div: 12);
     vel = if(~fpVelSource == \z) { z } { strikeSpeed };
     amp = (~fpAmp * (0.25 + (0.75 * vel)) * ~fpSens).clip(0.0, 1.0);
     (note: note, freq: note.midicps, amp: amp, inst: ~fpResolveInst.());
@@ -155,8 +141,8 @@ OSCdef(\posePinch, { |msg|
 // Un SynthDef sans gate ne sera jamais libere par le gate=0 differe -> note bloquee.
 ~fpInst_     = { |sym| ~fpInst = sym; ("[fp] inst = " ++ sym).postln; };
 ~fpScale_    = { |name|
-    ~fpScaleArr = ~fpScales[name] ? ~fpScaleArr;
-    ("[fp] scale = " ++ name).postln;
+    (~scales[name].notNil).if({ ~fpScaleName = name });
+    ("[fp] scale = " ++ ~fpScaleName).postln;
 };
 ~fpSens_     = { |v| ~fpSens = v; };
 ~fpOctave_   = { |n| ~fpBaseOct = n; };

@@ -11,16 +11,17 @@ base = thisProcess.nowExecutingPath.dirname.dirname ++ "/";
 ~melodyInst = \pluck;
 (base ++ "control/finger_piano.scd").load;
 
-// default scale is minor pentatonic; left thumb (hand 0, finger 0) -> degree 0
+// note.scd must be loaded for ~noteFor
+(base ++ "palette/note.scd").load;
+// default scale minorPent; L thumb (hand 0, finger 0) -> degree 0 -> root 60
 ev = ~fpResolve.(0, 0, 1.0, 0.0, 0.5, 0.5);
 ("note L thumb = " ++ ev[\note]).postln;
-if(ev[\note] != ~fpScaleArr.wrapAt(0)) {
+if(ev[\note] != ~noteFor.(0, \minorPent, 60, 0)) {
     ok = false; "FAIL: L thumb note wrong".postln;
 };
-
 // right hand defaults one octave up (~fpHandOct[1] = 12)
 ev = ~fpResolve.(1, 0, 1.0, 0.0, 0.5, 0.5);
-if(ev[\note] != (~fpScaleArr.wrapAt(0) + 12)) {
+if(ev[\note] != (~noteFor.(0, \minorPent, 60, 0) + 12)) {
     ok = false; "FAIL: R thumb octave wrong".postln;
 };
 
