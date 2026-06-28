@@ -387,6 +387,15 @@ class PoseSoundBridge:
             pass
         self._vj("/pose/finger", args)
 
+    def send_pinch(self, ev) -> None:
+        """Emit one thumb-to-finger pinch event (clip toggle trigger)."""
+        args = [0, int(ev.hand), int(ev.finger)]
+        try:
+            self._client.send_message("/pose/pinch", args)
+        except OSError:
+            pass
+        self._vj("/pose/pinch", args)
+
     def send_enter(self, pid: int) -> None:
         """Send lifecycle event when person enters frame."""
         self._client.send_message("/pose/enter", [int(pid)])

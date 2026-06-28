@@ -147,6 +147,7 @@ class ActionHeadPublisher(threading.Thread):
         self._last_pids = current_pids
         self._emit_hands(t_now)
         self._emit_fingers(t_now)
+        self._emit_pinch(t_now)
 
     def _emit_hands(self, t_now: float) -> None:
         """Lock state, extract hand features, emit /pose/hands once per tick."""
@@ -162,9 +163,11 @@ class ActionHeadPublisher(threading.Thread):
         self.bridge.send_hands(feats, t_now)
 
     def _init_finger_piano(self) -> None:
-        """Read FINGER_PIANO env config and build the strike detector."""
+        """Read FINGER_* env config and build the strike + pinch detectors."""
         import os
-        from data_only_viz.finger_strike import FingerStrikeDetector
+        from data_only_viz.finger_strike import (
+            FingerStrikeDetector, PinchDetector,
+        )
         self._finger_enabled = os.environ.get("FINGER_PIANO", "0") not in (
             "0", "", "false", "False",
         )
@@ -172,6 +175,11 @@ class ActionHeadPublisher(threading.Thread):
         refr = float(os.environ.get("FINGER_STRIKE_REFRACTORY_MS", "120"))
         self._finger_det = FingerStrikeDetector(
             vel_thresh=vel, refractory_ms=refr,
+        )
+        self._pinch_det = PinchDetector(
+            ratio_on=float(os.environ.get("PINCH_RATIO_ON", "0.45")),
+            ratio_off=float(os.environ.get("PINCH_RATIO_OFF", "0.65")),
+            refractory_ms=float(os.environ.get("PINCH_REFRACTORY_MS", "250")),
         )
         self._finger_dbg = os.environ.get("FINGER_DEBUG", "0") not in (
             "0", "", "false", "False",
@@ -181,14 +189,8 @@ class ActionHeadPublisher(threading.Thread):
         self._finger_source = os.environ.get("FINGER_SOURCE", "auto").lower()
         self._fdbg_n = 0
 
-    def _emit_fingers(self, t_now: float) -> None:
-        """Detect finger strikes and emit /pose/finger.
-
-        Source: iPhone Vision hands (stable, rotation-invariant) when fresh,
-        else MediaPipe hands from the (possibly rotated) video frame.
-        """
-        if not getattr(self, "_finger_enabled", False):
-            return
+    def _pick_hands(self) -> tuple[list, str, bool]:
+        """Return (hands, source_label, ip_fresh) per FINGER_SOURCE policy."""
         with self.state.lock():
             mp_hands = list(getattr(self.state, "persons_hands", None) or [])
             ip_hands = list(getattr(self.state, "persons_hands_iphone", None) or [])
@@ -196,11 +198,17 @@ class ActionHeadPublisher(threading.Thread):
         ip_fresh = bool(ip_hands) and (time.perf_counter() - ip_t) < 0.5
         src = getattr(self, "_finger_source", "auto")
         if src == "iphone":
-            hands, used = ip_hands, "iphone"
-        elif src == "mediapipe":
-            hands, used = mp_hands, "mediapipe"
-        else:
-            hands, used = (ip_hands, "iphone") if ip_fresh else (mp_hands, "mediapipe")
+            return ip_hands, "iphone", ip_fresh
+        if src == "mediapipe":
+            return mp_hands, "mediapipe", ip_fresh
+        return (ip_hands, "iphone", ip_fresh) if ip_fresh else (
+            mp_hands, "mediapipe", ip_fresh)
+
+    def _emit_fingers(self, t_now: float) -> None:
+        """Detect finger strikes (air-piano) and emit /pose/finger."""
+        if not getattr(self, "_finger_enabled", False):
+            return
+        hands, used, ip_fresh = self._pick_hands()
         events = self._finger_det.step(hands, t_now)
         if getattr(self, "_finger_dbg", False):
             self._fdbg_n += 1
@@ -209,6 +217,17 @@ class ActionHeadPublisher(threading.Thread):
                          used, len(hands), len(events), ip_fresh)
         for ev in events:
             self.bridge.send_finger(ev)
+
+    def _emit_pinch(self, t_now: float) -> None:
+        """Detect thumb-to-finger pinches (clip toggles) and emit /pose/pinch."""
+        if not getattr(self, "_finger_enabled", False):
+            return
+        hands, used, _ip = self._pick_hands()
+        for ev in self._pinch_det.step(hands, t_now):
+            if getattr(self, "_finger_dbg", False):
+                LOG.info("pinch dbg: src=%s hand=%d finger=%d",
+                         used, ev.hand, ev.finger)
+            self.bridge.send_pinch(ev)
 
     def _read_sources(self) -> tuple[
         list[tuple[int, np.ndarray, np.ndarray, float, np.ndarray]] | None,

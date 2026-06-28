@@ -7,6 +7,7 @@ fingers. Output feeds the OSC /pose/finger route consumed by SuperCollider.
 """
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
 
 from data_only_viz.hand_features import _clamp, _coord, _finite
@@ -15,6 +16,29 @@ from data_only_viz.hand_features import _clamp, _coord, _finite
 # (thumb, index, middle, ring, pinky). Thumb base = ThumbMP (2).
 FINGERTIPS: tuple[int, ...] = (4, 8, 12, 16, 20)
 FINGER_BASES: tuple[int, ...] = (2, 5, 9, 13, 17)
+
+# Pinch: thumb tip vs the 4 opposable finger tips (index..pinky).
+THUMB_TIP: int = 4
+WRIST: int = 0
+MIDDLE_MCP: int = 9
+PINCH_TIPS: tuple[int, ...] = (8, 12, 16, 20)
+
+
+def order_hands_by_cx(hands: list, max_slots: int) -> list:
+    """Return up to max_slots hand-landmark lists ordered leftmost-first
+    (slot 0 = L), matching HandFeatureExtractor / FingerStrikeDetector."""
+    cand = []
+    for lm in hands:
+        try:
+            if lm is None or len(lm) < 21:
+                continue
+        except TypeError:
+            continue
+        xs = [_finite(_coord(p, "x", 0), 0.5) for p in lm[:21]]
+        cx = _clamp(sum(xs) / len(xs), 0.0, 1.0)
+        cand.append((cx, lm))
+    cand.sort(key=lambda c: c[0])
+    return [lm for _cx, lm in cand[:max_slots]]
 
 
 @dataclass
@@ -98,4 +122,67 @@ class FingerStrikeDetector:
                 for f in range(5):
                     self._state[slot][f].prev_rel = None
                     self._state[slot][f].armed = True
+        return events
+
+
+@dataclass
+class PinchEvent:
+    hand: int          # 0 = left slot (leftmost cx), 1 = right slot
+    finger: int        # 1..4 = index, middle, ring, pinky (thumb is trigger)
+
+
+class _PinchState:
+    __slots__ = ("engaged", "last_t")
+
+    def __init__(self) -> None:
+        self.engaged: bool = False
+        self.last_t: float = -1e9
+
+
+class PinchDetector:
+    """Edge-triggered thumb-to-finger pinch with hysteresis.
+
+    Fires one PinchEvent when thumb tip contacts a finger tip (distance,
+    normalized by hand size, drops below ratio_on). Re-arms only after the
+    distance rises back above ratio_off, so one pinch = one event.
+    """
+
+    def __init__(self, ratio_on: float = 0.45, ratio_off: float = 0.65,
+                 refractory_ms: float = 250.0, history_slots: int = 2) -> None:
+        self.ratio_on = ratio_on
+        self.ratio_off = ratio_off
+        self.refractory_s = refractory_ms / 1000.0
+        self._state = [[_PinchState() for _ in range(4)]
+                       for _ in range(history_slots)]
+
+    def step(self, hands: list, t_now: float) -> list[PinchEvent]:
+        ordered = order_hands_by_cx(hands, len(self._state))
+        present = set(range(len(ordered)))
+        events: list[PinchEvent] = []
+        for slot, lm in enumerate(ordered):
+            tx = _finite(_coord(lm[THUMB_TIP], "x", 0), 0.5)
+            ty = _finite(_coord(lm[THUMB_TIP], "y", 1), 0.5)
+            wx = _finite(_coord(lm[WRIST], "x", 0), 0.5)
+            wy = _finite(_coord(lm[WRIST], "y", 1), 0.5)
+            mx = _finite(_coord(lm[MIDDLE_MCP], "x", 0), 0.5)
+            my = _finite(_coord(lm[MIDDLE_MCP], "y", 1), 0.5)
+            size = math.hypot(mx - wx, my - wy)
+            size = size if size > 1e-4 else 1e-4
+            for i, tip_idx in enumerate(PINCH_TIPS):
+                fx = _finite(_coord(lm[tip_idx], "x", 0), 0.5)
+                fy = _finite(_coord(lm[tip_idx], "y", 1), 0.5)
+                ratio = math.hypot(fx - tx, fy - ty) / size
+                st = self._state[slot][i]
+                if st.engaged:
+                    if ratio > self.ratio_off:
+                        st.engaged = False
+                elif ratio < self.ratio_on and (
+                        t_now - st.last_t) >= self.refractory_s:
+                    st.engaged = True
+                    st.last_t = t_now
+                    events.append(PinchEvent(hand=slot, finger=i + 1))
+        for slot in range(len(self._state)):
+            if slot not in present:
+                for i in range(4):
+                    self._state[slot][i].engaged = False
         return events

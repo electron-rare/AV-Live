@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from data_only_viz.finger_strike import (
     FingerStrikeDetector,
+    PinchDetector,
     StrikeEvent,
     FINGERTIPS,
     FINGER_BASES,
@@ -65,3 +66,60 @@ def test_strike_speed_scales_with_velocity():
     s = soft.step([_hand({1: 0.44})], t_now=0.04)   # delta 0.04
     h = hard.step([_hand({1: 0.50})], t_now=0.04)   # delta 0.10
     assert h[0].strike_speed > s[0].strike_speed
+
+
+def _pinch_hand(thumb_xy, index_xy):
+    """21-kp hand with fixed wrist & middle-MCP (hand size = 0.3). Middle/
+    ring/pinky tips are parked far from the thumb so only the thumb-index
+    pair can pinch."""
+    lm = [[0.5, 0.5, 0.0] for _ in range(21)]
+    lm[0] = [0.5, 0.8, 0.0]                       # WRIST
+    lm[9] = [0.5, 0.5, 0.0]                       # MIDDLE_MCP -> size 0.3
+    lm[4] = [thumb_xy[0], thumb_xy[1], 0.0]       # THUMB_TIP
+    lm[8] = [index_xy[0], index_xy[1], 0.0]       # INDEX_TIP
+    lm[12] = [0.9, 0.5, 0.0]                      # MIDDLE_TIP (far)
+    lm[16] = [0.9, 0.6, 0.0]                      # RING_TIP (far)
+    lm[20] = [0.9, 0.7, 0.0]                      # LITTLE_TIP (far)
+    return lm
+
+
+_OPEN = ((0.2, 0.5), (0.8, 0.5))     # thumb-index dist 0.6 -> ratio 2.0
+_PINCH = ((0.5, 0.5), (0.52, 0.5))   # dist 0.02 -> ratio 0.067
+
+
+def test_pinch_fires_on_thumb_index_contact():
+    det = PinchDetector(ratio_on=0.45, ratio_off=0.65)
+    assert det.step([_pinch_hand(*_OPEN)], 0.0) == []
+    ev = det.step([_pinch_hand(*_PINCH)], 0.1)
+    assert len(ev) == 1
+    assert ev[0].finger == 1     # index = finger 1
+    assert ev[0].hand == 0
+
+
+def test_pinch_does_not_refire_while_held():
+    det = PinchDetector(ratio_on=0.45, ratio_off=0.65, refractory_ms=0)
+    det.step([_pinch_hand(*_OPEN)], 0.0)
+    a = det.step([_pinch_hand(*_PINCH)], 0.1)   # fire
+    b = det.step([_pinch_hand(*_PINCH)], 0.2)   # still held -> no refire
+    assert len(a) == 1
+    assert b == []
+
+
+def test_pinch_rearms_after_release():
+    det = PinchDetector(ratio_on=0.45, ratio_off=0.65, refractory_ms=0)
+    det.step([_pinch_hand(*_OPEN)], 0.0)
+    a = det.step([_pinch_hand(*_PINCH)], 0.1)   # fire
+    det.step([_pinch_hand(*_OPEN)], 0.2)        # release (ratio > off)
+    c = det.step([_pinch_hand(*_PINCH)], 0.3)   # pinch again -> fire
+    assert len(a) == 1
+    assert len(c) == 1
+
+
+def test_pinch_refractory_blocks():
+    det = PinchDetector(ratio_on=0.45, ratio_off=0.65, refractory_ms=200)
+    det.step([_pinch_hand(*_OPEN)], 0.0)
+    a = det.step([_pinch_hand(*_PINCH)], 0.05)  # fire t=0.05
+    det.step([_pinch_hand(*_OPEN)], 0.08)       # release
+    b = det.step([_pinch_hand(*_PINCH)], 0.10)  # within 200 ms -> blocked
+    assert len(a) == 1
+    assert b == []
