@@ -62,3 +62,16 @@ button.sel { background: #246; border-color: #4af; color: #8cf; }
   border: 1px solid #333; border-radius: 4px; overflow: hidden; }
 .vu-bar { height: 100%; width: 0%; background: linear-gradient(to right, #2b6, #9d4, #fa0);
   border-radius: 4px; transition: width 0.08s linear; }
+
+/* --- Quantize selector --- */
+.quant-bar { display: flex; align-items: center; gap: 6px; margin: 8px 0; flex-wrap: wrap; }
+.quant-label { font-size: 13px; color: #888; flex-shrink: 0; }
+.quant-btn { width: auto; padding: 8px 14px; font-size: 14px; flex-shrink: 0; }
+.quant-btn.active { background: #246; color: #8cf; border-color: #4af; font-weight: 700; }
+
+/* --- Queued state blink --- */
+@keyframes queued-blink {
+  from { opacity: 1; }
+  to   { opacity: 0.35; }
+}
+button.queued { animation: queued-blink 600ms ease-in-out infinite alternate; }

@@ -6,11 +6,16 @@ function send(address, ...args) {
   if (ws.readyState === 1) ws.send(JSON.stringify({ address, args }));
 }
 const armed = new Set();
+const clipState = new Map(); // name -> last-known state int: 0 off, 1 playing, 2 queued-launch, 3 queued-stop
 function togglePad(el, name) {
-  const on = !armed.has(name);
-  on ? armed.add(name) : armed.delete(name);
-  el.classList.toggle("armed", on);
-  send("/launch", name, on ? 1 : 0);
+  // Use last-known state for toggle direction; fall back to armed Set
+  const st = clipState.has(name) ? clipState.get(name) : (armed.has(name) ? 1 : 0);
+  // launch (1) when off or queued-stop; stop (0) when playing or queued-launch
+  const launch = (st === 0 || st === 3);
+  // optimistic feedback — authoritative update comes from /armed feedback
+  el.classList.add("queued");
+  if (launch) el.classList.add("armed");
+  send("/launch", name, launch ? 1 : 0);
 }
 
 // --- Feedback: engine -> browser ---
@@ -23,13 +28,16 @@ ws.addEventListener("message", (ev) => {
   if (!msg || typeof msg.address !== "string") return;
   const { address, args } = msg;
 
-  // /armed/<name> — engine is source of truth for arm state
+  // /armed/<name> — engine is source of truth; args[0] is a state int 0-3
+  // 0 = off, 1 = playing (solid), 2 = queued-launch (blink), 3 = queued-stop (blink)
   if (address.startsWith("/armed/")) {
     const name = address.slice(7); // strip "/armed/"
-    const isArmed = args[0] === 1;
-    if (isArmed) armed.add(name); else armed.delete(name);
+    const st = Number(args[0]);
+    clipState.set(name, st);
+    if (st >= 1) armed.add(name); else armed.delete(name);
     document.querySelectorAll(`[data-pad="${name}"]`).forEach((btn) => {
-      btn.classList.toggle("armed", isArmed);
+      btn.classList.toggle("armed", st >= 1);
+      btn.classList.toggle("queued", st === 2 || st === 3);
     });
     return;
   }
@@ -309,6 +317,14 @@ document.addEventListener("DOMContentLoaded", () => {
   // Filter
   const filt = document.getElementById("filter");
   filt && filt.addEventListener("input", () => send("/control/fx/filter", +filt.value));
+
+  // Quantize selector
+  document.querySelectorAll(".quant-btn").forEach(btn =>
+    btn.addEventListener("click", () => {
+      document.querySelectorAll(".quant-btn").forEach(b => b.classList.remove("active"));
+      btn.classList.add("active");
+      send("/launch/quant", +btn.dataset.quant);
+    }));
 
   // Clear
   document.getElementById("clear").addEventListener("click", () => {
