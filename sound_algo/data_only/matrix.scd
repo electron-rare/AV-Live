@@ -588,7 +588,7 @@ OSCdef(\mat_steps_get, { |msg, time, addr|
             ((raw.isArray.not) and: { raw[\mods].notNil }).if({
                 raw[\mods].do { |m, vi|
                     (m != \none and: { m.isArray and: { m.size == 3 } and: { vi < ~matVoices.size } }).if({
-                        (1..6).do { |c| ~matColorDefs[vi][c][\mod] = (source: m[0], target: m[1], depth: m[2]) }
+                        (1..6).do { |c| (~matColorDefs[vi][c][\mod].isNil).if({ ~matColorDefs[vi][c][\mod] = (source: m[0], target: m[1], depth: m[2]) }) }
                     })
                 }
             });
@@ -597,7 +597,7 @@ OSCdef(\mat_steps_get, { |msg, time, addr|
                     (list.isArray and: { vi < ~matVoices.size }).if({
                         list.do { |b| (b.isArray and: { b.size == 3 }).if({
                             var c = b[2].asInteger.clip(1, 6);
-                            ~matColorDefs[vi][c][\pose] = ~matColorDefs[vi][c][\pose] ++ [ (poseId: b[0], action: b[1]) ]
+                            (~matColorDefs[vi][c][\pose].isEmpty).if({ ~matColorDefs[vi][c][\pose] = ~matColorDefs[vi][c][\pose] ++ [ (poseId: b[0], action: b[1]) ] })
                         }) }
                     })
                 }
@@ -722,9 +722,13 @@ OSCdef(\mat_colormod, { |msg, time, addr|
         (msg[3] ? \none).asSymbol, (msg[4] ? \none).asSymbol, (msg[5] ? 0).asFloat)
 }, '/matrix/colormod');
 OSCdef(\mat_colorpose, { |msg, time, addr|
+    var vi = (msg[1] ? 0).asInteger, color = (msg[2] ? 1).asInteger, n = (msg[3] ? 0).asInteger;
     ~toscTouch !? { ~toscTouch.(addr) };
-    ~matSetColorPose.((msg[1] ? 0).asInteger, (msg[2] ? 1).asInteger,
-        (msg[3] ? \none).asSymbol, (msg[4] ? \trigger).asSymbol)
+    ((vi >= 0 and: { vi < ~matVoices.size }) and: { color >= 1 and: { color <= 6 } }).if({
+        ~matColorDefs[vi][color][\pose] = Array.fill(n, { |k|
+            (poseId: (msg[4 + (k * 2)] ? \none).asSymbol, action: (msg[5 + (k * 2)] ? \trigger).asSymbol) });
+        ~matColorPosePush.(vi, color)
+    })
 }, '/matrix/colorpose');
 OSCdef(\mat_colorpose_get, { |msg, time, addr|
     ~toscTouch !? { ~toscTouch.(addr) };

@@ -480,6 +480,17 @@ pass = pass and: { ~matColorDefs[4][1][\mod][\target] == \cutoff };   // voice m
 pass = pass and: { ~matColorDefs[4][3][\pose][0][\poseId] == \poseL }; // pose -> its color
 File.delete(~matDir +/+ "legc.matrix");
 
+// colorpose OSCdef list-format parse (web sends vi color n pairs)
+~cpMsg = ["/matrix/colorpose", 5, 2, 2, "poseA", "trigger", "poseB", "gate"];
+~matColorDefs[5][2][\pose] = Array.fill((~cpMsg[3]).asInteger, { |k|
+    (poseId: (~cpMsg[4 + (k*2)]).asSymbol, action: (~cpMsg[5 + (k*2)]).asSymbol) });
+pass = pass and: { ~matColorDefs[5][2][\pose].size == 2 };
+pass = pass and: { ~matColorDefs[5][2][\pose][1][\poseId] == \poseB };
+pass = pass and: { ~matColorDefs[5][2][\pose][1][\action] == \gate };
+// n=0 clears
+~matColorDefs[5][2][\pose] = Array.fill(0, { nil });
+pass = pass and: { ~matColorDefs[5][2][\pose].isEmpty };
+
 pass.if(
     { "TEST PASS".postln },
     { "TEST FAIL".postln }
