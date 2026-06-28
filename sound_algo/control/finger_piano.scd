@@ -7,6 +7,10 @@
 //  la vitesse de frappe donne la velocite. Module aussi des params globaux
 //  depuis l'ecart des mains (~handFeat[\dist]).
 //
+//  NOTE : ~fpOff coupe UNIQUEMENT le declenchement des notes. La
+//  modulation continue (~fpModTick) tourne des que le fichier est charge,
+//  via le hook dans data_feeds.scd \poseHands (sorties sur ~fpCutBus/~fpFxBus).
+//
 //  Charge par data_only/boot.scd et boot.data-only.scd apres data_feeds.scd.
 //  Un seul bloc top-level (compatible .load).
 // =====================================================================
@@ -91,6 +95,8 @@ OSCdef(\poseFinger, { |msg|
 // ---------- API LIVE (env-direct wrappers) ------------------------------
 ~fpOn        = { ~fpEnabled = true;  "[fp] air-piano ON".postln; };
 ~fpOff       = { ~fpEnabled = false; "[fp] air-piano OFF".postln; };
+// ATTENTION : choisir un SynthDef gate/doneAction:2 (ex \pluck, \lead).
+// Un SynthDef sans gate ne sera jamais libere par le gate=0 differe -> note bloquee.
 ~fpInst_     = { |sym| ~fpInst = sym; ("[fp] inst = " ++ sym).postln; };
 ~fpScale_    = { |name|
     ~fpScaleArr = ~fpScales[name] ? ~fpScaleArr;
