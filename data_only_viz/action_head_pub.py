@@ -100,6 +100,7 @@ class ActionHeadPublisher(threading.Thread):
         self._last_pids: set[int] = set()
         from data_only_viz.hand_features import HandFeatureExtractor
         self._hand_ext = HandFeatureExtractor()
+        self._init_finger_piano()
 
     def stop(self) -> None:
         self._stop.set()
@@ -145,6 +146,7 @@ class ActionHeadPublisher(threading.Thread):
             self.bridge.send_leave(pid=gone)
         self._last_pids = current_pids
         self._emit_hands(t_now)
+        self._emit_fingers(t_now)
 
     def _emit_hands(self, t_now: float) -> None:
         """Lock state, extract hand features, emit /pose/hands once per tick."""
@@ -158,6 +160,28 @@ class ActionHeadPublisher(threading.Thread):
         with self.state.lock():
             self.state.hand_feats = feats
         self.bridge.send_hands(feats, t_now)
+
+    def _init_finger_piano(self) -> None:
+        """Read FINGER_PIANO env config and build the strike detector."""
+        import os
+        from data_only_viz.finger_strike import FingerStrikeDetector
+        self._finger_enabled = os.environ.get("FINGER_PIANO", "0") not in (
+            "0", "", "false", "False",
+        )
+        vel = float(os.environ.get("FINGER_STRIKE_VEL", "0.02"))
+        refr = float(os.environ.get("FINGER_STRIKE_REFRACTORY_MS", "120"))
+        self._finger_det = FingerStrikeDetector(
+            vel_thresh=vel, refractory_ms=refr,
+        )
+
+    def _emit_fingers(self, t_now: float) -> None:
+        """Detect finger strikes on persons_hands and emit /pose/finger."""
+        if not getattr(self, "_finger_enabled", False):
+            return
+        with self.state.lock():
+            hands = list(getattr(self.state, "persons_hands", None) or [])
+        for ev in self._finger_det.step(hands, t_now):
+            self.bridge.send_finger(ev)
 
     def _read_sources(self) -> tuple[
         list[tuple[int, np.ndarray, np.ndarray, float, np.ndarray]] | None,
