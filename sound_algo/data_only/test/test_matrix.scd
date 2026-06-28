@@ -62,6 +62,21 @@ try {
     ("EXCEPTION in ~matStop: " ++ e.class.name).postln
 };
 
+// ~matEmitTrig must be defined and emit /matrix/trig with amp clipped to 0..1
+pass = pass and: { ~matEmitTrig.notNil };
+~trigLog = nil;
+~toscSend = { |path ...args| ~trigLog = ([path] ++ args) };  // capturing stub
+try {
+    ~matEmitTrig.(3, 1.5)
+} { |e|
+    pass = false;
+    ("EXCEPTION in ~matEmitTrig: " ++ e.class.name).postln
+};
+pass = pass and: { ~trigLog.notNil };
+pass = pass and: { ~trigLog[0] == "/matrix/trig" };
+pass = pass and: { ~trigLog[1] == 3 };
+pass = pass and: { ~trigLog[2] == 1.0 };   // 1.5 clipped to 1.0
+
 pass.if(
     { "TEST PASS".postln },
     { "TEST FAIL".postln }
