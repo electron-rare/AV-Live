@@ -11,7 +11,17 @@
 //  1. SETUP -- evalue UNE FOIS au demarrage de la session
 // =====================================================================
 (
-s.waitForBoot {
+// Setter de tempo unique et coordonne : une seule horloge
+// (TempoClock.default). Tous les controleurs runtime passent par ici.
+~setTempo = { |bpm|
+    ~bpm = bpm.clip(20, 300);
+    TempoClock.default.tempo = ~bpm / 60;
+    ("[tempo] " ++ ~bpm ++ " BPM").postln;
+    ~bpm;
+};
+
+// Protection defensive : evite la propagation si le boot reseau echoue
+try { s.waitForBoot {
 
     // ----- Acid 303 -----
     // Env ADSR sur l'amp avec doneAction:2 -- garanti pas de fuite
@@ -294,6 +304,6 @@ s.waitForBoot {
     //   (charges automatiquement par 00_load.scd > CHARGER TOUT)
 
     "=== setup OK -- lance le bloc PLAY ===".postln;
-};
+} } { |e| ("[engine] avertissement boot serveur : " ++ e.errorString).postln };
 )
 

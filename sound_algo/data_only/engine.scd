@@ -25,6 +25,15 @@
 ~doMaster   !? { ~doMaster.free };
 ~doMasterGroup !? { ~doMasterGroup.free };
 
+// Setter de tempo unique et coordonne : une seule horloge
+// (TempoClock.default). Tous les controleurs runtime passent par ici.
+~setTempo = { |bpm|
+    ~bpm = bpm.clip(20, 300);
+    TempoClock.default.tempo = ~bpm / 60;
+    ("[tempo] " ++ ~bpm ++ " BPM").postln;
+    ~bpm;
+};
+
 s.waitForBoot {
     var rate = s.sampleRate;
 
