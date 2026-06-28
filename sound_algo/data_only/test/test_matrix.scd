@@ -8,6 +8,7 @@ var featureFile = PathName(thisProcess.nowExecutingPath).pathOnly
     ++ "../matrix.scd";
 var pass      = true;
 var variation = nil;
+var glowPat   = nil;
 
 // Minimal dummy environment
 ~lp = (
@@ -104,6 +105,41 @@ pass = pass and: {
 };
 
 File.delete(~matDir +/+ "test_grid.matrix");
+
+// ~matEmitTrig must be defined and emit /matrix/trig with amp clipped to 0..1
+pass = pass and: { ~matEmitTrig.notNil };
+~trigLog = nil;
+~toscSend = { |path ...args| ~trigLog = ([path] ++ args) };  // capturing stub
+try {
+    ~matEmitTrig.(3, 1.5)
+} { |e|
+    pass = false;
+    ("EXCEPTION in ~matEmitTrig: " ++ e.class.name).postln
+};
+pass = pass and: { ~trigLog.notNil };
+pass = pass and: { ~trigLog[0] == "/matrix/trig" };
+pass = pass and: { ~trigLog[1] == 3 };
+pass = pass and: { ~trigLog[2] == 1.0 };   // 1.5 clipped to 1.0
+
+// Integration test: consuming a ~matVariation pattern fires ~matEmitTrig via \matGlow
+~trigLog = nil;
+~toscSend = { |path ...args| ~trigLog = ([path] ++ args) };  // reset capturing stub
+try {
+    glowPat = ~matVariation.(\kick, 2, 5)
+} { |e|
+    pass = false;
+    ("EXCEPTION building matVariation for matGlow test: " ++ e.class.name).postln
+};
+try {
+    glowPat.asStream.next(())
+} { |e|
+    pass = false;
+    ("EXCEPTION consuming matGlow: " ++ e.class.name).postln
+};
+pass = pass and: { ~trigLog.notNil };
+pass = pass and: { ~trigLog[0] == "/matrix/trig" };
+pass = pass and: { ~trigLog[1] == 5 };
+pass = pass and: { ~trigLog[2] == 1.0 };  // color 2 spec[\amp]=1.0; base has no \amp
 
 pass.if(
     { "TEST PASS".postln },

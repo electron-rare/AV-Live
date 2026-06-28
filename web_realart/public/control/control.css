@@ -113,7 +113,10 @@ button.queued { animation: queued-blink 600ms ease-in-out infinite alternate; }
 .mcell.m5 { background: #c60;   border-color: #e80; }
 .mcell.m6 { background: #82a;   border-color: #a4d; }
 .mcell.playing { box-shadow: 0 0 0 2px rgba(255,255,255,0.28),
-  inset 0 0 0 1px rgba(255,255,255,0.40); }
+  inset 0 0 0 1px rgba(255,255,255,0.40),
+  0 0 calc(var(--glow, 0) * 12px) calc(var(--glow, 0) * 4px)
+    rgba(255,255,255, calc(var(--glow, 0) * 0.7));
+  filter: brightness(calc(1 + var(--glow, 0) * 0.9)); }
 
 /* --- Matrix persistence bar --- */
 .matrix-persist { display: flex; align-items: center; gap: 6px; margin: 8px 0; flex-wrap: wrap; }

@@ -50,7 +50,7 @@ File.exists(~matDir).not.if({ ("mkdir -p " ++ ~matDir.quote).systemCmd });
 // NOTE: voices that compute \freq via Pfunc (ignoring \octave) will not respond
 // to the octave variation — acceptable for v1; tune the palette at the live gate.
 // Single function so all variation logic lives in one place.
-~matVariation = { |name, color|
+~matVariation = { |name, color, vi = 0|
     (color == 0).if({ nil }, {
         var base = ~matBaseFor.(name);
         base.notNil.if({
@@ -66,6 +66,10 @@ File.exists(~matDir).not.if({ ("mkdir -p " ++ ~matDir.quote).systemCmd });
             spec.notNil.if({
                 Pchain(
                     Pbind(
+                        \matGlow, Pfunc { |e|
+                            ~matEmitTrig.(vi, (e[\amp] ? spec[\amp]).clip(0, 1));
+                            0
+                        },
                         \stretch, spec[\stretch],
                         \octave,  spec[\octave],
                         \amp,     spec[\amp]
@@ -91,7 +95,7 @@ File.exists(~matDir).not.if({ ("mkdir -p " ++ ~matDir.quote).systemCmd });
                 },
                 {
                     (color != ~matLastColor[vi]).if({
-                        var pat = ~matVariation.(name, color);
+                        var pat = ~matVariation.(name, color, vi);
                         pat.notNil.if({
                             ~matLastColor[vi] = color;
                             Pdef(key, pat);
@@ -110,6 +114,12 @@ File.exists(~matDir).not.if({ ("mkdir -p " ++ ~matDir.quote).systemCmd });
 // -- ~matPush : push playhead position to all TouchOSC clients --
 ~matPush = {
     ~toscSend !? { ~toscSend.("/matrix/playhead", ~lp[\matBar]) }
+};
+
+// -- ~matEmitTrig : push a per-note amplitude pulse to web/TouchOSC clients --
+// vi = voice index, amp clipped to 0..1. Same ~toscSend path as /matrix/playhead.
+~matEmitTrig = { |vi, amp|
+    ~toscSend !? { ~toscSend.("/matrix/trig", vi, amp.clip(0, 1)) }
 };
 
 // -- ~matStop : halt the playhead Routine and silence all matrix voices --

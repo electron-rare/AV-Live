@@ -192,6 +192,12 @@ ws.addEventListener("message", (ev) => {
     renderMatrix();
     return;
   }
+
+  // /matrix/trig <vi> <amp> — per-note pulse: glow the active cell of voice vi
+  if (address === "/matrix/trig") {
+    triggerGlow(Math.round(Number(args[0])), Number(args[1]));
+    return;
+  }
 });
 
 // --- Matrix (16-voice x 32-bar song arranger) ---
@@ -282,6 +288,62 @@ function renderMatrix() {
       row.appendChild(cell);
     }
     container.appendChild(row);
+  }
+}
+
+// --- Matrix audio-reactive glow (trigger envelope; math in matrix_glow.js) ---
+const voiceLevel = new Array(MATRIX_VOICES.length).fill(0);
+let glowRaf = null;
+let glowLastTs = 0;
+let glowAppliedBar = -1;
+
+function clearGlowColumn(bar) {
+  if (bar < 0) return;
+  for (let vi = 0; vi < MATRIX_VOICES.length; vi++) {
+    const el = cellRefs[bar][vi];
+    if (el) el.style.removeProperty("--glow");
+  }
+}
+
+function glowFrame(ts) {
+  const decay = window.MatrixGlow ? window.MatrixGlow.nextGlow : (l) => 0;
+  const dt = glowLastTs ? (ts - glowLastTs) : (1000 / 60);
+  glowLastTs = ts;
+  if (matPlayhead !== glowAppliedBar) {
+    clearGlowColumn(glowAppliedBar);
+    glowAppliedBar = matPlayhead;
+  }
+  let anyActive = false;
+  for (let vi = 0; vi < MATRIX_VOICES.length; vi++) {
+    const lvl = decay(voiceLevel[vi], dt);
+    voiceLevel[vi] = lvl;
+    if (matPlayhead >= 0) {
+      const el = cellRefs[matPlayhead][vi];
+      if (el) {
+        if (lvl > 0) el.style.setProperty("--glow", lvl.toFixed(3));
+        else el.style.removeProperty("--glow");
+      }
+    }
+    if (lvl > 0) anyActive = true;
+  }
+  if (anyActive) {
+    glowRaf = requestAnimationFrame(glowFrame);
+  } else {
+    clearGlowColumn(glowAppliedBar);
+    glowRaf = null;
+    glowLastTs = 0;
+    glowAppliedBar = -1;
+  }
+}
+
+function triggerGlow(vi, amp) {
+  if (!Number.isInteger(vi) || vi < 0 || vi >= MATRIX_VOICES.length) return;
+  const a = Math.max(0, Math.min(1, amp));
+  if (a <= 0) return;
+  voiceLevel[vi] = Math.max(voiceLevel[vi], a);
+  if (glowRaf === null) {
+    glowLastTs = 0;
+    glowRaf = requestAnimationFrame(glowFrame);
   }
 }
 
