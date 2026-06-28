@@ -369,6 +369,24 @@ class PoseSoundBridge:
             pass
         self._vj("/pose/hands", args)
 
+    def send_finger(self, ev) -> None:
+        """Emit one air-piano strike event. Not throttled: the detector's
+        refractory window already rate-limits these."""
+        args = [
+            0,                          # pid (single performer)
+            int(ev.hand),
+            int(ev.finger),
+            float(ev.strike_speed),
+            float(ev.z),
+            float(ev.tipx),
+            float(ev.tipy),
+        ]
+        try:
+            self._client.send_message("/pose/finger", args)
+        except OSError:
+            pass
+        self._vj("/pose/finger", args)
+
     def send_enter(self, pid: int) -> None:
         """Send lifecycle event when person enters frame."""
         self._client.send_message("/pose/enter", [int(pid)])
