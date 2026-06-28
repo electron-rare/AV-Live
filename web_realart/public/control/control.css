@@ -114,3 +114,15 @@ button.queued { animation: queued-blink 600ms ease-in-out infinite alternate; }
 .mcell.m6 { background: #82a;   border-color: #a4d; }
 .mcell.playing { box-shadow: 0 0 0 2px rgba(255,255,255,0.28),
   inset 0 0 0 1px rgba(255,255,255,0.40); }
+
+/* --- Matrix persistence bar --- */
+.matrix-persist { display: flex; align-items: center; gap: 6px; margin: 8px 0; flex-wrap: wrap; }
+.matrix-name-input { flex: 1; min-width: 100px; background: #1a1a2e; color: #9af;
+  border: 1px solid #335; border-radius: 6px; padding: 8px 10px; font-size: 14px; }
+.matrix-name-input:focus { outline: none; border-color: #4af; }
+.matrix-list-select { flex: 1; min-width: 100px; background: #1a1a2e; color: #9af;
+  border: 1px solid #335; border-radius: 6px; padding: 7px 6px; font-size: 14px;
+  cursor: pointer; -webkit-appearance: none; appearance: none; }
+.mat-action-btn { width: auto; padding: 8px 14px; font-size: 14px; flex-shrink: 0; }
+.mat-refresh-btn { width: auto; padding: 8px 12px; font-size: 16px; flex-shrink: 0;
+  background: #1a2a1a; border-color: #2a4a2a; color: #4d9; }
