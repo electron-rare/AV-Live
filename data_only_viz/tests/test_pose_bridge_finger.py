@@ -26,3 +26,11 @@ def test_send_finger_emits_expected_osc():
     assert args[2] == 2           # finger
     assert abs(args[3] - 0.5) < 1e-6
     assert len(args) == 7
+    # Verify z, tipx, tipy values
+    assert abs(args[4] - 0.1) < 1e-6     # z
+    assert abs(args[5] - 0.7) < 1e-6     # tipx
+    assert abs(args[6] - 0.6) < 1e-6     # tipy
+    # types matter for OSC tags / the SC ~fpResolve reader
+    assert isinstance(args[0], int) and not isinstance(args[0], bool)
+    assert isinstance(args[1], int) and isinstance(args[2], int)
+    assert all(isinstance(a, float) for a in args[3:7])
