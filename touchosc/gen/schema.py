@@ -87,9 +87,29 @@ def const(s):
     return Partial("CONSTANT", "STRING", s)
 
 
+def consti(n):
+    """A CONSTANT/INTEGER partial — a fixed integer arg."""
+    return Partial("CONSTANT", "INTEGER", str(n))
+
+
+def constf(x):
+    """A CONSTANT/FLOAT partial — a fixed float arg."""
+    return Partial("CONSTANT", "FLOAT", str(x))
+
+
 def val():
-    """A VALUE/FLOAT partial bound to the control's ``x`` value."""
+    """A VALUE/FLOAT partial bound to the control's ``x`` value (scale 0..1)."""
     return Partial("VALUE", "FLOAT", "x")
+
+
+def vali():
+    """A VALUE/INTEGER partial — control value as int (button 0/1)."""
+    return Partial("VALUE", "INTEGER", "x")
+
+
+def valf(scale_min=0, scale_max=1):
+    """A VALUE/FLOAT partial with a custom scale range (e.g. tempo 60..200)."""
+    return Partial("VALUE", "FLOAT", "x", scale_min, scale_max)
 
 
 def _trigger(var="x", condition="ANY"):
