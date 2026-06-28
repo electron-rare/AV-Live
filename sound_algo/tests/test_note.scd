@@ -18,6 +18,16 @@ if(~noteFor.(-1, \minor, 60, 0) != 58) { ok = false; "FAIL: neg".postln };
 // freq matches midicps
 if(~freqFor.(0, \minorPent, 60, 0) != 60.midicps) { ok = false; "FAIL: freq".postln };
 
+// ~ccNote parity: wrapper must match the historical formula
+~ccHarmony = (root: 45, scale: \minor, pad: \dark, phrase: 0, octave: 0);
+~ccScales = ~scales;
+~ccNote = { |degree, oct = 0|
+    ~noteFor.(degree, ~ccHarmony[\scale] ? \minor,
+        ~ccHarmony[\root] ? 45, (~ccHarmony[\octave] ? 0) + oct);
+};
+if(~ccNote.(2, 0) != 48) { ok = false; "FAIL: ccNote 48".postln };
+if(~ccNote.(0, 1) != 57) { ok = false; "FAIL: ccNote oct".postln };
+
 if(ok) { "PASS test_note".postln } { "TESTS FAILED".postln };
 0.exit;
 )

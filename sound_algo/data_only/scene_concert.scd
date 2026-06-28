@@ -69,16 +69,13 @@
 };
 
 // -- harmony state --
-~ccScales = (
-    minor:    [0,2,3,5,7,8,10], dorian: [0,2,3,5,7,9,10],
-    phrygian: [0,1,3,5,7,8,10], penta:  [0,2,4,7,9]);
+// Gammes + resolution degree->note : delegue a palette/note.scd (~noteFor).
+// ~ccScales reste un alias de ~scales pour les lecteurs externes.
+~ccScales = ~scales ? ~ccScales;
 ~ccHarmony = ~ccHarmony ? (root: 45, scale: \minor, pad: \dark, phrase: 0, octave: 0);
 ~ccNote = { |degree, oct=0|
-    var sc = ~ccScales[~ccHarmony[\scale]] ? ~ccScales[\minor];
-    var d  = degree.asInteger;
-    (~ccHarmony[\root] ? 45)
-        + (((~ccHarmony[\octave] ? 0) + oct + (d div: sc.size)) * 12)
-        + sc[d % sc.size];
+    ~noteFor.(degree, ~ccHarmony[\scale] ? \minor,
+        ~ccHarmony[\root] ? 45, (~ccHarmony[\octave] ? 0) + oct);
 };
 
 // -- registre des morceaux --
