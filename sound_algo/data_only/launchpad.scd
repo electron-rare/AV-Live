@@ -91,7 +91,7 @@ SynthDef(\lp_sweep, { |out=0, amp=0.0, gate=1|
 s.sync;
 
 ~lp = ~lp ? ();
-~lp[\clock] = ~lp[\clock] ? TempoClock(126/60).permanent_(true);
+~lp[\clock] = TempoClock.default;   // horloge unique (Lot C)
 ~lp[\armed] = ~lp[\armed] ? Set.new;
 ~lp[\vol]       = ~lp[\vol]       ? IdentityDictionary.new;
 ~lp[\quant]     = ~lp[\quant]     ? 4;

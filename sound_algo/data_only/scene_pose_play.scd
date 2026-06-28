@@ -86,7 +86,7 @@
     start: {
         if(~bpEngine[\running]) { "[bp] deja en cours".postln } {
             ~bpEngine[\running] = true;
-            ~bpEngine[\clock] = TempoClock(100/60).permanent_(true);
+            ~bpEngine[\clock] = TempoClock.default;   // horloge unique (Lot C)
             ~bpEngine[\pad] = Synth(\bp_pad, [\freq, ~bpModes[\pulse][\root].midicps, \amp, 0.0]);
             ~bpEngine[\routine] = Routine({
                 var beatCount = 0;
