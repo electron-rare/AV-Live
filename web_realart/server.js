@@ -114,7 +114,7 @@ feedbackPort.on("ready", () => {
     console.log(`[feedback] ecoute :${FEEDBACK_PORT_IN} <- SC engine`);
 });
 
-const FEEDBACK_PREFIXES = ["/armed/", "/sync/", "/seq/"];
+const FEEDBACK_PREFIXES = ["/armed/", "/sync/", "/seq/", "/scene/"];
 feedbackPort.on("message", (oscMsg) => {
     if (!FEEDBACK_PREFIXES.some((p) => oscMsg.address.startsWith(p))) return;
     broadcast({ address: oscMsg.address, args: oscMsg.args });
