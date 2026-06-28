@@ -260,7 +260,7 @@ function renderMatrix() {
 }
 
 // --- Matrix audio-reactive glow (trigger envelope; math in matrix_glow.js) ---
-const voiceLevel = new Array(16).fill(0);
+const voiceLevel = new Array(MATRIX_VOICES.length).fill(0);
 let glowRaf = null;
 let glowLastTs = 0;
 let glowAppliedBar = -1;
@@ -282,7 +282,7 @@ function glowFrame(ts) {
     glowAppliedBar = matPlayhead;
   }
   let anyActive = false;
-  for (let vi = 0; vi < 16; vi++) {
+  for (let vi = 0; vi < MATRIX_VOICES.length; vi++) {
     const lvl = decay(voiceLevel[vi], dt);
     voiceLevel[vi] = lvl;
     if (matPlayhead >= 0) {
@@ -305,7 +305,7 @@ function glowFrame(ts) {
 }
 
 function triggerGlow(vi, amp) {
-  if (!Number.isInteger(vi) || vi < 0 || vi >= 16) return;
+  if (!Number.isInteger(vi) || vi < 0 || vi >= MATRIX_VOICES.length) return;
   const a = Math.max(0, Math.min(1, amp));
   if (a <= 0) return;
   voiceLevel[vi] = Math.max(voiceLevel[vi], a);
