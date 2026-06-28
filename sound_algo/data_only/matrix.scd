@@ -4,6 +4,8 @@
 // A playhead Routine advances bar-by-bar on the launchpad clock, applying cells.
 // Colors 1-6 map to Pchain overlays (\stretch / \octave / \amp). 0 = Pdef.stop.
 // Loaded after sections.scd (boot step 6i). Idempotent reload, nil-guarded.
+// NOTE: the \amp variation override bypasses ~lpVol per-voice volume; web vol sliders
+//       have no effect while a matrix variation plays — deferred to v2.
 (
 
 // -- Env init (nil-guarded; idempotent reload) --
@@ -20,6 +22,7 @@
 ~lp[\matPlaying] = ~lp[\matPlaying] ? false;
 ~matBase        = ~matBase        ? IdentityDictionary.new;
 ~matBeatsPerBar = ~matBeatsPerBar ? 4;
+~matLastColor   = ~matLastColor   ? Array.fill(~matVoices.size, -1);
 
 // -- ~matBaseFor : capture base Pdef source once (lazy, per voice name symbol) --
 // Returns nil when the Pdef is missing (safe for partial environments).
@@ -42,28 +45,30 @@
 // to the octave variation — acceptable for v1; tune the palette at the live gate.
 // Single function so all variation logic lives in one place.
 ~matVariation = { |name, color|
-    var base = ~matBaseFor.(name);
-    base.notNil.if({
-        var spec = [
-            nil,
-            (stretch: 1.0, octave:  0, amp: 1.0),
-            (stretch: 0.5, octave:  0, amp: 1.0),
-            (stretch: 1.0, octave:  1, amp: 1.0),
-            (stretch: 2.0, octave:  0, amp: 1.0),
-            (stretch: 1.0, octave: -1, amp: 1.05),
-            (stretch: 0.5, octave:  0, amp: 1.2)
-        ][color];
-        spec.notNil.if({
-            Pchain(
-                Pbind(
-                    \stretch, spec[\stretch],
-                    \octave,  spec[\octave],
-                    \amp,     spec[\amp]
-                ),
-                base
-            )
-        }, { base })
-    }, { nil })
+    (color == 0).if({ nil }, {
+        var base = ~matBaseFor.(name);
+        base.notNil.if({
+            var spec = [
+                nil,
+                (stretch: 1.0, octave:  0, amp: 1.0),
+                (stretch: 0.5, octave:  0, amp: 1.0),
+                (stretch: 1.0, octave:  1, amp: 1.0),
+                (stretch: 2.0, octave:  0, amp: 1.0),
+                (stretch: 1.0, octave: -1, amp: 1.05),
+                (stretch: 0.5, octave:  0, amp: 1.2)
+            ][color];
+            spec.notNil.if({
+                Pchain(
+                    Pbind(
+                        \stretch, spec[\stretch],
+                        \octave,  spec[\octave],
+                        \amp,     spec[\amp]
+                    ),
+                    base
+                )
+            }, { base })
+        }, { nil })
+    })
 };
 
 // -- ~matApplyBar : set each voice's Pdef to its cell color and (re)play or stop --
@@ -74,15 +79,21 @@
         var key   = ("lp_" ++ name).asSymbol;
         Pdef.all.includesKey(key).if({
             (color == 0).if(
-                { Pdef(key).stop },
                 {
-                    var pat = ~matVariation.(name, color);
-                    pat.notNil.if({
-                        Pdef(key, pat);
-                        Pdef(key).play(
-                            ~lp[\clock] ? TempoClock.default,
-                            quant: ~matBeatsPerBar
-                        )
+                    Pdef(key).stop;
+                    ~matLastColor[vi] = 0
+                },
+                {
+                    (color != ~matLastColor[vi]).if({
+                        var pat = ~matVariation.(name, color);
+                        pat.notNil.if({
+                            ~matLastColor[vi] = color;
+                            Pdef(key, pat);
+                            Pdef(key).play(
+                                ~lp[\clock] ? TempoClock.default,
+                                quant: ~matBeatsPerBar
+                            )
+                        })
                     })
                 }
             )
@@ -103,6 +114,7 @@
         var k = ("lp_" ++ name).asSymbol;
         Pdef.all.includesKey(k).if({ Pdef(k).stop })
     };
+    ~matVoices.size.do { |i| ~matLastColor[i] = -1 };
     ~matPush.()
 };
 

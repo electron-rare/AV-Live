@@ -182,7 +182,8 @@ function loadMatState() {
       const parsed = JSON.parse(raw);
       if (
         Array.isArray(parsed) && parsed.length === 16 &&
-        parsed.every(row => Array.isArray(row) && row.length === 32)
+        parsed.every(row => Array.isArray(row) && row.length === 32 &&
+          row.every(v => Number.isInteger(v) && v >= 0 && v <= 6))
       ) {
         matGrid = parsed;
         return;
