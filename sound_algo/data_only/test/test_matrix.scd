@@ -415,6 +415,32 @@ pass = pass and: { ~matLoad.("sleg") };
 pass = pass and: { ~matStepsEmpty.(~matColorDefs[4][3][\steps]) };
 File.delete(~matDir +/+ "sleg.matrix");
 
+// --- Pose bindings (Task 4) ---
+pass = pass and: { ~matPoseBindings.notNil and: { ~matSetPoseBind.notNil } };
+pass = pass and: { ~matPoseBindings.size == 16 };
+~trigLog = nil;
+~toscSend = { |path ...args| ~trigLog = ([path] ++ args) };
+~matSetPoseBind.(5, \poseA, \trigger, 3);
+pass = pass and: { ~matPoseBindings[5].size == 1 };
+pass = pass and: { ~matPoseBindings[5][0][\poseId] == \poseA };
+pass = pass and: { ~trigLog[0] == "/matrix/poses" and: { ~trigLog[1] == 5 } };
+// firing an unknown pose must not raise
+try { ~matPoseFire.(\nope) } { |e| pass = false; ("EXCEPTION matPoseFire: " ++ e.class.name).postln };
+// same poseId replaces (no duplicate)
+~matSetPoseBind.(5, \poseA, \trigger, 3);
+pass = pass and: { ~matPoseBindings[5].size == 1 };
+// clear all for isolation
+~matPoseBindings.size.do { |i| ~matPoseBindings[i] = [] };
+
+// --- Pose persistence (Task 4) ---
+~matSetPoseBind.(5, \poseA, \trigger, 3);
+~matSave.("pose grid");
+~matPoseBindings = Array.fill(~matVoices.size, { [] });
+pass = pass and: { ~matLoad.("pose grid") };
+pass = pass and: { ~matPoseBindings[5].size == 1 };
+pass = pass and: { ~matPoseBindings[5][0][\poseId] == \poseA };
+File.delete(~matDir +/+ "pose_grid.matrix");
+
 pass.if(
     { "TEST PASS".postln },
     { "TEST FAIL".postln }
