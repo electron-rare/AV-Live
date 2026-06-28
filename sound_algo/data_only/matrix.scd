@@ -405,5 +405,31 @@ OSCdef(\mat_kit, { |msg, time, addr|
     ~matApplyKit.((msg[1] ? \default).asSymbol)
 }, '/matrix/kit');
 
+// -- Capture mod source cache (nil-guarded; idempotent reload) --
+~matModCache   = ~matModCache ? IdentityDictionary.new;
+~matModSources = ~matModSources ?
+    [\lHandY, \rHandY, \lOpen, \rOpen, \handSpeed, \handDist, \bodyY, \depth];
+
+// reader: clamp to 0..1, default 0 when absent
+~matModSourceVal = { |key| (~matModCache[key] ? 0).clip(0, 1) };
+
+// own capture listeners (independent of the pose pipeline's internal dicts)
+OSCdef(\mat_mod_hands, { |msg|
+    ~matModCache[\lHandY]    = 1 - (msg[3] ? 0.5);   // image y top-down -> up=1
+    ~matModCache[\rHandY]    = 1 - (msg[7] ? 0.5);
+    ~matModCache[\lOpen]     = msg[4] ? 0;
+    ~matModCache[\rOpen]     = msg[8] ? 0;
+    ~matModCache[\handSpeed] = ((msg[5] ? 0) max: (msg[9] ? 0));
+    ~matModCache[\handDist]  = msg[10] ? 0;
+}, '/pose/hands');
+
+OSCdef(\mat_mod_center, { |msg|
+    ~matModCache[\bodyY] = 1 - (msg[3] ? 0.5);       // /pose/center [pid, cx, cy]
+}, '/pose/center');
+
+OSCdef(\mat_mod_span, { |msg|
+    ~matModCache[\depth] = ((msg[2] ? 0) * 2.5).clip(0, 1);  // /pose/sho_span depth proxy
+}, '/pose/sho_span');
+
 "[matrix] ready".postln;
 )

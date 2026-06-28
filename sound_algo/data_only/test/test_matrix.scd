@@ -212,6 +212,14 @@ pass = pass and: { ~matLoad.("legacy") };
 pass = pass and: { ~matInstruments.every({ |x| x.isNil }) };  // defaulted
 File.delete(~matDir +/+ "legacy.matrix");
 
+// --- Capture mod sources (Task 1) ---
+pass = pass and: { ~matModSourceVal.notNil and: { ~matModSources.notNil } };
+~matModCache = IdentityDictionary[ \rHandY -> 1.5, \rOpen -> -0.2, \handSpeed -> 0.6 ];
+pass = pass and: { ~matModSourceVal.(\rHandY) == 1.0 };     // clamped to 1
+pass = pass and: { ~matModSourceVal.(\rOpen) == 0.0 };      // clamped to 0
+pass = pass and: { ~matModSourceVal.(\handSpeed) == 0.6 };
+pass = pass and: { ~matModSourceVal.(\unknownKey) == 0.0 }; // safe default
+
 pass.if(
     { "TEST PASS".postln },
     { "TEST FAIL".postln }
