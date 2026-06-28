@@ -400,6 +400,21 @@ pass = pass and: { ~sv2[\degree] == 4 };          // step 0 degree
 pass = pass and: { ~sv2[\dur] == (~matBeatsPerBar / 16) };
 ~matColorDefs[5][2][\steps] = Array.fill(16, nil);  // restore empty
 
+// --- Step persistence (Task 3) ---
+~matColorDefs[4][3][\steps][2] = (degree: 5, vel: 0.7);
+~matSave.("step grid");
+~matColorDefs = Array.fill(~matVoices.size, { ~matDefaultColorDefs.value });
+pass = pass and: { ~matLoad.("step grid") };
+pass = pass and: { ~matColorDefs[4][3][\steps][2][\degree] == 5 };
+pass = pass and: { ~matColorDefs[4][3][\steps][2][\vel] == 0.7 };
+File.delete(~matDir +/+ "step_grid.matrix");
+// legacy grid-only file -> default empty steps
+File.use(~matDir +/+ "sleg.matrix", "w", { |f| f.write(Array.fill(16, { Array.fill(32, 0) }).asCompileString) });
+~matColorDefs[4][3][\steps][2] = (degree: 9, vel: 0.5);
+pass = pass and: { ~matLoad.("sleg") };
+pass = pass and: { ~matStepsEmpty.(~matColorDefs[4][3][\steps]) };
+File.delete(~matDir +/+ "sleg.matrix");
+
 pass.if(
     { "TEST PASS".postln },
     { "TEST FAIL".postln }

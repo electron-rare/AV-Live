@@ -592,7 +592,7 @@ OSCdef(\mat_steps_get, { |msg, time, addr|
                             (d.isKindOf(Event)).if({
                                 [\stretch, \octave, \amp, \inst, \cutoff, \pan].do { |f|
                                     d[f].notNil.if({ ~matColorDefs[vi][ci + 1][f] = d[f] })
-                                }
+                                }; (d[\steps].notNil and: { d[\steps].isArray }).if({ ~matColorDefs[vi][ci + 1][\steps] = d[\steps] })
                             })
                         }
                     })
