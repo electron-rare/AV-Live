@@ -40,7 +40,15 @@ limbSpan, danse, mouthOpen
 | `sound_algo/data_only/matrix_presets/generate_presets.py` | preset emit | modify |
 | `sound_algo/data_only/matrix_presets/patterns.py` | demo mappings | modify (optional demo) |
 
-Validation note (SC): the SC suite is slow/flaky headless. Each SC task gates on the **`validating-scd-files` skill (P:0 B:0)** first, then runs the targeted logic harness given in the task, then (best-effort) the full `test_matrix.scd`. Final acceptance is the macm1 live smoke (Task 14).
+### SC test protocol (authoritative — supersedes any standalone harness shown in a task)
+
+`sound_algo/data_only/test/test_matrix.scd` is the canonical SC harness and the ONLY place SC assertions go. Verified facts:
+
+- **Run:** `/Applications/SuperCollider.app/Contents/MacOS/sclang sound_algo/data_only/test/test_matrix.scd` (the binary is NOT on `$PATH`; there is **no `timeout`/`gtimeout`** on this macOS host — the script self-terminates and the Bash-tool timeout bounds any runaway).
+- **Server is NOT booted.** The harness stubs `~toscSend`/`~toscTouch`, defines dummy `Pdef(\lp_*)`, sets a minimal `~lp = (clock: TempoClock.default)`, then `featureFile.load`s `../matrix.scd`. It is fast and deterministic — not flaky.
+- **Assertion style:** accumulate `pass = pass and: { <cond> };`, wrap risky calls in `try { } { |e| pass = false; (...).postln }`. Final output line is `TEST PASS` (and no `ERROR` lines).
+- **Testing OSCdef logic without a server:** call the registered function directly, e.g. `OSCdef(\mat_mod_kin).func.value(['/pose/kin', 0, 1.5, 5.0, 0.0]);` then assert on `~matModCache`. Call `~mat*` functions directly the same way.
+- **Each SC task:** (1) balance-check the edited `.scd` with the `validating-scd-files` skill (P:0 B:0); (2) add assertions to `test_matrix.scd` in its existing style; (3) run the harness, expect `TEST PASS`. The per-task "logic harness" code blocks below are illustrative content for the assertions — fold them into `test_matrix.scd`, do NOT create standalone `scratchpad/*.scd` boot scripts. Final behavior acceptance is the macm1 live smoke (Task 14).
 
 ---
 
@@ -164,7 +172,7 @@ Expected: 8 `OK` lines, 0 `FAIL`. (`bodyVitesse=0.5` because 1.5/3.0; `bodyAccel
 
 ```bash
 git add sound_algo/data_only/matrix.scd
-git commit -m "feat(matrix): route kin/head/limb/mouth/action sources"
+git commit -m "feat(matrix): route new iphone mod sources"
 ```
 
 ---
@@ -748,21 +756,18 @@ git commit -m "feat(pose): emit /pose/mouth from bridge"
 
 **Files:**
 - Modify: `web_realart/public/control/js/matrix-state.js`
-- Test: `web_realart/public/control/js/__tests__/matrix-state.test.js` (create)
+- Test: `web_realart/test/matrix-state.test.mjs` (EXTEND the existing file — do not create a new one; match its style: `import assert from "node:assert"`, import from `../public/control/js/matrix-state.js`)
 
 **Interfaces:**
 - Produces: extended `MATRIX_MOD_SOURCES` (19 + `none`), `MOD_SOURCE_ORDER` (19, no none), `MOD_SOURCE_LABELS`, `MOD_TARGET_LABELS`, `POSE_EVENT_CHOICES`, `matVoiceMods`/`matVoicePoses` state arrays, `resetVoiceMaps()`, and save/load coverage. Pure parsers `parseVoiceMod(args)`, `parseVoicePose(args)`, `parseModValues(args)`.
 - Consumes: `MATRIX_VOICES`.
 
-- [ ] **Step 1: Write failing tests** `web_realart/public/control/js/__tests__/matrix-state.test.js`:
+- [ ] **Step 1: Write failing tests** — APPEND these cases to the existing `web_realart/test/matrix-state.test.mjs` (keep its `import assert from "node:assert"` style; add the new symbols to the existing import from `../public/control/js/matrix-state.js`). The new imports/cases:
 
 ```javascript
-import { test } from "node:test";
-import assert from "node:assert/strict";
-import {
-  MOD_SOURCE_ORDER, MOD_SOURCE_LABELS, MATRIX_MOD_SOURCES,
-  POSE_EVENT_CHOICES, parseVoiceMod, parseVoicePose, parseModValues,
-} from "../matrix-state.js";
+// add to the existing import from "../public/control/js/matrix-state.js":
+//   MOD_SOURCE_ORDER, MOD_SOURCE_LABELS, MATRIX_MOD_SOURCES, POSE_EVENT_CHOICES,
+//   parseVoiceMod, parseVoicePose, parseModValues
 
 test("every ordered source has a FR label", () => {
   assert.equal(MOD_SOURCE_ORDER.length, 19);
@@ -804,8 +809,8 @@ test("parseModValues maps ordered values to a dict", () => {
 
 - [ ] **Step 2: Run to verify FAIL.**
 
-Run: `cd web_realart && node --test public/control/js/__tests__/matrix-state.test.js`
-Expected: FAIL — symbols not exported yet.
+Run: `cd web_realart && node --test test/`
+Expected: FAIL — new symbols not exported yet (existing tests still pass).
 
 - [ ] **Step 3: Implement.** In `matrix-state.js`, replace the `MATRIX_MOD_SOURCES` line (`:31`) and add new exports after `MATRIX_MOD_TARGETS` (`:42`):
 
@@ -882,13 +887,13 @@ export function parseModValues(args) {
 
 - [ ] **Step 5: Run to verify PASS.**
 
-Run: `cd web_realart && node --test public/control/js/__tests__/matrix-state.test.js`
-Expected: all tests PASS.
+Run: `cd web_realart && node --test test/`
+Expected: all tests PASS (existing + new).
 
 - [ ] **Step 6: Commit.**
 
 ```bash
-git add web_realart/public/control/js/matrix-state.js web_realart/public/control/js/__tests__/matrix-state.test.js
+git add web_realart/public/control/js/matrix-state.js web_realart/test/matrix-state.test.mjs
 git commit -m "feat(web): mod source labels + per-voice state"
 ```
 
