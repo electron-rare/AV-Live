@@ -92,7 +92,7 @@ button.queued { animation: queued-blink 600ms ease-in-out infinite alternate; }
 .scene-nav { display: flex; gap: 8px; margin: 8px 0; }
 .scene-nav button { flex: 1; font-size: 16px; padding: 16px; }
 
-/* --- Matrix arranger (16x32) --- */
+/* --- Matrix arranger (22x64) --- */
 .matrix-transport { display: flex; gap: 8px; margin: 10px 0; }
 .matrix-transport button { flex: 1; padding: 14px 10px; font-size: 14px; }
 .matrix-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }

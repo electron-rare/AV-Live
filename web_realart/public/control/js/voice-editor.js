@@ -438,15 +438,40 @@ function renderPattern(vi) {
 }
 
 // --- OSC handlers ---
-on("/matrix/colordefs", (args) => {
+
+// Pure parse function for stride-8 /matrix/colordefs flat args.
+// SC field order per colour: stretch, octave, amp, inst(str),
+//   cutoff(-1=nil), pan(-2=nil), res(-3=nil), rev(-4=nil).
+// Returns { vi, colors: { 1..6 -> plain field object (no steps/mod/pose) } }.
+export function parseColorDefs(args) {
   const vi = Math.round(Number(args[0]));
+  const colors = {};
+  for (let c = 1; c <= 6; c++) {
+    const b = 1 + (c - 1) * 8;
+    const cutoffRaw = Number(args[b + 4]);
+    const panRaw    = Number(args[b + 5]);
+    const resRaw    = Number(args[b + 6]);
+    const revRaw    = Number(args[b + 7]);
+    colors[c] = {
+      stretch: Number(args[b]),
+      octave:  Math.round(Number(args[b + 1])),
+      amp:     Number(args[b + 2]),
+      inst:    String(args[b + 3] ?? "default"),
+      cutoff:  cutoffRaw === -1 ? null : cutoffRaw,
+      pan:     panRaw    === -2 ? null : panRaw,
+      res:     resRaw    === -3 ? null : resRaw,
+      rev:     revRaw    === -4 ? null : revRaw,
+    };
+  }
+  return { vi, colors };
+}
+
+on("/matrix/colordefs", (args) => {
+  const { vi, colors } = parseColorDefs(args);
   if (vi >= 0 && vi < MATRIX_VOICES.length) {
     for (let c = 1; c <= 6; c++) {
-      const b = 1 + (c - 1) * 6;
       const ex = matColorDefs[vi][c] || {};
-      matColorDefs[vi][c] = { stretch:Number(args[b]), octave:Math.round(Number(args[b+1])),
-        amp:Number(args[b+2]), inst:String(args[b+3] ?? "default"),
-        cutoff:Number(args[b+4]), pan:Number(args[b+5]),
+      matColorDefs[vi][c] = { ...colors[c],
         mod:ex.mod ?? null, pose:ex.pose || [], steps:ex.steps || new Array(16).fill(null) };
     }
     saveMatState();
