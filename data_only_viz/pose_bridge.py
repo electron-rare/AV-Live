@@ -10,6 +10,7 @@ Routes emises :
     /pose/head <pid> <x> <y> <c>       position du nez (visage)
     /pose/sho_span <pid> <dx>          ecart epaules (estime distance camera)
     /pose/limb_span <pid> <span>       envergure brassse (poignet a poignet)
+    /pose/mouth <pid> <open>           mouth openness 0..1
     /face/count <n>                    nombre de visages detectes
     /face/kp <pid> <idx> <x> <y> <z> <c>  68-pt subset (dlib mapping)
     /hand/count <n_left> <n_right>     nombre de mains gauche / droite
@@ -349,6 +350,15 @@ class PoseSoundBridge:
         kin_args = [int(pid), float(kin[0]), float(kin[1]), float(kin[2])]
         self._client.send_message("/pose/kin", kin_args)
         self._vj("/pose/kin", kin_args)
+
+    def send_mouth(self, pid: int, mouth_open: float) -> None:
+        """Send mouth openness via /pose/mouth OSC route.
+
+        Sends: [pid (int), mouth_open (float)]  — mouth_open is 0..1.
+        """
+        args = [int(pid), float(mouth_open)]
+        self._client.send_message("/pose/mouth", args)
+        self._vj("/pose/mouth", args)
 
     @staticmethod
     def _hand_slot(h):

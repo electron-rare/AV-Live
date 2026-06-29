@@ -139,6 +139,7 @@ class ActionHeadPublisher(threading.Thread):
                 idx = LABELS.index(label)
                 self.bridge.send_action(pid, idx, probs, t_now, force=True)
                 self.bridge.send_kin(pid, kin, t_now, force=True)
+                self.bridge.send_mouth(pid, mouth)
                 if pid not in self._last_pids:
                     self.bridge.send_enter(pid=pid)
         for gone in self._last_pids - current_pids:
