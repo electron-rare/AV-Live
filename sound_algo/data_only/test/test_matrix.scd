@@ -681,6 +681,34 @@ pass = pass and: { ~matModValuesRoutine.isKindOf(Routine) };
 // cleanup
 ~matVoicePoses[\acid] = [];
 
+// --- T6: Voice mods/poses persistence + legacy migration ---
+// Round-trip: set voice-level data, save, clear, reload, assert
+~matVoiceMods[\acid]  = [ (source: \bodyVitesse, target: \cutoff, depth: 0.6) ];
+~matVoicePoses[\acid] = [ (poseId: \danse, action: \gate) ];
+~matSave.("t6_tmp");
+~matVoiceMods[\acid]  = [];
+~matVoicePoses[\acid] = [];
+pass = pass and: { ~matLoad.("t6_tmp") };
+pass = pass and: {
+    (~matVoiceMods[\acid].size == 1).if({ true }, {
+        ("FAIL T6: voiceMods size=" ++ ~matVoiceMods[\acid].size).postln; false }) };
+pass = pass and: {
+    (~matVoiceMods[\acid][0][\target] == \cutoff).if({ true }, {
+        ("FAIL T6: voiceMods[0][target]=" ++ ~matVoiceMods[\acid][0][\target]).postln; false }) };
+pass = pass and: {
+    (~matVoicePoses[\acid].size == 1).if({ true }, {
+        ("FAIL T6: voicePoses size=" ++ ~matVoicePoses[\acid].size).postln; false }) };
+pass = pass and: {
+    (~matVoicePoses[\acid][0][\poseId] == \danse).if({ true }, {
+        ("FAIL T6: voicePoses[0][poseId]=" ++ ~matVoicePoses[\acid][0][\poseId]).postln; false }) };
+pass = pass and: {
+    (~matVoicePoses[\acid][0][\action] == \gate).if({ true }, {
+        ("FAIL T6: voicePoses[0][action]=" ++ ~matVoicePoses[\acid][0][\action]).postln; false }) };
+File.delete(~matDir +/+ "t6_tmp.matrix");
+// cleanup
+~matVoiceMods[\acid]  = [];
+~matVoicePoses[\acid] = [];
+
 pass.if(
     { "TEST PASS".postln },
     { "TEST FAIL".postln }

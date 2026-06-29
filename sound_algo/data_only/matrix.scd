@@ -586,7 +586,9 @@ OSCdef(\mat_steps_get, { |msg, time, addr|
     var payload = (
         grid: ~lp[\matrix],
         instruments: ~matInstruments.collect({ |x| (x ? \default) }),
-        colorDefs: ~matColorDefs.collect({ |defs| (1..6).collect({ |c| defs[c] }) })
+        colorDefs: ~matColorDefs.collect({ |defs| (1..6).collect({ |c| defs[c] }) }),
+        voiceMods:  ~matVoices.collect({ |name| ~matVoiceMods[name]  ? [] }),
+        voicePoses: ~matVoices.collect({ |name| ~matVoicePoses[name] ? [] })
     );
     File.use(path, "w", { |f| f.write(payload.asCompileString) });
     ~matSavedNames.add(safe.asSymbol);
@@ -649,11 +651,44 @@ OSCdef(\mat_steps_get, { |msg, time, addr|
                     })
                 }
             });
+            // -- voice-level mods/poses: reset, restore new format, then migrate legacy --
+            ~matVoices.do { |name| ~matVoiceMods[name] = []; ~matVoicePoses[name] = [] };
+            ((raw.isArray.not) and: { raw[\voiceMods].notNil }).if({
+                raw[\voiceMods].do { |list, vi| (list.isArray and: { vi < ~matVoices.size }).if({
+                    ~matVoiceMods[~matVoices[vi]] = list.select({ |m| m.isKindOf(Event) and: { m[\source].notNil } })
+                }) }
+            });
+            ((raw.isArray.not) and: { raw[\voicePoses].notNil }).if({
+                raw[\voicePoses].do { |list, vi| (list.isArray and: { vi < ~matVoices.size }).if({
+                    ~matVoicePoses[~matVoices[vi]] = list.select({ |b| b.isKindOf(Event) and: { b[\poseId].notNil } })
+                }) }
+            });
+            // legacy: collapse per-colour \mod/\pose into voice lists (dedup) when new keys absent
+            (raw.isArray.not).if({
+                ~matVoices.do { |name, vi|
+                    (~matVoiceMods[name].isEmpty).if({
+                        var seen = [], acc = [];
+                        (1..6).do { |c| var m = ~matColorDefs[vi][c][\mod];
+                            (m.notNil and: { seen.includes(m[\target]).not }).if({
+                                seen = seen.add(m[\target]);
+                                acc = acc.add((source: m[\source], target: m[\target], depth: m[\depth])) }) };
+                        ~matVoiceMods[name] = acc;
+                    });
+                    (~matVoicePoses[name].isEmpty).if({
+                        var acc = [];
+                        (1..6).do { |c| ((~matColorDefs[vi][c][\pose]) ? []).do { |b|
+                            (acc.any({ |x| (x[\poseId] == b[\poseId]) and: { x[\action] == b[\action] } }).not).if({
+                                acc = acc.add((poseId: b[\poseId], action: b[\action])) }) } };
+                        ~matVoicePoses[name] = acc;
+                    });
+                }
+            });
             ~lp[\matPlaying].if({ ~matApplyBar.(~lp[\matBar]) });
             ~matGridPush.();
             ~matInstrPush.();
             ~matVoices.size.do { |vi| ~matColorDefPush.(vi) };
             ~matVoices.size.do { |vi| (1..6).do { |c| ~matStepsPush.(vi, c) } };
+            ~matVoices.size.do { |vi| ~matVoiceModPush.(vi); ~matVoicePosePush.(vi) };
             ("[matrix] loaded " ++ path).postln;
             true
         }, {
