@@ -28,7 +28,7 @@ PY="$REPO/data_only_viz/.venv/bin/python"
 SCLANG="/Applications/SuperCollider.app/Contents/MacOS/sclang"
 # matrix preset auto-loaded on boot (a sound_algo/.../matrix_presets/*.matrix name
 # without extension); set MATRIX_PRESET="" to start from an empty grid.
-MATRIX_PRESET="${MATRIX_PRESET:-techno_drive}"
+MATRIX_PRESET="${MATRIX_PRESET:-techno_drive_live}"
 
 notify() { osascript -e "display notification \"$1\" with title \"AV-Live Concert\"" 2>/dev/null; }
 

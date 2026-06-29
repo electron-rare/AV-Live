@@ -559,22 +559,22 @@ DRUMS["perc"]["dnb"]    = ["..x...x.x.x...x.", "..X.o.x.x.X.o.x.", ".x.x..x.x..x
 
 # preset name -> (drum family, melodic family)
 PRESET_FAMILY = {
-    "techno_drive": ("techno", "default"), "detroit_soul": ("house", "default"),
-    "peak_drop": ("techno", "default"), "rave_stab": ("techno", "default"),
+    "techno_drive": ("techno", "default"), "detroit_soul": ("house", "house"),
+    "peak_drop": ("techno", "default"), "rave_stab": ("techno", "house"),
     "dub_techno": ("techno", "dub"),
     "acid_journey": ("techno", "default"), "schranz_drive": ("industrial", "default"),
-    "trance_euphoria": ("techno", "default"), "melodic_builder": ("techno", "default"),
-    "melodic_deep": ("techno", "default"), "progressive_lift": ("techno", "default"),
-    "hypnotic_arp": ("techno", "default"),
-    "psytrance_roll": ("techno", "psy"), "minimal_hypno": ("techno", "default"),
+    "trance_euphoria": ("techno", "house"), "melodic_builder": ("techno", "house"),
+    "melodic_deep": ("techno", "dub"), "progressive_lift": ("techno", "house"),
+    "hypnotic_arp": ("techno", "psy"),
+    "psytrance_roll": ("techno", "psy"), "minimal_hypno": ("techno", "psy"),
     "breakbeat": ("breaks", "default"), "bass_science": ("breaks", "default"),
     "jungle_amen": ("breaks", "default"), "dnb_roller": ("dnb", "default"),
     "footwork_chop": ("footwork", "default"), "neuro_reese": ("dnb", "default"),
     "tribal_perc": ("breaks", "default"),
-    "electro_808": ("electro", "default"), "ebm_body": ("ebm", "default"),
-    "synthwave_drive": ("electro", "default"), "electro_funk": ("electro", "default"),
+    "electro_808": ("electro", "house"), "ebm_body": ("ebm", "house"),
+    "synthwave_drive": ("electro", "house"), "electro_funk": ("electro", "house"),
     "industrial_grind": ("industrial", "default"), "hardcore_punk": ("industrial", "default"),
-    "ambient_intro": ("ambient", "default"),
+    "ambient_intro": ("ambient", "ambient"),
 }
 
 DRUM_VOICES = {"kick", "hats", "clap", "snare", "perc", "shaker", "ride", "rim",
@@ -586,7 +586,12 @@ def patterns_for(voice, preset_name):
     or None if the voice has no bank. The `default` family's colours 2-6 are
     derived from colour 1 for a consistent base/busier/broken/double/sparse/fill
     contrast; authored style families pass through unchanged."""
-    dfam, mfam = PRESET_FAMILY.get(preset_name, ("default", "default"))
+    base = preset_name
+    for _sfx in ("_intro", "_live", "_outro"):
+        if base.endswith(_sfx):
+            base = base[:-len(_sfx)]
+            break
+    dfam, mfam = PRESET_FAMILY.get(base, ("default", "default"))
     if voice in DRUM_VOICES:
         rolebank = DRUMS.get(voice)
         if rolebank is None:
