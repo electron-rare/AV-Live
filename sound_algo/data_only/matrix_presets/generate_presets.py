@@ -505,28 +505,55 @@ def emit_step(s):
 from patterns import patterns_for
 
 
-# === per-voice mods/poses: demo bindings for a few presets ===================
-# Default is [] for every voice.  Only a handful of presets carry demo bindings
-# so generated presets exercise the feature without over-designing it.
-#
-# voiceMods:  voice -> [(source_id, target, depth)]
-#   allowed targets: amp/pan/rev for all voices;
-#                    cutoff only for perc/acid/arp/lead/stab/pad/reese/melody/chord
-# voicePoses: voice -> [(poseId, action)]
-#   action is "trigger" or "gate"
+# -- Default pose->instrument mapping scheme (fixed, role-adapted) --
+# Eligibility mirrors the SC engine ~matModTargets (cycle 1): a binding is only
+# emitted if its target is valid for that voice.
+_MOD_TARGETS = {v: {"amp", "pan", "rev"} for v in VOICES}
+for v in ("perc", "acid", "arp", "lead", "stab", "pad", "reese", "melody", "chord"):
+    _MOD_TARGETS[v].add("cutoff")
+for v in ("sub", "acid", "arp", "lead", "stab", "pad", "reese", "bells", "melody", "chord"):
+    _MOD_TARGETS[v].add("res")
+for v in ("sub", "acid", "arp", "lead", "stab", "pad", "reese", "bells", "perc", "tom"):
+    _MOD_TARGETS[v].add("pitch")
 
-VOICE_MODS_DEMO = {
-    "techno_drive": {
-        "acid": [("bodyVitesse", "cutoff", 0.6)],  # body energy drives acid cutoff
-        "lead": [("rHandY",      "rev",    0.4)],   # right hand height -> lead reverb
-    },
+# Per-role default bindings (source, target, depth). Soloists -> hand sources
+# (expressive, close-up); energy/structure -> body sources (robust at distance).
+_ROLE_MODS = {
+    "lead":   [("rHandX", "amp", 0.4), ("rHandY", "pitch", 0.4), ("lHandY", "cutoff", 0.5), ("lHandX", "res", 0.4)],
+    "bells":  [("rHandX", "amp", 0.4), ("rHandY", "pitch", 0.4), ("lHandX", "res", 0.4)],
+    "melody": [("rHandX", "amp", 0.4), ("lHandY", "cutoff", 0.5), ("lHandX", "res", 0.4)],
+    "reese":  [("bodyVitesse", "cutoff", 0.5), ("bodyY", "pitch", 0.3), ("limbSpan", "res", 0.4), ("bodyX", "pan", 0.3)],
+    "sub":    [("bodyVitesse", "res", 0.4), ("bodyY", "pitch", 0.3), ("bodyX", "pan", 0.3)],
+    "pad":    [("bodyVitesse", "cutoff", 0.4), ("limbSpan", "rev", 0.4), ("bodyX", "pan", 0.3)],
+    "perc":   [("bodyVitesse", "cutoff", 0.4), ("bodyY", "pitch", 0.3), ("bodyX", "pan", 0.3)],
+    "tom":    [("bodyY", "pitch", 0.3), ("bodyVitesse", "amp", 0.3), ("bodyX", "pan", 0.3)],
+    "drums":  [("bodyVitesse", "rev", 0.3), ("bodyX", "pan", 0.3)],
+    "fx":     [("danse", "rev", 0.5), ("bodyVitesse", "amp", 0.4)],
+}
+_VOICE_ROLE = {
+    "acid": "lead", "arp": "lead", "lead": "lead", "stab": "lead",
+    "bells": "bells", "melody": "melody",
+    "reese": "reese", "sub": "sub",
+    "pad": "pad", "chord": "pad",
+    "perc": "perc", "tom": "tom",
+    "kick": "drums", "hats": "drums", "clap": "drums", "ride": "drums",
+    "rim": "drums", "snare": "drums", "crash": "drums", "shaker": "drums",
+    "sweep": "fx", "fx": "fx",
 }
 
-VOICE_POSES_DEMO = {
-    "techno_drive": {
-        "kick": [("danse", "trigger")],             # danse action retriggers kick
-    },
-}
+
+def default_mods(voice):
+    """Fixed default mod bindings for a voice, filtered by target eligibility."""
+    role = _VOICE_ROLE.get(voice)
+    if role is None:
+        return []
+    elig = _MOD_TARGETS.get(voice, {"amp", "pan", "rev"})
+    return [(s, t, d) for (s, t, d) in _ROLE_MODS[role] if t in elig]
+
+
+def default_poses(voice):
+    """Fixed default pose bindings: danse->gate swells the FX voices."""
+    return [("danse", "gate")] if voice in ("fx", "sweep") else []
 
 
 def emit_sc_mod_binding(source, target, depth):
@@ -540,28 +567,26 @@ def emit_sc_pose_binding(pose_id, action):
 
 
 def emit_voicemods(preset_name):
-    """22-element list of SC sub-arrays, one per voice (default [])."""
-    demos = VOICE_MODS_DEMO.get(preset_name, {})
+    """22-element list of SC sub-arrays: default scheme for active voices, else []."""
     parts = []
     for voice in VOICES:
-        bindings = demos.get(voice, [])
+        active = patterns_for(voice, preset_name) is not None
+        bindings = default_mods(voice) if active else []
         if bindings:
-            bstr = ", ".join(emit_sc_mod_binding(*b) for b in bindings)
-            parts.append("[" + bstr + "]")
+            parts.append("[" + ", ".join(emit_sc_mod_binding(*b) for b in bindings) + "]")
         else:
             parts.append("[]")
     return parts
 
 
 def emit_voiceposes(preset_name):
-    """22-element list of SC sub-arrays, one per voice (default [])."""
-    demos = VOICE_POSES_DEMO.get(preset_name, {})
+    """22-element list of SC sub-arrays: default poses for active voices, else []."""
     parts = []
     for voice in VOICES:
-        bindings = demos.get(voice, [])
+        active = patterns_for(voice, preset_name) is not None
+        bindings = default_poses(voice) if active else []
         if bindings:
-            bstr = ", ".join(emit_sc_pose_binding(*b) for b in bindings)
-            parts.append("[" + bstr + "]")
+            parts.append("[" + ", ".join(emit_sc_pose_binding(*b) for b in bindings) + "]")
         else:
             parts.append("[]")
     return parts
