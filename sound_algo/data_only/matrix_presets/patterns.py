@@ -39,6 +39,54 @@ def _mel(pairs):
     return [None if p is None else (int(p[0]), round(float(p[1]), 2)) for p in pairs]
 
 
+_DRUM_VELS = (0.30, 0.50, 0.80, 1.0)
+
+
+def _dhit(v):
+    return None if v == 0.0 else (0, round(v, 2))
+
+
+def derive_drum_colors(base):
+    """Colours 2-6 from a 16-step drum base (None | (0, vel))."""
+    n = len(base)
+    busier = [base[i] if base[i] is not None else (_dhit(0.30) if i % 4 == 2 else None)
+              for i in range(n)]
+    broken = base[-1:] + base[:-1]                       # rotate right 1: same count, displaced
+    double = [base[i] if base[i] is not None else (_dhit(0.80) if i % 2 == 0 else None)
+              for i in range(n)]
+    sparse = [base[i] if (base[i] is not None and ((base[i][1] >= 1.0) or i % 4 == 0)) else None
+              for i in range(n)]
+    fill = list(base)
+    for k, v in enumerate((0.80, 0.80, 1.0, 1.0)):
+        fill[n - 4 + k] = _dhit(v)
+    return [busier, broken, double, sparse, fill]
+
+
+def derive_mel_colors(base):
+    """Colours 2-6 from a 16-step melodic base (None | (degree, vel))."""
+    n = len(base)
+    actives = [base[i][0] for i in range(n) if base[i] is not None]
+    last_deg = actives[-1] if actives else 0
+
+    def prev_deg(i):
+        for j in range(i, -1, -1):
+            if base[j] is not None:
+                return base[j][0]
+        return last_deg
+
+    busier = [base[i] if base[i] is not None else ((prev_deg(i), 0.5) if i % 4 == 2 else None)
+              for i in range(n)]
+    broken = [((base[i][0] + 7, base[i][1]) if (base[i] is not None and i % 4 == 0) else base[i])
+              for i in range(n)]
+    double = [base[i] if base[i] is not None else ((prev_deg(i), 0.6) if i % 2 == 0 else None)
+              for i in range(n)]
+    sparse = [base[i] if (base[i] is not None and i % 4 == 0) else None for i in range(n)]
+    fill = list(base)
+    for k in range(4):
+        fill[n - 4 + k] = (last_deg + k, round(0.6 + 0.1 * k, 2))
+    return [busier, broken, double, sparse, fill]
+
+
 N = None
 
 # =============================================================================
