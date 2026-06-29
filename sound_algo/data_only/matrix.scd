@@ -707,6 +707,36 @@ OSCdef(\mat_steps_get, { |msg, time, addr|
     })
 };
 
+// -- ~matSetVoiceMod : replace a voice's whole additive binding list; validate; re-source; echo --
+~matSetVoiceMod = { |vi, n, tail|
+    ((vi >= 0) and: { vi < ~matVoices.size }).if({
+        var name = ~matVoices[vi];
+        var allowed = ~matModTargets[name] ? [];
+        ~matVoiceMods[name] = Array.fill(n.asInteger, { |k|
+            var s = (tail[k * 3]       ? \none).asSymbol;
+            var t = (tail[(k * 3) + 1] ? \none).asSymbol;
+            var d = (tail[(k * 3) + 2] ? 0).asFloat.clip(0, 1);
+            ((s != \none) and: { t != \none }
+                and: { ~matModSources.includes(s) } and: { allowed.includes(t) }).if(
+                { (source: s, target: t, depth: d) }, { nil })
+        }).reject({ |x| x.isNil });
+        ~matLastColor[vi] = -1;
+        (~lp[\matPlaying] and: { ~matApplyBar.notNil }).if({ ~matApplyBar.(~lp[\matBar]) });
+        ~matVoiceModPush.(vi)
+    })
+};
+
+// -- ~matVoiceModPush : echo a voice's binding list to surfaces --
+~matVoiceModPush = { |vi|
+    ~toscSend !? {
+        ((vi >= 0) and: { vi < ~matVoices.size }).if({
+            var list = ~matVoiceMods[~matVoices[vi]] ? [];
+            var flat = list.collect({ |m| [m[\source], m[\target], m[\depth]] }).flatten;
+            ~toscSend.valueArray(["/matrix/voicemod", vi, list.size] ++ flat)
+        })
+    }
+};
+
 // -- ~matSetColorMod : set/clear a color's capture effect; validate; re-source; echo --
 ~matSetColorMod = { |vi, color, source, target, depth|
     ((vi >= 0 and: { vi < ~matVoices.size }) and: { color >= 1 and: { color <= 6 } }).if({
@@ -764,11 +794,14 @@ OSCdef(\mat_steps_get, { |msg, time, addr|
     })
 };
 
-OSCdef(\mat_colormod, { |msg, time, addr|
+OSCdef(\mat_voicemod, { |msg, time, addr|
     ~toscTouch !? { ~toscTouch.(addr) };
-    ~matSetColorMod.((msg[1] ? 0).asInteger, (msg[2] ? 1).asInteger,
-        (msg[3] ? \none).asSymbol, (msg[4] ? \none).asSymbol, (msg[5] ? 0).asFloat)
-}, '/matrix/colormod');
+    ~matSetVoiceMod.((msg[1] ? 0).asInteger, (msg[2] ? 0).asInteger, msg.copyToEnd(3))
+}, '/matrix/voicemod');
+OSCdef(\mat_voicemod_get, { |msg, time, addr|
+    ~toscTouch !? { ~toscTouch.(addr) };
+    ~matVoiceModPush.((msg[1] ? 0).asInteger)
+}, '/matrix/voicemod/get');
 OSCdef(\mat_colorpose, { |msg, time, addr|
     var vi = (msg[1] ? 0).asInteger, color = (msg[2] ? 1).asInteger, n = (msg[3] ? 0).asInteger;
     ~toscTouch !? { ~toscTouch.(addr) };

@@ -572,6 +572,52 @@ try {
 } { |e| pass = false; ("EXCEPTION mat_mod_action: " ++ e.class.name).postln };
 pass = pass and: { (~matModCache[\danse] - 0.7).abs < 0.02 };   // p2 = msg[5] = 0.7
 
+// --- Task 3: ~matSetVoiceMod + OSCdefs ---
+pass = pass and: { ~matSetVoiceMod.notNil };
+pass = pass and: { ~matVoiceModPush.notNil };
+
+// OSCdef invoked directly: vi=5 (\acid), 3 bindings.
+// "bogus" not in ~matModSources -> dropped; acid allows amp/cutoff/pan/rev.
+// Expected: size 2, [0].source=\bodyVitesse, [1].target=\pan
+~matVoiceMods[\acid] = [];
+~trigLog = nil;
+~toscSend = { |path ...args| ~trigLog = ([path] ++ args) };
+try {
+    OSCdef(\mat_voicemod).func.value(
+        ['/matrix/voicemod', 5, 3,
+         "bodyVitesse","cutoff",0.6,
+         "rHandY","pan",0.4,
+         "bogus","amp",0.9])
+} { |e| pass = false; ("EXCEPTION mat_voicemod: " ++ e.class.name).postln };
+pass = pass and: { ~matVoiceMods[\acid].size == 2 };
+pass = pass and: { ~matVoiceMods[\acid][0][\source] == \bodyVitesse };
+pass = pass and: { (~matVoiceMods[\acid][0][\depth] - 0.6).abs < 0.001 };
+pass = pass and: { ~matVoiceMods[\acid][1][\target] == \pan };
+pass = pass and: { (~matVoiceMods[\acid][1][\depth] - 0.4).abs < 0.001 };
+// echo: ~toscSend called with /matrix/voicemod, vi=5, n=2
+pass = pass and: { ~trigLog.notNil and: { ~trigLog[0] == "/matrix/voicemod" } };
+pass = pass and: { ~trigLog[1] == 5 };
+pass = pass and: { ~trigLog[2] == 2 };
+
+// Disallowed target for kick (vi=0): cutoff not in kick's allowed targets -> rejected
+~matVoiceMods[\kick] = [];
+try {
+    OSCdef(\mat_voicemod).func.value(
+        ['/matrix/voicemod', 0, 1, "bodyY","cutoff",0.8])
+} { |e| pass = false; ("EXCEPTION mat_voicemod kick: " ++ e.class.name).postln };
+pass = pass and: { ~matVoiceMods[\kick].isEmpty };
+
+// voicemod_get: echoes current state for a voice
+~trigLog = nil;
+try {
+    OSCdef(\mat_voicemod_get).func.value(['/matrix/voicemod/get', 5])
+} { |e| pass = false; ("EXCEPTION mat_voicemod_get: " ++ e.class.name).postln };
+pass = pass and: { ~trigLog.notNil and: { ~trigLog[0] == "/matrix/voicemod" } };
+
+// cleanup
+~matVoiceMods[\acid] = [];
+~matVoiceMods[\kick] = [];
+
 pass.if(
     { "TEST PASS".postln },
     { "TEST FAIL".postln }
