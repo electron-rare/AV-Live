@@ -899,8 +899,8 @@ OSCdef(\mat_voicepose_get, { |msg, time, addr|
 ~matEventFinger = { |hand, finger| ("finger" ++ (hand.asInteger == 0).if({ "L" }, { "R" }) ++ (finger.asInteger + 1)).asSymbol };
 ~matEventPinch  = { |hand, finger| ("pinch"  ++ (hand.asInteger == 0).if({ "L" }, { "R" }) ++ finger.asInteger).asSymbol };
 
-OSCdef(\mat_ev_finger, { |msg| ~matPoseFire.(~matEventFinger.(msg[1] ? 0, msg[2] ? 0)) }, '/pose/finger');
-OSCdef(\mat_ev_pinch,  { |msg| ~matPoseFire.(~matEventPinch.(msg[1] ? 0, msg[2] ? 1)) }, '/pose/pinch');
+OSCdef(\mat_ev_finger, { |msg| ~matPoseFire.(~matEventFinger.(msg[2] ? 0, msg[3] ? 0)) }, '/pose/finger');
+OSCdef(\mat_ev_pinch,  { |msg| ~matPoseFire.(~matEventPinch.(msg[2] ? 0, msg[3] ? 1)) }, '/pose/pinch');
 
 OSCdef(\mat_pose, { |msg, time, addr|
     ~matPoseFire.((msg[1] ? \none).asSymbol)

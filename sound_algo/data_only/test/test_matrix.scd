@@ -631,6 +631,24 @@ pass = pass and: { ~matEventFinger.(1, 1) == \fingerR2 };
 // hand 0=L, finger 3 → poseId pinchL3
 pass = pass and: { ~matEventPinch.(0, 3) == \pinchL3 };
 
+// OSCdef arg extraction: /pose/finger and /pose/pinch carry a leading pid at msg[1];
+// hand=msg[2], finger=msg[3] — spy on ~matPoseFire to verify correct dispatch
+~firedPose = nil;
+~origPoseFire = ~matPoseFire;
+~matPoseFire = { |p| ~firedPose = p };
+try {
+    // pid=0, hand=1(R), finger=2 → fingerR3
+    OSCdef(\mat_ev_finger).func.value(['/pose/finger', 0, 1, 2, 0, 0, 0, 0]);
+} { |e| pass = false; ("EXC mat_ev_finger: " ++ e.class.name).postln };
+pass = pass and: { ~firedPose == \fingerR3 };
+~firedPose = nil;
+try {
+    // pid=0, hand=0(L), finger=3 → pinchL3
+    OSCdef(\mat_ev_pinch).func.value(['/pose/pinch', 0, 0, 3]);
+} { |e| pass = false; ("EXC mat_ev_pinch: " ++ e.class.name).postln };
+pass = pass and: { ~firedPose == \pinchL3 };
+~matPoseFire = ~origPoseFire;  // restore
+
 // OSCdef(\mat_voicepose): vi=5 (\acid), 2 bindings
 ~matVoicePoses[\acid] = [];
 ~trigLog = nil;
