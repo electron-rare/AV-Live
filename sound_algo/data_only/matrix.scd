@@ -966,6 +966,16 @@ OSCdef(\mat_audition, { |msg, time, addr|
 // reader: clamp to 0..1, default 0 when absent
 ~matModSourceVal = { |key| (~matModCache[key] ? 0).clip(0, 1) };
 
+// -- Live modvalues push (~12 Hz) --
+~matModValuesPush = {
+    ~toscSend !? {
+        ~toscSend.valueArray(["/matrix/modvalues"]
+            ++ ~matModOrder.collect({ |k| (~matModCache[k] ? 0).clip(0, 1) }))
+    }
+};
+~matModValuesRoutine !? { ~matModValuesRoutine.stop };
+~matModValuesRoutine = Routine({ loop { ~matModValuesPush.(); (1/12).wait } }).play(AppClock);
+
 // own capture listeners (independent of the pose pipeline's internal dicts)
 OSCdef(\mat_mod_hands, { |msg|
     ~matModCache[\lHandY]    = 1 - (msg[3] ? 0.5);   // image y top-down -> up=1

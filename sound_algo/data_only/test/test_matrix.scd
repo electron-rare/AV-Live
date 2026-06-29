@@ -664,6 +664,20 @@ try {
     ("EXCEPTION in ~matPoseFire with unknown pose: " ++ e.class.name).postln
 };
 
+// -- T5: ~matModValuesPush + ~matModValuesRoutine --
+~trigLog = nil;
+~toscSend = { |path ...args| ~trigLog = ([path] ++ args) };
+~matModCache[\bodyVitesse] = 0.5;
+try {
+    ~matModValuesPush.()
+} { |e| pass = false; ("EXCEPTION matModValuesPush: " ++ e.class.name).postln };
+pass = pass and: { ~trigLog.notNil };
+pass = pass and: { ~trigLog[0] == "/matrix/modvalues" };
+pass = pass and: { ~trigLog.size == 20 };           // address + 19 values
+pass = pass and: { (~trigLog[12] - 0.5).abs < 0.001 };  // bodyVitesse at order[11] -> trigLog[12]
+pass = pass and: { ~matModValuesRoutine.notNil };
+pass = pass and: { ~matModValuesRoutine.isKindOf(Routine) };
+
 // cleanup
 ~matVoicePoses[\acid] = [];
 
