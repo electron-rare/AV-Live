@@ -221,6 +221,18 @@ pass = pass and: { ~matModSourceVal.(\rOpen) == 0.0 };      // clamped to 0
 pass = pass and: { ~matModSourceVal.(\handSpeed) == 0.6 };
 pass = pass and: { ~matModSourceVal.(\unknownKey) == 0.0 }; // safe default
 
+// --- At-rest neutral: position sources default to 0.5, magnitudes to 0 ---
+~matModCache = IdentityDictionary.new;   // empty (no pose feed)
+pass = pass and: { (~matModSourceVal.(\bodyX) - 0.5).abs < 0.001 };
+pass = pass and: { (~matModSourceVal.(\rHandY) - 0.5).abs < 0.001 };
+pass = pass and: { (~matModSourceVal.(\bodySym) - 0.5).abs < 0.001 };
+pass = pass and: { ~matModSourceVal.(\bodyVitesse) == 0 };
+pass = pass and: { ~matModSourceVal.(\limbSpan) == 0 };
+// consequence: a pitch binding produces ZERO transpose at rest (was negative)
+~matVoiceMods[\acid] = [ (source: \rHandY, target: \pitch, depth: 1.0) ];
+pass = pass and: { ~matPitchOffset.(\acid) == 0 };
+~matVoiceMods[\acid] = [];
+
 // --- Mod targets still available (capture sources kept) ---
 pass = pass and: { ~matModTargets.notNil };
 

@@ -948,8 +948,15 @@ OSCdef(\mat_audition, { |msg, time, addr|
 ~matKinAccelMax  = ~matKinAccelMax  ? 10.0;   // m/s^2 mapped to 1.0
 ~matLimbSpanGain = ~matLimbSpanGain ? 1.0;    // limb span scale
 
-// reader: clamp to 0..1, default 0 when absent
-~matModSourceVal = { |key| (~matModCache[key] ? 0).clip(0, 1) };
+// Sources whose neutral/rest value is centre (0.5): positions + symmetry.
+// All other sources (magnitudes: speed, accel, openness, span, danse, depth,
+// mouth) correctly rest at 0.
+~matModRest = ~matModRest ? IdentityDictionary[
+    \lHandX -> 0.5, \lHandY -> 0.5, \rHandX -> 0.5, \rHandY -> 0.5,
+    \bodyX -> 0.5, \bodyY -> 0.5, \headX -> 0.5, \headY -> 0.5, \bodySym -> 0.5
+];
+// reader: clamp to 0..1, use per-source rest value when absent from cache
+~matModSourceVal = { |key| (~matModCache[key] ? (~matModRest[key] ? 0)).clip(0, 1) };
 
 // +/- scale-degree offset at full deflection (env-tunable; 7 ~= 1 diatonic octave)
 ~matPitchRange = ~matPitchRange ? 7;
@@ -966,7 +973,7 @@ OSCdef(\mat_audition, { |msg, time, addr|
 ~matModValuesPush = {
     ~toscSend !? {
         ~toscSend.valueArray(["/matrix/modvalues"]
-            ++ ~matModOrder.collect({ |k| (~matModCache[k] ? 0).clip(0, 1) }))
+            ++ ~matModOrder.collect({ |k| (~matModCache[k] ? (~matModRest[k] ? 0)).clip(0, 1) }))
     }
 };
 ~matModValuesRoutine !? { ~matModValuesRoutine.stop };
