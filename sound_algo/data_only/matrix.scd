@@ -622,6 +622,7 @@ OSCdef(\mat_steps_get, { |msg, time, addr|
             ~matGridPush.();
             ~matInstrPush.();
             ~matVoices.size.do { |vi| ~matColorDefPush.(vi) };
+            ~matVoices.size.do { |vi| (1..6).do { |c| ~matStepsPush.(vi, c) } };
             ("[matrix] loaded " ++ path).postln;
             true
         }, {
