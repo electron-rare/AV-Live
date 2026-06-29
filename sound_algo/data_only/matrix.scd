@@ -27,12 +27,12 @@
 ~matInstruments  = ~matInstruments  ? Array.fill(~matVoices.size, nil);
 ~matModTargets   = ~matModTargets   ? IdentityDictionary[
     \kick->[\amp,\pan,\rev], \hats->[\amp,\pan,\rev], \clap->[\amp,\pan,\rev],
-    \perc->[\amp,\cutoff,\pan,\rev],
-    \sub->[\amp,\pan,\rev,\res], \acid->[\amp,\cutoff,\pan,\rev,\res], \arp->[\amp,\cutoff,\pan,\rev,\res],
-    \lead->[\amp,\cutoff,\pan,\rev,\res], \stab->[\amp,\cutoff,\pan,\rev,\res], \pad->[\amp,\cutoff,\pan,\rev,\res],
-    \ride->[\amp,\pan,\rev], \rim->[\amp,\pan,\rev], \tom->[\amp,\pan,\rev],
-    \reese->[\amp,\cutoff,\pan,\rev,\res],
-    \bells->[\amp,\pan,\rev,\res], \sweep->[\amp,\pan,\rev],
+    \perc->[\amp,\cutoff,\pan,\rev,\pitch],
+    \sub->[\amp,\pan,\rev,\res,\pitch], \acid->[\amp,\cutoff,\pan,\rev,\res,\pitch], \arp->[\amp,\cutoff,\pan,\rev,\res,\pitch],
+    \lead->[\amp,\cutoff,\pan,\rev,\res,\pitch], \stab->[\amp,\cutoff,\pan,\rev,\res,\pitch], \pad->[\amp,\cutoff,\pan,\rev,\res,\pitch],
+    \ride->[\amp,\pan,\rev], \rim->[\amp,\pan,\rev], \tom->[\amp,\pan,\rev,\pitch],
+    \reese->[\amp,\cutoff,\pan,\rev,\res,\pitch],
+    \bells->[\amp,\pan,\rev,\res,\pitch], \sweep->[\amp,\pan,\rev],
     \melody->[\amp,\cutoff,\pan,\rev,\res], \chord->[\amp,\cutoff,\pan,\rev,\res],
     \fx->[\amp,\pan,\rev], \snare->[\amp,\pan,\rev],
     \crash->[\amp,\pan,\rev], \shaker->[\amp,\pan,\rev]
@@ -158,7 +158,8 @@ File.exists(~matDir).not.if({ ("mkdir -p " ++ ~matDir.quote).systemCmd });
     var byTarget = IdentityDictionary.new;
     var pairs = [];
     ((~matVoiceMods[name] ? []).select { |b|
-        b[\source].notNil and: { b[\target].notNil } and: { allowed.includes(b[\target]) }
+        b[\source].notNil and: { b[\target].notNil }
+            and: { b[\target] != \pitch } and: { allowed.includes(b[\target]) }
     }).do { |b| byTarget[b[\target]] = (byTarget[b[\target]] ? []) ++ [b] };
     byTarget.keysValuesDo { |tgt, list|
         (tgt == \cutoff).if({
@@ -208,7 +209,7 @@ File.exists(~matDir).not.if({ ("mkdir -p " ++ ~matDir.quote).systemCmd });
     var pitched = [\sub, \acid, \arp, \lead, \stab, \pad, \reese, \bells, \perc, \tom];
     var freqRatio = 2 ** (spec[\octave] ? 0);
     var freqPair = (pitched.includes(name) and: { freqRatio != 1.0 }).if({
-        [\freq, Pfunc({ |e| (e[\freq] ? 440) * freqRatio })]
+        [\freq, Pfunc({ |e| (e[\freq] ? 440) * freqRatio })]  // pitch mod step-path only (no degree here)
     }, { [] });
     var modPairs = ~matModPairs.(name, spec, volOf);
     Pchain(
@@ -229,7 +230,7 @@ File.exists(~matDir).not.if({ ("mkdir -p " ++ ~matDir.quote).systemCmd });
     var pitched = [\sub, \acid, \arp, \lead, \stab, \pad, \reese, \bells, \perc, \tom];
     var modPairs = ~matModPairs.(name, spec, volOf);
     var freqPair = pitched.includes(name).if({
-        [\freq, Pfunc { |e| (~lpNote.notNil).if({ ~lpNote.(e[\degree], 0).midicps * freqRatio }, { 440 }) }]
+        [\freq, Pfunc { |e| (~lpNote.notNil).if({ ~lpNote.(e[\degree] + ~matPitchOffset.(name), 0).midicps * freqRatio }, { 440 }) }]
     }, { [] });
     Pbind(*([
         \stepIdx, Pseq((0..15), inf),
@@ -949,6 +950,17 @@ OSCdef(\mat_audition, { |msg, time, addr|
 
 // reader: clamp to 0..1, default 0 when absent
 ~matModSourceVal = { |key| (~matModCache[key] ? 0).clip(0, 1) };
+
+// +/- scale-degree offset at full deflection (env-tunable; 7 ~= 1 diatonic octave)
+~matPitchRange = ~matPitchRange ? 7;
+// bipolar additive sum of \pitch bindings -> integer degree offset applied in the freq Pfunc
+~matPitchOffset = { |name|
+    var off = 0;
+    ((~matVoiceMods[name] ? []).select { |b| b[\target] == \pitch }).do { |b|
+        off = off + (((~matModSourceVal.(b[\source]) * 2 - 1) * b[\depth] * ~matPitchRange).round.asInteger)
+    };
+    off
+};
 
 // -- Live modvalues push (~12 Hz) --
 ~matModValuesPush = {

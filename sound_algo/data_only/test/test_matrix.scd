@@ -766,6 +766,43 @@ File.delete(~matDir +/+ "t6_tmp.matrix");
     ~matVoicePoses[\acid] = [];
 }.value;
 
+// --- pitch target (cycle 1): bipolar scale-degree offset ---
+~matPitchRange = 7;   // make the assertion deterministic regardless of env
+// +full deflection: source 1.0, depth 1.0 -> +7
+~matVoiceMods[\acid] = [ (source: \rHandY, target: \pitch, depth: 1.0) ];
+~matModCache[\rHandY] = 1.0;
+pass = pass and: { ~matPitchOffset.(\acid) == 7 };
+// -full deflection: source 0.0 -> -7
+~matModCache[\rHandY] = 0.0;
+pass = pass and: { ~matPitchOffset.(\acid) == -7 };
+// neutral: source 0.5 -> 0
+~matModCache[\rHandY] = 0.5;
+pass = pass and: { ~matPitchOffset.(\acid) == 0 };
+// additive: two bindings sum (1.0*+7 and 0.5-source*0 -> +7)
+~matVoiceMods[\acid] = [ (source: \rHandY, target: \pitch, depth: 1.0),
+                          (source: \bodyY,  target: \pitch, depth: 1.0) ];
+~matModCache[\rHandY] = 1.0; ~matModCache[\bodyY] = 0.5;   // +7 + 0 = +7
+pass = pass and: { ~matPitchOffset.(\acid) == 7 };
+~matVoiceMods[\acid] = [];
+// gating: pitch allowed on acid (melodic) but NOT on kick (percussive)
+pass = pass and: { (~matModTargets[\acid] ? []).includes(\pitch) };
+pass = pass and: { (~matModTargets[\kick] ? []).includes(\pitch).not };
+// pitch is NOT emitted as a ~matModPairs pair (handled in the freq Pfunc)
+~matVoiceMods[\acid] = [ (source: \rHandY, target: \pitch, depth: 1.0) ];
+pass = pass and: { ~matModPairs.(\acid, (amp: 1.0), { 1.0 }).includes(\pitch).not };
+~matVoiceMods[\acid] = [];
+// freq integration: with ~lpNote stubbed, a +7 offset transposes the played note up
+~origLpNote = ~lpNote;
+~lpNote = { |deg, oct| 60 + deg };   // simple midi-note stub
+~matVoiceMods[\acid] = [ (source: \rHandY, target: \pitch, depth: 1.0) ];
+~matModCache[\rHandY] = 1.0;   // +7
+~matColorDefs[5][2][\steps] = Array.fill(16, nil).put(0, (degree: 0, vel: 0.8));
+~pEv = ~matVariation.(\acid, 2, 5).asStream.next(());
+pass = pass and: { (~pEv[\freq] - ((60 + 0 + 7).midicps * (2 ** (~matColorDefs[5][2][\octave] ? 0)))).abs < 1.0 };
+~lpNote = ~origLpNote;
+~matVoiceMods[\acid] = [];
+~matColorDefs[5][2][\steps] = Array.fill(16, nil);
+
 pass.if(
     { "TEST PASS".postln },
     { "TEST FAIL".postln }
