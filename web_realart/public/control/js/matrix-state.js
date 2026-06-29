@@ -28,7 +28,38 @@ export const MATRIX_INST_CHOICES = {
   crash:["lp_crash","tr909_ride","akai_s"], shaker:["lp_shaker","tr909_hat","tr808_hat"]
 };
 
-export const MATRIX_MOD_SOURCES = ["none","lHandY","rHandY","lHandX","rHandX","lOpen","rOpen","handSpeed","handDist","bodyX","bodyY","depth"];
+export const MOD_SOURCE_ORDER = [
+  "lHandY","rHandY","lHandX","rHandX","lOpen","rOpen","handSpeed","handDist",
+  "bodyX","bodyY","depth","bodyVitesse","bodyAccel","bodySym","headX","headY",
+  "limbSpan","danse","mouthOpen"
+];
+export const MATRIX_MOD_SOURCES = ["none", ...MOD_SOURCE_ORDER];
+
+export const MOD_SOURCE_LABELS = {
+  none:"—",
+  lHandY:"Main G ↕", rHandY:"Main D ↕", lHandX:"Main G ↔", rHandX:"Main D ↔",
+  lOpen:"Main G ouvert", rOpen:"Main D ouvert", handSpeed:"Vitesse mains", handDist:"Écart mains",
+  bodyX:"Corps ↔", bodyY:"Corps ↕", depth:"Profondeur",
+  bodyVitesse:"Vitesse corps", bodyAccel:"Accél. corps", bodySym:"Symétrie",
+  headX:"Tête ↔", headY:"Tête ↕", limbSpan:"Envergure", danse:"Danse (proba)", mouthOpen:"Bouche"
+};
+export const MOD_TARGET_LABELS = { none:"—", amp:"volume", cutoff:"cutoff", pan:"pan", rev:"reverb" };
+
+// Curated pose/event dropdown. id is the SC poseId symbol; __custom__ reveals a text input.
+export const POSE_EVENT_CHOICES = [
+  { id:"danse", label:"Danse" }, { id:"debout", label:"Debout" }, { id:"assise", label:"Assise" },
+  { id:"fingerL1", label:"Frappe MG pouce" },  { id:"fingerL2", label:"Frappe MG index" },
+  { id:"fingerL3", label:"Frappe MG majeur" }, { id:"fingerL4", label:"Frappe MG annul." },
+  { id:"fingerL5", label:"Frappe MG auric." },
+  { id:"fingerR1", label:"Frappe MD pouce" },  { id:"fingerR2", label:"Frappe MD index" },
+  { id:"fingerR3", label:"Frappe MD majeur" }, { id:"fingerR4", label:"Frappe MD annul." },
+  { id:"fingerR5", label:"Frappe MD auric." },
+  { id:"pinchL1", label:"Pincement MG index" }, { id:"pinchL2", label:"Pincement MG majeur" },
+  { id:"pinchL3", label:"Pincement MG annul." }, { id:"pinchL4", label:"Pincement MG auric." },
+  { id:"pinchR1", label:"Pincement MD index" }, { id:"pinchR2", label:"Pincement MD majeur" },
+  { id:"pinchR3", label:"Pincement MD annul." }, { id:"pinchR4", label:"Pincement MD auric." },
+  { id:"__custom__", label:"Personnalisé…" }
+];
 
 export const MATRIX_MOD_TARGETS = {
   kick:["none","amp","pan","rev"], hats:["none","amp","pan","rev"], clap:["none","amp","pan","rev"], perc:["none","amp","cutoff","pan","rev"],
@@ -85,9 +116,44 @@ export function resetMatGrid() {
   matGrid = Array.from({ length: MATRIX_VOICES.length }, () => new Array(MATRIX_BARS).fill(0));
 }
 
+// --- Per-voice mod/pose state (live bindings, separate from per-colour matColorDefs) ---
+export let matVoiceMods  = Array.from({ length: MATRIX_VOICES.length }, () => []); // [{source,target,depth}]
+export let matVoicePoses = Array.from({ length: MATRIX_VOICES.length }, () => []); // [{poseId,action}]
+export function resetVoiceMaps() {
+  matVoiceMods  = Array.from({ length: MATRIX_VOICES.length }, () => []);
+  matVoicePoses = Array.from({ length: MATRIX_VOICES.length }, () => []);
+}
+
+export function parseVoiceMod(args) {
+  const vi = Math.round(Number(args[0]));
+  const n = Math.round(Number(args[1]));
+  const list = [];
+  for (let k = 0; k < n; k++) {
+    const b = 2 + k * 3;
+    list.push({ source: String(args[b]), target: String(args[b + 1]), depth: Number(args[b + 2]) });
+  }
+  return { vi, list };
+}
+export function parseVoicePose(args) {
+  const vi = Math.round(Number(args[0]));
+  const n = Math.round(Number(args[1]));
+  const list = [];
+  for (let k = 0; k < n; k++) {
+    const b = 2 + k * 2;
+    list.push({ poseId: String(args[b]), action: String(args[b + 1]) });
+  }
+  return { vi, list };
+}
+export function parseModValues(args) {
+  const m = {};
+  for (let i = 0; i < MOD_SOURCE_ORDER.length; i++) m[MOD_SOURCE_ORDER[i]] = Number(args[i]) || 0;
+  return m;
+}
+
 export function saveMatState() {
   try { localStorage.setItem(MATRIX_STORAGE_KEY,
-    JSON.stringify({ grid: matGrid, inst: matInst, cdef: matColorDefs })); } catch (_e) {}
+    JSON.stringify({ grid: matGrid, inst: matInst, cdef: matColorDefs,
+                     vmod: matVoiceMods, vpose: matVoicePoses })); } catch (_e) {}
 }
 
 export function loadMatState() {
@@ -109,6 +175,10 @@ export function loadMatState() {
           }
         }
       }
+      // Restore voice mod/pose display caches when present with correct length.
+      // SC remains authoritative; these are UI display caches only.
+      if (Array.isArray(raw.vmod) && raw.vmod.length === MATRIX_VOICES.length) matVoiceMods = raw.vmod;
+      if (Array.isArray(raw.vpose) && raw.vpose.length === MATRIX_VOICES.length) matVoicePoses = raw.vpose;
       return; }
     if (Array.isArray(raw) && raw.length === MATRIX_VOICES.length) { matGrid = raw; return; }   // legacy: bare grid
   } catch (_e) {}
