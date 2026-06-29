@@ -877,27 +877,106 @@ def arc_outro_synthwave_drive(g):
 INTRO_ARCS["synthwave_drive"] = arc_intro_synthwave_drive
 OUTRO_ARCS["synthwave_drive"] = arc_outro_synthwave_drive
 
-# -- breaks / DnB / jungle / footwork --
-def _breaks_intro(g, lead="reese", extra=None):
+# -- breaks / DnB / jungle / footwork (independent bodies) --
+def arc_intro_breakbeat(g):
     fill(g, "kick", "IBRDP", 1, step=4); fill(g, "snare", "BRDP", 1, step=2, off=1)
-    fill(g, "sub", "BRDP", 1); fill(g, "shaker", "RDP", 1)
-    fill(g, lead, "DP", 1); fill(g, "perc", "DP", 1, step=2)
-    fill(g, "rim", "P", 1, step=2, off=1); fill(g, "pad", "P", 1)
-    if extra: fill(g, extra, "P", 1)
-    for v in ("snare", "sub", lead): fill(g, v, "O", 1)
+    fill(g, "sub", "BRDP", 1); fill(g, "shaker", "RDP", 1); fill(g, "reese", "DP", 1)
+    fill(g, "perc", "DP", 1, step=2); fill(g, "rim", "P", 1, step=2, off=1); fill(g, "pad", "P", 1)
+    for v in ("snare", "sub", "reese"): fill(g, v, "O", 1)
     fill(g, "kick", "O", 1, step=4); hit(g, "fx", [SECTIONS["P"][0]], 1); return g
-def _breaks_outro(g, lead="reese", extra=None):
+def arc_outro_breakbeat(g):
     fill(g, "kick", "IBRDP", 1, step=4); fill(g, "snare", "IBRD", 1, step=2, off=1)
-    fill(g, "sub", "IBRDP", 1); fill(g, "shaker", "IBRD", 1)
-    fill(g, lead, "IBR", 1); fill(g, "perc", "IBR", 1, step=2)
-    fill(g, "rim", "IB", 1, step=2, off=1); fill(g, "pad", "IB", 1)
-    if extra: fill(g, extra, "I", 1)
+    fill(g, "sub", "IBRDP", 1); fill(g, "shaker", "IBRD", 1); fill(g, "reese", "IBR", 1)
+    fill(g, "perc", "IBR", 1, step=2); fill(g, "rim", "IB", 1, step=2, off=1); fill(g, "pad", "IB", 1)
     hit(g, "fx", [0], 1); return g
-for _nm, _ex in [("breakbeat", None), ("bass_science", None), ("jungle_amen", None),
-                 ("dnb_roller", None), ("footwork_chop", None),
-                 ("neuro_reese", "stab"), ("tribal_perc", "tom")]:
-    INTRO_ARCS[_nm] = (lambda ex: (lambda g: _breaks_intro(g, "reese", ex)))(_ex)
-    OUTRO_ARCS[_nm] = (lambda ex: (lambda g: _breaks_outro(g, "reese", ex)))(_ex)
+INTRO_ARCS["breakbeat"] = arc_intro_breakbeat
+OUTRO_ARCS["breakbeat"] = arc_outro_breakbeat
+
+def arc_intro_bass_science(g):
+    fill(g, "kick", "IBRDP", 1, step=4); fill(g, "sub", "BRDP", 1); fill(g, "reese", "BRDP", 1)
+    fill(g, "snare", "RDP", 1, step=2, off=1); fill(g, "shaker", "RDP", 1)
+    fill(g, "perc", "DP", 1, step=2); fill(g, "stab", "P", 1); fill(g, "rim", "P", 1, step=2, off=1)
+    for v in ("sub", "reese", "snare"): fill(g, v, "O", 1)
+    fill(g, "kick", "O", 1, step=4); hit(g, "fx", [SECTIONS["P"][0]], 1); return g
+def arc_outro_bass_science(g):
+    fill(g, "kick", "IBRDP", 1, step=4); fill(g, "sub", "IBRDP", 1); fill(g, "reese", "IBRD", 1)
+    fill(g, "snare", "IBRD", 1, step=2, off=1); fill(g, "shaker", "IBR", 1)
+    fill(g, "perc", "IBR", 1, step=2); fill(g, "stab", "IB", 1); fill(g, "rim", "I", 1, step=2, off=1)
+    hit(g, "fx", [0], 1); return g
+INTRO_ARCS["bass_science"] = arc_intro_bass_science
+OUTRO_ARCS["bass_science"] = arc_outro_bass_science
+
+def arc_intro_jungle_amen(g):
+    fill(g, "kick", "BRDP", 1, step=4); fill(g, "snare", "BRDP", 1, step=2, off=1)
+    fill(g, "sub", "BRDP", 1); fill(g, "shaker", "RDP", 1); fill(g, "reese", "DP", 1)
+    fill(g, "snare", "P", 6, step=4, off=3); fill(g, "perc", "DP", 1, step=2); fill(g, "pad", "P", 1)
+    for v in ("snare", "sub", "reese"): fill(g, v, "O", 1)
+    fill(g, "kick", "O", 1, step=4); hit(g, "fx", [SECTIONS["P"][0]], 1); return g
+def arc_outro_jungle_amen(g):
+    fill(g, "kick", "IBRD", 1, step=4); fill(g, "snare", "IBRD", 1, step=2, off=1)
+    fill(g, "sub", "IBRD", 1); fill(g, "shaker", "IBR", 1); fill(g, "reese", "IBR", 1)
+    fill(g, "perc", "IB", 1, step=2); fill(g, "pad", "IB", 1); fill(g, "snare", "I", 6, step=4, off=3)
+    hit(g, "fx", [0], 1); return g
+INTRO_ARCS["jungle_amen"] = arc_intro_jungle_amen
+OUTRO_ARCS["jungle_amen"] = arc_outro_jungle_amen
+
+def arc_intro_dnb_roller(g):
+    fill(g, "kick", "IBRDP", 1, step=4); fill(g, "sub", "BRDP", 1)
+    fill(g, "snare", "BRDP", 1, step=2, off=1); fill(g, "reese", "RDP", 1)
+    fill(g, "shaker", "RDP", 1); fill(g, "perc", "DP", 1, step=2)
+    fill(g, "rim", "P", 1, step=2, off=1); fill(g, "pad", "P", 1)
+    for v in ("snare", "sub", "reese"): fill(g, v, "O", 1)
+    fill(g, "kick", "O", 1, step=4); hit(g, "fx", [SECTIONS["P"][0]], 1); return g
+def arc_outro_dnb_roller(g):
+    fill(g, "kick", "IBRDP", 1, step=4); fill(g, "sub", "IBRDP", 1)
+    fill(g, "snare", "IBRD", 1, step=2, off=1); fill(g, "reese", "IBRD", 1)
+    fill(g, "shaker", "IBR", 1); fill(g, "perc", "IBR", 1, step=2)
+    fill(g, "rim", "IB", 1, step=2, off=1); fill(g, "pad", "I", 1)
+    hit(g, "fx", [0], 1); return g
+INTRO_ARCS["dnb_roller"] = arc_intro_dnb_roller
+OUTRO_ARCS["dnb_roller"] = arc_outro_dnb_roller
+
+def arc_intro_footwork_chop(g):
+    fill(g, "kick", "IBRDP", 1, step=2); fill(g, "snare", "BRDP", 1, step=2, off=1)
+    fill(g, "sub", "BRDP", 1); fill(g, "shaker", "RDP", 1); fill(g, "reese", "DP", 1)
+    fill(g, "perc", "DP", 1, step=2); fill(g, "rim", "P", 1, step=2, off=1); fill(g, "pad", "P", 1)
+    for v in ("snare", "sub", "reese"): fill(g, v, "O", 1)
+    fill(g, "kick", "O", 1, step=2); hit(g, "fx", [SECTIONS["P"][0]], 1); return g
+def arc_outro_footwork_chop(g):
+    fill(g, "kick", "IBRDP", 1, step=2); fill(g, "snare", "IBRD", 1, step=2, off=1)
+    fill(g, "sub", "IBRDP", 1); fill(g, "shaker", "IBRD", 1); fill(g, "reese", "IBR", 1)
+    fill(g, "perc", "IBR", 1, step=2); fill(g, "rim", "IB", 1, step=2, off=1); fill(g, "pad", "IB", 1)
+    hit(g, "fx", [0], 1); return g
+INTRO_ARCS["footwork_chop"] = arc_intro_footwork_chop
+OUTRO_ARCS["footwork_chop"] = arc_outro_footwork_chop
+
+def arc_intro_neuro_reese(g):
+    fill(g, "kick", "IBRDP", 1, step=4); fill(g, "sub", "BRDP", 1); fill(g, "reese", "BRDP", 1)
+    fill(g, "stab", "RDP", 1); fill(g, "snare", "RDP", 1, step=2, off=1)
+    fill(g, "shaker", "DP", 1); fill(g, "perc", "DP", 1, step=2); fill(g, "rim", "P", 1, step=2, off=1)
+    for v in ("sub", "reese", "stab"): fill(g, v, "O", 1)
+    fill(g, "kick", "O", 1, step=4); hit(g, "fx", [SECTIONS["P"][0]], 1); return g
+def arc_outro_neuro_reese(g):
+    fill(g, "kick", "IBRDP", 1, step=4); fill(g, "sub", "IBRDP", 1); fill(g, "reese", "IBRD", 1)
+    fill(g, "stab", "IBR", 1); fill(g, "snare", "IBR", 1, step=2, off=1)
+    fill(g, "shaker", "IB", 1); fill(g, "perc", "IB", 1, step=2); fill(g, "rim", "I", 1, step=2, off=1)
+    hit(g, "fx", [0], 1); return g
+INTRO_ARCS["neuro_reese"] = arc_intro_neuro_reese
+OUTRO_ARCS["neuro_reese"] = arc_outro_neuro_reese
+
+def arc_intro_tribal_perc(g):
+    fill(g, "kick", "IBRDP", 1, step=4); fill(g, "sub", "BRDP", 1); fill(g, "perc", "BRDP", 1)
+    fill(g, "tom", "RDP", 1, step=2); fill(g, "shaker", "RDP", 1); fill(g, "reese", "DP", 1)
+    fill(g, "snare", "DP", 1, step=2, off=1); fill(g, "rim", "P", 1, step=2, off=1); fill(g, "pad", "P", 1)
+    for v in ("kick", "sub", "perc"): fill(g, v, "O", 1)
+    hit(g, "fx", [SECTIONS["P"][0]], 1); return g
+def arc_outro_tribal_perc(g):
+    fill(g, "kick", "IBRDP", 1, step=4); fill(g, "sub", "IBRDP", 1); fill(g, "perc", "IBRD", 1)
+    fill(g, "tom", "IBR", 1, step=2); fill(g, "shaker", "IBR", 1); fill(g, "reese", "IB", 1)
+    fill(g, "snare", "IB", 1, step=2, off=1); fill(g, "rim", "I", 1, step=2, off=1); fill(g, "pad", "I", 1)
+    hit(g, "fx", [0], 1); return g
+INTRO_ARCS["tribal_perc"] = arc_intro_tribal_perc
+OUTRO_ARCS["tribal_perc"] = arc_outro_tribal_perc
 
 # -- electro / EBM / synthwave --
 def arc_intro_electro_808(g):
