@@ -86,6 +86,21 @@ document.addEventListener("DOMContentLoaded", () => {
     send("/matrix/clear");
   });
 
+  // Matrix evolve toggle + rate
+  const matEvolve = document.getElementById("matrix-evolve");
+  const matEvolveRate = document.getElementById("matrix-evolve-rate");
+  if (matEvolve) matEvolve.addEventListener("click", () => {
+    const isOn = !matEvolve.classList.contains("on");
+    send("/matrix/evolve", isOn ? 1 : 0);
+  });
+  if (matEvolveRate) matEvolveRate.addEventListener("change", () => send("/matrix/evolverate", +matEvolveRate.value));
+  on("/matrix/evolve", (args) => {
+    const isOn = Math.round(Number(args[0])) === 1;
+    const rate = Number(args[1]);
+    if (matEvolve) matEvolve.classList.toggle("on", isOn);
+    if (matEvolveRate && Number.isFinite(rate)) matEvolveRate.value = rate;
+  });
+
   document.querySelectorAll(".kit-btn").forEach((b) => {
     b.addEventListener("click", () => send("/matrix/kit", b.dataset.kit));
   });

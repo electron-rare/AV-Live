@@ -218,3 +218,7 @@ button.queued { animation: queued-blink 600ms ease-in-out infinite alternate; }
   border-radius:3px; vertical-align:middle; margin:0 4px; position:relative; background:#1b1b1b; }
 .cd-meter::after { content:""; position:absolute; left:0; top:0; bottom:0;
   width:calc(var(--v,0) * 100%); background:#1a8; border-radius:2px; }
+
+/* --- Matrix evolve toggle --- */
+.mat-evolve { padding: 2px 8px; flex: none; }
+.mat-evolve.on { background: #1a8; color: #000; }
