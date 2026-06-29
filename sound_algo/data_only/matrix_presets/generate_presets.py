@@ -614,6 +614,369 @@ def emit_colordefs(preset_name):
     return out
 
 
+# -- intro/outro arc registries (populated by arc_intro_*/arc_outro_* as they are
+# authored; a morceau with no registered section reuses its live arc) --
+INTRO_ARCS = {}
+OUTRO_ARCS = {}
+
+
+# === hand-written intro/outro arcs (one independent body per morceau). intro =
+# voices enter across the 64 bars (sparse->full); outro = voices exit (full->
+# sparse). Section codes: I B R D P K O. ==========================================
+
+# -- four-on-the-floor --
+def arc_intro_techno_drive(g):
+    fill(g, "kick", "IBRDP", 1); fill(g, "sub", "BRDP", 1); fill(g, "hats", "BRDP", 1)
+    fill(g, "clap", "RDP", 1); fill(g, "perc", "DP", 1); fill(g, "shaker", "DP", 1)
+    fill(g, "ride", "P", 1); fill(g, "chord", "P", 1); fill(g, "pad", "P", 1)
+    for v in ("kick", "sub", "hats", "clap"): fill(g, v, "O", 1)   # lead-in to live
+    hit(g, "crash", [SECTIONS["P"][0]], 1); return g
+def arc_outro_techno_drive(g):
+    fill(g, "kick", "IBRDP", 1); fill(g, "sub", "IBRDP", 1)
+    fill(g, "hats", "IBRD", 1); fill(g, "clap", "IBRD", 1)
+    fill(g, "perc", "IBR", 1); fill(g, "shaker", "IBRD", 1)
+    fill(g, "ride", "IBRD", 1); fill(g, "chord", "IB", 1); fill(g, "pad", "IBR", 1)
+    hit(g, "crash", [0], 1); return g
+INTRO_ARCS["techno_drive"] = arc_intro_techno_drive
+OUTRO_ARCS["techno_drive"] = arc_outro_techno_drive
+
+def arc_intro_detroit_soul(g):
+    fill(g, "kick", "IBRDP", 1); fill(g, "sub", "BRDP", 1); fill(g, "hats", "BRDP", 1)
+    fill(g, "pad", "RDP", 1); fill(g, "clap", "DP", 1); fill(g, "chord", "DP", 1)
+    fill(g, "stab", "P", 1); fill(g, "perc", "P", 1); fill(g, "shaker", "P", 1)
+    for v in ("kick", "sub", "hats", "pad"): fill(g, v, "O", 1)
+    hit(g, "crash", [SECTIONS["P"][0]], 1); return g
+def arc_outro_detroit_soul(g):
+    fill(g, "kick", "IBRDP", 1); fill(g, "sub", "IBRDP", 1)
+    fill(g, "hats", "IBRD", 1); fill(g, "pad", "IBRD", 1)
+    fill(g, "clap", "IBR", 1); fill(g, "chord", "IBR", 1)
+    fill(g, "stab", "IB", 1); fill(g, "perc", "IB", 1); fill(g, "shaker", "IBR", 1)
+    hit(g, "crash", [0], 1); return g
+INTRO_ARCS["detroit_soul"] = arc_intro_detroit_soul
+OUTRO_ARCS["detroit_soul"] = arc_outro_detroit_soul
+
+def arc_intro_peak_drop(g):
+    fill(g, "kick", "IBRDP", 1); fill(g, "sub", "BRDP", 1); fill(g, "hats", "BRDP", 1)
+    fill(g, "acid", "RDP", 1); fill(g, "clap", "DP", 1); fill(g, "lead", "DP", 1)
+    fill(g, "perc", "P", 1); fill(g, "shaker", "P", 1); fill(g, "pad", "P", 1)
+    for v in ("kick", "sub", "hats", "acid"): fill(g, v, "O", 1)
+    hit(g, "crash", [SECTIONS["P"][0]], 1); hit(g, "fx", [SECTIONS["R"][0]], 1); return g
+def arc_outro_peak_drop(g):
+    fill(g, "kick", "IBRDP", 1); fill(g, "sub", "IBRDP", 1)
+    fill(g, "hats", "IBRD", 1); fill(g, "acid", "IBRD", 1)
+    fill(g, "clap", "IBR", 1); fill(g, "lead", "IBR", 1)
+    fill(g, "perc", "IB", 1); fill(g, "shaker", "IBR", 1); fill(g, "pad", "IB", 1)
+    hit(g, "crash", [0], 1); return g
+INTRO_ARCS["peak_drop"] = arc_intro_peak_drop
+OUTRO_ARCS["peak_drop"] = arc_outro_peak_drop
+
+def arc_intro_rave_stab(g):
+    fill(g, "kick", "IBRDP", 1); fill(g, "sub", "BRDP", 1); fill(g, "hats", "BRDP", 1)
+    fill(g, "stab", "RDP", 1); fill(g, "clap", "DP", 1); fill(g, "chord", "DP", 1)
+    fill(g, "perc", "P", 1); fill(g, "shaker", "P", 1); fill(g, "ride", "P", 1)
+    for v in ("kick", "sub", "hats", "stab"): fill(g, v, "O", 1)
+    hit(g, "crash", [SECTIONS["P"][0]], 1); return g
+def arc_outro_rave_stab(g):
+    fill(g, "kick", "IBRDP", 1); fill(g, "sub", "IBRDP", 1)
+    fill(g, "hats", "IBRD", 1); fill(g, "stab", "IBRD", 1)
+    fill(g, "clap", "IBR", 1); fill(g, "chord", "IBR", 1)
+    fill(g, "perc", "IB", 1); fill(g, "shaker", "IBR", 1); fill(g, "ride", "IB", 1)
+    hit(g, "crash", [0], 1); return g
+INTRO_ARCS["rave_stab"] = arc_intro_rave_stab
+OUTRO_ARCS["rave_stab"] = arc_outro_rave_stab
+
+# -- rolling (dub) --
+def arc_intro_dub_techno(g):
+    fill(g, "kick", "IBRDP", 1); fill(g, "sub", "BRDP", 1)
+    fill(g, "hats", "BRDP", 1, step=2, off=1); fill(g, "rim", "RDP", 1)
+    fill(g, "reese", "DP", 1); fill(g, "perc", "DP", 1, step=2)
+    fill(g, "shaker", "P", 1); fill(g, "pad", "P", 1); fill(g, "bells", "P", 1)
+    for v in ("kick", "sub", "rim"): fill(g, v, "O", 1)
+    fill(g, "hats", "O", 1, step=2, off=1)
+    hit(g, "fx", [SECTIONS["P"][0]], 1); return g
+def arc_outro_dub_techno(g):
+    fill(g, "kick", "IBRDP", 1); fill(g, "sub", "IBRDP", 1)
+    fill(g, "hats", "IBRD", 1, step=2, off=1); fill(g, "rim", "IBRD", 1)
+    fill(g, "reese", "IBRD", 1); fill(g, "perc", "IBR", 1, step=2)
+    fill(g, "shaker", "IBR", 1); fill(g, "pad", "IB", 1); fill(g, "bells", "I", 1)
+    return g
+INTRO_ARCS["dub_techno"] = arc_intro_dub_techno
+OUTRO_ARCS["dub_techno"] = arc_outro_dub_techno
+
+# -- rolling (psy / minimal / hypnotic) --
+def arc_intro_hypnotic_arp(g):
+    fill(g, "kick", "IBRDP", 1); fill(g, "sub", "BRDP", 1)
+    fill(g, "hats", "BRDP", 1, step=2, off=1); fill(g, "rim", "RDP", 1)
+    fill(g, "reese", "DP", 1); fill(g, "arp", "DP", 1)
+    fill(g, "perc", "P", 1, step=2); fill(g, "pad", "P", 1); fill(g, "bells", "P", 1)
+    for v in ("kick", "sub", "hats", "arp"): fill(g, v, "O", 1)
+    hit(g, "fx", [SECTIONS["P"][0]], 1); return g
+def arc_outro_hypnotic_arp(g):
+    fill(g, "kick", "IBRDP", 1); fill(g, "sub", "IBRDP", 1)
+    fill(g, "hats", "IBRD", 1, step=2, off=1); fill(g, "rim", "IBRD", 1)
+    fill(g, "reese", "IBR", 1); fill(g, "arp", "IBR", 1)
+    fill(g, "perc", "IB", 1, step=2); fill(g, "pad", "IB", 1); fill(g, "bells", "I", 1); return g
+INTRO_ARCS["hypnotic_arp"] = arc_intro_hypnotic_arp
+OUTRO_ARCS["hypnotic_arp"] = arc_outro_hypnotic_arp
+
+def arc_intro_psytrance_roll(g):
+    fill(g, "kick", "IBRDP", 1); fill(g, "sub", "BRDP", 1)
+    fill(g, "hats", "BRDP", 1, step=2, off=1); fill(g, "rim", "RDP", 1)
+    fill(g, "reese", "DP", 1); fill(g, "acid", "DP", 1)
+    fill(g, "perc", "P", 1, step=2); fill(g, "pad", "P", 1); fill(g, "bells", "P", 1)
+    for v in ("kick", "sub", "hats", "acid"): fill(g, v, "O", 1)
+    hit(g, "fx", [SECTIONS["P"][0]], 1); return g
+def arc_outro_psytrance_roll(g):
+    fill(g, "kick", "IBRDP", 1); fill(g, "sub", "IBRDP", 1)
+    fill(g, "hats", "IBRD", 1, step=2, off=1); fill(g, "rim", "IBRD", 1)
+    fill(g, "reese", "IBR", 1); fill(g, "acid", "IBR", 1)
+    fill(g, "perc", "IB", 1, step=2); fill(g, "pad", "IB", 1); fill(g, "bells", "I", 1); return g
+INTRO_ARCS["psytrance_roll"] = arc_intro_psytrance_roll
+OUTRO_ARCS["psytrance_roll"] = arc_outro_psytrance_roll
+
+def arc_intro_minimal_hypno(g):
+    fill(g, "kick", "IBRDP", 1); fill(g, "sub", "BRDP", 1)
+    fill(g, "hats", "BRDP", 1, step=2, off=1); fill(g, "rim", "RDP", 1)
+    fill(g, "reese", "DP", 1); fill(g, "perc", "P", 1, step=2)
+    fill(g, "pad", "P", 1); fill(g, "bells", "P", 1)
+    for v in ("kick", "sub", "hats", "reese"): fill(g, v, "O", 1)
+    return g
+def arc_outro_minimal_hypno(g):
+    fill(g, "kick", "IBRDP", 1); fill(g, "sub", "IBRDP", 1)
+    fill(g, "hats", "IBRD", 1, step=2, off=1); fill(g, "rim", "IBR", 1)
+    fill(g, "reese", "IBR", 1); fill(g, "perc", "IB", 1, step=2); fill(g, "bells", "I", 1); return g
+INTRO_ARCS["minimal_hypno"] = arc_intro_minimal_hypno
+OUTRO_ARCS["minimal_hypno"] = arc_outro_minimal_hypno
+
+# -- acid --
+def arc_intro_acid_journey(g):
+    fill(g, "kick", "IBRDP", 1); fill(g, "sub", "BRDP", 1); fill(g, "hats", "BRDP", 1)
+    fill(g, "acid", "RDP", 1); fill(g, "clap", "DP", 1); fill(g, "perc", "DP", 1)
+    fill(g, "shaker", "P", 1); fill(g, "pad", "P", 1)
+    for v in ("kick", "sub", "hats", "acid"): fill(g, v, "O", 1)
+    hit(g, "crash", [SECTIONS["P"][0]], 1); return g
+def arc_outro_acid_journey(g):
+    fill(g, "kick", "IBRDP", 1); fill(g, "sub", "IBRDP", 1); fill(g, "hats", "IBRD", 1)
+    fill(g, "acid", "IBRD", 1); fill(g, "clap", "IBR", 1); fill(g, "perc", "IB", 1)
+    fill(g, "shaker", "IB", 1); fill(g, "pad", "I", 1)
+    hit(g, "crash", [0], 1); return g
+INTRO_ARCS["acid_journey"] = arc_intro_acid_journey
+OUTRO_ARCS["acid_journey"] = arc_outro_acid_journey
+
+# -- industrial / hardcore --
+def arc_intro_schranz_drive(g):
+    fill(g, "kick", "IBRDP", 1); fill(g, "sub", "BRDP", 1); fill(g, "hats", "BRDP", 1)
+    fill(g, "acid", "RDP", 1); fill(g, "perc", "DP", 1); fill(g, "stab", "DP", 1)
+    fill(g, "snare", "P", 1); fill(g, "shaker", "P", 1); fill(g, "reese", "P", 1)
+    for v in ("kick", "sub", "hats", "acid"): fill(g, v, "O", 1)
+    hit(g, "crash", [SECTIONS["P"][0]], 1); return g
+def arc_outro_schranz_drive(g):
+    fill(g, "kick", "IBRDP", 1); fill(g, "sub", "IBRDP", 1); fill(g, "hats", "IBRD", 1)
+    fill(g, "acid", "IBRD", 1); fill(g, "perc", "IBR", 1); fill(g, "stab", "IBR", 1)
+    fill(g, "snare", "IB", 1); fill(g, "shaker", "IB", 1); fill(g, "reese", "I", 1)
+    hit(g, "crash", [0], 1); return g
+INTRO_ARCS["schranz_drive"] = arc_intro_schranz_drive
+OUTRO_ARCS["schranz_drive"] = arc_outro_schranz_drive
+
+def arc_intro_industrial_grind(g):
+    fill(g, "kick", "IBRDP", 6); fill(g, "sub", "BRDP", 1); fill(g, "perc", "BRDP", 6)
+    fill(g, "tom", "RDP", 1, step=2); fill(g, "reese", "DP", 1); fill(g, "stab", "DP", 1)
+    fill(g, "snare", "P", 6, step=4, off=2); fill(g, "shaker", "P", 1); fill(g, "sweep", "P", 1)
+    for v in ("kick", "sub", "perc", "reese"): fill(g, v, "O", 1)
+    hit(g, "crash", [SECTIONS["P"][0]], 1); return g
+def arc_outro_industrial_grind(g):
+    fill(g, "kick", "IBRDP", 6); fill(g, "sub", "IBRDP", 1); fill(g, "perc", "IBRD", 6)
+    fill(g, "tom", "IBR", 1, step=2); fill(g, "reese", "IBR", 1); fill(g, "stab", "IB", 1)
+    fill(g, "snare", "IB", 6, step=4, off=2); fill(g, "shaker", "I", 1); fill(g, "sweep", "I", 1)
+    hit(g, "crash", [0], 1); return g
+INTRO_ARCS["industrial_grind"] = arc_intro_industrial_grind
+OUTRO_ARCS["industrial_grind"] = arc_outro_industrial_grind
+
+def arc_intro_hardcore_punk(g):
+    fill(g, "kick", "IBRDP", 6); fill(g, "sub", "BRDP", 1); fill(g, "hats", "BRDP", 1)
+    fill(g, "perc", "RDP", 6); fill(g, "reese", "DP", 1); fill(g, "stab", "DP", 1)
+    fill(g, "snare", "P", 6, step=4, off=2); fill(g, "clap", "P", 1); fill(g, "shaker", "P", 1)
+    for v in ("kick", "sub", "hats", "reese"): fill(g, v, "O", 1)
+    hit(g, "crash", [SECTIONS["P"][0]], 1); return g
+def arc_outro_hardcore_punk(g):
+    fill(g, "kick", "IBRDP", 6); fill(g, "sub", "IBRDP", 1); fill(g, "hats", "IBRD", 1)
+    fill(g, "perc", "IBRD", 6); fill(g, "reese", "IBR", 1); fill(g, "stab", "IBR", 1)
+    fill(g, "snare", "IB", 6, step=4, off=2); fill(g, "clap", "IB", 1); fill(g, "shaker", "I", 1)
+    hit(g, "crash", [0], 1); return g
+INTRO_ARCS["hardcore_punk"] = arc_intro_hardcore_punk
+OUTRO_ARCS["hardcore_punk"] = arc_outro_hardcore_punk
+
+# -- trance / melodic / progressive --
+def arc_intro_trance_euphoria(g):
+    fill(g, "kick", "IBRDP", 1); fill(g, "sub", "BRDP", 1); fill(g, "hats", "BRDP", 1)
+    fill(g, "pad", "RDP", 1); fill(g, "arp", "RDP", 1); fill(g, "chord", "DP", 1)
+    fill(g, "lead", "DP", 1); fill(g, "melody", "P", 1); fill(g, "bells", "P", 1); fill(g, "shaker", "P", 1)
+    for v in ("kick", "sub", "hats", "arp"): fill(g, v, "O", 1)
+    hit(g, "crash", [SECTIONS["P"][0]], 1); return g
+def arc_outro_trance_euphoria(g):
+    fill(g, "kick", "IBRDP", 1); fill(g, "sub", "IBRDP", 1); fill(g, "hats", "IBRD", 1)
+    fill(g, "pad", "IBRD", 1); fill(g, "arp", "IBRD", 1); fill(g, "chord", "IBR", 1)
+    fill(g, "lead", "IBR", 1); fill(g, "melody", "IB", 1); fill(g, "bells", "IB", 1); fill(g, "shaker", "I", 1)
+    hit(g, "crash", [0], 1); return g
+INTRO_ARCS["trance_euphoria"] = arc_intro_trance_euphoria
+OUTRO_ARCS["trance_euphoria"] = arc_outro_trance_euphoria
+
+def arc_intro_melodic_builder(g):
+    fill(g, "kick", "IBRDP", 1); fill(g, "sub", "BRDP", 1); fill(g, "pad", "BRDP", 1)
+    fill(g, "hats", "RDP", 1); fill(g, "arp", "RDP", 1); fill(g, "chord", "DP", 1)
+    fill(g, "lead", "DP", 1); fill(g, "melody", "P", 1); fill(g, "bells", "P", 1)
+    for v in ("kick", "sub", "pad", "arp"): fill(g, v, "O", 1)
+    hit(g, "crash", [SECTIONS["P"][0]], 1); return g
+def arc_outro_melodic_builder(g):
+    fill(g, "kick", "IBRDP", 1); fill(g, "sub", "IBRDP", 1); fill(g, "pad", "IBRD", 1)
+    fill(g, "hats", "IBRD", 1); fill(g, "arp", "IBR", 1); fill(g, "chord", "IBR", 1)
+    fill(g, "lead", "IB", 1); fill(g, "melody", "IB", 1); fill(g, "bells", "I", 1)
+    hit(g, "crash", [0], 1); return g
+INTRO_ARCS["melodic_builder"] = arc_intro_melodic_builder
+OUTRO_ARCS["melodic_builder"] = arc_outro_melodic_builder
+
+def arc_intro_melodic_deep(g):
+    fill(g, "kick", "IBRDP", 1); fill(g, "sub", "BRDP", 1); fill(g, "pad", "BRDP", 1)
+    fill(g, "reese", "RDP", 1); fill(g, "arp", "RDP", 1); fill(g, "chord", "DP", 1)
+    fill(g, "lead", "DP", 1); fill(g, "melody", "P", 1); fill(g, "bells", "P", 1)
+    for v in ("kick", "sub", "pad", "arp"): fill(g, v, "O", 1)
+    hit(g, "crash", [SECTIONS["P"][0]], 1); return g
+def arc_outro_melodic_deep(g):
+    fill(g, "kick", "IBRDP", 1); fill(g, "sub", "IBRDP", 1); fill(g, "pad", "IBRD", 1)
+    fill(g, "reese", "IBRD", 1); fill(g, "arp", "IBR", 1); fill(g, "chord", "IBR", 1)
+    fill(g, "lead", "IB", 1); fill(g, "melody", "IB", 1); fill(g, "bells", "I", 1)
+    hit(g, "crash", [0], 1); return g
+INTRO_ARCS["melodic_deep"] = arc_intro_melodic_deep
+OUTRO_ARCS["melodic_deep"] = arc_outro_melodic_deep
+
+def arc_intro_progressive_lift(g):
+    fill(g, "kick", "IBRDP", 1); fill(g, "sub", "BRDP", 1); fill(g, "hats", "BRDP", 1)
+    fill(g, "pad", "RDP", 1); fill(g, "arp", "RDP", 1); fill(g, "reese", "DP", 1)
+    fill(g, "lead", "DP", 1); fill(g, "melody", "P", 1); fill(g, "bells", "P", 1); fill(g, "chord", "P", 1)
+    for v in ("kick", "sub", "hats", "arp"): fill(g, v, "O", 1)
+    hit(g, "crash", [SECTIONS["P"][0]], 1); return g
+def arc_outro_progressive_lift(g):
+    fill(g, "kick", "IBRDP", 1); fill(g, "sub", "IBRDP", 1); fill(g, "hats", "IBRD", 1)
+    fill(g, "pad", "IBRD", 1); fill(g, "arp", "IBR", 1); fill(g, "reese", "IBR", 1)
+    fill(g, "lead", "IB", 1); fill(g, "melody", "IB", 1); fill(g, "bells", "I", 1); fill(g, "chord", "I", 1)
+    hit(g, "crash", [0], 1); return g
+INTRO_ARCS["progressive_lift"] = arc_intro_progressive_lift
+OUTRO_ARCS["progressive_lift"] = arc_outro_progressive_lift
+
+def arc_intro_synthwave_drive(g):
+    fill(g, "kick", "IBRDP", 1); fill(g, "sub", "BRDP", 1); fill(g, "hats", "BRDP", 1)
+    fill(g, "pad", "RDP", 1); fill(g, "arp", "RDP", 1); fill(g, "chord", "DP", 1)
+    fill(g, "lead", "DP", 1); fill(g, "melody", "P", 1); fill(g, "bells", "P", 1)
+    for v in ("kick", "sub", "hats", "lead"): fill(g, v, "O", 1)
+    hit(g, "crash", [SECTIONS["P"][0]], 1); return g
+def arc_outro_synthwave_drive(g):
+    fill(g, "kick", "IBRDP", 1); fill(g, "sub", "IBRDP", 1); fill(g, "hats", "IBRD", 1)
+    fill(g, "pad", "IBRD", 1); fill(g, "arp", "IBR", 1); fill(g, "chord", "IBR", 1)
+    fill(g, "lead", "IB", 1); fill(g, "melody", "IB", 1); fill(g, "bells", "I", 1)
+    hit(g, "crash", [0], 1); return g
+INTRO_ARCS["synthwave_drive"] = arc_intro_synthwave_drive
+OUTRO_ARCS["synthwave_drive"] = arc_outro_synthwave_drive
+
+# -- breaks / DnB / jungle / footwork --
+def _breaks_intro(g, lead="reese", extra=None):
+    fill(g, "kick", "IBRDP", 1, step=4); fill(g, "snare", "BRDP", 1, step=2, off=1)
+    fill(g, "sub", "BRDP", 1); fill(g, "shaker", "RDP", 1)
+    fill(g, lead, "DP", 1); fill(g, "perc", "DP", 1, step=2)
+    fill(g, "rim", "P", 1, step=2, off=1); fill(g, "pad", "P", 1)
+    if extra: fill(g, extra, "P", 1)
+    for v in ("snare", "sub", lead): fill(g, v, "O", 1)
+    fill(g, "kick", "O", 1, step=4); hit(g, "fx", [SECTIONS["P"][0]], 1); return g
+def _breaks_outro(g, lead="reese", extra=None):
+    fill(g, "kick", "IBRDP", 1, step=4); fill(g, "snare", "IBRD", 1, step=2, off=1)
+    fill(g, "sub", "IBRDP", 1); fill(g, "shaker", "IBRD", 1)
+    fill(g, lead, "IBR", 1); fill(g, "perc", "IBR", 1, step=2)
+    fill(g, "rim", "IB", 1, step=2, off=1); fill(g, "pad", "IB", 1)
+    if extra: fill(g, extra, "I", 1)
+    hit(g, "fx", [0], 1); return g
+for _nm, _ex in [("breakbeat", None), ("bass_science", None), ("jungle_amen", None),
+                 ("dnb_roller", None), ("footwork_chop", None),
+                 ("neuro_reese", "stab"), ("tribal_perc", "tom")]:
+    INTRO_ARCS[_nm] = (lambda ex: (lambda g: _breaks_intro(g, "reese", ex)))(_ex)
+    OUTRO_ARCS[_nm] = (lambda ex: (lambda g: _breaks_outro(g, "reese", ex)))(_ex)
+
+# -- electro / EBM / synthwave --
+def arc_intro_electro_808(g):
+    fill(g, "kick", "IBRDP", 1, step=2); fill(g, "sub", "BRDP", 1); fill(g, "hats", "BRDP", 1, step=2, off=1)
+    fill(g, "acid", "RDP", 1); fill(g, "stab", "DP", 1); fill(g, "melody", "DP", 1)
+    fill(g, "clap", "P", 1); fill(g, "perc", "P", 1); fill(g, "shaker", "P", 1)
+    for v in ("kick", "sub", "acid"): fill(g, v, "O", 1)
+    hit(g, "crash", [SECTIONS["P"][0]], 1); return g
+def arc_outro_electro_808(g):
+    fill(g, "kick", "IBRDP", 1, step=2); fill(g, "sub", "IBRDP", 1); fill(g, "hats", "IBRD", 1, step=2, off=1)
+    fill(g, "acid", "IBRD", 1); fill(g, "stab", "IBR", 1); fill(g, "melody", "IBR", 1)
+    fill(g, "clap", "IB", 1); fill(g, "perc", "IB", 1); fill(g, "shaker", "I", 1)
+    hit(g, "crash", [0], 1); return g
+INTRO_ARCS["electro_808"] = arc_intro_electro_808
+OUTRO_ARCS["electro_808"] = arc_outro_electro_808
+
+def arc_intro_ebm_body(g):
+    fill(g, "kick", "IBRDP", 1, step=2); fill(g, "sub", "BRDP", 1); fill(g, "reese", "BRDP", 1)
+    fill(g, "acid", "RDP", 1); fill(g, "stab", "DP", 1); fill(g, "melody", "DP", 1)
+    fill(g, "clap", "P", 1); fill(g, "perc", "P", 1); fill(g, "shaker", "P", 1)
+    for v in ("kick", "sub", "acid"): fill(g, v, "O", 1)
+    hit(g, "crash", [SECTIONS["P"][0]], 1); return g
+def arc_outro_ebm_body(g):
+    fill(g, "kick", "IBRDP", 1, step=2); fill(g, "sub", "IBRDP", 1); fill(g, "reese", "IBRD", 1)
+    fill(g, "acid", "IBRD", 1); fill(g, "stab", "IBR", 1); fill(g, "melody", "IBR", 1)
+    fill(g, "clap", "IB", 1); fill(g, "perc", "IB", 1); fill(g, "shaker", "I", 1)
+    hit(g, "crash", [0], 1); return g
+INTRO_ARCS["ebm_body"] = arc_intro_ebm_body
+OUTRO_ARCS["ebm_body"] = arc_outro_ebm_body
+
+def arc_intro_electro_funk(g):
+    fill(g, "kick", "IBRDP", 1, step=2); fill(g, "sub", "BRDP", 1); fill(g, "hats", "BRDP", 1, step=2, off=1)
+    fill(g, "acid", "RDP", 1); fill(g, "stab", "DP", 1); fill(g, "melody", "DP", 1)
+    fill(g, "clap", "P", 1); fill(g, "perc", "P", 1); fill(g, "shaker", "P", 1)
+    for v in ("kick", "sub", "melody"): fill(g, v, "O", 1)
+    hit(g, "crash", [SECTIONS["P"][0]], 1); return g
+def arc_outro_electro_funk(g):
+    fill(g, "kick", "IBRDP", 1, step=2); fill(g, "sub", "IBRDP", 1); fill(g, "hats", "IBRD", 1, step=2, off=1)
+    fill(g, "acid", "IBRD", 1); fill(g, "stab", "IBR", 1); fill(g, "melody", "IBR", 1)
+    fill(g, "clap", "IB", 1); fill(g, "perc", "IB", 1); fill(g, "shaker", "I", 1)
+    hit(g, "crash", [0], 1); return g
+INTRO_ARCS["electro_funk"] = arc_intro_electro_funk
+OUTRO_ARCS["electro_funk"] = arc_outro_electro_funk
+
+# -- ambient (pad-driven, sparse) --
+def arc_intro_ambient_intro(g):
+    fill(g, "pad", "IBRDP", 1); fill(g, "sub", "BRDP", 1); fill(g, "bells", "RDP", 1)
+    fill(g, "sweep", "DP", 1); fill(g, "melody", "DP", 1); fill(g, "chord", "P", 1)
+    fill(g, "kick", "P", 1, step=4)
+    for v in ("pad", "sub", "bells"): fill(g, v, "O", 1)
+    hit(g, "fx", [SECTIONS["P"][0]], 1); return g
+def arc_outro_ambient_intro(g):
+    fill(g, "pad", "IBRDP", 1); fill(g, "sub", "IBRD", 1); fill(g, "bells", "IBR", 1)
+    fill(g, "sweep", "IB", 1); fill(g, "melody", "IBR", 1); fill(g, "chord", "IB", 1)
+    fill(g, "kick", "IBR", 1, step=4)
+    hit(g, "fx", [0], 1); return g
+INTRO_ARCS["ambient_intro"] = arc_intro_ambient_intro
+OUTRO_ARCS["ambient_intro"] = arc_outro_ambient_intro
+
+
+def _sections(name):
+    arc, instkit, melodies, extra = PRESETS[name]
+    return dict(live=arc, intro=INTRO_ARCS.get(name, arc), outro=OUTRO_ARCS.get(name, arc),
+                instkit=instkit, melodies=melodies, extra=extra)
+
+
+class _Morceaux:
+    """28 morceaux, each resolving to 3 sections (intro/live/outro) lazily so the
+    arc registries can be populated anywhere at module level."""
+    def __iter__(self): return iter(PRESETS)
+    def items(self): return ((n, _sections(n)) for n in PRESETS)
+    def keys(self): return PRESETS.keys()
+    def __getitem__(self, n): return _sections(n)
+    def __len__(self): return len(PRESETS)
+
+
+MORCEAUX = _Morceaux()
+
+
 def to_sc(name, arc_fn, instkit, melodies, extra):
     # melodic voices carrying steps need a concrete instrument (step mode builds a
     # standalone Pbind with no base \instrument) -> default to the base lp_ synth.
@@ -646,11 +1009,15 @@ def to_sc(name, arc_fn, instkit, melodies, extra):
 def main():
     import os
     here = os.path.dirname(os.path.abspath(__file__))
-    for name, (arc_fn, instkit, melodies, extra) in PRESETS.items():
-        sc = to_sc(name, arc_fn, instkit, melodies, extra)
-        with open(os.path.join(here, name + ".matrix"), "w") as f:
-            f.write(sc)
-    print("wrote %d presets (22 voices x %d bars, melodies + colour arcs)" % (len(PRESETS), BARS))
+    n = 0
+    for name, m in MORCEAUX.items():
+        for sec in ("intro", "live", "outro"):
+            sc = to_sc("%s_%s" % (name, sec), m[sec], m["instkit"], m["melodies"], m["extra"])
+            with open(os.path.join(here, "%s_%s.matrix" % (name, sec)), "w") as f:
+                f.write(sc)
+            n += 1
+    print("wrote %d presets (%d morceaux x intro/live/outro, 22 voices x %d bars)"
+          % (n, len(MORCEAUX), BARS))
 
 
 if __name__ == "__main__":
