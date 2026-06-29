@@ -39,9 +39,6 @@ def _mel(pairs):
     return [None if p is None else (int(p[0]), round(float(p[1]), 2)) for p in pairs]
 
 
-_DRUM_VELS = (0.30, 0.50, 0.80, 1.0)
-
-
 def _dhit(v):
     return None if v == 0.0 else (0, round(v, 2))
 
@@ -336,19 +333,26 @@ DRUM_VOICES = {"kick", "hats", "clap", "snare", "perc", "shaker", "ride", "rim",
                "tom", "crash", "fx", "sweep"}
 
 
-def _pick(bank, role, family):
-    """Return the 6-pattern list for role, preferring family then 'default'."""
-    rolebank = bank.get(role)
-    if rolebank is None:
-        return None
-    return rolebank.get(family) or rolebank.get("default")
-
-
 def patterns_for(voice, preset_name):
     """Return 6 step-patterns (one per colour 1-6) for `voice` in `preset_name`,
-    or None if the voice has no bank (caller leaves it on overlay default)."""
+    or None if the voice has no bank. The `default` family's colours 2-6 are
+    derived from colour 1 for a consistent base/busier/broken/double/sparse/fill
+    contrast; authored style families pass through unchanged."""
     dfam, mfam = PRESET_FAMILY.get(preset_name, ("default", "default"))
     if voice in DRUM_VOICES:
-        strs = _pick(DRUMS, voice, dfam)
-        return None if strs is None else [_rhythm(s) for s in strs]
-    return _pick(MEL, voice, mfam)
+        rolebank = DRUMS.get(voice)
+        if rolebank is None:
+            return None
+        fam = dfam if dfam in rolebank else "default"
+        cols = [_rhythm(s) for s in rolebank[fam]]
+        if fam == "default":
+            cols = [cols[0]] + derive_drum_colors(cols[0])
+        return cols
+    rolebank = MEL.get(voice)
+    if rolebank is None:
+        return None
+    fam = mfam if mfam in rolebank else "default"
+    cols = rolebank[fam]
+    if fam == "default":
+        cols = [cols[0]] + derive_mel_colors(cols[0])
+    return cols

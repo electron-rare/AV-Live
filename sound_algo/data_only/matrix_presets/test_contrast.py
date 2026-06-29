@@ -40,5 +40,18 @@ check(all((s is None) or (isinstance(s[0], int) and isinstance(s[1], float)) for
 check(all(m6[i] is not None for i in range(12, 16)), "mel fill last 4 active")
 check(derive_mel_colors(mbase) == derive_mel_colors(mbase), "mel deterministic")
 
+from patterns import patterns_for, MEL
+# default family is derived: colours 2-6 are not all identical to colour 1
+ac = patterns_for("acid", "techno_drive")      # techno_drive maps mel-family default for acid
+check(ac is not None and len(ac) == 6, "patterns_for returns 6")
+check(ac[4] != ac[0] or ac[3] != ac[0], "default colours are contrasted (derived)")
+# kick default colour 5 (sparse) has <= hits than colour 1
+def dens2(p): return sum(1 for s in p if s is not None)
+kk = patterns_for("kick", "techno_drive")
+check(dens2(kk[4]) <= dens2(kk[0]), "kick sparse <= base")
+# authored style family is NOT derived: acid in psy preset keeps hand-authored set
+psy = patterns_for("acid", "psytrance_roll")
+check(psy == MEL["acid"]["psy"], "authored psy family untouched")
+
 print("TEST PASS" if ok else "TEST FAIL")
 sys.exit(0 if ok else 1)
