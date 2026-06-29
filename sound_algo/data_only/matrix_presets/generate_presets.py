@@ -505,6 +505,68 @@ def emit_step(s):
 from patterns import patterns_for
 
 
+# === per-voice mods/poses: demo bindings for a few presets ===================
+# Default is [] for every voice.  Only a handful of presets carry demo bindings
+# so generated presets exercise the feature without over-designing it.
+#
+# voiceMods:  voice -> [(source_id, target, depth)]
+#   allowed targets: amp/pan/rev for all voices;
+#                    cutoff only for perc/acid/arp/lead/stab/pad/reese/melody/chord
+# voicePoses: voice -> [(poseId, action)]
+#   action is "trigger" or "gate"
+
+VOICE_MODS_DEMO = {
+    "techno_drive": {
+        "acid": [("bodyVitesse", "cutoff", 0.6)],  # body energy drives acid cutoff
+        "lead": [("rHandY",      "rev",    0.4)],   # right hand height -> lead reverb
+    },
+}
+
+VOICE_POSES_DEMO = {
+    "techno_drive": {
+        "kick": [("danse", "trigger")],             # danse action retriggers kick
+    },
+}
+
+
+def emit_sc_mod_binding(source, target, depth):
+    """One SC Event literal: (source: \\src, target: \\tgt, depth: 0.xx)"""
+    return "(source: \\%s, target: \\%s, depth: %.2f)" % (source, target, depth)
+
+
+def emit_sc_pose_binding(pose_id, action):
+    """One SC Event literal: (poseId: \\id, action: \\act)"""
+    return "(poseId: \\%s, action: \\%s)" % (pose_id, action)
+
+
+def emit_voicemods(preset_name):
+    """22-element list of SC sub-arrays, one per voice (default [])."""
+    demos = VOICE_MODS_DEMO.get(preset_name, {})
+    parts = []
+    for voice in VOICES:
+        bindings = demos.get(voice, [])
+        if bindings:
+            bstr = ", ".join(emit_sc_mod_binding(*b) for b in bindings)
+            parts.append("[" + bstr + "]")
+        else:
+            parts.append("[]")
+    return parts
+
+
+def emit_voiceposes(preset_name):
+    """22-element list of SC sub-arrays, one per voice (default [])."""
+    demos = VOICE_POSES_DEMO.get(preset_name, {})
+    parts = []
+    for voice in VOICES:
+        bindings = demos.get(voice, [])
+        if bindings:
+            bstr = ", ".join(emit_sc_pose_binding(*b) for b in bindings)
+            parts.append("[" + bstr + "]")
+        else:
+            parts.append("[]")
+    return parts
+
+
 def emit_colordefs(preset_name):
     """22 entries, each [6 colour Events] = 6 distinct step-patterns per voice.
 
@@ -548,8 +610,12 @@ def to_sc(name, arc_fn, instkit, melodies, extra):
     rows = ",\n".join("[" + ",".join(str(c) for c in row) + "]" for row in g)
     isyms = ", ".join("\\" + s for s in insts)
     cds = ",\n".join(emit_colordefs(name))
+    vms = ", ".join(emit_voicemods(name))
+    vps = ", ".join(emit_voiceposes(name))
     return ("(\n'grid': [\n%s\n],\n'instruments': [ %s ],\n"
-            "'colorDefs': [\n%s\n]\n)\n" % (rows, isyms, cds))
+            "'colorDefs': [\n%s\n],\n"
+            "'voiceMods': [ %s ],\n"
+            "'voicePoses': [ %s ]\n)\n" % (rows, isyms, cds, vms, vps))
 
 
 def main():
