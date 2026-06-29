@@ -28,12 +28,12 @@
 ~matModTargets   = ~matModTargets   ? IdentityDictionary[
     \kick->[\amp,\pan,\rev], \hats->[\amp,\pan,\rev], \clap->[\amp,\pan,\rev],
     \perc->[\amp,\cutoff,\pan,\rev],
-    \sub->[\amp,\pan,\rev], \acid->[\amp,\cutoff,\pan,\rev], \arp->[\amp,\cutoff,\pan,\rev],
-    \lead->[\amp,\cutoff,\pan,\rev], \stab->[\amp,\cutoff,\pan,\rev], \pad->[\amp,\cutoff,\pan,\rev],
+    \sub->[\amp,\pan,\rev,\res], \acid->[\amp,\cutoff,\pan,\rev,\res], \arp->[\amp,\cutoff,\pan,\rev,\res],
+    \lead->[\amp,\cutoff,\pan,\rev,\res], \stab->[\amp,\cutoff,\pan,\rev,\res], \pad->[\amp,\cutoff,\pan,\rev,\res],
     \ride->[\amp,\pan,\rev], \rim->[\amp,\pan,\rev], \tom->[\amp,\pan,\rev],
-    \reese->[\amp,\cutoff,\pan,\rev],
-    \bells->[\amp,\pan,\rev], \sweep->[\amp,\pan,\rev],
-    \melody->[\amp,\cutoff,\pan,\rev], \chord->[\amp,\cutoff,\pan,\rev],
+    \reese->[\amp,\cutoff,\pan,\rev,\res],
+    \bells->[\amp,\pan,\rev,\res], \sweep->[\amp,\pan,\rev],
+    \melody->[\amp,\cutoff,\pan,\rev,\res], \chord->[\amp,\cutoff,\pan,\rev,\res],
     \fx->[\amp,\pan,\rev], \snare->[\amp,\pan,\rev],
     \crash->[\amp,\pan,\rev], \shaker->[\amp,\pan,\rev]
 ];
@@ -182,12 +182,18 @@ File.exists(~matDir).not.if({ ("mkdir -p " ++ ~matDir.quote).systemCmd });
                 a.clip(0, 1)
             }]
         }, {
+        (tgt == \res).if({
+            pairs = pairs ++ [\res, Pfunc {
+                var a = 0; list.do { |b| a = a + (~matModSourceVal.(b[\source]) * b[\depth]) };
+                a.clip(0, 1)
+            }]
+        }, {
             pairs = pairs ++ [\amp, Pfunc {
                 var base = (spec[\amp] ? 1.0) * volOf.value;
                 list.do { |b| base = base * (1 + (b[\depth] * (~matModSourceVal.(b[\source]) * 2 - 1))).max(0) };
                 base
             }]
-        }) }) })
+        }) }) }) })
     };
     pairs
 };

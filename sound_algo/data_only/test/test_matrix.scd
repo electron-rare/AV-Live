@@ -456,6 +456,21 @@ pass = pass and: {
     pf.notNil and: { (pf.asStream.next(()) - 0.4).abs < 0.001 }
 };
 ~matVoiceMods[\acid] = [];
+// --- res target (cycle 1) ---
+// res: additive, two sources sum and clip 0..1
+~matVoiceMods[\acid] = [ (source: \rHandY, target: \res, depth: 0.5),
+                          (source: \bodyY,  target: \res, depth: 0.5) ];
+~matModCache[\rHandY] = 1.0; ~matModCache[\bodyY] = 1.0;   // 1*0.5 + 1*0.5 = 1.0 (clip)
+pass = pass and: {
+    var pairs, pf;
+    pairs = ~matModPairs.(\acid, (amp: 1.0), { 1.0 });
+    pf    = pairs[pairs.indexOf(\res) + 1];
+    pf.notNil and: { (pf.asStream.next(()) - 1.0).abs < 0.001 }
+};
+~matVoiceMods[\acid] = [];
+// res target is gated to res-voices: ~matModTargets[\hats] must NOT include \res
+pass = pass and: { (~matModTargets[\hats] ? []).includes(\res).not };
+pass = pass and: { (~matModTargets[\acid] ? []).includes(\res) };
 // disallowed target: kick has no cutoff in ~matModTargets -> gated out
 ~matVoiceMods[\kick] = [ (source: \bodyY, target: \cutoff, depth: 1.0) ];
 pass = pass and: { ~matModPairs.(\kick, (amp: 1.0), { 1.0 }).includes(\cutoff).not };
