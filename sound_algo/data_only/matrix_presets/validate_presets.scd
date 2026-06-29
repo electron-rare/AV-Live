@@ -54,46 +54,48 @@ names.do { |name|
     ("OK: " ++ nOK ++ "/28 presets loaded").postln
 });
 
-// -- 2. Load techno_drive specifically and assert demo bindings parsed --
+// -- 2. Load peak_drop and assert new role-adapted default mappings --
+//    acid (lead role) → 4 hand bindings incl. \pitch
+//    kick (drums role) → 2 body bindings, first source = \bodyVitesse
+//    fx   (fx role)   → danse→gate pose binding
 {
-    var path = ~matPresetDir +/+ "techno_drive.matrix";
+    var path = ~matPresetDir +/+ "peak_drop.matrix";
+    var vpass;
     ~matVoices.do { |v| ~matVoiceMods[v] = []; ~matVoicePoses[v] = [] };
     try {
         ~matLoadFile.(path)
     } { |e|
         pass = false;
-        ("EXCEPTION reloading techno_drive: " ++ e.class.name).postln
+        ("EXCEPTION reloading peak_drop: " ++ e.class.name).postln
     };
-    // acid (vi=5) must have one mod binding (bodyVitesse->cutoff, depth 0.6)
-    (~matVoiceMods[\acid].notNil and: { ~matVoiceMods[\acid].size == 1 }).if({
-        var b = ~matVoiceMods[\acid][0];
-        ((b[\source] == \bodyVitesse) and: { b[\target] == \cutoff }).if(
-            { "OK techno_drive acid voiceMods".postln },
-            {
-                pass = false;
-                ("FAIL techno_drive acid mod: " ++ b).postln
-            }
-        )
-    }, {
+    // acid (vi=5, lead role): 4 hand bindings, one targets \pitch
+    vpass = (~matVoiceMods[\acid].notNil and: { ~matVoiceMods[\acid].size == 4 })
+        and: { ~matVoiceMods[\acid].any({ |b| b[\target] == \pitch }) };
+    vpass.not.if({
         pass = false;
-        ("FAIL techno_drive acid voiceMods empty/nil: "
-            ++ (~matVoiceMods[\acid])).postln
+        ("FAIL peak_drop acid voiceMods (expected 4 w/ pitch): "
+            ++ ~matVoiceMods[\acid]).postln
     });
-    // kick (vi=0) must have one pose binding (danse / trigger)
-    (~matVoicePoses[\kick].notNil and: { ~matVoicePoses[\kick].size == 1 }).if({
-        var b = ~matVoicePoses[\kick][0];
-        ((b[\poseId] == \danse) and: { b[\action] == \trigger }).if(
-            { "OK techno_drive kick voicePoses".postln },
-            {
-                pass = false;
-                ("FAIL techno_drive kick pose: " ++ b).postln
-            }
-        )
-    }, {
+    // kick (vi=0, drums role): 2 body bindings, first source = \bodyVitesse
+    vpass = vpass
+        and: { (~matVoiceMods[\kick].notNil and: { ~matVoiceMods[\kick].size == 2 })
+            and: { ~matVoiceMods[\kick][0][\source] == \bodyVitesse } };
+    vpass.not.if({
         pass = false;
-        ("FAIL techno_drive kick voicePoses empty/nil: "
-            ++ (~matVoicePoses[\kick])).postln
-    })
+        ("FAIL peak_drop kick voiceMods (expected 2, src=bodyVitesse): "
+            ++ ~matVoiceMods[\kick]).postln
+    });
+    // fx (vi=18, fx role): danse→gate pose
+    vpass = vpass
+        and: { (~matVoicePoses[\fx].notNil and: { ~matVoicePoses[\fx].size == 1 })
+            and: { (~matVoicePoses[\fx][0][\poseId] == \danse)
+                and: { ~matVoicePoses[\fx][0][\action] == \gate } } };
+    vpass.not.if({
+        pass = false;
+        ("FAIL peak_drop fx voicePoses (expected danse→gate): "
+            ++ ~matVoicePoses[\fx]).postln
+    });
+    vpass.if({ "DEFAULTS PASS".postln }, { "DEFAULTS FAIL".postln })
 }.value;
 
 pass.if(
