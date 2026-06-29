@@ -4,7 +4,11 @@ import {
   MATRIX_VOICES, MATRIX_INST_CHOICES,
   MATRIX_MOD_SOURCES, MATRIX_MOD_TARGETS,
   matColorDefs, saveMatState,
+  VOICE_CLASS, defaultStepMode,
 } from "./matrix-state.js";
+
+// Per-voice step edit mode; initialised from defaultStepMode() on first expand.
+const stepMode = {}; // vi -> 'pitch' | 'drum'
 
 let expandedVoice = -1;
 let expandedContainer = null;
@@ -50,6 +54,7 @@ export function openFor(vi, containerEl) {
   cdColor = 1;
   cdAuditioning = false;
   activeTab = "steps";
+  if (stepMode[vi] === undefined) stepMode[vi] = defaultStepMode(MATRIX_VOICES[vi]);
 
   // Mark the expand toggle button
   const grid = document.getElementById("matrix-grid");
@@ -136,40 +141,120 @@ function renderColorSel(vi) {
 
 // --- Tab renderers ---
 
-// Renders the 16-step sub-editor into cdTabBodyEl.
+// Adaptive step tab: branches on stepMode[vi] ('pitch' | 'drum').
 function renderStepsTab(vi) {
   if (!cdTabBodyEl) return;
+  const d = matColorDefs[vi][cdColor];
+  if (!d) return;
+
+  const voiceName = MATRIX_VOICES[vi];
+  const isDrumOnly = VOICE_CLASS[voiceName] === "drum";
+
+  // Mode toggle header — hidden for pure-drum voices (pitch is meaningless).
+  const hdr = document.createElement("div");
+  hdr.className = "steps-mode-hdr";
+  if (!isDrumOnly) {
+    ["pitch", "drum"].forEach(mode => {
+      const btn = document.createElement("button");
+      btn.className = "steps-mode-btn" + (stepMode[vi] === mode ? " active" : "");
+      btn.textContent = mode === "pitch" ? "Pitch" : "Drum";
+      btn.addEventListener("click", () => {
+        if (stepMode[vi] === mode) return;
+        stepMode[vi] = mode;
+        renderPattern(vi);
+      });
+      hdr.appendChild(btn);
+    });
+  }
+  cdTabBodyEl.appendChild(hdr);
+
+  if (stepMode[vi] === "pitch") {
+    renderPitchRoll(vi, cdColor, cdTabBodyEl);
+  } else {
+    renderDrumGrid(vi);
+  }
+}
+
+// Drum mode: 16 pads cycling off -> soft (vel 0.6) -> loud (vel 0.95).
+function renderDrumGrid(vi) {
   const c = cdColor;
   const d = matColorDefs[vi][c];
+  if (!d) return;
   const seqRow = document.createElement("div");
   seqRow.className = "seq-row m" + c;
+  seqRow.style.setProperty("--row-color", PALETTE[c - 1]);
   for (let s = 0; s < 16; s++) {
     const cell = document.createElement("button");
     cell.className = "seq-cell";
     const st = d.steps[s];
-    cell.textContent = st ? st.degree : "";
-    if (st) cell.classList.add("on");
+    if (st) cell.classList.add(st.vel >= 0.9 ? "loud" : "soft");
     cell.addEventListener("click", () => {
-      if (d.steps[s]) { d.steps[s] = null; send("/matrix/step", vi, c, s, -99, 0); }
-      else { d.steps[s] = {degree:0, vel:0.8}; send("/matrix/step", vi, c, s, 0, 0.8); }
-      saveMatState(); renderPattern(vi);
+      const cur = d.steps[s];
+      if (!cur) {
+        d.steps[s] = { degree: 0, vel: 0.6 };
+        send("/matrix/step", vi, c, s, 0, 0.6);
+      } else if (cur.vel < 0.9) {
+        d.steps[s] = { degree: 0, vel: 0.95 };
+        send("/matrix/step", vi, c, s, 0, 0.95);
+      } else {
+        d.steps[s] = null;
+        send("/matrix/step", vi, c, s, -99, 0);
+      }
+      saveMatState();
+      renderPattern(vi);
     });
     cell.addEventListener("wheel", (e) => {
       e.preventDefault();
-      const st2 = d.steps[s];
-      if (!st2) return;
-      if (e.shiftKey) {
-        st2.vel = Math.max(0, Math.min(1, st2.vel + (e.deltaY < 0 ? 0.1 : -0.1)));
-      } else {
-        st2.degree = Math.max(-48, Math.min(48, st2.degree + (e.deltaY < 0 ? 1 : -1)));
-      }
-      send("/matrix/step", vi, c, s, st2.degree, st2.vel);
+      const cur = d.steps[s];
+      if (!cur) return;
+      cur.vel = Math.max(0, Math.min(1, cur.vel + (e.deltaY < 0 ? 0.05 : -0.05)));
+      send("/matrix/step", vi, c, s, 0, cur.vel);
       saveMatState();
-      renderPattern(vi);
     });
     seqRow.appendChild(cell);
   }
   cdTabBodyEl.appendChild(seqRow);
+}
+
+// Pitch mode: piano-roll grid (rows=degrees top=high, cols=16 steps).
+// One note per step; clicking the active degree clears, another degree moves it.
+// Wheel on an active cell adjusts velocity.
+function renderPitchRoll(vi, colour, body) {
+  const def = matColorDefs[vi][colour];
+  if (!def) return;
+  const degrees = [14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0]; // top=high
+  const grid = document.createElement("div");
+  grid.className = "pianoroll";
+  grid.style.setProperty("--pr-color", PALETTE[colour - 1]);
+  for (const d of degrees) {
+    const rowEl = document.createElement("div");
+    rowEl.className = "pr-row";
+    for (let s = 0; s < 16; s++) {
+      const cell = document.createElement("button");
+      cell.className = "pr-cell";
+      const st = def.steps[s];
+      if (st && st.degree === d) cell.classList.add("on");
+      cell.addEventListener("click", () => {
+        const cur = def.steps[s];
+        const vel = cur ? cur.vel : 0.8;
+        def.steps[s] = (cur && cur.degree === d) ? null : { degree: d, vel };
+        saveMatState();
+        send("/matrix/step", vi, colour, s, def.steps[s] ? d : -99, vel);
+        renderPattern(vi);
+      });
+      cell.addEventListener("wheel", (e) => {
+        e.preventDefault();
+        const cur = def.steps[s];
+        if (!cur || cur.degree !== d) return;
+        cur.vel = Math.max(0, Math.min(1, cur.vel + (e.deltaY < 0 ? 0.05 : -0.05)));
+        send("/matrix/step", vi, colour, s, d, cur.vel);
+        saveMatState();
+      });
+      rowEl.appendChild(cell);
+    }
+    grid.appendChild(rowEl);
+  }
+  body.appendChild(grid);
 }
 
 // Renders the var row (inst/stretch/oct/amp/cutoff/pan) into cdTabBodyEl.

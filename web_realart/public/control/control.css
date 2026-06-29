@@ -188,3 +188,22 @@ button.queued { animation: queued-blink 600ms ease-in-out infinite alternate; }
 .seq-row.m4 .seq-cell.on { background: var(--m4); color: #fff; }
 .seq-row.m5 .seq-cell.on { background: var(--m5); color: #fff; }
 .seq-row.m6 .seq-cell.on { background: var(--m6); color: #fff; }
+
+/* --- Drum grid accent levels (soft / loud) --- */
+.seq-cell.soft { background: color-mix(in srgb, var(--row-color, #4c8), transparent 50%);
+  border-color: var(--row-color, #4c8); }
+.seq-cell.loud { background: var(--row-color, #4c8); color: #fff; }
+
+/* --- Steps tab mode toggle --- */
+.steps-mode-hdr { display:flex; gap:4px; margin-bottom:4px; }
+.steps-mode-btn { width:auto; padding:4px 10px; font-size:11px; background:#1a1a1a;
+  color:#888; border:1px solid #333; border-radius:6px; }
+.steps-mode-btn.active { background:#246; color:#8cf; border-color:#4af; font-weight:700; }
+
+/* --- Piano-roll (pitch mode) --- */
+.pianoroll { display:flex; flex-direction:column; gap:1px; max-height:240px; overflow-y:auto; }
+.pr-row { display:flex; gap:1px; }
+.pr-cell { width:20px; height:14px; background:#1c1c1c; border:none; cursor:pointer;
+  padding:0; flex-shrink:0; border-radius:1px; }
+.pr-cell:active { opacity:0.65; }
+.pr-cell.on { background: var(--pr-color, #4c8); }
