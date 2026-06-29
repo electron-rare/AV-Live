@@ -802,44 +802,70 @@ OSCdef(\mat_voicemod_get, { |msg, time, addr|
     ~toscTouch !? { ~toscTouch.(addr) };
     ~matVoiceModPush.((msg[1] ? 0).asInteger)
 }, '/matrix/voicemod/get');
-OSCdef(\mat_colorpose, { |msg, time, addr|
-    var vi = (msg[1] ? 0).asInteger, color = (msg[2] ? 1).asInteger, n = (msg[3] ? 0).asInteger;
+OSCdef(\mat_voicepose, { |msg, time, addr|
     ~toscTouch !? { ~toscTouch.(addr) };
-    ((vi >= 0 and: { vi < ~matVoices.size }) and: { color >= 1 and: { color <= 6 } }).if({
-        ~matColorDefs[vi][color][\pose] = Array.fill(n, { |k|
-            (poseId: (msg[4 + (k * 2)] ? \none).asSymbol, action: (msg[5 + (k * 2)] ? \trigger).asSymbol) });
-        ~matColorPosePush.(vi, color)
-    })
-}, '/matrix/colorpose');
-OSCdef(\mat_colorpose_get, { |msg, time, addr|
+    ~matSetVoicePose.((msg[1] ? 0).asInteger, (msg[2] ? 0).asInteger, msg.copyToEnd(3))
+}, '/matrix/voicepose');
+OSCdef(\mat_voicepose_get, { |msg, time, addr|
     ~toscTouch !? { ~toscTouch.(addr) };
-    (1..6).do { |c| ~matColorModPush.((msg[1] ? 0).asInteger, c); ~matColorPosePush.((msg[1] ? 0).asInteger, c) }
-}, '/matrix/colordefs/get/ext');
+    ~matVoicePosePush.((msg[1] ? 0).asInteger)
+}, '/matrix/voicepose/get');
 
-// -- ~matPoseFire : run every per-color binding matching poseId across all voices/colors --
-// \trigger re-sources the voice to that color; \gate toggles the voice's Pdef.
+// -- ~matPoseFire : run every per-voice binding matching poseId across all voices --
+// \trigger re-sources the voice to its current bar color; \gate toggles the voice's Pdef.
 // Unknown poseId -> no-op (no raise).
 ~matPoseFire = { |poseId|
     var pid = poseId.asSymbol;
     ~matVoices.do { |name, vi|
         var key = ("lp_" ++ name).asSymbol;
-        (1..6).do { |color|
-            ((~matColorDefs[vi][color][\pose]) ? []).do { |b|
-                (b[\poseId] == pid).if({
-                    (b[\action] == \trigger).if({
-                        Pdef.all.includesKey(key).if({
-                            var pat = ~matVariation.(name, color, vi);
-                            pat.notNil.if({ Pdef(key, pat); Pdef(key).play(~lp[\clock] ? TempoClock.default, quant: 1) })
-                        })
-                    });
-                    (b[\action] == \gate).if({
-                        Pdef.all.includesKey(key).if({ Pdef(key).isPlaying.if({ Pdef(key).stop }, { Pdef(key).play(~lp[\clock] ? TempoClock.default, quant: 1) }) })
-                    });
-                })
-            }
+        ((~matVoicePoses[name]) ? []).do { |b|
+            (b[\poseId] == pid).if({
+                var bar   = ~lp[\matBar] ? 0;
+                var color = (~lp[\matrix][vi][bar] ? 0);
+                color = (color == 0).if({ 1 }, { color });
+                (b[\action] == \trigger).if({
+                    Pdef.all.includesKey(key).if({
+                        var pat = ~matVariation.(name, color, vi);
+                        pat.notNil.if({ Pdef(key, pat); Pdef(key).play(~lp[\clock] ? TempoClock.default, quant: 1) })
+                    })
+                });
+                (b[\action] == \gate).if({
+                    Pdef.all.includesKey(key).if({ Pdef(key).isPlaying.if({ Pdef(key).stop },
+                        { Pdef(key).play(~lp[\clock] ? TempoClock.default, quant: 1) }) })
+                });
+            })
         }
     }
 };
+
+// -- ~matSetVoicePose : replace a voice's pose binding list; echo --
+~matSetVoicePose = { |vi, n, tail|
+    ((vi >= 0) and: { vi < ~matVoices.size }).if({
+        ~matVoicePoses[~matVoices[vi]] = Array.fill(n.asInteger, { |k|
+            var pid = (tail[k * 2]       ? \none).asSymbol;
+            var act = (tail[(k * 2) + 1] ? \trigger).asSymbol;
+            ((pid == \none) or: { pid == '' }).if({ nil }, { (poseId: pid, action: act) })
+        }).reject({ |x| x.isNil });
+        ~matVoicePosePush.(vi)
+    })
+};
+
+~matVoicePosePush = { |vi|
+    ~toscSend !? {
+        ((vi >= 0) and: { vi < ~matVoices.size }).if({
+            var list = ~matVoicePoses[~matVoices[vi]] ? [];
+            var flat = list.collect({ |b| [b[\poseId], b[\action]] }).flatten;
+            ~toscSend.valueArray(["/matrix/voicepose", vi, list.size] ++ flat)
+        })
+    }
+};
+
+// canonical event -> poseId mappers (hand 0=L, 1=R; finger strikes 1..5, pinch 1..4)
+~matEventFinger = { |hand, finger| ("finger" ++ (hand.asInteger == 0).if({ "L" }, { "R" }) ++ (finger.asInteger + 1)).asSymbol };
+~matEventPinch  = { |hand, finger| ("pinch"  ++ (hand.asInteger == 0).if({ "L" }, { "R" }) ++ finger.asInteger).asSymbol };
+
+OSCdef(\mat_ev_finger, { |msg| ~matPoseFire.(~matEventFinger.(msg[1] ? 0, msg[2] ? 0)) }, '/pose/finger');
+OSCdef(\mat_ev_pinch,  { |msg| ~matPoseFire.(~matEventPinch.(msg[1] ? 0, msg[2] ? 1)) }, '/pose/pinch');
 
 OSCdef(\mat_pose, { |msg, time, addr|
     ~matPoseFire.((msg[1] ? \none).asSymbol)

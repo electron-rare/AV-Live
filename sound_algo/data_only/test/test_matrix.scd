@@ -618,6 +618,55 @@ pass = pass and: { ~trigLog.notNil and: { ~trigLog[0] == "/matrix/voicemod" } };
 ~matVoiceMods[\acid] = [];
 ~matVoiceMods[\kick] = [];
 
+// --- Task 4: ~matSetVoicePose, ~matVoicePosePush, mappers, OSCdefs ---
+
+// API presence
+pass = pass and: { ~matSetVoicePose.notNil };
+pass = pass and: { ~matVoicePosePush.notNil };
+pass = pass and: { ~matEventFinger.notNil };
+pass = pass and: { ~matEventPinch.notNil };
+
+// Mapper purity: hand 1=R, finger 1 → poseId fingerR2 (finger+1)
+pass = pass and: { ~matEventFinger.(1, 1) == \fingerR2 };
+// hand 0=L, finger 3 → poseId pinchL3
+pass = pass and: { ~matEventPinch.(0, 3) == \pinchL3 };
+
+// OSCdef(\mat_voicepose): vi=5 (\acid), 2 bindings
+~matVoicePoses[\acid] = [];
+~trigLog = nil;
+~toscSend = { |path ...args| ~trigLog = ([path] ++ args) };
+try {
+    OSCdef(\mat_voicepose).func.value(
+        ['/matrix/voicepose', 5, 2, "danse","gate", "fingerR2","trigger"])
+} { |e| pass = false; ("EXCEPTION mat_voicepose: " ++ e.class.name).postln };
+pass = pass and: { ~matVoicePoses[\acid].size == 2 };
+pass = pass and: { ~matVoicePoses[\acid][0][\poseId] == \danse };
+pass = pass and: { ~matVoicePoses[\acid][0][\action] == \gate };
+pass = pass and: { ~matVoicePoses[\acid][1][\poseId] == \fingerR2 };
+pass = pass and: { ~matVoicePoses[\acid][1][\action] == \trigger };
+// echo: ~toscSend called with /matrix/voicepose
+pass = pass and: { ~trigLog.notNil and: { ~trigLog[0] == "/matrix/voicepose" } };
+pass = pass and: { ~trigLog[1] == 5 };
+pass = pass and: { ~trigLog[2] == 2 };
+
+// voicepose_get: echoes current state for a voice
+~trigLog = nil;
+try {
+    OSCdef(\mat_voicepose_get).func.value(['/matrix/voicepose/get', 5])
+} { |e| pass = false; ("EXCEPTION mat_voicepose_get: " ++ e.class.name).postln };
+pass = pass and: { ~trigLog.notNil and: { ~trigLog[0] == "/matrix/voicepose" } };
+
+// ~matPoseFire robustness: unknown poseId -> no-op, no raise
+try {
+    ~matPoseFire.(\nonexistent_pose)
+} { |e|
+    pass = false;
+    ("EXCEPTION in ~matPoseFire with unknown pose: " ++ e.class.name).postln
+};
+
+// cleanup
+~matVoicePoses[\acid] = [];
+
 pass.if(
     { "TEST PASS".postln },
     { "TEST FAIL".postln }
