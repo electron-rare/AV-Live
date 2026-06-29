@@ -306,7 +306,7 @@ function renderSynthFxTab(vi) {
     res.type="range"; res.min=0; res.max=1; res.step=0.02;
     res.value = d.res ?? 0.3;
     res.addEventListener("change", () => setCD(c, "res", +res.value));
-    varRow.appendChild(mk("RES", res));
+    varRow.appendChild(mk("res", res));
   }
   if (hasPan) {
     const pan = document.createElement("input");
@@ -319,7 +319,7 @@ function renderSynthFxTab(vi) {
   rev.type="range"; rev.min=0; rev.max=1; rev.step=0.02;
   rev.value = d.rev ?? 0;
   rev.addEventListener("change", () => setCD(c, "rev", +rev.value));
-  varRow.appendChild(mk("REVERB", rev));
+  varRow.appendChild(mk("reverb", rev));
   cdTabBodyEl.appendChild(varRow);
 }
 
