@@ -868,7 +868,19 @@ OSCdef(\mat_audition, { |msg, time, addr|
 ~matModCache   = ~matModCache ? IdentityDictionary.new;
 ~matModSources = ~matModSources ?
     [\lHandY, \rHandY, \lHandX, \rHandX, \lOpen, \rOpen, \handSpeed, \handDist,
-     \bodyX, \bodyY, \depth];
+     \bodyX, \bodyY, \depth,
+     \bodyVitesse, \bodyAccel, \bodySym, \headX, \headY, \limbSpan, \danse, \mouthOpen];
+
+// Fixed wire order for /matrix/modvalues (mirrors web MOD_SOURCE_ORDER). No \none.
+~matModOrder = [
+    \lHandY, \rHandY, \lHandX, \rHandX, \lOpen, \rOpen, \handSpeed, \handDist,
+    \bodyX, \bodyY, \depth, \bodyVitesse, \bodyAccel, \bodySym, \headX, \headY,
+    \limbSpan, \danse, \mouthOpen];
+
+// Normalization for raw iPhone units -> 0..1 (env-tunable, no code edit to retune).
+~matKinSpeedMax  = ~matKinSpeedMax  ? 3.0;    // m/s mapped to 1.0
+~matKinAccelMax  = ~matKinAccelMax  ? 10.0;   // m/s^2 mapped to 1.0
+~matLimbSpanGain = ~matLimbSpanGain ? 1.0;    // limb span scale
 
 // reader: clamp to 0..1, default 0 when absent
 ~matModSourceVal = { |key| (~matModCache[key] ? 0).clip(0, 1) };
@@ -893,6 +905,40 @@ OSCdef(\mat_mod_center, { |msg|
 OSCdef(\mat_mod_span, { |msg|
     ~matModCache[\depth] = ((msg[2] ? 0) * 2.5).clip(0, 1);  // /pose/sho_span depth proxy
 }, '/pose/sho_span');
+
+OSCdef(\mat_mod_kin, { |msg|
+    // /pose/kin [pid, speed, accel, sym]
+    ~matModCache[\bodyVitesse] = ((msg[2] ? 0) / ~matKinSpeedMax).clip(0, 1);
+    ~matModCache[\bodyAccel]   = ((msg[3] ? 0) / ~matKinAccelMax).clip(0, 1);
+    ~matModCache[\bodySym]     = (((msg[4] ? 0) + 1) / 2).clip(0, 1);
+}, '/pose/kin');
+
+OSCdef(\mat_mod_head, { |msg|
+    // /pose/head [pid, x, y, c]
+    ~matModCache[\headX] = (msg[2] ? 0.5).clip(0, 1);
+    ~matModCache[\headY] = (1 - (msg[3] ? 0.5)).clip(0, 1);
+}, '/pose/head');
+
+OSCdef(\mat_mod_limb, { |msg|
+    // /pose/limb_span [pid, span]
+    ~matModCache[\limbSpan] = ((msg[2] ? 0) * ~matLimbSpanGain).clip(0, 1);
+}, '/pose/limb_span');
+
+OSCdef(\mat_mod_mouth, { |msg|
+    // /pose/mouth [pid, open]
+    ~matModCache[\mouthOpen] = (msg[2] ? 0).clip(0, 1);
+}, '/pose/mouth');
+
+~matActionLabels = ~matActionLabels ? [\debout, \assise, \danse];
+~matLastAction   = ~matLastAction   ? IdentityDictionary.new;
+OSCdef(\mat_mod_action, { |msg|
+    // /pose/action [pid, idx, p0, p1, p2] : danse proba feeds \danse; label change fires pose
+    var pid = (msg[1] ? 0).asInteger;
+    var idx = (msg[2] ? 0).asInteger.clip(0, 2);
+    var lab = ~matActionLabels[idx];
+    ~matModCache[\danse] = (msg[5] ? 0).clip(0, 1);
+    (~matLastAction[pid] != lab).if({ ~matLastAction[pid] = lab; ~matPoseFire.(lab) });
+}, '/pose/action');
 
 "[matrix] ready".postln;
 )

@@ -502,6 +502,49 @@ pass = pass and: { ~matColorDefs[5][2][\pose][1][\action] == \gate };
 ~matColorDefs[5][2][\pose] = Array.fill(0, { nil });
 pass = pass and: { ~matColorDefs[5][2][\pose].isEmpty };
 
+// --- New iPhone mod sources (Task 1) ---
+// ~matModOrder must have 19 entries
+pass = pass and: { ~matModOrder.notNil and: { ~matModOrder.size == 19 } };
+// ~matModSources must include all new symbols
+pass = pass and: { ~matModSources.includes(\bodyVitesse) };
+pass = pass and: { ~matModSources.includes(\bodyAccel) };
+pass = pass and: { ~matModSources.includes(\bodySym) };
+pass = pass and: { ~matModSources.includes(\headX) };
+pass = pass and: { ~matModSources.includes(\headY) };
+pass = pass and: { ~matModSources.includes(\limbSpan) };
+pass = pass and: { ~matModSources.includes(\danse) };
+pass = pass and: { ~matModSources.includes(\mouthOpen) };
+
+// Call OSCdef handlers directly (no server needed)
+~matModCache = IdentityDictionary.new;
+try {
+    OSCdef(\mat_mod_kin).func.value(['/pose/kin', 0, 1.5, 5.0, 0.0]);
+} { |e| pass = false; ("EXCEPTION mat_mod_kin: " ++ e.class.name).postln };
+pass = pass and: { (~matModCache[\bodyVitesse] - 0.5).abs < 0.02 };   // 1.5/3.0
+pass = pass and: { (~matModCache[\bodyAccel]   - 0.5).abs < 0.02 };   // 5.0/10.0
+pass = pass and: { (~matModCache[\bodySym]     - 0.5).abs < 0.02 };   // (0+1)/2
+
+try {
+    OSCdef(\mat_mod_head).func.value(['/pose/head', 0, 0.3, 0.25, 1.0]);
+} { |e| pass = false; ("EXCEPTION mat_mod_head: " ++ e.class.name).postln };
+pass = pass and: { (~matModCache[\headX] - 0.3).abs  < 0.02 };
+pass = pass and: { (~matModCache[\headY] - 0.75).abs < 0.02 };   // 1 - 0.25
+
+try {
+    OSCdef(\mat_mod_limb).func.value(['/pose/limb_span', 0, 0.7]);
+} { |e| pass = false; ("EXCEPTION mat_mod_limb: " ++ e.class.name).postln };
+pass = pass and: { (~matModCache[\limbSpan] - 0.7).abs < 0.02 };
+
+try {
+    OSCdef(\mat_mod_mouth).func.value(['/pose/mouth', 0, 0.8]);
+} { |e| pass = false; ("EXCEPTION mat_mod_mouth: " ++ e.class.name).postln };
+pass = pass and: { (~matModCache[\mouthOpen] - 0.8).abs < 0.02 };
+
+try {
+    OSCdef(\mat_mod_action).func.value(['/pose/action', 0, 2, 0.1, 0.2, 0.7]);
+} { |e| pass = false; ("EXCEPTION mat_mod_action: " ++ e.class.name).postln };
+pass = pass and: { (~matModCache[\danse] - 0.7).abs < 0.02 };   // p2 = msg[5] = 0.7
+
 pass.if(
     { "TEST PASS".postln },
     { "TEST FAIL".postln }
