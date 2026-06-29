@@ -47,13 +47,13 @@ export function renderMatrix() {
     const editorRow = document.createElement("div");
     editorRow.className = "voice-editor-row";
     editorRow.hidden = true;
+    editorRow.style.borderLeftColor = `var(--m${vi + 1})`;
 
     const row = document.createElement("div");
     row.className = "mrow";
     const label = document.createElement("span");
     label.className = "mvoice-label";
     label.textContent = MATRIX_VOICES[vi];
-    label.style.cursor = "pointer";
     label.addEventListener("click", () => toggle(vi, editorRow));
     row.appendChild(label);
     const vinst = document.createElement("select");
