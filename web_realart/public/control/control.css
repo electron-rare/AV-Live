@@ -207,3 +207,8 @@ button.queued { animation: queued-blink 600ms ease-in-out infinite alternate; }
   padding:0; flex-shrink:0; border-radius:1px; }
 .pr-cell:active { opacity:0.65; }
 .pr-cell.on { background: var(--pr-color, #4c8); }
+
+/* --- Step playhead highlight --- */
+.seq-cell.playhead { outline: 2px solid rgba(255,255,255,0.75); outline-offset: -1px; }
+.pr-cell.playhead  { background: rgba(255,255,255,0.14); outline: 1px solid rgba(255,255,255,0.55); outline-offset: -1px; }
+.pr-cell.on.playhead { filter: brightness(1.45); outline: 1px solid #fff; outline-offset: -1px; }

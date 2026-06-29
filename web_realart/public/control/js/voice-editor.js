@@ -232,6 +232,7 @@ function renderPitchRoll(vi, colour, body) {
     for (let s = 0; s < 16; s++) {
       const cell = document.createElement("button");
       cell.className = "pr-cell";
+      cell.dataset.step = s;
       const st = def.steps[s];
       if (st && st.degree === d) cell.classList.add("on");
       cell.addEventListener("click", () => {
@@ -510,6 +511,19 @@ on("/matrix/colorpose", (args) => {
     saveMatState();
     if (isOpenFor(vi) && cdColor === c) renderPattern(vi);
   }
+});
+
+on("/matrix/stephead", (args) => {
+  // Guard: only act when a voice is open and the STEPS tab is active.
+  if (expandedVoice < 0 || !cdTabBodyEl || activeTab !== "steps") return;
+  const s = Math.round(Number(args[0]));
+  if (s < 0 || s > 15) return;
+  // Drum mode: highlight the seq-cell at index s.
+  const seqCells = cdTabBodyEl.querySelectorAll(".seq-cell");
+  seqCells.forEach((c, i) => c.classList.toggle("playhead", i === s));
+  // Piano-roll mode: highlight all pr-cells in column s.
+  const prCells = cdTabBodyEl.querySelectorAll(".pr-cell");
+  prCells.forEach((c) => c.classList.toggle("playhead", Number(c.dataset.step) === s));
 });
 
 export function init() {

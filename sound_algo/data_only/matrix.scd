@@ -320,7 +320,8 @@ File.exists(~matDir).not.if({ ("mkdir -p " ++ ~matDir.quote).systemCmd });
 
 // -- ~matStop : halt the playhead Routine and silence all matrix voices --
 ~matStop = {
-    ~matRoutine !? { ~matRoutine.stop };
+    ~matRoutine     !? { ~matRoutine.stop };     ~matRoutine     = nil;
+    ~matStepRoutine !? { ~matStepRoutine.stop }; ~matStepRoutine = nil;
     ~lp[\matPlaying] = false;
     ~matVoices.do { |name|
         var k = ("lp_" ++ name).asSymbol;
@@ -333,7 +334,8 @@ File.exists(~matDir).not.if({ ("mkdir -p " ++ ~matDir.quote).systemCmd });
 // -- ~matPlay : start the playhead Routine from bar 0, looping over ~matBars --
 ~matPlay = {
     var clock = ~lp[\clock] ? TempoClock.default;
-    ~matRoutine !? { ~matRoutine.stop };
+    ~matRoutine     !? { ~matRoutine.stop };     ~matRoutine     = nil;
+    ~matStepRoutine !? { ~matStepRoutine.stop }; ~matStepRoutine = nil;
     ~lp[\matPlaying] = true;
     ~lp[\matBar]     = ~lp[\matLoopStart] ? 0;
     ~matRoutine = Routine({
@@ -342,6 +344,15 @@ File.exists(~matDir).not.if({ ("mkdir -p " ++ ~matDir.quote).systemCmd });
             ~toscSend !? { ~toscSend.("/matrix/playhead", ~lp[\matBar]) };
             ~matBeatsPerBar.wait;
             ~lp[\matBar] = ~matNextBar.value;
+        }
+    }).play(clock, quant: ~matBeatsPerBar);
+    // -- per-step playhead: emits /matrix/stephead s (0..15) every 16th note --
+    ~matStepRoutine = Routine({
+        loop {
+            16.do { |s|
+                ~toscSend !? { ~toscSend.("/matrix/stephead", s) };
+                (~matBeatsPerBar / 16).wait
+            }
         }
     }).play(clock, quant: ~matBeatsPerBar);
     ~matPush.()
