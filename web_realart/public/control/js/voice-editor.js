@@ -151,9 +151,9 @@ function renderStepsTab(vi) {
   const isDrumOnly = VOICE_CLASS[voiceName] === "drum";
 
   // Mode toggle header — hidden for pure-drum voices (pitch is meaningless).
-  const hdr = document.createElement("div");
-  hdr.className = "steps-mode-hdr";
   if (!isDrumOnly) {
+    const hdr = document.createElement("div");
+    hdr.className = "steps-mode-hdr";
     ["pitch", "drum"].forEach(mode => {
       const btn = document.createElement("button");
       btn.className = "steps-mode-btn" + (stepMode[vi] === mode ? " active" : "");
@@ -165,55 +165,55 @@ function renderStepsTab(vi) {
       });
       hdr.appendChild(btn);
     });
+    cdTabBodyEl.appendChild(hdr);
   }
-  cdTabBodyEl.appendChild(hdr);
 
   if (stepMode[vi] === "pitch") {
     renderPitchRoll(vi, cdColor, cdTabBodyEl);
   } else {
-    renderDrumGrid(vi);
+    renderDrumGrid(vi, cdColor, cdTabBodyEl);
   }
 }
 
 // Drum mode: 16 pads cycling off -> soft (vel 0.6) -> loud (vel 0.95).
-function renderDrumGrid(vi) {
-  const c = cdColor;
-  const d = matColorDefs[vi][c];
-  if (!d) return;
+function renderDrumGrid(vi, colour, body) {
+  const def = matColorDefs[vi][colour];
+  if (!def) return;
   const seqRow = document.createElement("div");
-  seqRow.className = "seq-row m" + c;
-  seqRow.style.setProperty("--row-color", PALETTE[c - 1]);
+  seqRow.className = "seq-row m" + colour;
+  seqRow.style.setProperty("--row-color", PALETTE[colour - 1]);
   for (let s = 0; s < 16; s++) {
     const cell = document.createElement("button");
     cell.className = "seq-cell";
-    const st = d.steps[s];
+    const st = def.steps[s];
     if (st) cell.classList.add(st.vel >= 0.9 ? "loud" : "soft");
     cell.addEventListener("click", () => {
-      const cur = d.steps[s];
+      const cur = def.steps[s];
       if (!cur) {
-        d.steps[s] = { degree: 0, vel: 0.6 };
-        send("/matrix/step", vi, c, s, 0, 0.6);
+        def.steps[s] = { degree: 0, vel: 0.6 };
+        send("/matrix/step", vi, colour, s, 0, 0.6);
       } else if (cur.vel < 0.9) {
-        d.steps[s] = { degree: 0, vel: 0.95 };
-        send("/matrix/step", vi, c, s, 0, 0.95);
+        def.steps[s] = { degree: 0, vel: 0.95 };
+        send("/matrix/step", vi, colour, s, 0, 0.95);
       } else {
-        d.steps[s] = null;
-        send("/matrix/step", vi, c, s, -99, 0);
+        def.steps[s] = null;
+        send("/matrix/step", vi, colour, s, -99, 0);
       }
       saveMatState();
       renderPattern(vi);
     });
     cell.addEventListener("wheel", (e) => {
       e.preventDefault();
-      const cur = d.steps[s];
+      const cur = def.steps[s];
       if (!cur) return;
       cur.vel = Math.max(0, Math.min(1, cur.vel + (e.deltaY < 0 ? 0.05 : -0.05)));
-      send("/matrix/step", vi, c, s, 0, cur.vel);
+      send("/matrix/step", vi, colour, s, 0, cur.vel);
       saveMatState();
+      renderPattern(vi);
     });
     seqRow.appendChild(cell);
   }
-  cdTabBodyEl.appendChild(seqRow);
+  body.appendChild(seqRow);
 }
 
 // Pitch mode: piano-roll grid (rows=degrees top=high, cols=16 steps).
