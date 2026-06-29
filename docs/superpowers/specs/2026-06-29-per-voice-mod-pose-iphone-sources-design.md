@@ -95,6 +95,7 @@ All from routes `pose_bridge.py` already emits (zero data_only change):
 | `/pose/head [pid, x, y, c]` | `headX`, `headY` | `headX = x`; `headY = 1 - y` |
 | `/pose/limb_span [pid, span]` | `limbSpan` | `span * LIMB_SPAN_GAIN` (clip 0..1) |
 | `/pose/action [pid, idx, p0, p1, p2]` | `danse` | `danse = p2` (probability, continuous) |
+| `/pose/mouth [pid, open]` *(new emit)* | `mouthOpen` | `open` (clip 0..1) |
 
 Normalization constants (`KIN_SPEED_MAX`, `KIN_ACCEL_MAX`, `LIMB_SPAN_GAIN`)
 are defined as env-vars in `matrix.scd` with sensible defaults so they can be
@@ -102,12 +103,12 @@ tuned without code edits. Stale handling: `~matModCache` entries decay/clamp;
 if a person leaves (`/pose/leave`), continuous body sources relax toward
 neutral (no hard reset mid-performance).
 
-**Optional (stretch)**: `mouthOpen` from a new `/pose/mouth [pid, open]` emit
-(one line in `pose_bridge.py` exposing the already-computed `mouth_open`).
-Flagged optional — only routing, not detection.
+**`mouthOpen`** requires one new emit `/pose/mouth [pid, open]` in
+`pose_bridge.py`, exposing the already-computed `mouth_open` scalar. This is
+the only `data_only_viz` change — routing an existing value, not detection.
 
 Total sources after this change: 11 existing + `bodyVitesse, bodyAccel,
-bodySym, headX, headY, limbSpan, danse` = **18** (+1 optional `mouthOpen`).
+bodySym, headX, headY, limbSpan, danse, mouthOpen` = **19**.
 
 ### 3. Pose/event system (per-voice trigger/gate)
 
@@ -209,14 +210,14 @@ legacy values are read only during preset/save migration.
 ## Out of scope
 
 - New detection algorithms or new computed scalars (the values already exist;
-  `mouthOpen` is the only borderline item and is optional routing).
+  `mouthOpen` just routes an already-computed `mouth_open` scalar).
 - Changes to STEPS / SYNTH-FX tabs, the grid, transport, or the launchpad.
 - TouchOSC surface parity for the new MOD/POSE layout (can follow later).
 
-## Open questions / defaults chosen
+## Decided defaults
 
-- `mouthOpen`: **included as optional/stretch** (1-line emit). Can be dropped
-  if `mouth_open` isn't readily available in `pose_bridge` scope.
+- `mouthOpen`: **kept** — first-class source via a new `/pose/mouth` emit
+  (one line in `pose_bridge.py`).
 - `/matrix/colormod`/`colorpose`: **removed as editors**, kept only for load
   migration.
 - Normalization constants for kin/limb: **env-var defaults**, tunable live.
