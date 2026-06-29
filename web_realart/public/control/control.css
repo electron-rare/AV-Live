@@ -157,19 +157,16 @@ button.queued { animation: queued-blink 600ms ease-in-out infinite alternate; }
 .mix-mute.on { background: #622; border-color: #c44; color: #f88; font-weight: 700; }
 .mix-label { font-size: 10px; color: #9af; text-align: center; word-break: break-all; }
 
-/* --- Color def modal --- */
+/* --- Inline voice editor (accordion) --- */
 .minst { position:sticky; left:54px; z-index:2; width:78px; font-size:10px; background:#1a1a1a; color:#ccc; border:1px solid #333; flex-shrink:0; }
 .minst-head { width:78px; flex-shrink:0; }
-.minst-edit { position: sticky; left: 132px; z-index: 2; width: 22px; font-size: 11px;
-  background: #222; color: #ccc; border: 1px solid #333; flex-shrink: 0; }
+.voice-expand-btn { position: sticky; left: 132px; z-index: 2; width: 22px; font-size: 11px;
+  background: #222; color: #ccc; border: 1px solid #333; flex-shrink: 0; padding: 0; }
+.voice-expand-btn.open { color: #4af; border-color: #4af; }
+.voice-editor-row { background: #141414; border-left: 3px solid var(--m1); padding: 8px; }
 .cd-colorsel { display:flex; gap:4px; margin:6px 0; }
 .cd-colorsel button.on { outline:2px solid #fff; }
 .cd-pattern { display:flex; flex-direction:column; gap:6px; }
-.cd-modal { position: fixed; inset: 0; background: rgba(0,0,0,0.6); display: flex;
-  align-items: center; justify-content: center; z-index: 50; }
-.cd-modal[hidden] { display: none; }
-.cd-panel { background: #161616; border: 1px solid #333; border-radius: 6px;
-  padding: 12px; max-height: 90vh; overflow-y: auto; min-width: 320px; }
 .cd-head { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; }
 .cd-aud.on { background: #2b6; color: #fff; }
 .cd-row { display: flex; gap: 6px; align-items: center; padding: 4px; border-radius: 3px;

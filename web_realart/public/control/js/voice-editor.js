@@ -6,45 +6,110 @@ import {
   matColorDefs, saveMatState,
 } from "./matrix-state.js";
 
-let cdEditVoice = -1, cdColor = 1, cdAuditioning = false;
+let expandedVoice = -1;
+let expandedContainer = null;
+let expandedBtn = null;
+let cdColor = 1;
+let cdAuditioning = false;
+let cdColorSelEl = null;
+let cdPatternEl = null;
+let cdAuditionBtn = null;
 
-// Returns true when the modal is currently open for voice vi.
+// Returns true when the inline editor is currently open for voice vi.
 export function isOpenFor(vi) {
-  return cdEditVoice === vi && !document.getElementById("colordef-modal").hidden;
+  return expandedVoice === vi;
 }
 
-// Public alias for openColorDef (Phase C will replace this signature).
-export function openFor(vi) {
-  cdEditVoice = vi;
+export function collapse() {
+  if (cdAuditioning && expandedVoice >= 0) {
+    send("/matrix/audition", expandedVoice, 0);
+    cdAuditioning = false;
+  }
+  if (expandedContainer) {
+    expandedContainer.innerHTML = "";
+    expandedContainer.hidden = true;
+  }
+  if (expandedBtn) {
+    expandedBtn.textContent = "▷";
+    expandedBtn.classList.remove("open");
+  }
+  expandedVoice = -1;
+  expandedContainer = null;
+  expandedBtn = null;
+  cdColorSelEl = null;
+  cdPatternEl = null;
+  cdAuditionBtn = null;
+}
+
+export function openFor(vi, containerEl) {
+  expandedVoice = vi;
+  expandedContainer = containerEl;
   cdColor = 1;
-  document.getElementById("cd-title").textContent = MATRIX_VOICES[vi];
-  document.getElementById("cd-audition").classList.toggle("on", cdAuditioning);
+  cdAuditioning = false;
+
+  // Mark the expand toggle button
+  const grid = document.getElementById("matrix-grid");
+  expandedBtn = grid ? grid.querySelector(`.voice-expand-btn[data-vi="${vi}"]`) : null;
+  if (expandedBtn) { expandedBtn.textContent = "▼"; expandedBtn.classList.add("open"); }
+
+  containerEl.innerHTML = "";
+  containerEl.hidden = false;
+
+  // Head: voice name + audition button
+  const head = document.createElement("div");
+  head.className = "cd-head";
+  const titleEl = document.createElement("span");
+  titleEl.textContent = MATRIX_VOICES[vi];
+  head.appendChild(titleEl);
+  cdAuditionBtn = document.createElement("button");
+  cdAuditionBtn.className = "cd-aud";
+  cdAuditionBtn.textContent = "AUDITION";
+  cdAuditionBtn.addEventListener("click", () => {
+    if (expandedVoice < 0) return;
+    cdAuditioning = !cdAuditioning;
+    send("/matrix/audition", expandedVoice, cdAuditioning ? 1 : 0);
+    cdAuditionBtn.classList.toggle("on", cdAuditioning);
+  });
+  head.appendChild(cdAuditionBtn);
+  containerEl.appendChild(head);
+
+  // Color selector container
+  cdColorSelEl = document.createElement("div");
+  cdColorSelEl.className = "cd-colorsel";
+  containerEl.appendChild(cdColorSelEl);
+
+  // Pattern container
+  cdPatternEl = document.createElement("div");
+  cdPatternEl.className = "cd-pattern";
+  containerEl.appendChild(cdPatternEl);
+
   renderColorSel(vi);
   renderPattern(vi);
-  document.getElementById("colordef-modal").hidden = false;
+
   send("/matrix/colordefs/get", vi);
   send("/matrix/steps/get", vi);
   send("/matrix/colordefs/get/ext", vi);
 }
 
-function closeColorDef() {
-  if (cdAuditioning && cdEditVoice >= 0) { send("/matrix/audition", cdEditVoice, 0); cdAuditioning = false; }
-  document.getElementById("cd-audition").classList.remove("on");
-  document.getElementById("colordef-modal").hidden = true;
-  cdEditVoice = -1;
+export function toggle(vi, containerEl) {
+  if (expandedVoice === vi) {
+    collapse();
+    return;
+  }
+  collapse();
+  openFor(vi, containerEl);
 }
 
 function setCD(color, field, value) {
-  if (cdEditVoice < 0) return;
-  matColorDefs[cdEditVoice][color][field] = value;
+  if (expandedVoice < 0) return;
+  matColorDefs[expandedVoice][color][field] = value;
   saveMatState();
-  send("/matrix/colordef", cdEditVoice, color, field, value);
+  send("/matrix/colordef", expandedVoice, color, field, value);
 }
 
 function renderColorSel(vi) {
-  const sel = document.getElementById("cd-colorsel");
-  if (!sel) return;
-  sel.innerHTML = "";
+  if (!cdColorSelEl) return;
+  cdColorSelEl.innerHTML = "";
   for (let c = 1; c <= 6; c++) {
     const btn = document.createElement("button");
     btn.textContent = String(c);
@@ -52,14 +117,13 @@ function renderColorSel(vi) {
     btn.style.borderColor = PALETTE[c-1];
     btn.classList.toggle("on", c === cdColor);
     btn.addEventListener("click", () => { cdColor = c; renderColorSel(vi); renderPattern(vi); });
-    sel.appendChild(btn);
+    cdColorSelEl.appendChild(btn);
   }
 }
 
 function renderPattern(vi) {
-  const p = document.getElementById("cd-pattern");
-  if (!p) return;
-  p.innerHTML = "";
+  if (!cdPatternEl) return;
+  cdPatternEl.innerHTML = "";
   const c = cdColor;
   const d = matColorDefs[vi][c];
   if (!d) return;
@@ -95,7 +159,7 @@ function renderPattern(vi) {
   if (hasPan) { const pan = document.createElement("input"); pan.type="range"; pan.min=-1; pan.max=1; pan.step=0.01;
     pan.value = d.pan >= -1 ? d.pan : 0;
     pan.addEventListener("change", () => setCD(c, "pan", +pan.value)); varRow.appendChild(mk("pan", pan)); }
-  p.appendChild(varRow);
+  cdPatternEl.appendChild(varRow);
 
   // 16-step row
   const seqRow = document.createElement("div"); seqRow.className = "seq-row m" + c;
@@ -120,7 +184,7 @@ function renderPattern(vi) {
     });
     seqRow.appendChild(cell);
   }
-  p.appendChild(seqRow);
+  cdPatternEl.appendChild(seqRow);
 
   // Effect (mod) row
   const modDiv = document.createElement("div"); modDiv.className = "cd-row m" + c;
@@ -137,7 +201,7 @@ function renderPattern(vi) {
   };
   src.addEventListener("change", sendMod); tgt.addEventListener("change", sendMod); dep.addEventListener("change", sendMod);
   modDiv.appendChild(mk("src", src)); modDiv.appendChild(mk("tgt", tgt)); modDiv.appendChild(mk("depth", dep));
-  p.appendChild(modDiv);
+  cdPatternEl.appendChild(modDiv);
 
   // Pose section
   const poseDiv = document.createElement("div");
@@ -169,7 +233,7 @@ function renderPattern(vi) {
     });
     line.appendChild(del); poseDiv.appendChild(line);
   });
-  p.appendChild(poseDiv);
+  cdPatternEl.appendChild(poseDiv);
 }
 
 // --- OSC handlers ---
@@ -223,14 +287,7 @@ on("/matrix/colorpose", (args) => {
 });
 
 export function init() {
-  document.getElementById("cd-close").addEventListener("click", closeColorDef);
-  document.getElementById("cd-audition").addEventListener("click", () => {
-    if (cdEditVoice < 0) return;
-    cdAuditioning = !cdAuditioning;
-    send("/matrix/audition", cdEditVoice, cdAuditioning ? 1 : 0);
-    document.getElementById("cd-audition").classList.toggle("on", cdAuditioning);
-  });
   window.addEventListener("beforeunload", () => {
-    if (cdAuditioning && cdEditVoice >= 0) send("/matrix/audition", cdEditVoice, 0);
+    if (cdAuditioning && expandedVoice >= 0) send("/matrix/audition", expandedVoice, 0);
   });
 }

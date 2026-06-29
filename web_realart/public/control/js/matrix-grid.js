@@ -3,7 +3,7 @@ import {
   MATRIX_VOICES, MATRIX_BARS, MATRIX_INST_CHOICES,
   matGrid, matInst, saveMatState,
 } from "./matrix-state.js";
-import { openFor } from "./voice-editor.js";
+import { toggle } from "./voice-editor.js";
 
 // cellRefs[bar][vi] for O(1) playhead column toggle
 const cellRefs = Array.from({ length: MATRIX_BARS }, () => new Array(MATRIX_VOICES.length).fill(null));
@@ -44,11 +44,17 @@ export function renderMatrix() {
 
   // Voice rows
   for (let vi = 0; vi < MATRIX_VOICES.length; vi++) {
+    const editorRow = document.createElement("div");
+    editorRow.className = "voice-editor-row";
+    editorRow.hidden = true;
+
     const row = document.createElement("div");
     row.className = "mrow";
     const label = document.createElement("span");
     label.className = "mvoice-label";
     label.textContent = MATRIX_VOICES[vi];
+    label.style.cursor = "pointer";
+    label.addEventListener("click", () => toggle(vi, editorRow));
     row.appendChild(label);
     const vinst = document.createElement("select");
     vinst.className = "minst"; vinst.dataset.vi = vi;
@@ -57,10 +63,10 @@ export function renderMatrix() {
     vinst.value = matInst[vi] || "default";
     vinst.addEventListener("change", ()=>{ matInst[vi]=vinst.value; saveMatState(); send("/matrix/instrument", vi, vinst.value); });
     row.appendChild(vinst);
-    const edit = document.createElement("button");
-    edit.className = "minst-edit"; edit.textContent = "..."; edit.dataset.vi = vi;
-    edit.addEventListener("click", () => openFor(vi));
-    row.appendChild(edit);
+    const expandBtn = document.createElement("button");
+    expandBtn.className = "voice-expand-btn"; expandBtn.textContent = "▷"; expandBtn.dataset.vi = vi;
+    expandBtn.addEventListener("click", () => toggle(vi, editorRow));
+    row.appendChild(expandBtn);
     for (let bar = 0; bar < MATRIX_BARS; bar++) {
       const color = matGrid[vi][bar];
       const cell = document.createElement("button");
@@ -89,6 +95,7 @@ export function renderMatrix() {
       row.appendChild(cell);
     }
     container.appendChild(row);
+    container.appendChild(editorRow);
   }
 }
 
