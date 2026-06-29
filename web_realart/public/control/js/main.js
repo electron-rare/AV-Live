@@ -1,10 +1,9 @@
-const ws = new WebSocket(`ws://${location.host}/ws`);
+import { send, on, onOpen, onClose, onPrefix } from "./osc.js";
+
 const dot = () => document.getElementById("status");
-ws.addEventListener("open", () => { dot().className = "on"; send("/matrix/list"); });
-ws.addEventListener("close", () => dot().className = "off");
-function send(address, ...args) {
-  if (ws.readyState === 1) ws.send(JSON.stringify({ address, args }));
-}
+onOpen(() => { dot().className = "on"; send("/matrix/list"); });
+onClose(() => { dot().className = "off"; });
+
 const armed = new Set();
 const clipState = new Map(); // name -> last-known state int: 0 off, 1 playing, 2 queued-launch, 3 queued-stop
 
@@ -31,257 +30,237 @@ function togglePad(el, name) {
 let suppressEmit = false;
 let beatFlashTimer = null;
 
-ws.addEventListener("message", (ev) => {
-  let msg;
-  try { msg = JSON.parse(ev.data); } catch (_e) { return; }
-  if (!msg || typeof msg.address !== "string") return;
-  const { address, args } = msg;
+// /armed/<name> — engine is source of truth; args[0] is a state int 0-3
+// 0 = off, 1 = playing (solid), 2 = queued-launch (blink), 3 = queued-stop (blink)
+onPrefix("/armed/", (address, args) => {
+  const name = address.slice(7); // strip "/armed/"
+  const st = Number(args[0]);
+  clipState.set(name, st);
+  if (st >= 1) armed.add(name); else armed.delete(name);
+  document.querySelectorAll(`[data-pad="${name}"]`).forEach((btn) => {
+    btn.classList.toggle("armed", st >= 1);
+    btn.classList.toggle("queued", st === 2 || st === 3);
+  });
+});
 
-  // /armed/<name> — engine is source of truth; args[0] is a state int 0-3
-  // 0 = off, 1 = playing (solid), 2 = queued-launch (blink), 3 = queued-stop (blink)
-  if (address.startsWith("/armed/")) {
-    const name = address.slice(7); // strip "/armed/"
-    const st = Number(args[0]);
-    clipState.set(name, st);
-    if (st >= 1) armed.add(name); else armed.delete(name);
-    document.querySelectorAll(`[data-pad="${name}"]`).forEach((btn) => {
-      btn.classList.toggle("armed", st >= 1);
-      btn.classList.toggle("queued", st === 2 || st === 3);
-    });
-    return;
+// /sync/beat — flash beat dot for 80 ms; cancel any pending clear first
+on("/sync/beat", (args) => {
+  const beatDot = document.getElementById("beat-dot");
+  if (!beatDot) return;
+  if (beatFlashTimer !== null) { clearTimeout(beatFlashTimer); beatFlashTimer = null; }
+  beatDot.classList.add("flash");
+  beatFlashTimer = setTimeout(() => {
+    beatDot.classList.remove("flash");
+    beatFlashTimer = null;
+  }, 80);
+});
+
+// /sync/rms — drive master VU meter width
+on("/sync/rms", (args) => {
+  const raw = Number(args[0]);
+  const rms = Number.isFinite(raw) ? Math.max(0, Math.min(1, raw)) : 0;
+  const bar = document.getElementById("vu-bar");
+  if (bar) bar.style.width = `${rms * 100}%`;
+});
+
+// /seq/rhythm/state [idx, k, s, h, name]
+on("/seq/rhythm/state", (args) => {
+  if (!state) return;
+  const i = Math.round(Number(args[0]));
+  if (!Number.isFinite(i) || i < 0 || i >= state.rhythms.length) return;
+  if (typeof args[1] === "string") state.rhythms[i].k = args[1];
+  if (typeof args[2] === "string") state.rhythms[i].s = args[2];
+  if (typeof args[3] === "string") state.rhythms[i].h = args[3];
+  if (typeof args[4] === "string") state.rhythms[i].name = args[4];
+  state.rhySel = i;
+  saveState();
+  suppressEmit = true;
+  try {
+    restoreSel("rhythm", i);
+    updateSelLabels("rhythm");
+    updateNameInputs();
+    renderRhyGrid();
+  } finally {
+    suppressEmit = false;
   }
+});
 
-  // /sync/beat — flash beat dot for 80 ms; cancel any pending clear first
-  if (address === "/sync/beat") {
-    const beatDot = document.getElementById("beat-dot");
-    if (!beatDot) return;
-    if (beatFlashTimer !== null) { clearTimeout(beatFlashTimer); beatFlashTimer = null; }
-    beatDot.classList.add("flash");
-    beatFlashTimer = setTimeout(() => {
-      beatDot.classList.remove("flash");
-      beatFlashTimer = null;
-    }, 80);
-    return;
+// /seq/melody/state [idx, deg0, deg1, ...]
+on("/seq/melody/state", (args) => {
+  if (!state) return;
+  const i = Math.round(Number(args[0]));
+  if (!Number.isFinite(i) || i < 0 || i >= state.melodies.length) return;
+  const degs = args.slice(1).map(Number).filter(Number.isFinite);
+  if (degs.length > 0) state.melodies[i].degrees = degs;
+  state.melSel = i;
+  saveState();
+  suppressEmit = true;
+  try {
+    restoreSel("melody", i);
+    updateSelLabels("melody");
+    updateNameInputs();
+    renderMelSteps();
+  } finally {
+    suppressEmit = false;
   }
+});
 
-  // /sync/rms — drive master VU meter width
-  if (address === "/sync/rms") {
-    const raw = Number(args[0]);
-    const rms = Number.isFinite(raw) ? Math.max(0, Math.min(1, raw)) : 0;
-    const bar = document.getElementById("vu-bar");
-    if (bar) bar.style.width = `${rms * 100}%`;
-    return;
-  }
+// /scene/state <cur:int> <fill0:int> ... <fill7:int>
+on("/scene/state", (args) => {
+  const cur = Number(args[0]);
+  document.querySelectorAll("[data-scene]").forEach((btn) => {
+    const n = +btn.dataset.scene;
+    btn.classList.toggle("filled", Number(args[n + 1]) === 1);
+    btn.classList.toggle("current", n === cur);
+  });
+});
 
-  // /seq/rhythm/state [idx, k, s, h, name]
-  if (address === "/seq/rhythm/state") {
-    if (!state) return;
-    const i = Math.round(Number(args[0]));
-    if (!Number.isFinite(i) || i < 0 || i >= state.rhythms.length) return;
-    if (typeof args[1] === "string") state.rhythms[i].k = args[1];
-    if (typeof args[2] === "string") state.rhythms[i].s = args[2];
-    if (typeof args[3] === "string") state.rhythms[i].h = args[3];
-    if (typeof args[4] === "string") state.rhythms[i].name = args[4];
-    state.rhySel = i;
-    saveState();
-    suppressEmit = true;
-    try {
-      restoreSel("rhythm", i);
-      updateSelLabels("rhythm");
-      updateNameInputs();
-      renderRhyGrid();
-    } finally {
-      suppressEmit = false;
-    }
-    return;
-  }
-
-  // /seq/melody/state [idx, deg0, deg1, ...]
-  if (address === "/seq/melody/state") {
-    if (!state) return;
-    const i = Math.round(Number(args[0]));
-    if (!Number.isFinite(i) || i < 0 || i >= state.melodies.length) return;
-    const degs = args.slice(1).map(Number).filter(Number.isFinite);
-    if (degs.length > 0) state.melodies[i].degrees = degs;
-    state.melSel = i;
-    saveState();
-    suppressEmit = true;
-    try {
-      restoreSel("melody", i);
-      updateSelLabels("melody");
-      updateNameInputs();
-      renderMelSteps();
-    } finally {
-      suppressEmit = false;
-    }
-    return;
-  }
-
-  // /scene/state <cur:int> <fill0:int> ... <fill7:int>
-  if (address === "/scene/state") {
-    const cur = Number(args[0]);
-    document.querySelectorAll("[data-scene]").forEach((btn) => {
-      const n = +btn.dataset.scene;
-      btn.classList.toggle("filled", Number(args[n + 1]) === 1);
-      btn.classList.toggle("current", n === cur);
-    });
-    return;
-  }
-
-  // /matrix/playhead <bar> — advance playhead column highlight
-  if (address === "/matrix/playhead") {
-    const bar = Math.round(Number(args[0]));
-    if (!Number.isFinite(bar) || bar < 0 || bar >= MATRIX_BARS) return;
-    if (matPlayhead >= 0) {
-      for (let vi = 0; vi < MATRIX_VOICES.length; vi++) {
-        const el = cellRefs[matPlayhead][vi];
-        if (el) el.classList.remove("playing");
-      }
-    }
-    matPlayhead = bar;
+// /matrix/playhead <bar> — advance playhead column highlight
+on("/matrix/playhead", (args) => {
+  const bar = Math.round(Number(args[0]));
+  if (!Number.isFinite(bar) || bar < 0 || bar >= MATRIX_BARS) return;
+  if (matPlayhead >= 0) {
     for (let vi = 0; vi < MATRIX_VOICES.length; vi++) {
       const el = cellRefs[matPlayhead][vi];
-      if (el) el.classList.add("playing");
+      if (el) el.classList.remove("playing");
     }
-    updateTimelineHead(bar);
-    return;
   }
+  matPlayhead = bar;
+  for (let vi = 0; vi < MATRIX_VOICES.length; vi++) {
+    const el = cellRefs[matPlayhead][vi];
+    if (el) el.classList.add("playing");
+  }
+  updateTimelineHead(bar);
+});
 
-  // /matrix/loop <start> <end> — loop region feedback
-  if (address === "/matrix/loop") {
-    const s = Math.round(Number(args[0]));
-    const e = Math.round(Number(args[1]));
-    if (Number.isFinite(s) && Number.isFinite(e) && s >= 0 && e < MATRIX_BARS) {
-      matLoopStart = Math.min(s, e);
-      matLoopEnd = Math.max(s, e);
-      updateTimelineLoop();
+// /matrix/loop <start> <end> — loop region feedback
+on("/matrix/loop", (args) => {
+  const s = Math.round(Number(args[0]));
+  const e = Math.round(Number(args[1]));
+  if (Number.isFinite(s) && Number.isFinite(e) && s >= 0 && e < MATRIX_BARS) {
+    matLoopStart = Math.min(s, e);
+    matLoopEnd = Math.max(s, e);
+    updateTimelineLoop();
+  }
+});
+
+// /matrix/cell <vi> <bar> <color> — cross-surface cell sync
+on("/matrix/cell", (args) => {
+  const vi = Math.round(Number(args[0]));
+  const bar = Math.round(Number(args[1]));
+  const color = Math.round(Number(args[2]));
+  if (vi < 0 || vi >= MATRIX_VOICES.length || bar < 0 || bar >= MATRIX_BARS || color < 0 || color > 6) return;
+  matGrid[vi][bar] = color;
+  saveMatState();
+  const el = cellRefs[bar][vi];
+  if (el) {
+    applyMatCellColor(el, color);
+    if (bar === matPlayhead) el.classList.add("playing");
+  }
+});
+
+// /matrix/list <name1> <name2> ... — populate saved/preset dropdown
+on("/matrix/list", (args) => {
+  const sel = document.getElementById("matrix-list");
+  if (!sel) return;
+  const prev = sel.value;
+  sel.innerHTML = "";
+  args.forEach(name => {
+    const opt = document.createElement("option");
+    opt.value = String(name);
+    opt.textContent = String(name);
+    sel.appendChild(opt);
+  });
+  // Preserve prior selection if still present
+  if (args.map(String).includes(prev)) sel.value = prev;
+});
+
+// /matrix/grid <512 ints row-major vi*32+bar> — rebuild grid from loaded preset
+on("/matrix/grid", (args) => {
+  if (!Array.isArray(args) || args.length < (MATRIX_VOICES.length * MATRIX_BARS)) return;
+  for (let vi = 0; vi < MATRIX_VOICES.length; vi++) {
+    for (let bar = 0; bar < MATRIX_BARS; bar++) {
+      const v = Math.round(Number(args[vi * MATRIX_BARS + bar]));
+      matGrid[vi][bar] = (Number.isFinite(v) && v >= 0 && v <= 6) ? v : 0;
     }
-    return;
   }
+  saveMatState();
+  renderMatrix();
+});
 
-  // /matrix/cell <vi> <bar> <color> — cross-surface cell sync
-  if (address === "/matrix/cell") {
-    const vi = Math.round(Number(args[0]));
-    const bar = Math.round(Number(args[1]));
-    const color = Math.round(Number(args[2]));
-    if (vi < 0 || vi >= MATRIX_VOICES.length || bar < 0 || bar >= MATRIX_BARS || color < 0 || color > 6) return;
-    matGrid[vi][bar] = color;
+// /matrix/trig <vi> <amp> — per-note pulse: glow the active cell of voice vi
+on("/matrix/trig", (args) => {
+  triggerGlow(Math.round(Number(args[0])), Number(args[1]));
+});
+
+// /matrix/instrument <vi> <inst> — single-voice instrument echo
+on("/matrix/instrument", (args) => {
+  const vi = Math.round(Number(args[0])); const v = String(args[1] ?? "default");
+  if (vi >= 0 && vi < MATRIX_VOICES.length) {
+    matInst[vi] = v; saveMatState();
+    const rowSel = document.querySelector(`.minst[data-vi="${vi}"]`);
+    if (rowSel) rowSel.value = v;
+  }
+});
+
+// /matrix/instruments <16 strings> — bulk (preset load / kit)
+on("/matrix/instruments", (args) => {
+  for (let vi = 0; vi < MATRIX_VOICES.length && vi < args.length; vi++) {
+    const v = String(args[vi] ?? "default"); matInst[vi] = v;
+    const rowSel = document.querySelector(`.minst[data-vi="${vi}"]`);
+    if (rowSel) rowSel.value = v;
+  }
+  saveMatState();
+});
+
+on("/matrix/colordefs", (args) => {
+  const vi = Math.round(Number(args[0]));
+  if (vi >= 0 && vi < MATRIX_VOICES.length) {
+    for (let c = 1; c <= 6; c++) {
+      const b = 1 + (c - 1) * 6;
+      const ex = matColorDefs[vi][c] || {};
+      matColorDefs[vi][c] = { stretch:Number(args[b]), octave:Math.round(Number(args[b+1])),
+        amp:Number(args[b+2]), inst:String(args[b+3] ?? "default"),
+        cutoff:Number(args[b+4]), pan:Number(args[b+5]),
+        mod:ex.mod ?? null, pose:ex.pose || [], steps:ex.steps || new Array(16).fill(null) };
+    }
     saveMatState();
-    const el = cellRefs[bar][vi];
-    if (el) {
-      applyMatCellColor(el, color);
-      if (bar === matPlayhead) el.classList.add("playing");
+    if (cdEditVoice === vi && !document.getElementById("colordef-modal").hidden) {
+      renderColorSel(vi); renderPattern(vi);
     }
-    return;
   }
+});
 
-  // /matrix/list <name1> <name2> ... — populate saved/preset dropdown
-  if (address === "/matrix/list") {
-    const sel = document.getElementById("matrix-list");
-    if (!sel) return;
-    const prev = sel.value;
-    sel.innerHTML = "";
-    args.forEach(name => {
-      const opt = document.createElement("option");
-      opt.value = String(name);
-      opt.textContent = String(name);
-      sel.appendChild(opt);
-    });
-    // Preserve prior selection if still present
-    if (args.map(String).includes(prev)) sel.value = prev;
-    return;
-  }
-
-  // /matrix/grid <512 ints row-major vi*32+bar> — rebuild grid from loaded preset
-  if (address === "/matrix/grid") {
-    if (!Array.isArray(args) || args.length < (MATRIX_VOICES.length * MATRIX_BARS)) return;
-    for (let vi = 0; vi < MATRIX_VOICES.length; vi++) {
-      for (let bar = 0; bar < MATRIX_BARS; bar++) {
-        const v = Math.round(Number(args[vi * MATRIX_BARS + bar]));
-        matGrid[vi][bar] = (Number.isFinite(v) && v >= 0 && v <= 6) ? v : 0;
-      }
+on("/matrix/steps", (args) => {
+  const vi = Math.round(Number(args[0])), c = Math.round(Number(args[1]));
+  if (vi>=0 && vi<MATRIX_VOICES.length && c>=1 && c<=6 && matColorDefs[vi][c]) {
+    if (!matColorDefs[vi][c].steps) matColorDefs[vi][c].steps = new Array(16).fill(null);
+    for (let s=0; s<16; s++) {
+      const deg = Number(args[2 + s*2]), vel = Number(args[3 + s*2]);
+      matColorDefs[vi][c].steps[s] = (deg === -99) ? null : {degree:deg, vel:vel};
     }
     saveMatState();
-    renderMatrix();
-    return;
+    if (cdEditVoice===vi && cdColor===c && !document.getElementById("colordef-modal").hidden) renderPattern(vi);
   }
+});
 
-  // /matrix/trig <vi> <amp> — per-note pulse: glow the active cell of voice vi
-  if (address === "/matrix/trig") {
-    triggerGlow(Math.round(Number(args[0])), Number(args[1]));
-    return;
-  }
-
-  // /matrix/instrument <vi> <inst> — single-voice instrument echo
-  if (address === "/matrix/instrument") {
-    const vi = Math.round(Number(args[0])); const v = String(args[1] ?? "default");
-    if (vi >= 0 && vi < MATRIX_VOICES.length) {
-      matInst[vi] = v; saveMatState();
-      const rowSel = document.querySelector(`.minst[data-vi="${vi}"]`);
-      if (rowSel) rowSel.value = v;
-    }
-    return;
-  }
-  // /matrix/instruments <16 strings> — bulk (preset load / kit)
-  if (address === "/matrix/instruments") {
-    for (let vi = 0; vi < MATRIX_VOICES.length && vi < args.length; vi++) {
-      const v = String(args[vi] ?? "default"); matInst[vi] = v;
-      const rowSel = document.querySelector(`.minst[data-vi="${vi}"]`);
-      if (rowSel) rowSel.value = v;
-    }
+on("/matrix/colormod", (args) => {
+  const vi=Math.round(Number(args[0])), c=Math.round(Number(args[1]));
+  if (vi>=0&&vi<MATRIX_VOICES.length&&c>=1&&c<=6&&matColorDefs[vi][c]) {
+    const src=String(args[2]??"none");
+    matColorDefs[vi][c].mod = (src==="none") ? null : {source:src, target:String(args[3]??"none"), depth:Number(args[4])||0};
     saveMatState();
-    return;
+    if (cdEditVoice===vi && cdColor===c && !document.getElementById("colordef-modal").hidden) renderPattern(vi);
   }
-  if (address === "/matrix/colordefs") {
-    const vi = Math.round(Number(args[0]));
-    if (vi >= 0 && vi < MATRIX_VOICES.length) {
-      for (let c = 1; c <= 6; c++) {
-        const b = 1 + (c - 1) * 6;
-        const ex = matColorDefs[vi][c] || {};
-        matColorDefs[vi][c] = { stretch:Number(args[b]), octave:Math.round(Number(args[b+1])),
-          amp:Number(args[b+2]), inst:String(args[b+3] ?? "default"),
-          cutoff:Number(args[b+4]), pan:Number(args[b+5]),
-          mod:ex.mod ?? null, pose:ex.pose || [], steps:ex.steps || new Array(16).fill(null) };
-      }
-      saveMatState();
-      if (cdEditVoice === vi && !document.getElementById("colordef-modal").hidden) {
-        renderColorSel(vi); renderPattern(vi);
-      }
-    }
-    return;
-  }
-  if (address === "/matrix/steps") {
-    const vi = Math.round(Number(args[0])), c = Math.round(Number(args[1]));
-    if (vi>=0 && vi<MATRIX_VOICES.length && c>=1 && c<=6 && matColorDefs[vi][c]) {
-      if (!matColorDefs[vi][c].steps) matColorDefs[vi][c].steps = new Array(16).fill(null);
-      for (let s=0; s<16; s++) {
-        const deg = Number(args[2 + s*2]), vel = Number(args[3 + s*2]);
-        matColorDefs[vi][c].steps[s] = (deg === -99) ? null : {degree:deg, vel:vel};
-      }
-      saveMatState();
-      if (cdEditVoice===vi && cdColor===c && !document.getElementById("colordef-modal").hidden) renderPattern(vi);
-    }
-    return;
-  }
-  if (address === "/matrix/colormod") {
-    const vi=Math.round(Number(args[0])), c=Math.round(Number(args[1]));
-    if (vi>=0&&vi<MATRIX_VOICES.length&&c>=1&&c<=6&&matColorDefs[vi][c]) {
-      const src=String(args[2]??"none");
-      matColorDefs[vi][c].mod = (src==="none") ? null : {source:src, target:String(args[3]??"none"), depth:Number(args[4])||0};
-      saveMatState();
-      if (cdEditVoice===vi && cdColor===c && !document.getElementById("colordef-modal").hidden) renderPattern(vi);
-    }
-    return;
-  }
-  if (address === "/matrix/colorpose") {
-    const vi=Math.round(Number(args[0])), c=Math.round(Number(args[1])), n=Math.round(Number(args[2]));
-    if (vi>=0&&vi<MATRIX_VOICES.length&&c>=1&&c<=6&&matColorDefs[vi][c]) {
-      matColorDefs[vi][c].pose = [];
-      for (let k=0;k<n;k++){ const b=3+k*2; matColorDefs[vi][c].pose.push({poseId:String(args[b]),action:String(args[b+1])}); }
-      saveMatState();
-      if (cdEditVoice===vi && cdColor===c && !document.getElementById("colordef-modal").hidden) renderPattern(vi);
-    }
-    return;
+});
+
+on("/matrix/colorpose", (args) => {
+  const vi=Math.round(Number(args[0])), c=Math.round(Number(args[1])), n=Math.round(Number(args[2]));
+  if (vi>=0&&vi<MATRIX_VOICES.length&&c>=1&&c<=6&&matColorDefs[vi][c]) {
+    matColorDefs[vi][c].pose = [];
+    for (let k=0;k<n;k++){ const b=3+k*2; matColorDefs[vi][c].pose.push({poseId:String(args[b]),action:String(args[b+1])}); }
+    saveMatState();
+    if (cdEditVoice===vi && cdColor===c && !document.getElementById("colordef-modal").hidden) renderPattern(vi);
   }
 });
 
