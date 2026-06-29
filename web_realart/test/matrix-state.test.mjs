@@ -3,7 +3,8 @@ import assert from "node:assert";
 import { PALETTE, VOICE_CLASS, defaultStepMode, MATRIX_VOICES, MATRIX_BARS,
          mkColor, saveMatState, loadMatState, matGrid, matInst, matColorDefs,
          MOD_SOURCE_ORDER, MOD_SOURCE_LABELS, MATRIX_MOD_SOURCES, POSE_EVENT_CHOICES,
-         parseVoiceMod, parseVoicePose, parseModValues } from "../public/control/js/matrix-state.js";
+         parseVoiceMod, parseVoicePose, parseModValues,
+         MATRIX_MOD_TARGETS, MOD_TARGET_LABELS } from "../public/control/js/matrix-state.js";
 
 test("palette is the single 6-colour source", () => {
   assert.deepEqual(PALETTE, ["#c22","#1a8","#25b","#990","#c60","#82a"]);
@@ -78,4 +79,21 @@ test("parseModValues maps ordered values to a dict", () => {
   const m = parseModValues(vals);
   assert.equal(m.lHandY, 0);
   assert.equal(m.mouthOpen, 1);
+});
+
+test("res target on res-voices only", () => {
+  for (const v of ["sub","acid","arp","lead","stab","pad","reese","bells","melody","chord"])
+    assert.ok(MATRIX_MOD_TARGETS[v].includes("res"), `${v} should allow res`);
+  for (const v of ["kick","hats","perc","tom","fx"])
+    assert.ok(!MATRIX_MOD_TARGETS[v].includes("res"), `${v} should NOT allow res`);
+});
+test("pitch target on melodic step voices only", () => {
+  for (const v of ["sub","acid","arp","lead","stab","pad","reese","bells","perc","tom"])
+    assert.ok(MATRIX_MOD_TARGETS[v].includes("pitch"), `${v} should allow pitch`);
+  for (const v of ["kick","hats","clap","melody","chord","fx"])
+    assert.ok(!MATRIX_MOD_TARGETS[v].includes("pitch"), `${v} should NOT allow pitch`);
+});
+test("MOD_TARGET_LABELS covers pitch and res", () => {
+  assert.ok(MOD_TARGET_LABELS.pitch);
+  assert.ok(MOD_TARGET_LABELS.res);
 });

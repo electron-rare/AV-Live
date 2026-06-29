@@ -43,7 +43,7 @@ export const MOD_SOURCE_LABELS = {
   bodyVitesse:"Vitesse corps", bodyAccel:"Accél. corps", bodySym:"Symétrie",
   headX:"Tête ↔", headY:"Tête ↕", limbSpan:"Envergure", danse:"Danse (proba)", mouthOpen:"Bouche"
 };
-export const MOD_TARGET_LABELS = { none:"—", amp:"volume", cutoff:"cutoff", pan:"pan", rev:"reverb" };
+export const MOD_TARGET_LABELS = { none:"—", amp:"volume", cutoff:"cutoff", pan:"pan", rev:"reverb", res:"résonance", pitch:"pitch" };
 
 // Curated pose/event dropdown. id is the SC poseId symbol; __custom__ reveals a text input.
 export const POSE_EVENT_CHOICES = [
@@ -62,12 +62,12 @@ export const POSE_EVENT_CHOICES = [
 ];
 
 export const MATRIX_MOD_TARGETS = {
-  kick:["none","amp","pan","rev"], hats:["none","amp","pan","rev"], clap:["none","amp","pan","rev"], perc:["none","amp","cutoff","pan","rev"],
-  sub:["none","amp","pan","rev"], acid:["none","amp","cutoff","pan","rev"], arp:["none","amp","cutoff","pan","rev"],
-  lead:["none","amp","cutoff","pan","rev"], stab:["none","amp","cutoff","pan","rev"], pad:["none","amp","cutoff","pan","rev"],
-  ride:["none","amp","pan","rev"], rim:["none","amp","pan","rev"], tom:["none","amp","pan","rev"], reese:["none","amp","cutoff","pan","rev"],
-  bells:["none","amp","pan","rev"], sweep:["none","amp","pan","rev"],
-  melody:["none","amp","cutoff","pan","rev"], chord:["none","amp","cutoff","pan","rev"],
+  kick:["none","amp","pan","rev"], hats:["none","amp","pan","rev"], clap:["none","amp","pan","rev"], perc:["none","amp","cutoff","pan","rev","pitch"],
+  sub:["none","amp","pan","rev","res","pitch"], acid:["none","amp","cutoff","pan","rev","res","pitch"], arp:["none","amp","cutoff","pan","rev","res","pitch"],
+  lead:["none","amp","cutoff","pan","rev","res","pitch"], stab:["none","amp","cutoff","pan","rev","res","pitch"], pad:["none","amp","cutoff","pan","rev","res","pitch"],
+  ride:["none","amp","pan","rev"], rim:["none","amp","pan","rev"], tom:["none","amp","pan","rev","pitch"], reese:["none","amp","cutoff","pan","rev","res","pitch"],
+  bells:["none","amp","pan","rev","res","pitch"], sweep:["none","amp","pan","rev"],
+  melody:["none","amp","cutoff","pan","rev","res"], chord:["none","amp","cutoff","pan","rev","res"],
   fx:["none","amp","pan","rev"], snare:["none","amp","pan","rev"],
   crash:["none","amp","pan","rev"], shaker:["none","amp","pan","rev"]
 };
