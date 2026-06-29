@@ -41,16 +41,19 @@
     \perc->1260, \acid->700, \arp->3000, \lead->4000, \stab->2200,
     \pad->1500, \reese->1100, \melody->3500, \chord->2000
 ];
+// voices whose SynthDef has a resonant filter (res param). rev (reverb send)
+// is accepted by all lp_/classic synths, so it is not gated by voice.
+~matResVoices = ~matResVoices ? [\sub, \acid, \arp, \lead, \stab, \pad, \reese, \bells, \melody, \chord];
 
 // -- default color defs reproduce the historical global variation table --
 ~matDefaultColorDefs = {
     [ nil,
-        (stretch: 1.0, octave:  0, amp: 1.0,  inst: nil, cutoff: nil, pan: nil, steps: Array.fill(16, nil), mod: nil, pose: Array.new),
-        (stretch: 0.5, octave:  0, amp: 1.0,  inst: nil, cutoff: nil, pan: nil, steps: Array.fill(16, nil), mod: nil, pose: Array.new),
-        (stretch: 1.0, octave:  1, amp: 1.0,  inst: nil, cutoff: nil, pan: nil, steps: Array.fill(16, nil), mod: nil, pose: Array.new),
-        (stretch: 2.0, octave:  0, amp: 1.0,  inst: nil, cutoff: nil, pan: nil, steps: Array.fill(16, nil), mod: nil, pose: Array.new),
-        (stretch: 1.0, octave: -1, amp: 1.05, inst: nil, cutoff: nil, pan: nil, steps: Array.fill(16, nil), mod: nil, pose: Array.new),
-        (stretch: 0.5, octave:  0, amp: 1.2,  inst: nil, cutoff: nil, pan: nil, steps: Array.fill(16, nil), mod: nil, pose: Array.new) ]
+        (stretch: 1.0, octave:  0, amp: 1.0,  inst: nil, cutoff: nil, pan: nil, res: nil, rev: nil, steps: Array.fill(16, nil), mod: nil, pose: Array.new),
+        (stretch: 0.5, octave:  0, amp: 1.0,  inst: nil, cutoff: nil, pan: nil, res: nil, rev: nil, steps: Array.fill(16, nil), mod: nil, pose: Array.new),
+        (stretch: 1.0, octave:  1, amp: 1.0,  inst: nil, cutoff: nil, pan: nil, res: nil, rev: nil, steps: Array.fill(16, nil), mod: nil, pose: Array.new),
+        (stretch: 2.0, octave:  0, amp: 1.0,  inst: nil, cutoff: nil, pan: nil, res: nil, rev: nil, steps: Array.fill(16, nil), mod: nil, pose: Array.new),
+        (stretch: 1.0, octave: -1, amp: 1.05, inst: nil, cutoff: nil, pan: nil, res: nil, rev: nil, steps: Array.fill(16, nil), mod: nil, pose: Array.new),
+        (stretch: 0.5, octave:  0, amp: 1.2,  inst: nil, cutoff: nil, pan: nil, res: nil, rev: nil, steps: Array.fill(16, nil), mod: nil, pose: Array.new) ]
 };
 ~matColorDefs = ~matColorDefs ? Array.fill(~matVoices.size, { ~matDefaultColorDefs.value });
 
@@ -241,6 +244,10 @@ File.exists(~matDir).not.if({ ("mkdir -p " ++ ~matDir.quote).systemCmd });
                     cdPairs = cdPairs ++ [\cutoff, spec[\cutoff]] });
                 (spec[\pan].notNil and: { (~matModTargets[name] ? []).includes(\pan) }).if({
                     cdPairs = cdPairs ++ [\pan, spec[\pan]] });
+                (spec[\res].notNil and: { ~matResVoices.includes(name) }).if({
+                    cdPairs = cdPairs ++ [\res, spec[\res]] });
+                (spec[\rev].notNil).if({
+                    cdPairs = cdPairs ++ [\rev, spec[\rev]] });
                 (~matStepsEmpty.(spec[\steps]).not).if({
                     ~matColorStepPattern.(name, vi, color, spec, volOf, instPair, cdPairs)
                 }, {
@@ -435,7 +442,7 @@ File.exists(~matDir).not.if({ ("mkdir -p " ++ ~matDir.quote).systemCmd });
 
 // -- ~matSetColorDef : set one field of one voice/color, validate, re-source, echo --
 ~matSetColorDef = { |vi, color, field, value|
-    var fields = [\stretch, \octave, \amp, \inst, \cutoff, \pan];
+    var fields = [\stretch, \octave, \amp, \inst, \cutoff, \pan, \res, \rev];
     ((vi >= 0 and: { vi < ~matVoices.size }) and: { color >= 1 and: { color <= 6 } }
         and: { fields.includes(field.asSymbol) }).if({
         var name = ~matVoices[vi];
@@ -448,6 +455,14 @@ File.exists(~matDir).not.if({ ("mkdir -p " ++ ~matDir.quote).systemCmd });
         ((field.asSymbol == \cutoff) or: { field.asSymbol == \pan }).if({
             ok = (~matModTargets[name] ? []).includes(field.asSymbol);
             v = value.asFloat;
+        });
+        (field.asSymbol == \res).if({
+            ok = ~matResVoices.includes(name);
+            v = value.asFloat;
+        });
+        (field.asSymbol == \rev).if({
+            v = value.asFloat;
+            // rev accepted for all voices (ungated)
         });
         ((field.asSymbol == \stretch) or: { field.asSymbol == \octave }
             or: { field.asSymbol == \amp }).if({
@@ -463,7 +478,8 @@ File.exists(~matDir).not.if({ ("mkdir -p " ++ ~matDir.quote).systemCmd });
 };
 
 // -- ~matColorDefPush : send one voice's 6 color defs flattened to surfaces --
-// flat layout per color (1..6): stretch, octave, amp, inst(str), cutoff(-1=nil), pan(-2=nil)
+// flat layout per color (1..6) — stride 8:
+//   stretch, octave, amp, inst(str), cutoff(-1=nil), pan(-2=nil), res(-3=nil), rev(-4=nil)
 // Distinct OUTBOUND address (plural) so it never collides with the 4-arg inbound
 // /matrix/colordef set (mirrors /matrix/instrument vs /matrix/instruments).
 ~matColorDefPush = { |vi|
@@ -471,7 +487,7 @@ File.exists(~matDir).not.if({ ("mkdir -p " ++ ~matDir.quote).systemCmd });
         var flat = (1..6).collect({ |c|
             var d = ~matColorDefs[vi][c];
             [ d[\stretch], d[\octave], d[\amp], (d[\inst] ? \default).asString,
-              d[\cutoff] ? -1, d[\pan] ? -2 ]
+              d[\cutoff] ? -1, d[\pan] ? -2, d[\res] ? -3, d[\rev] ? -4 ]
         }).flatten;
         ~toscSend.valueArray(["/matrix/colordefs", vi] ++ flat)
     }
@@ -574,7 +590,7 @@ OSCdef(\mat_steps_get, { |msg, time, addr|
                     (voiceDefs.isArray and: { vi < ~matVoices.size }).if({
                         voiceDefs.do { |d, ci|
                             (d.isKindOf(Event)).if({
-                                [\stretch, \octave, \amp, \inst, \cutoff, \pan].do { |f|
+                                [\stretch, \octave, \amp, \inst, \cutoff, \pan, \res, \rev].do { |f|
                                     d[f].notNil.if({ ~matColorDefs[vi][ci + 1][f] = d[f] })
                                 }; (d[\steps].notNil and: { d[\steps].isArray }).if({ ~matColorDefs[vi][ci + 1][\steps] = d[\steps] });
                                 (d[\mod].notNil).if({ ~matColorDefs[vi][ci + 1][\mod] = d[\mod] });

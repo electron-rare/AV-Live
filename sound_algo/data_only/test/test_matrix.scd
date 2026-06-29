@@ -285,16 +285,16 @@ pass = pass and: { ~matSetColorDef.notNil and: { ~matColorDefPush.notNil } };
 ~matSetColorDef.(5, 3, \octave, -2);                 // acid, color 3
 pass = pass and: { ~matColorDefs[5][3][\octave] == -2 };
 pass = pass and: { ~trigLog[0] == "/matrix/colordefs" and: { ~trigLog[1] == 5 } };
-pass = pass and: { ~trigLog.size == 38 };   // path + vi + 36 values
+pass = pass and: { ~trigLog.size == 50 };   // path + vi + 48 values (6 colors x 8 fields)
 
-// direct test of ~matColorDefPush: address, vi, 38 items total, nil pan=-2, nil cutoff=-1
+// direct test of ~matColorDefPush: address, vi, 50 items total, nil pan=-2, nil cutoff=-1, nil res=-3, nil rev=-4
 ~trigLog = nil;
 ~matColorDefPush.(5);
 pass = pass and: { ~trigLog[0] == "/matrix/colordefs" };
 pass = pass and: { ~trigLog[1] == 5 };
-pass = pass and: { ~trigLog.size == 38 };
-pass = pass and: { ~trigLog[(2 + ((1-1)*6) + 5)] == -2 };   // color 1 pan nil -> -2
-pass = pass and: { ~trigLog[(2 + ((1-1)*6) + 4)] == -1 };   // color 1 cutoff nil -> -1
+pass = pass and: { ~trigLog.size == 50 };
+pass = pass and: { ~trigLog[(2 + ((1-1)*8) + 5)] == -2 };   // color 1 pan nil -> -2
+pass = pass and: { ~trigLog[(2 + ((1-1)*8) + 4)] == -1 };   // color 1 cutoff nil -> -1
 
 // invalid field is rejected (state unchanged)
 ~matSetColorDef.(5, 3, \bogus, 9);
@@ -335,6 +335,17 @@ pass = pass and: { ~matColorDefs[6][2][\inst] == \do_strike };
 ~matColorDefs[6][2][\inst] = nil;                   // restore
 
 pass = pass and: { ~matVariation.(\acid, 1, 5).asStream.next(()).notNil };
+
+// res/rev round-trip through a colour def
+~matColorDefs[5][1][\res] = 0.7;   // acid, colour 1
+~matColorDefs[5][1][\rev] = 0.3;
+variation = ~matVariation.(\acid, 1, 5);
+pass = pass and: { variation.notNil and: { variation.isKindOf(Pattern) } };
+// stream one event, must not raise
+try { variation.asStream.next(()) } { |e| pass = false;
+    ("EXCEPTION res/rev stream: " ++ e.errorString).postln };
+~matColorDefs[5][1][\res] = nil;   // restore
+~matColorDefs[5][1][\rev] = nil;
 
 // --- Step sequencer state (Task 1) ---
 pass = pass and: { ~matStepsEmpty.notNil and: { ~matSetStep.notNil and: { ~matStepsPush.notNil } } };
