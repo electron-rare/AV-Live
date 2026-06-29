@@ -1,10 +1,16 @@
 import { send, on, onOpen, onClose, onPrefix } from "./osc.js";
 import {
+  PALETTE,
   MATRIX_VOICES, MATRIX_BARS, MATRIX_INST_CHOICES,
   MATRIX_MOD_SOURCES, MATRIX_MOD_TARGETS,
   mkColor, matGrid, matInst, matColorDefs,
   resetMatGrid, saveMatState, loadMatState,
 } from "./matrix-state.js";
+
+function installPaletteVars() {
+  const root = document.documentElement.style;
+  PALETTE.forEach((c, i) => root.setProperty(`--m${i + 1}`, c));
+}
 
 const dot = () => document.getElementById("status");
 onOpen(() => { dot().className = "on"; send("/matrix/list"); });
@@ -365,12 +371,11 @@ function renderColorSel(vi) {
   const sel = document.getElementById("cd-colorsel");
   if (!sel) return;
   sel.innerHTML = "";
-  const COLORS = ["#c22","#1a8","#25b","#990","#c60","#82a"];
   for (let c = 1; c <= 6; c++) {
     const btn = document.createElement("button");
     btn.textContent = String(c);
-    btn.style.background = COLORS[c-1];
-    btn.style.borderColor = COLORS[c-1];
+    btn.style.background = PALETTE[c-1];
+    btn.style.borderColor = PALETTE[c-1];
     btn.classList.toggle("on", c === cdColor);
     btn.addEventListener("click", () => { cdColor = c; renderColorSel(vi); renderPattern(vi); });
     sel.appendChild(btn);
@@ -886,6 +891,7 @@ function updateNameInputs() {
 }
 
 document.addEventListener("DOMContentLoaded", () => {
+  installPaletteVars();
   loadState();
   loadMatState();
 
