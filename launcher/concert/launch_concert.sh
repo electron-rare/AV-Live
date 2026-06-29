@@ -12,7 +12,15 @@ set -u
 REPO="$HOME/Documents/Projets/AV-Live"
 DEV="AC1CDE5F-DDC4-5B2C-80D7-9953D8ABA0AC"   # iPhone 16 Pro (xcrun devicectl list devices)
 export PATH=/opt/homebrew/bin:$PATH
-export MEDIAPIPE_DELEGATE=cpu
+# MediaPipe Metal GPU delegate runs Pose+Face+Hand inference on the GPU instead of
+# the CPU. The CPU delegate pegged ~1.6 cores and, under load, starved the realtime
+# pose loop -> choppy/jittery/flickering detection (body+hands). GPU frees the CPU
+# (measured 163%->60% on M1 Max) and is stable on M1/M2/M3 Max. It flakes on M5, so
+# fall back to cpu there.
+case "$(sysctl -n machdep.cpu.brand_string 2>/dev/null)" in
+  *M5*) export MEDIAPIPE_DELEGATE=cpu ;;
+  *)    export MEDIAPIPE_DELEGATE=gpu ;;
+esac
 export POSE_FILTER=median+kalman+lookahead+ik+arkit_fuse
 # CONCERT_MIRROR=0 in the environment disables the video mirror.
 
