@@ -353,8 +353,8 @@ File.exists(~matDir).not.if({ ("mkdir -p " ++ ~matDir.quote).systemCmd });
 // enable/disable: snapshot base on enable; restore clean grid on disable
 ~matSetEvolve = { |on|
     on.asBoolean.if({
-        ~matEvolve   = true;
-        ~matBaseGrid = ~lp[\matrix].collect({ |row| row.copy });
+        ~matEvolve.not.if({ ~matBaseGrid = ~lp[\matrix].collect({ |row| row.copy }) });
+        ~matEvolve = true;
     }, {
         ~matEvolve = false;
         ~matBaseGrid.notNil.if({
@@ -447,6 +447,8 @@ File.exists(~matDir).not.if({ ("mkdir -p " ++ ~matDir.quote).systemCmd });
 // -- ~matClear : reset all cells to 0 and push state --
 ~matClear = {
     ~lp[\matrix] = Array.fill(~matVoices.size, { Array.fill(~matBars, 0) });
+    (~matEvolve and: { ~matBaseGrid.notNil }).if({
+        ~matBaseGrid = ~lp[\matrix].collect({ |row| row.copy }) });
     ~matPush.()
 };
 
@@ -747,6 +749,7 @@ OSCdef(\mat_steps_get, { |msg, time, addr|
             ~matVoices.size.do { |vi| ~matColorDefPush.(vi) };
             ~matVoices.size.do { |vi| (1..6).do { |c| ~matStepsPush.(vi, c) } };
             ~matVoices.size.do { |vi| ~matVoiceModPush.(vi); ~matVoicePosePush.(vi) };
+            ~matEvolvePush.();
             ("[matrix] loaded " ++ path).postln;
             true
         }, {

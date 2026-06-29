@@ -870,6 +870,26 @@ pass = pass and: { ~matEvolve == true and: { ~matBaseGrid.notNil } };
 OSCdef(\mat_evolve).func.value(['/matrix/evolve', 0]);
 pass = pass and: { ~matEvolve == false };
 
+// Fix 1: clear while evolving also clears the base (no resurrection)
+~lp[\matrix] = Array.fill(~matVoices.size, { Array.fill(~matBars, 0) });
+~lp[\matrix][0][0] = 2;
+~matSetEvolve.(true);                  // base has the active cell
+~matClear.();
+pass = pass and: { ~matBaseGrid[0][0] == 0 };           // base cleared too
+~matEvolveRate = 1.0; ~matEvolveStep.();
+pass = pass and: { ~lp[\matrix][0][0] == 0 };           // stays cleared (no resurrection)
+~matSetEvolve.(false);
+
+// Fix 2: re-enabling while evolving keeps the ORIGINAL base (idempotent)
+~lp[\matrix] = Array.fill(~matVoices.size, { Array.fill(~matBars, 0) });
+~lp[\matrix][0][0] = 3;
+~matSetEvolve.(true);                  // base[0][0] = 3
+~matEvolveRate = 1.0; ~matEvolveStep.();   // working[0][0] mutates to != 3
+~matSetEvolve.(true);                  // re-enable: must NOT re-snapshot the mutated grid
+pass = pass and: { ~matBaseGrid[0][0] == 3 };           // original baseline kept
+~matSetEvolve.(false);
+pass = pass and: { ~lp[\matrix][0][0] == 3 };           // restores the original
+
 pass.if(
     { "TEST PASS".postln },
     { "TEST FAIL".postln }
