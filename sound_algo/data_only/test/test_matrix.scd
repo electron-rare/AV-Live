@@ -412,37 +412,6 @@ pass = pass and: { ~ev[\freq].isNil };
 // --- Per-color mod + pose state (Task 1) ---
 pass = pass and: { ~matColorDefs[5][2][\mod].isNil };               // default no effect
 pass = pass and: { ~matColorDefs[5][2][\pose].isArray and: { ~matColorDefs[5][2][\pose].isEmpty } };
-pass = pass and: { ~matSetColorMod.notNil and: { ~matSetColorPose.notNil } };
-~trigLog = nil; ~toscSend = { |path ...args| ~trigLog = ([path] ++ args) };
-~matSetColorMod.(5, 2, \rHandY, \cutoff, 0.7);                      // acid supports cutoff
-pass = pass and: { ~matColorDefs[5][2][\mod][\target] == \cutoff };
-pass = pass and: { ~trigLog[0] == "/matrix/colormod" and: { ~trigLog[1] == 5 } };
-~matSetColorMod.(0, 1, \rHandY, \cutoff, 0.7);                      // kick has no cutoff -> reject
-pass = pass and: { ~matColorDefs[0][1][\mod].isNil };
-~matSetColorMod.(5, 2, \none, \none, 0);                            // clears
-pass = pass and: { ~matColorDefs[5][2][\mod].isNil };
-~matSetColorPose.(5, 2, \poseA, \trigger);
-pass = pass and: { ~matColorDefs[5][2][\pose][0][\poseId] == \poseA };
-~matColorDefs[5][2][\pose] = [];
-
-// dedup: setting the same poseId twice keeps one entry
-~matColorDefs[5][2][\pose] = [];
-~matSetColorPose.(5, 2, \poseD, \trigger);
-~matSetColorPose.(5, 2, \poseD, \gate);
-pass = pass and: { ~matColorDefs[5][2][\pose].size == 1 };
-pass = pass and: { ~matColorDefs[5][2][\pose][0][\action] == \gate };
-~matColorDefs[5][2][\pose] = [];
-
-// colorpose push echo
-~trigLog = nil;
-~matSetColorPose.(5, 2, \poseE, \trigger);
-pass = pass and: { ~trigLog[0] == "/matrix/colorpose" and: { ~trigLog[1] == 5 } };
-~matColorDefs[5][2][\pose] = [];
-
-// out-of-bounds set must not raise / not corrupt
-~matSetColorMod.(-1, 1, \rHandY, \cutoff, 0.5);
-~matSetColorMod.(5, 7, \rHandY, \cutoff, 0.5);
-pass = pass and: { true };
 
 // Fix 1: fresh color pose arrays and distinct per color
 pass = pass and: { (~matColorDefs[5][1][\pose] === ~matColorDefs[5][2][\pose]).not };
@@ -498,8 +467,8 @@ try { ~matPoseFire.(\unknown) } { |e| pass = false };
 ~matColorDefs[5][3][\pose] = [];
 
 // --- Per-color mod/pose persistence + migration (Task 3) ---
-~matSetColorMod.(4, 3, \rHandY, \amp, 0.5);
-~matSetColorPose.(4, 3, \poseM, \gate);
+~matColorDefs[4][3][\mod] = (source: \rHandY, target: \amp, depth: 0.5);
+~matColorDefs[4][3][\pose] = [ (poseId: \poseM, action: \gate) ];
 ~matSave.("cp grid");
 ~matColorDefs = Array.fill(~matVoices.size, { ~matDefaultColorDefs.value });
 pass = pass and: { ~matLoad.("cp grid") };
@@ -518,16 +487,6 @@ pass = pass and: { ~matColorDefs[4][1][\mod][\target] == \cutoff };   // voice m
 pass = pass and: { ~matColorDefs[4][3][\pose][0][\poseId] == \poseL }; // pose -> its color
 File.delete(~matDir +/+ "legc.matrix");
 
-// colorpose OSCdef list-format parse (web sends vi color n pairs)
-~cpMsg = ["/matrix/colorpose", 5, 2, 2, "poseA", "trigger", "poseB", "gate"];
-~matColorDefs[5][2][\pose] = Array.fill((~cpMsg[3]).asInteger, { |k|
-    (poseId: (~cpMsg[4 + (k*2)]).asSymbol, action: (~cpMsg[5 + (k*2)]).asSymbol) });
-pass = pass and: { ~matColorDefs[5][2][\pose].size == 2 };
-pass = pass and: { ~matColorDefs[5][2][\pose][1][\poseId] == \poseB };
-pass = pass and: { ~matColorDefs[5][2][\pose][1][\action] == \gate };
-// n=0 clears
-~matColorDefs[5][2][\pose] = Array.fill(0, { nil });
-pass = pass and: { ~matColorDefs[5][2][\pose].isEmpty };
 
 // --- New iPhone mod sources (Task 1) ---
 // ~matModOrder must have 19 entries

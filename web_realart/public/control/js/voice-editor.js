@@ -530,26 +530,6 @@ on("/matrix/steps", (args) => {
   }
 });
 
-on("/matrix/colormod", (args) => {
-  const vi=Math.round(Number(args[0])), c=Math.round(Number(args[1]));
-  if (vi>=0&&vi<MATRIX_VOICES.length&&c>=1&&c<=6&&matColorDefs[vi][c]) {
-    const src=String(args[2]??"none");
-    matColorDefs[vi][c].mod = (src==="none") ? null : {source:src, target:String(args[3]??"none"), depth:Number(args[4])||0};
-    saveMatState();
-    if (isOpenFor(vi) && cdColor === c) renderPattern(vi);
-  }
-});
-
-on("/matrix/colorpose", (args) => {
-  const vi=Math.round(Number(args[0])), c=Math.round(Number(args[1])), n=Math.round(Number(args[2]));
-  if (vi>=0&&vi<MATRIX_VOICES.length&&c>=1&&c<=6&&matColorDefs[vi][c]) {
-    matColorDefs[vi][c].pose = [];
-    for (let k=0;k<n;k++){ const b=3+k*2; matColorDefs[vi][c].pose.push({poseId:String(args[b]),action:String(args[b+1])}); }
-    saveMatState();
-    if (isOpenFor(vi) && cdColor === c) renderPattern(vi);
-  }
-});
-
 on("/matrix/voicemod", (args) => {
   const { vi, list } = parseVoiceMod(args);
   if (vi >= 0 && vi < MATRIX_VOICES.length) {
