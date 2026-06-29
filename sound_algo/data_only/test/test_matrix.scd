@@ -815,6 +815,39 @@ pass = pass and: { (~pEv[\freq] - ((60 + 0 + 7).midicps * (2 ** (~matColorDefs[5
 ~matVoiceMods[\acid] = [];
 ~matColorDefs[5][2][\steps] = Array.fill(16, nil);
 
+// --- generative evolve (SP-B) ---
+// build a base grid with known 0 and active cells (small 2-voice fixture in-place)
+~evBase = Array.fill(~matVoices.size, { Array.fill(~matBars, 0) });
+~evBase[0][0] = 3; ~evBase[0][1] = 0; ~evBase[0][2] = 5;   // kick: active,0,active
+~evBase[1][0] = 0; ~evBase[1][4] = 2;                       // hats: 0,...,active
+~matBaseGrid = ~evBase.collect({ |row| row.copy });
+~lp[\matrix] = ~evBase.collect({ |row| row.copy });
+~matEvolveRate = 1.0;   // mutate every active cell
+~matEvolveStep.();
+// density preserved: 0-cells stay 0, active stay active (1..6)
+pass = pass and: { ~lp[\matrix][0][1] == 0 };       // base 0 stays 0
+pass = pass and: { ~lp[\matrix][1][0] == 0 };
+pass = pass and: { (~lp[\matrix][0][0] >= 1) and: { ~lp[\matrix][0][0] <= 6 } };
+pass = pass and: { (~lp[\matrix][0][2] >= 1) and: { ~lp[\matrix][0][2] <= 6 } };
+pass = pass and: { (~lp[\matrix][1][4] >= 1) and: { ~lp[\matrix][1][4] <= 6 } };
+// recolour differs from base (rate 1.0 guarantees a change)
+pass = pass and: { ~lp[\matrix][0][0] != 3 };
+pass = pass and: { ~lp[\matrix][0][2] != 5 };
+pass = pass and: { ~lp[\matrix][1][4] != 2 };
+// rate 0 -> identical to base
+~matEvolveRate = 0.0;
+~lp[\matrix] = ~evBase.collect({ |row| row.copy });
+~matEvolveStep.();
+pass = pass and: { ~lp[\matrix][0][0] == 3 and: { ~lp[\matrix][0][2] == 5 } };
+// bounded: base is untouched by mutation; setEvolve(false) restores base exactly
+~matEvolveRate = 1.0;
+~matSetEvolve.(true);                 // snapshots current ~lp[\matrix] as base
+~evSnap = ~matBaseGrid.collect({ |row| row.copy });
+~matEvolveStep.(); ~matEvolveStep.(); // two cycles
+pass = pass and: { ~matBaseGrid == ~evSnap };   // base unchanged by steps
+~matSetEvolve.(false);                // restore
+pass = pass and: { ~lp[\matrix] == ~evSnap };   // working grid back to base
+
 pass.if(
     { "TEST PASS".postln },
     { "TEST FAIL".postln }

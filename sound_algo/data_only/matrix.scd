@@ -321,6 +321,52 @@ File.exists(~matDir).not.if({ ("mkdir -p " ++ ~matDir.quote).systemCmd });
     }
 };
 
+// -- generative per-cycle evolution (SP-B) --
+~matEvolve     = ~matEvolve     ? false;
+~matEvolveRate = ~matEvolveRate ? 0.15;   // fraction of active cells recoloured per cycle
+~matBaseGrid   = ~matBaseGrid   ? nil;     // immutable clean snapshot while evolving
+
+// re-derive ~lp[\matrix] from ~matBaseGrid: recolour active cells (0 stays 0),
+// mutated colour differs from base and is in 1..6. Bounded (always from base).
+~matEvolveStep = {
+    ~matBaseGrid.notNil.if({
+        ~matVoices.do { |name, vi|
+            ~matBars.do { |b|
+                var base = ~matBaseGrid[vi][b];
+                ((base != 0) and: { 1.0.rand < ~matEvolveRate }).if({
+                    ~lp[\matrix][vi][b] = (1..6).reject({ |c| c == base }).choose
+                }, {
+                    ~lp[\matrix][vi][b] = base
+                })
+            }
+        };
+        ~matVoices.size.do { |i| ~matLastColor[i] = -1 };   // force re-source next bar
+        ~matGridPush.()
+    })
+};
+
+// push evolve state to surfaces
+~matEvolvePush = {
+    ~toscSend !? { ~toscSend.("/matrix/evolve", ~matEvolve.if({ 1 }, { 0 }), ~matEvolveRate) }
+};
+
+// enable/disable: snapshot base on enable; restore clean grid on disable
+~matSetEvolve = { |on|
+    on.asBoolean.if({
+        ~matEvolve   = true;
+        ~matBaseGrid = ~lp[\matrix].collect({ |row| row.copy });
+    }, {
+        ~matEvolve = false;
+        ~matBaseGrid.notNil.if({
+            ~lp[\matrix] = ~matBaseGrid.collect({ |row| row.copy });
+            ~matVoices.size.do { |i| ~matLastColor[i] = -1 };
+            ~matGridPush.()
+        });
+        ~matBaseGrid = nil;
+    });
+    ~matEvolvePush.()
+};
+
 // -- ~matPush : push playhead position to all TouchOSC clients --
 ~matPush = {
     ~toscSend !? { ~toscSend.("/matrix/playhead", ~lp[\matBar]) }
@@ -370,7 +416,10 @@ File.exists(~matDir).not.if({ ("mkdir -p " ++ ~matDir.quote).systemCmd });
             ~matApplyBar.(~lp[\matBar]);
             ~toscSend !? { ~toscSend.("/matrix/playhead", ~lp[\matBar]) };
             ~matBeatsPerBar.wait;
+            ~matPrevBar  = ~lp[\matBar];
             ~lp[\matBar] = ~matNextBar.value;
+            // loop wrapped (playhead jumped backward) -> mutate one cycle
+            (~matEvolve and: { ~lp[\matBar] < ~matPrevBar }).if({ ~matEvolveStep.() });
         }
     }).play(clock, quant: ~matBeatsPerBar);
     // -- per-step playhead: emits /matrix/stephead s (0..15) every 16th note --
