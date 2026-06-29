@@ -53,14 +53,14 @@ in voice activation + density over the 64 bars.
   ```
 - `main()` loops morceaux × {intro, live, outro}, calling `to_sc(f"{name}_{sec}",
   section_arc, instkit, melodies, extra)` → writes 84 `.matrix` files.
-- Section arcs are hand-specified per morceau. To stay consistent and tractable
-  while remaining per-morceau, they are built from reusable **section-arc
-  helpers** (`build_intro(g, schedule)`, `build_outro(g, schedule)`) driven by a
-  per-morceau voice-entry/exit schedule — the hand-authoring is the morceau's
-  schedule + density choices, the helper enforces the section shape. `live` is
-  the morceau's existing full arc.
-- `live` = the current arc (the 28 existing arcs become the `live` sections).
-  `intro`/`outro` are authored as the build/breakdown of that arc.
+- **Each intro and outro is its own fully-independent hand-written arc
+  function** — `arc_intro_<morceau>(g)` / `arc_outro_<morceau>(g)` — 56 distinct
+  bodies (28 intro + 28 outro), no shared helper. Maximum per-morceau control.
+  `live` = the morceau's existing arc (reused unchanged). So per morceau: 1
+  existing live arc + 2 new hand-written arcs.
+- The intro/outro arcs follow the section semantics (intro builds, outro breaks
+  down) but each is composed by hand for its morceau (its own voice timing,
+  density curve, and section pivots over the 64 bars).
 
 ### Pattern families (`patterns.py`) — merged SP-C2
 - Hand-authored 6-colour entries added to `DRUMS`/`MEL` (dub/psy/house/ambient
@@ -99,7 +99,8 @@ in voice activation + density over the 64 bars.
 
 ## Decided defaults
 
-- 84 presets = 28 morceaux × {intro, live, outro}, hand-arranged per morceau via
-  reusable section-arc helpers + per-morceau schedules; `live` = the existing arc.
+- 84 presets = 28 morceaux × {intro, live, outro}; `live` = the existing arc,
+  `intro`/`outro` = 56 fully-independent hand-written arc functions (no shared
+  helper), one each per morceau.
 - Hand-authored 6-colour families (not derived); existing families/default kept.
 - Full batch; user ear-reviews and we iterate.
