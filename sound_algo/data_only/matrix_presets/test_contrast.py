@@ -44,11 +44,10 @@ from patterns import patterns_for, MEL
 # default family is derived: colours 2-6 are not all identical to colour 1
 ac = patterns_for("acid", "techno_drive")      # techno_drive maps mel-family default for acid
 check(ac is not None and len(ac) == 6, "patterns_for returns 6")
-check(ac[4] != ac[0] or ac[3] != ac[0], "default colours are contrasted (derived)")
-# kick default colour 5 (sparse) has <= hits than colour 1
-def dens2(p): return sum(1 for s in p if s is not None)
+# WIRING: default-family colours 2-6 are EXACTLY the derived ones (proves the wiring)
 kk = patterns_for("kick", "techno_drive")
-check(dens2(kk[4]) <= dens2(kk[0]), "kick sparse <= base")
+check(kk[1:] == derive_drum_colors(kk[0]), "kick default colours exactly derived")
+check(ac[1:] == derive_mel_colors(ac[0]), "acid default colours exactly derived")
 # authored style family is NOT derived: acid in psy preset keeps hand-authored set
 psy = patterns_for("acid", "psytrance_roll")
 check(psy == MEL["acid"]["psy"], "authored psy family untouched")
