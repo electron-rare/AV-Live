@@ -23,10 +23,18 @@ export const MATRIX_VOICES=Array.from({length:22},(_,i)=>"v"+i);
 export const MATRIX_BARS=64;
 export const MATRIX_INST_CHOICES=[];
 export const MATRIX_MOD_SOURCES=[];
-export const MATRIX_MOD_TARGETS=[];
+export const MATRIX_MOD_TARGETS={};
+export const MOD_SOURCE_ORDER=[];
+export const MOD_SOURCE_LABELS={};
+export const MOD_TARGET_LABELS={};
+export const POSE_EVENT_CHOICES=[];
 export const matColorDefs=Array.from({length:22},()=>Array.from({length:7},()=>({})));
+export let matVoiceMods=Array.from({length:22},()=>[]);
+export let matVoicePoses=Array.from({length:22},()=>[]);
+export function parseVoiceMod(args){ return {vi:0,list:[]}; }
+export function parseVoicePose(args){ return {vi:0,list:[]}; }
 export function saveMatState(){}
-export const VOICE_CLASS=()=>"perc";
+export const VOICE_CLASS={};
 export function defaultStepMode(){ return "drum"; }
 export function isMelodic(){ return false; }
 `,

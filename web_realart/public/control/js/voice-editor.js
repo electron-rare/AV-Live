@@ -5,6 +5,9 @@ import {
   MATRIX_MOD_SOURCES, MATRIX_MOD_TARGETS,
   matColorDefs, saveMatState,
   VOICE_CLASS, defaultStepMode, isMelodic,
+  matVoiceMods, matVoicePoses,
+  MOD_SOURCE_LABELS, MOD_TARGET_LABELS, POSE_EVENT_CHOICES,
+  parseVoiceMod, parseVoicePose,
 } from "./matrix-state.js";
 
 // Per-voice step edit mode; initialised from defaultStepMode() on first expand.
@@ -97,7 +100,8 @@ export function openFor(vi, containerEl) {
 
   send("/matrix/colordefs/get", vi);
   send("/matrix/steps/get", vi);
-  send("/matrix/colordefs/get/ext", vi);
+  send("/matrix/voicemod/get", vi);
+  send("/matrix/voicepose/get", vi);
 }
 
 export function toggle(vi, containerEl) {
@@ -324,75 +328,108 @@ function renderSynthFxTab(vi) {
   cdTabBodyEl.appendChild(varRow);
 }
 
-// Renders mod row + pose section into cdTabBodyEl.
+// Per-voice MOD (additive free list) + POSE (curated events). Independent of cdColor.
+function sendVoiceMod(vi) {
+  const list = matVoiceMods[vi] || [];
+  send("/matrix/voicemod", vi, list.length,
+    ...list.flatMap((b) => [b.source, b.target, +b.depth]));
+  saveMatState();
+}
+function sendVoicePose(vi) {
+  const list = matVoicePoses[vi] || [];
+  send("/matrix/voicepose", vi, list.length,
+    ...list.flatMap((b) => [b.poseId, b.action]));
+  saveMatState();
+}
+
+// helpers
+function firstTarget(targets) { return targets.find((t) => t !== "none") || "amp"; }
+function MOD_SOURCE_ORDER_FIRST() { return "bodyVitesse"; }
+
 function renderModPoseTab(vi) {
   if (!cdTabBodyEl) return;
-  const c = cdColor;
-  const d = matColorDefs[vi][c];
-  const targets = MATRIX_MOD_TARGETS[MATRIX_VOICES[vi]] || ["none","amp"];
+  const voice = MATRIX_VOICES[vi];
+  const targets = MATRIX_MOD_TARGETS[voice] || ["none", "amp"];
 
-  // Mod row
-  const modDiv = document.createElement("div");
-  modDiv.className = "cd-row m" + c;
-  const src = document.createElement("select");
-  MATRIX_MOD_SOURCES.forEach(s=>{ const o=document.createElement("option"); o.value=s; o.textContent=s; src.appendChild(o); });
-  const tgt = document.createElement("select");
-  targets.forEach(t=>{ const o=document.createElement("option"); o.value=t; o.textContent=t; tgt.appendChild(o); });
-  const dep = document.createElement("input");
-  dep.type="range"; dep.min=0; dep.max=1; dep.step=0.01;
-  const mod = d.mod || {source:"none", target:"none", depth:0.5};
-  src.value = mod.source; tgt.value = mod.target; dep.value = mod.depth;
-  const sendMod = () => {
-    matColorDefs[vi][c].mod = {source:src.value, target:tgt.value, depth:+dep.value};
-    saveMatState();
-    send("/matrix/colormod", vi, c, src.value, tgt.value, +dep.value);
-  };
-  src.addEventListener("change", sendMod);
-  tgt.addEventListener("change", sendMod);
-  dep.addEventListener("change", sendMod);
-  modDiv.appendChild(mk("src", src));
-  modDiv.appendChild(mk("tgt", tgt));
-  modDiv.appendChild(mk("depth", dep));
-  cdTabBodyEl.appendChild(modDiv);
-
-  // Pose section
-  const poseDiv = document.createElement("div");
-  const addDiv = document.createElement("div");
-  const poseId = document.createElement("input");
-  poseId.placeholder = "poseId";
-  poseId.className = "pose-id";
-  const poseAct = document.createElement("select");
-  ["trigger","gate"].forEach(a=>{ const o=document.createElement("option"); o.value=a; o.textContent=a; poseAct.appendChild(o); });
-  const poseGo = document.createElement("button");
-  poseGo.textContent = "+";
-  poseGo.addEventListener("click", () => {
-    if (!poseId.value) return;
-    const poses = (d.pose || []).filter(b => b.poseId !== poseId.value);
-    poses.push({poseId: poseId.value, action: poseAct.value});
-    matColorDefs[vi][c].pose = poses;
-    saveMatState();
-    send("/matrix/colorpose", vi, c, poses.length, ...poses.flatMap(b => [b.poseId, b.action]));
-    renderPattern(vi);
-  });
-  [poseId, poseAct, poseGo].forEach(e => addDiv.appendChild(e));
-  poseDiv.appendChild(addDiv);
-  (d.pose || []).forEach(b => {
-    const line = document.createElement("div");
-    line.textContent = `${b.poseId} -> ${b.action}`;
+  // --- MOD: additive list ---
+  const modWrap = document.createElement("div");
+  modWrap.className = "cd-modlist";
+  (matVoiceMods[vi] || []).forEach((b, i) => {
+    const row = document.createElement("div");
+    row.className = "cd-row";
+    const src = document.createElement("select");
+    MATRIX_MOD_SOURCES.forEach((s) => { const o = document.createElement("option");
+      o.value = s; o.textContent = MOD_SOURCE_LABELS[s] || s; src.appendChild(o); });
+    src.value = b.source;
+    const tgt = document.createElement("select");
+    targets.forEach((t) => { const o = document.createElement("option");
+      o.value = t; o.textContent = MOD_TARGET_LABELS[t] || t; tgt.appendChild(o); });
+    tgt.value = b.target;
+    const dep = document.createElement("input");
+    dep.type = "range"; dep.min = 0; dep.max = 1; dep.step = 0.01; dep.value = b.depth;
+    const meter = document.createElement("span");
+    meter.className = "cd-meter"; meter.dataset.src = b.source;
     const del = document.createElement("button");
-    del.textContent = "x";
-    del.style.cssText = "width:auto;padding:2px 6px;font-size:10px;";
-    del.addEventListener("click", () => {
-      matColorDefs[vi][c].pose = (d.pose || []).filter(pp => pp.poseId !== b.poseId);
-      const poses = matColorDefs[vi][c].pose;
-      saveMatState();
-      send("/matrix/colorpose", vi, c, poses.length, ...poses.flatMap(pp => [pp.poseId, pp.action]));
-      renderPattern(vi);
-    });
-    line.appendChild(del);
-    poseDiv.appendChild(line);
+    del.textContent = "x"; del.style.cssText = "width:auto;padding:2px 6px;font-size:10px;";
+    const apply = () => { b.source = src.value; b.target = tgt.value; b.depth = +dep.value;
+      meter.dataset.src = b.source; sendVoiceMod(vi); };
+    src.addEventListener("change", apply);
+    tgt.addEventListener("change", apply);
+    dep.addEventListener("change", apply);
+    del.addEventListener("click", () => { matVoiceMods[vi].splice(i, 1); sendVoiceMod(vi); renderPattern(vi); });
+    [mk("src", src), mk("cible", tgt), mk("depth", dep), meter, del].forEach((e) => row.appendChild(e));
+    modWrap.appendChild(row);
   });
-  cdTabBodyEl.appendChild(poseDiv);
+  const addMod = document.createElement("button");
+  addMod.textContent = "+ modulation";
+  addMod.addEventListener("click", () => {
+    (matVoiceMods[vi] ||= []).push({ source: MOD_SOURCE_ORDER_FIRST(), target: firstTarget(targets), depth: 0.5 });
+    sendVoiceMod(vi); renderPattern(vi);
+  });
+  modWrap.appendChild(addMod);
+  cdTabBodyEl.appendChild(modWrap);
+
+  // --- POSE: curated events ---
+  const poseWrap = document.createElement("div");
+  poseWrap.className = "cd-poselist";
+  (matVoicePoses[vi] || []).forEach((b, i) => {
+    const row = document.createElement("div");
+    row.className = "cd-row";
+    const ev = document.createElement("select");
+    POSE_EVENT_CHOICES.forEach((c) => { const o = document.createElement("option");
+      o.value = c.id; o.textContent = c.label; ev.appendChild(o); });
+    const custom = document.createElement("input");
+    custom.placeholder = "poseId"; custom.className = "pose-id";
+    const known = POSE_EVENT_CHOICES.some((c) => c.id === b.poseId);
+    ev.value = known ? b.poseId : "__custom__";
+    custom.value = known ? "" : b.poseId;
+    custom.hidden = ev.value !== "__custom__";
+    const act = document.createElement("select");
+    ["trigger", "gate"].forEach((a) => { const o = document.createElement("option");
+      o.value = a; o.textContent = a; act.appendChild(o); });
+    act.value = b.action;
+    const del = document.createElement("button");
+    del.textContent = "x"; del.style.cssText = "width:auto;padding:2px 6px;font-size:10px;";
+    const apply = () => {
+      custom.hidden = ev.value !== "__custom__";
+      b.poseId = ev.value === "__custom__" ? (custom.value || "none") : ev.value;
+      b.action = act.value; sendVoicePose(vi);
+    };
+    ev.addEventListener("change", apply);
+    custom.addEventListener("change", apply);
+    act.addEventListener("change", apply);
+    del.addEventListener("click", () => { matVoicePoses[vi].splice(i, 1); sendVoicePose(vi); renderPattern(vi); });
+    [mk("event", ev), custom, mk("action", act), del].forEach((e) => row.appendChild(e));
+    poseWrap.appendChild(row);
+  });
+  const addPose = document.createElement("button");
+  addPose.textContent = "+ pose";
+  addPose.addEventListener("click", () => {
+    (matVoicePoses[vi] ||= []).push({ poseId: "danse", action: "trigger" });
+    sendVoicePose(vi); renderPattern(vi);
+  });
+  poseWrap.appendChild(addPose);
+  cdTabBodyEl.appendChild(poseWrap);
 }
 
 // Renders the tab bar into cdPatternEl.
@@ -510,6 +547,22 @@ on("/matrix/colorpose", (args) => {
     for (let k=0;k<n;k++){ const b=3+k*2; matColorDefs[vi][c].pose.push({poseId:String(args[b]),action:String(args[b+1])}); }
     saveMatState();
     if (isOpenFor(vi) && cdColor === c) renderPattern(vi);
+  }
+});
+
+on("/matrix/voicemod", (args) => {
+  const { vi, list } = parseVoiceMod(args);
+  if (vi >= 0 && vi < MATRIX_VOICES.length) {
+    matVoiceMods[vi] = list; saveMatState();
+    if (isOpenFor(vi)) renderPattern(vi);
+  }
+});
+
+on("/matrix/voicepose", (args) => {
+  const { vi, list } = parseVoicePose(args);
+  if (vi >= 0 && vi < MATRIX_VOICES.length) {
+    matVoicePoses[vi] = list; saveMatState();
+    if (isOpenFor(vi)) renderPattern(vi);
   }
 });
 
