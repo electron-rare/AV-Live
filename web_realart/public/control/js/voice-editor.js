@@ -7,7 +7,7 @@ import {
   VOICE_CLASS, defaultStepMode, isMelodic,
   matVoiceMods, matVoicePoses,
   MOD_SOURCE_LABELS, MOD_TARGET_LABELS, POSE_EVENT_CHOICES,
-  parseVoiceMod, parseVoicePose,
+  parseVoiceMod, parseVoicePose, parseModValues,
 } from "./matrix-state.js";
 
 // Per-voice step edit mode; initialised from defaultStepMode() on first expand.
@@ -565,6 +565,21 @@ on("/matrix/voicepose", (args) => {
     if (isOpenFor(vi)) renderPattern(vi);
   }
 });
+
+let latestModValues = {};
+on("/matrix/modvalues", (args) => {
+  latestModValues = parseModValues(args);
+  updateMeters();
+});
+function updateMeters() {
+  if (expandedVoice < 0 || activeTab !== "modpose") return;
+  const meters = cdTabBodyEl ? cdTabBodyEl.querySelectorAll(".cd-meter") : [];
+  meters.forEach((m) => {
+    const v = latestModValues[m.dataset.src] || 0;
+    m.style.setProperty("--v", v.toFixed(3));
+    m.title = `${m.dataset.src}: ${v.toFixed(2)}`;
+  });
+}
 
 on("/matrix/stephead", (args) => {
   // Guard: only act when a voice is open and the STEPS tab is active.

@@ -212,3 +212,9 @@ button.queued { animation: queued-blink 600ms ease-in-out infinite alternate; }
 .seq-cell.playhead { outline: 2px solid rgba(255,255,255,0.75); outline-offset: -1px; }
 .pr-cell.playhead  { background: rgba(255,255,255,0.14); outline: 1px solid rgba(255,255,255,0.55); outline-offset: -1px; }
 .pr-cell.on.playhead { filter: brightness(1.45); outline: 1px solid #fff; outline-offset: -1px; }
+
+/* --- Mod-source live meters --- */
+.cd-meter { display:inline-block; width:42px; height:8px; border:1px solid #444;
+  border-radius:3px; vertical-align:middle; margin:0 4px; position:relative; background:#1b1b1b; }
+.cd-meter::after { content:""; position:absolute; left:0; top:0; bottom:0;
+  width:calc(var(--v,0) * 100%); background:#1a8; border-radius:2px; }

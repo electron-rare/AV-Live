@@ -33,6 +33,7 @@ export let matVoiceMods=Array.from({length:22},()=>[]);
 export let matVoicePoses=Array.from({length:22},()=>[]);
 export function parseVoiceMod(args){ return {vi:0,list:[]}; }
 export function parseVoicePose(args){ return {vi:0,list:[]}; }
+export function parseModValues(){ return {}; }
 export function saveMatState(){}
 export const VOICE_CLASS={};
 export function defaultStepMode(){ return "drum"; }
