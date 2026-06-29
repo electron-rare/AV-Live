@@ -447,23 +447,50 @@ pass = pass and: { true };
 // Fix 1: fresh color pose arrays and distinct per color
 pass = pass and: { (~matColorDefs[5][1][\pose] === ~matColorDefs[5][2][\pose]).not };
 
-// --- Engine reads per-color mod + per-color pose fire (Task 2 color-refactor) ---
+// --- Engine reads per-voice mod (Task 2 per-voice additive) ---
 pass = pass and: { ~matModPairs.notNil };
-// a color with a cutoff mod -> the produced event has a \cutoff key
+// a voice with a cutoff mod -> the produced event has a \cutoff key
 ~matModCache = IdentityDictionary[ \rHandY -> 1.0 ];
-~matColorDefs[5][2][\mod] = (source: \rHandY, target: \cutoff, depth: 1.0);
+~matVoiceMods[\acid] = [ (source: \rHandY, target: \cutoff, depth: 1.0) ];
 ~ev = ~matVariation.(\acid, 2, 5).asStream.next(());
 pass = pass and: { ~ev[\cutoff].notNil and: { ~ev[\cutoff] > 3000 } };
-~matColorDefs[5][2][\mod] = nil;
-// a color with a rev mod -> the produced event has a \rev key
+~matVoiceMods[\acid] = [];
+// a voice with a rev mod -> the produced event has a \rev key
 ~matModCache = IdentityDictionary[ \rHandY -> 1.0 ];
-~matColorDefs[0][1][\mod] = (source: \rHandY, target: \rev, depth: 0.5);
+~matVoiceMods[\kick] = [ (source: \rHandY, target: \rev, depth: 0.5) ];
 ~revEv = ~matVariation.(\kick, 1, 0).asStream.next(());
 pass = pass and: { ~revEv[\rev].notNil };
-~matColorDefs[0][1][\mod] = nil;
+~matVoiceMods[\kick] = [];
 // per-voice ~matMod removed
 pass = pass and: { ~matMod.isNil };
 pass = pass and: { ~matPoseBindings.isNil };
+
+// --- Per-voice additive modulation model (Task 2) ---
+// pan: two sources cancel additively (rHandX=1.0 -> +0.5, bodyX=0.0 -> -0.5 -> sum 0)
+~matVoiceMods[\acid] = [ (source: \rHandX, target: \pan, depth: 0.5),
+                          (source: \bodyX,  target: \pan, depth: 0.5) ];
+~matModCache[\rHandX] = 1.0; ~matModCache[\bodyX] = 0.0;
+pass = pass and: {
+    var pairs, pf;
+    pairs = ~matModPairs.(\acid, (amp: 1.0), { 1.0 });
+    pf    = pairs[pairs.indexOf(\pan) + 1];
+    pf.notNil and: { pf.asStream.next(()).abs < 0.001 }
+};
+~matVoiceMods[\acid] = [];
+// rev: single source, cache 0.4, depth 1.0 -> value 0.4
+~matVoiceMods[\acid] = [ (source: \handDist, target: \rev, depth: 1.0) ];
+~matModCache[\handDist] = 0.4;
+pass = pass and: {
+    var pairs, pf;
+    pairs = ~matModPairs.(\acid, (amp: 1.0), { 1.0 });
+    pf    = pairs[pairs.indexOf(\rev) + 1];
+    pf.notNil and: { (pf.asStream.next(()) - 0.4).abs < 0.001 }
+};
+~matVoiceMods[\acid] = [];
+// disallowed target: kick has no cutoff in ~matModTargets -> gated out
+~matVoiceMods[\kick] = [ (source: \bodyY, target: \cutoff, depth: 1.0) ];
+pass = pass and: { ~matModPairs.(\kick, (amp: 1.0), { 1.0 }).includes(\cutoff).not };
+~matVoiceMods[\kick] = [];
 // per-color pose fire: a binding under a color, firing re-sources (no raise)
 ~matColorDefs[5][3][\pose] = [ (poseId: \poseX, action: \trigger) ];
 try { ~matPoseFire.(\poseX) } { |e| pass = false; ("EXC poseFire: " ++ e.class.name).postln };

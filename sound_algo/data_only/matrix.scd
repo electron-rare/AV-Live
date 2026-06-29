@@ -149,27 +149,47 @@ File.exists(~matDir).not.if({ ("mkdir -p " ++ ~matDir.quote).systemCmd });
     })
 };
 
-// -- ~matModPairs : capture-effect keys from the color's own mod (spec[\mod]) --
-// Returns [] when mod is nil (no effect key). Used by both pattern builders.
+// -- ~matModPairs : per-voice additive binding list -> flat pair list for Pbind --
+// Reads ~matVoiceMods[name] (array of (source:,target:,depth:) events).
+// Groups by target, sums contributions, returns flat [tgt1, Pfunc1, tgt2, Pfunc2, ...].
+// Targets not in ~matModTargets[name] are silently dropped.
 ~matModPairs = { |name, spec, volOf|
-    var mod = spec[\mod];
-    mod.isNil.if({ [] }, {
-        var src = mod[\source], tgt = mod[\target], d = mod[\depth];
+    var allowed = ~matModTargets[name] ? [];
+    var byTarget = IdentityDictionary.new;
+    var pairs = [];
+    ((~matVoiceMods[name] ? []).select { |b|
+        b[\source].notNil and: { b[\target].notNil } and: { allowed.includes(b[\target]) }
+    }).do { |b| byTarget[b[\target]] = (byTarget[b[\target]] ? []) ++ [b] };
+    byTarget.keysValuesDo { |tgt, list|
         (tgt == \cutoff).if({
             var c0 = ~matModNeutralCut[name] ? 1000;
-            [\cutoff, Pfunc { var s = ~matModSourceVal.(src); c0 * (s.linexp(0,1,200,6000)/c0).pow(d) }]
+            pairs = pairs ++ [\cutoff, Pfunc {
+                var f = c0;
+                list.do { |b| var s = ~matModSourceVal.(b[\source]);
+                    f = f * (s.linexp(0, 1, 200, 6000) / c0).pow(b[\depth]) };
+                f
+            }]
         }, {
-            (tgt == \pan).if({
-                [\pan, Pfunc { (~matModSourceVal.(src) * 2 - 1) * d }]
-            }, {
-                (tgt == \rev).if({
-                    [\rev, Pfunc { (~matModSourceVal.(src) * d).clip(0, 1) }]
-                }, {
-                    [\amp, Pfunc { ((spec[\amp] ? 1.0) * volOf.value) * (1 + (d * (~matModSourceVal.(src) * 2 - 1))).max(0) }]
-                })
-            })
-        })
-    })
+        (tgt == \pan).if({
+            pairs = pairs ++ [\pan, Pfunc {
+                var a = 0; list.do { |b| a = a + ((~matModSourceVal.(b[\source]) * 2 - 1) * b[\depth]) };
+                a.clip(-1, 1)
+            }]
+        }, {
+        (tgt == \rev).if({
+            pairs = pairs ++ [\rev, Pfunc {
+                var a = 0; list.do { |b| a = a + (~matModSourceVal.(b[\source]) * b[\depth]) };
+                a.clip(0, 1)
+            }]
+        }, {
+            pairs = pairs ++ [\amp, Pfunc {
+                var base = (spec[\amp] ? 1.0) * volOf.value;
+                list.do { |b| base = base * (1 + (b[\depth] * (~matModSourceVal.(b[\source]) * 2 - 1))).max(0) };
+                base
+            }]
+        }) }) })
+    };
+    pairs
 };
 
 // -- ~matVariationOverlay : assemble the Pchain overlay given a resolved spec --
@@ -865,7 +885,9 @@ OSCdef(\mat_audition, { |msg, time, addr|
 }, '/matrix/audition');
 
 // -- Capture mod source cache (nil-guarded; idempotent reload) --
-~matModCache   = ~matModCache ? IdentityDictionary.new;
+~matModCache   = ~matModCache   ? IdentityDictionary.new;
+~matVoiceMods  = ~matVoiceMods  ? IdentityDictionary.new;   // voice -> [ (source:,target:,depth:) ]
+~matVoicePoses = ~matVoicePoses ? IdentityDictionary.new;   // voice -> [ (poseId:,action:) ]
 ~matModSources = ~matModSources ?
     [\lHandY, \rHandY, \lHandX, \rHandX, \lOpen, \rOpen, \handSpeed, \handDist,
      \bodyX, \bodyY, \depth,
