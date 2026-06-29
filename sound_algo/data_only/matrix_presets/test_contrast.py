@@ -52,5 +52,22 @@ check(ac[1:] == derive_mel_colors(ac[0]), "acid default colours exactly derived"
 psy = patterns_for("acid", "psytrance_roll")
 check(psy == MEL["acid"]["psy"], "authored psy family untouched")
 
+# distinctness: stab (worst real base) and every default-derived voice
+# -> >=4 distinct colours, sparse strictly fewer hits than base
+# (no EMPTY, no sparse==base) for bases with >=2 hits
+# cols = [base, busier, broken, double, sparse, fill] -> cols[4] = sparse
+def _distinct(cols): return len({repr(c) for c in cols})
+for v in ("stab", "kick", "hats", "acid", "shaker", "pad"):
+    cols = patterns_for(v, "techno_drive")
+    check(_distinct(cols) >= 4,
+          "%s default >=4 distinct colours (got %d)" % (v, _distinct(cols)))
+    base_d = sum(1 for s in cols[0] if s is not None)
+    sparse_d = sum(1 for s in cols[4] if s is not None)  # cols[4] = sparse
+    check(sparse_d >= 1,
+          "%s sparse not empty (got %d)" % (v, sparse_d))
+    if base_d >= 2:
+        check(sparse_d < base_d,
+              "%s sparse < base when base>=2 hits (sparse=%d base=%d)" % (v, sparse_d, base_d))
+
 print("TEST PASS" if ok else "TEST FAIL")
 sys.exit(0 if ok else 1)

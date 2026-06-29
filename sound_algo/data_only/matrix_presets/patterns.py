@@ -44,15 +44,30 @@ def _dhit(v):
 
 
 def derive_drum_colors(base):
-    """Colours 2-6 from a 16-step drum base (None | (0, vel))."""
+    """Colours 2-6 from a 16-step drum base (None | (0, vel)).
+    Transforms operate on the base's own rest/hit lists (alignment-independent):
+    busier adds ghost on every other rest of THIS base; sparse keeps the
+    strongest half of THIS base's hits — never empty, always < base when >=2 hits.
+    broken=rotation, double=even-rest fill, fill=end-roll are unchanged.
+    """
     n = len(base)
-    busier = [base[i] if base[i] is not None else (_dhit(0.30) if i % 4 == 2 else None)
-              for i in range(n)]
-    broken = base[-1:] + base[:-1]                       # rotate right 1: same count, displaced
+    rests = [i for i in range(n) if base[i] is None]
+    hits  = [i for i in range(n) if base[i] is not None]
+    # busier: ghost (0.30) on every other rest of THIS base (adds >=1 when any rest exists)
+    busier = list(base)
+    for i in rests[::2]:
+        busier[i] = _dhit(0.30)
+    # broken: rotate right 1 step (same hit count, displaced)
+    broken = base[-1:] + base[:-1]
+    # double: fill even-position rests with soft hit (unchanged)
     double = [base[i] if base[i] is not None else (_dhit(0.80) if i % 2 == 0 else None)
               for i in range(n)]
-    sparse = [base[i] if (base[i] is not None and ((base[i][1] >= 1.0) or i % 4 == 0)) else None
-              for i in range(n)]
+    # sparse: keep the STRONGEST half of hits (by vel desc, then position);
+    # never empty, always <= base; strictly < base when >=2 hits
+    keep = (set(sorted(hits, key=lambda i: (-base[i][1], i))[:max(1, (len(hits) + 1) // 2)])
+            if hits else set())
+    sparse = [base[i] if i in keep else None for i in range(n)]
+    # fill: end-roll (last 4 steps forced active, unchanged)
     fill = list(base)
     for k, v in enumerate((0.80, 0.80, 1.0, 1.0)):
         fill[n - 4 + k] = _dhit(v)
@@ -60,10 +75,17 @@ def derive_drum_colors(base):
 
 
 def derive_mel_colors(base):
-    """Colours 2-6 from a 16-step melodic base (None | (degree, vel))."""
+    """Colours 2-6 from a 16-step melodic base (None | (degree, vel)).
+    Transforms operate on the base's own rest/active lists (alignment-independent):
+    busier adds a passing note on every other rest of THIS base; broken
+    octave-displaces (+7) every other active note of THIS base; sparse keeps
+    the first half of THIS base's active notes — never empty, always < base
+    when >=2 notes. double=even-rest fill, fill=ascending run are unchanged.
+    """
     n = len(base)
-    actives = [base[i][0] for i in range(n) if base[i] is not None]
-    last_deg = actives[-1] if actives else 0
+    actives = [i for i in range(n) if base[i] is not None]
+    last_deg = base[actives[-1]][0] if actives else 0
+    rests = [i for i in range(n) if base[i] is None]
 
     def prev_deg(i):
         for j in range(i, -1, -1):
@@ -71,13 +93,23 @@ def derive_mel_colors(base):
                 return base[j][0]
         return last_deg
 
-    busier = [base[i] if base[i] is not None else ((prev_deg(i), 0.5) if i % 4 == 2 else None)
-              for i in range(n)]
-    broken = [((base[i][0] + 7, base[i][1]) if (base[i] is not None and i % 4 == 0) else base[i])
-              for i in range(n)]
+    # busier: passing note on every other rest of THIS base (alignment-independent)
+    busier = list(base)
+    for i in rests[::2]:
+        busier[i] = (prev_deg(i), 0.5)
+    # broken: octave-displace (+7) every other active note (alignment-independent;
+    # displaces >=1 note when any note exists)
+    broken = list(base)
+    for i in actives[::2]:
+        broken[i] = (base[i][0] + 7, base[i][1])
+    # double: fill even-position rests with passing note (unchanged)
     double = [base[i] if base[i] is not None else ((prev_deg(i), 0.6) if i % 2 == 0 else None)
               for i in range(n)]
-    sparse = [base[i] if (base[i] is not None and i % 4 == 0) else None for i in range(n)]
+    # sparse: keep the FIRST HALF of active notes (deterministic; never empty,
+    # strictly < base when >=2 notes)
+    keep = set(actives[:max(1, (len(actives) + 1) // 2)]) if actives else set()
+    sparse = [base[i] if i in keep else None for i in range(n)]
+    # fill: ascending run on last 4 steps (unchanged)
     fill = list(base)
     for k in range(4):
         fill[n - 4 + k] = (last_deg + k, round(0.6 + 0.1 * k, 2))
