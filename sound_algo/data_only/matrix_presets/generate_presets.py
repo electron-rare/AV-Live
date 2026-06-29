@@ -502,27 +502,27 @@ def emit_step(s):
     return "(degree:%d, vel:%.2f)" % (int(d), float(vel))
 
 
-def emit_colordefs(g, melodies):
-    """22 entries: nil (no custom melody) or [6 colour Events] for melodic voices.
+from patterns import patterns_for
 
-    For each colour actually used by the voice in the grid, emit (octave:, steps:)
-    so the melody replaces the base lp_ riff while keeping the colour's register.
+
+def emit_colordefs(preset_name):
+    """22 entries, each [6 colour Events] = 6 distinct step-patterns per voice.
+
+    Every (voice, colour) carries its own 16-step pattern from patterns.py,
+    tinted by the preset's groove family. Melodic voices render at their natural
+    octave; drums at octave 0 (the engine ignores pitch for non-pitched voices).
     """
     out = []
-    for vi, voice in enumerate(VOICES):
-        motif = melodies.get(voice)
-        used = sorted({g[vi][b] for b in range(BARS) if g[vi][b] > 0})
-        if motif is None or not used:
+    for voice in VOICES:
+        pats = patterns_for(voice, preset_name)
+        if pats is None:
             out.append("nil")
             continue
-        stepstr = "[" + ",".join(emit_step(s) for s in motif) + "]"
+        octv = BASE_OCT.get(voice, 0)
         cells = []
-        for c in range(1, 7):
-            if c in used:
-                octv = BASE_OCT[voice] + COLOR_OCT_DELTA[c]
-                cells.append("(octave:%d, steps:%s)" % (octv, stepstr))
-            else:
-                cells.append("()")
+        for c in range(6):
+            stepstr = "[" + ",".join(emit_step(s) for s in pats[c]) + "]"
+            cells.append("(octave:%d, steps:%s)" % (octv, stepstr))
         out.append("[" + ", ".join(cells) + "]")
     return out
 
@@ -530,8 +530,11 @@ def emit_colordefs(g, melodies):
 def to_sc(name, arc_fn, instkit, melodies, extra):
     # melodic voices carrying steps need a concrete instrument (step mode builds a
     # standalone Pbind with no base \instrument) -> default to the base lp_ synth.
+    # all 6 colours of every voice now carry patterns -> every voice plays in
+    # step mode, which builds a standalone Pbind with no base \instrument. So
+    # every voice needs a concrete instrument (default to the base lp_ synth).
     instkit = dict(instkit)
-    for v in melodies:
+    for v in VOICES:
         instkit.setdefault(v, DEFAULT_INST[v])
     validate_kit(name, instkit, melodies)
 
@@ -544,7 +547,7 @@ def to_sc(name, arc_fn, instkit, melodies, extra):
     insts = [instkit.get(v, "default") for v in VOICES]
     rows = ",\n".join("[" + ",".join(str(c) for c in row) + "]" for row in g)
     isyms = ", ".join("\\" + s for s in insts)
-    cds = ",\n".join(emit_colordefs(g, melodies))
+    cds = ",\n".join(emit_colordefs(name))
     return ("(\n'grid': [\n%s\n],\n'instruments': [ %s ],\n"
             "'colorDefs': [\n%s\n]\n)\n" % (rows, isyms, cds))
 
