@@ -709,6 +709,71 @@ File.delete(~matDir +/+ "t6_tmp.matrix");
 ~matVoiceMods[\acid]  = [];
 ~matVoicePoses[\acid] = [];
 
+// --- T7: Legacy-collapse migration: per-colour \mod/\pose → ~matVoiceMods/~matVoicePoses ---
+// Prove ~matLoadFile collapses per-colour mod/pose into voice lists when the file
+// has NO voiceMods:/voicePoses: keys (the "legacy" format that predates Task 6).
+{
+    var legacyPath = ~matDir +/+ "t7_collapse.matrix";
+    var neutralColor = {
+        (stretch: 1.0, octave: 0, amp: 1.0, inst: nil, cutoff: nil, pan: nil,
+         res: nil, rev: nil, steps: Array.fill(16, nil), mod: nil, pose: Array.new)
+    };
+    // acid (vi=5), color 1 (ci=0 in saved array → stored at colorDefs[5][1]): set mod + pose
+    var acidColor1 = (
+        stretch: 1.0, octave: 0, amp: 1.0, inst: nil, cutoff: nil, pan: nil,
+        res: nil, rev: nil, steps: Array.fill(16, nil),
+        mod: (source: \rHandX, target: \pan, depth: 0.5),
+        pose: [ (poseId: \debout, action: \trigger) ]
+    );
+    // colorDefs: 6 voices, only vi=5 (acid) has a marked entry at color 1
+    var colorDefs = Array.fill(6, { |vi|
+        (vi == 5).if(
+            { [acidColor1] ++ (2..6).collect({ neutralColor.value }) },
+            { (1..6).collect({ neutralColor.value }) }
+        )
+    });
+    // Legacy payload: Event with grid + instruments + colorDefs but NO voiceMods/voicePoses
+    var payload = (
+        grid: Array.fill(16, { Array.fill(32, 0) }),
+        instruments: Array.fill(16, \default),
+        colorDefs: colorDefs
+    );
+    File.use(legacyPath, "w", { |f| f.write(payload.asCompileString) });
+    // Clear voice-level data so the isEmpty-guarded collapse path runs
+    ~matVoiceMods[\acid]  = [];
+    ~matVoicePoses[\acid] = [];
+    try {
+        ~matLoadFile.(legacyPath)
+    } { |e| pass = false; ("EXCEPTION T7 matLoadFile: " ++ e.class.name).postln };
+    // Mod collapse: per-colour mod → voice binding
+    pass = pass and: {
+        (~matVoiceMods[\acid].size == 1).if({ true }, {
+            ("FAIL T7: voiceMods size=" ++ ~matVoiceMods[\acid].size).postln; false }) };
+    pass = pass and: {
+        (~matVoiceMods[\acid][0][\source] == \rHandX).if({ true }, {
+            ("FAIL T7: source=" ++ ~matVoiceMods[\acid][0][\source]).postln; false }) };
+    pass = pass and: {
+        (~matVoiceMods[\acid][0][\target] == \pan).if({ true }, {
+            ("FAIL T7: target=" ++ ~matVoiceMods[\acid][0][\target]).postln; false }) };
+    pass = pass and: {
+        ((~matVoiceMods[\acid][0][\depth] - 0.5).abs < 0.001).if({ true }, {
+            ("FAIL T7: depth=" ++ ~matVoiceMods[\acid][0][\depth]).postln; false }) };
+    // Pose collapse: per-colour pose → voice binding
+    pass = pass and: {
+        (~matVoicePoses[\acid].size == 1).if({ true }, {
+            ("FAIL T7: voicePoses size=" ++ ~matVoicePoses[\acid].size).postln; false }) };
+    pass = pass and: {
+        (~matVoicePoses[\acid][0][\poseId] == \debout).if({ true }, {
+            ("FAIL T7: poseId=" ++ ~matVoicePoses[\acid][0][\poseId]).postln; false }) };
+    pass = pass and: {
+        (~matVoicePoses[\acid][0][\action] == \trigger).if({ true }, {
+            ("FAIL T7: action=" ++ ~matVoicePoses[\acid][0][\action]).postln; false }) };
+    File.delete(legacyPath);
+    // cleanup
+    ~matVoiceMods[\acid]  = [];
+    ~matVoicePoses[\acid] = [];
+}.value;
+
 pass.if(
     { "TEST PASS".postln },
     { "TEST FAIL".postln }
