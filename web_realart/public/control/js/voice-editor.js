@@ -4,7 +4,7 @@ import {
   MATRIX_VOICES, MATRIX_INST_CHOICES,
   MATRIX_MOD_SOURCES, MATRIX_MOD_TARGETS,
   matColorDefs, saveMatState,
-  VOICE_CLASS, defaultStepMode,
+  VOICE_CLASS, defaultStepMode, isMelodic,
 } from "./matrix-state.js";
 
 // Per-voice step edit mode; initialised from defaultStepMode() on first expand.
@@ -301,6 +301,13 @@ function renderSynthFxTab(vi) {
     cut.addEventListener("change", () => setCD(c, "cutoff", +cut.value));
     varRow.appendChild(mk("cutoff", cut));
   }
+  if (isMelodic(MATRIX_VOICES[vi])) {
+    const res = document.createElement("input");
+    res.type="range"; res.min=0; res.max=1; res.step=0.02;
+    res.value = d.res ?? 0.3;
+    res.addEventListener("change", () => setCD(c, "res", +res.value));
+    varRow.appendChild(mk("RES", res));
+  }
   if (hasPan) {
     const pan = document.createElement("input");
     pan.type="range"; pan.min=-1; pan.max=1; pan.step=0.01;
@@ -308,6 +315,11 @@ function renderSynthFxTab(vi) {
     pan.addEventListener("change", () => setCD(c, "pan", +pan.value));
     varRow.appendChild(mk("pan", pan));
   }
+  const rev = document.createElement("input");
+  rev.type="range"; rev.min=0; rev.max=1; rev.step=0.02;
+  rev.value = d.rev ?? 0;
+  rev.addEventListener("change", () => setCD(c, "rev", +rev.value));
+  varRow.appendChild(mk("REVERB", rev));
   cdTabBodyEl.appendChild(varRow);
 }
 
