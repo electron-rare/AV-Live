@@ -438,6 +438,7 @@ File.exists(~matDir).not.if({ ("mkdir -p " ++ ~matDir.quote).systemCmd });
 ~matSetCell = { |vi, bar, color|
     (vi >= 0 and: { vi < ~matVoices.size and: { bar >= 0 and: { bar < ~matBars } } }).if({
         ~lp[\matrix][vi][bar] = color.clip(0, 6).asInteger;
+        (~matEvolve and: { ~matBaseGrid.notNil }).if({ ~matBaseGrid[vi][bar] = ~lp[\matrix][vi][bar] });
         (~lp[\matPlaying] and: { bar == ~lp[\matBar] }).if({ ~matApplyBar.(bar) });
         ~toscSend !? { ~toscSend.("/matrix/cell", vi, bar, ~lp[\matrix][vi][bar]) }
     })
@@ -640,7 +641,7 @@ OSCdef(\mat_steps_get, { |msg, time, addr|
     var safe = ~matSafeName.(name);
     var path = ~matDir +/+ (safe ++ ".matrix");
     var payload = (
-        grid: ~lp[\matrix],
+        grid: (~matEvolve.if({ ~matBaseGrid ? ~lp[\matrix] }, { ~lp[\matrix] })),
         instruments: ~matInstruments.collect({ |x| (x ? \default) }),
         colorDefs: ~matColorDefs.collect({ |defs| (1..6).collect({ |c| defs[c] }) }),
         voiceMods:  ~matVoices.collect({ |name| ~matVoiceMods[name]  ? [] }),
@@ -664,6 +665,7 @@ OSCdef(\mat_steps_get, { |msg, time, addr|
         grid  = grid.isArray.if({ ~matMigrateGrid.(grid) }, { grid });   // pad/tile to current dims
         ~matGridValid.(grid).if({
             ~lp[\matrix] = grid;
+            (~matEvolve).if({ ~matBaseGrid = ~lp[\matrix].collect({ |row| row.copy }) });
             // restore instruments (default nil; validate against choices)
             ~matVoices.do { |name, vi|
                 var sym = (insts.notNil).if({ insts[vi] }, { \default });
@@ -915,6 +917,17 @@ OSCdef(\mat_play, { |msg, time, addr|
     ~toscTouch !? { ~toscTouch.(addr) };
     ~matPlay.()
 }, '/matrix/play');
+
+OSCdef(\mat_evolve, { |msg, time, addr|
+    ~toscTouch !? { ~toscTouch.(addr) };
+    ~matSetEvolve.((msg[1] ? 0).asInteger > 0)
+}, '/matrix/evolve');
+
+OSCdef(\mat_evolverate, { |msg, time, addr|
+    ~toscTouch !? { ~toscTouch.(addr) };
+    ~matEvolveRate = (msg[1] ? 0.15).asFloat.clip(0, 1);
+    ~matEvolvePush.()
+}, '/matrix/evolverate');
 
 OSCdef(\mat_stop, { |msg, time, addr|
     ~toscTouch !? { ~toscTouch.(addr) };

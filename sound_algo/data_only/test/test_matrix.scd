@@ -848,6 +848,28 @@ pass = pass and: { ~matBaseGrid == ~evSnap };   // base unchanged by steps
 ~matSetEvolve.(false);                // restore
 pass = pass and: { ~lp[\matrix] == ~evSnap };   // working grid back to base
 
+// -- Task 2: persistence integration + OSC routes --
+// edit during evolve writes through to the base (survives next cycle)
+~lp[\matrix] = Array.fill(~matVoices.size, { Array.fill(~matBars, 0) });
+~lp[\matrix][0][0] = 1;
+~matSetEvolve.(true);                 // base = current grid
+~matSetCell.(0, 0, 4);                // edit while evolving
+pass = pass and: { ~matBaseGrid[0][0] == 4 };       // base updated, not just working grid
+// save serializes the base, not the mutated working grid
+~matEvolveRate = 1.0; ~matEvolveStep.();              // working grid now mutated
+~matSave.("ev_tmp");
+~evRaw = File.use(~matDir +/+ "ev_tmp.matrix", "r", { |f| f.readAllString }).interpret;
+pass = pass and: { ~evRaw[\grid][0][0] == 4 };       // saved = base value, not the mutated one
+File.delete(~matDir +/+ "ev_tmp.matrix");
+~matSetEvolve.(false);
+// OSCdefs route through to the setters
+OSCdef(\mat_evolverate).func.value(['/matrix/evolverate', 0.42]);
+pass = pass and: { (~matEvolveRate - 0.42).abs < 0.001 };
+OSCdef(\mat_evolve).func.value(['/matrix/evolve', 1]);
+pass = pass and: { ~matEvolve == true and: { ~matBaseGrid.notNil } };
+OSCdef(\mat_evolve).func.value(['/matrix/evolve', 0]);
+pass = pass and: { ~matEvolve == false };
+
 pass.if(
     { "TEST PASS".postln },
     { "TEST FAIL".postln }
