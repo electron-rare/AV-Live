@@ -66,6 +66,9 @@ export const GLOBAL_ACTION_CHOICES = [
   { id: "none", label: "—" }, { id: "fill", label: "Fill" },
   { id: "drop", label: "Drop" }, { id: "breakdown", label: "Breakdown" },
   { id: "evolve", label: "Relance + evolve" },
+  { id: "muteDrums", label: "Mute drums" }, { id: "muteMelo", label: "Mute mélo" },
+  { id: "doubleTime", label: "Double-time" }, { id: "halfTime", label: "Half-time" },
+  { id: "washReverb", label: "Wash reverb" }, { id: "next", label: "Suivant" },
 ];
 export const GLOBAL_SLOTS = [
   { key: 0, label: "Main G ouverte" }, { key: 1, label: "Main G fermée" },

@@ -140,3 +140,9 @@ test("parseGlobalSettings decodes the OSC arg layout", () => {
   assert.equal(s.transientBars, 3);
   assert.deepEqual(s.breakdownKeep, ["kick", "snare"]);
 });
+
+test("extended action choices include phase-2 actions", () => {
+  const ids = GLOBAL_ACTION_CHOICES.map((c) => c.id);
+  for (const id of ["muteDrums", "muteMelo", "doubleTime", "halfTime", "washReverb", "next"])
+    assert.ok(ids.includes(id), `missing action ${id}`);
+});
