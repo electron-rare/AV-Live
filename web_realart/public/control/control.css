@@ -237,3 +237,11 @@ button.queued { animation: queued-blink 600ms ease-in-out infinite alternate; }
   gap: 6px; font-size: 13px; color: #ccc; }
 .morceau-slot select { flex: 0 0 auto; background: #222; color: #eee;
   border: 1px solid #444; border-radius: 4px; padding: 2px 4px; }
+
+/* --- Réglages group --- */
+.morceau-settings { display: flex; flex-direction: column; gap: 4px; margin-top: 4px; }
+.morceau-set-row { display: grid; grid-template-columns: 1fr 2fr auto; align-items: center; gap: 6px; font-size: 12px; color: #ccc; }
+.morceau-set-row output { min-width: 2.5em; text-align: right; color: #8c8; }
+.morceau-keep { display: flex; flex-wrap: wrap; gap: 2px 8px; margin-top: 4px; font-size: 11px; color: #aaa; }
+.morceau-keep > span { flex-basis: 100%; color: #888; }
+.morceau-keep-box { display: inline-flex; align-items: center; gap: 2px; }
