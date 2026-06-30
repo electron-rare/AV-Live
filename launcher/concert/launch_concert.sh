@@ -12,15 +12,14 @@ set -u
 REPO="$HOME/Documents/Projets/AV-Live"
 DEV="AC1CDE5F-DDC4-5B2C-80D7-9953D8ABA0AC"   # iPhone 16 Pro (xcrun devicectl list devices)
 export PATH=/opt/homebrew/bin:$PATH
-# MediaPipe Metal GPU delegate runs Pose+Face+Hand inference on the GPU instead of
-# the CPU. The CPU delegate pegged ~1.6 cores and, under load, starved the realtime
-# pose loop -> choppy/jittery/flickering detection (body+hands). GPU frees the CPU
-# (measured 163%->60% on M1 Max) and is stable on M1/M2/M3 Max. It flakes on M5, so
-# fall back to cpu there.
-case "$(sysctl -n machdep.cpu.brand_string 2>/dev/null)" in
-  *M5*) export MEDIAPIPE_DELEGATE=cpu ;;
-  *)    export MEDIAPIPE_DELEGATE=gpu ;;
-esac
+# MediaPipe delegate: CPU by default. The GPU (Metal) delegate is faster but
+# CRASHES under sustained load -- gpu_buffer_storage_cv_pixel_buffer.cc fatal
+# CVPixelBuffer alloc failure (-6662) in Image::ConvertToGpu() -- on M1 Max too,
+# not just M5. The original choppiness it was meant to fix was CPU STARVATION
+# (baby-brain + model servers hogging the box); those are now stopped, so the CPU
+# delegate has headroom and stays fluid AND stable. Override with
+# MEDIAPIPE_DELEGATE=gpu only for short sessions where you accept the crash risk.
+export MEDIAPIPE_DELEGATE="${MEDIAPIPE_DELEGATE:-cpu}"
 export POSE_FILTER=median+kalman+lookahead+ik+arkit_fuse
 # CONCERT_MIRROR=0 in the environment disables the video mirror.
 
