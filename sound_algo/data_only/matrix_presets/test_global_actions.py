@@ -33,5 +33,11 @@ missing_set = [os.path.basename(f) for f in files
                if EXPECT_SET not in open(f, encoding="utf-8").read()]
 check(not missing_set, "globalSettings missing in: %s" % missing_set[:5])
 
+EXPECT_PHMS = "'pinchHoldMs': 300"
+check(EXPECT_PHMS in sample, "to_sc output missing pinchHoldMs")
+missing_phms = [os.path.basename(f) for f in files
+                if EXPECT_PHMS not in open(f, encoding="utf-8").read()]
+check(not missing_phms, "pinchHoldMs missing in: %s" % missing_phms[:5])
+
 print("GLOBALACT-PY PASS" if ok else "GLOBALACT-PY FAIL")
 sys.exit(0 if ok else 1)
