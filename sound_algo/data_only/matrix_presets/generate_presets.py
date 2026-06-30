@@ -155,6 +155,17 @@ def apply_colors(g):
     return g
 
 
+def make_live_continuous(g):
+    """Live = the plateau groove tiled across all 64 bars: full from bar 0, no
+    intro ramp, no breakdown. The intro builds to it, the outro descends from it."""
+    ps, pn = SECTIONS["P"]            # (32, 16)
+    for row in g:
+        plateau = row[ps:ps + pn]
+        for b in range(len(row)):
+            row[b] = plateau[(b - ps) % pn]
+    return g
+
+
 # === melodic motif library (A-minor relative degrees; 7 = octave-up root) =====
 # step = (degree, vel) or None (rest). 16 steps per bar (1/16 grid).
 def _m(*steps):
@@ -1059,7 +1070,7 @@ class _Morceaux:
 MORCEAUX = _Morceaux()
 
 
-def to_sc(name, arc_fn, instkit, melodies, extra):
+def to_sc(name, arc_fn, instkit, melodies, extra, post=None):
     # melodic voices carrying steps need a concrete instrument (step mode builds a
     # standalone Pbind with no base \instrument) -> default to the base lp_ synth.
     # all 6 colours of every voice now carry patterns -> every voice plays in
@@ -1075,6 +1086,8 @@ def to_sc(name, arc_fn, instkit, melodies, extra):
     if extra is not None:
         extra(g)
     apply_colors(g)
+    if post is not None:
+        post(g)
 
     insts = [instkit.get(v, "default") for v in VOICES]
     rows = ",\n".join("[" + ",".join(str(c) for c in row) + "]" for row in g)
@@ -1094,7 +1107,8 @@ def main():
     n = 0
     for name, m in MORCEAUX.items():
         for sec in ("intro", "live", "outro"):
-            sc = to_sc("%s_%s" % (name, sec), m[sec], m["instkit"], m["melodies"], m["extra"])
+            post = make_live_continuous if sec == "live" else None
+            sc = to_sc("%s_%s" % (name, sec), m[sec], m["instkit"], m["melodies"], m["extra"], post)
             with open(os.path.join(here, "%s_%s.matrix" % (name, sec)), "w") as f:
                 f.write(sc)
             n += 1
