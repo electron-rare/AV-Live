@@ -27,5 +27,12 @@ missing = [os.path.basename(f) for f in files
            if EXPECT not in open(f, encoding="utf-8").read()]
 check(not missing, "globalActions missing in: %s" % missing[:5])
 
+EXPECT_SET = ("'globalSettings': ( 'openThresh': 0.65, 'closeThresh': 0.3, "
+              "'transientBars': 1, 'breakdownKeep': [ \\kick, \\sub ] )")
+check(EXPECT_SET in sample, "to_sc output missing globalSettings default")
+missing_set = [os.path.basename(f) for f in files
+               if EXPECT_SET not in open(f, encoding="utf-8").read()]
+check(not missing_set, "globalSettings missing in: %s" % missing_set[:5])
+
 print("GLOBALACT-PY PASS" if ok else "GLOBALACT-PY FAIL")
 sys.exit(0 if ok else 1)

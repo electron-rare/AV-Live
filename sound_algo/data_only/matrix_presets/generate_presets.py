@@ -1148,7 +1148,9 @@ def to_sc(name, arc_fn, instkit, melodies, extra, post=None):
             "'colorDefs': [\n%s\n],\n"
             "'voiceMods': [ %s ],\n"
             "'voicePoses': [ %s ],\n"
-            "'globalActions': [ \\fill, \\drop, \\evolve, \\breakdown ]\n)\n"
+            "'globalActions': [ \\fill, \\drop, \\evolve, \\breakdown ],\n"
+            "'globalSettings': ( 'openThresh': 0.65, 'closeThresh': 0.3, "
+            "'transientBars': 1, 'breakdownKeep': [ \\kick, \\sub ] )\n)\n"
             % (rows, isyms, cds, vms, vps))
 
 
