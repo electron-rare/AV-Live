@@ -20,9 +20,11 @@ export PATH=/opt/homebrew/bin:$PATH
 # delegate has headroom and stays fluid AND stable. Override with
 # MEDIAPIPE_DELEGATE=gpu only for short sessions where you accept the crash risk.
 export MEDIAPIPE_DELEGATE="${MEDIAPIPE_DELEGATE:-cpu}"
-# Finger pinches drive the matrix global actions (8 slots). PINCH_ENABLE gates
-# ONLY the pinch detector; the air-piano finger-strike (FINGER_PIANO) stays off.
-export PINCH_ENABLE="${PINCH_ENABLE:-1}"
+# Finger pinches (matrix global actions + per-voice pinch bindings) are
+# DISABLED by default. PINCH_ENABLE gates ONLY the pinch detector; set
+# PINCH_ENABLE=1 to re-enable. The air-piano finger-strike (FINGER_PIANO)
+# stays off independently.
+export PINCH_ENABLE="${PINCH_ENABLE:-0}"
 # Gestures use the iPhone Vision hands exclusively (stable, rotation-invariant);
 # the Mac MediaPipe hand detector is skipped under --iphone-usb (multi.py).
 export FINGER_SOURCE="${FINGER_SOURCE:-iphone}"
