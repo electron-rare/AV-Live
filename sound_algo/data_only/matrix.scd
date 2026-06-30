@@ -468,6 +468,14 @@ File.exists(~matDir).not.if({ ("mkdir -p " ++ ~matDir.quote).systemCmd });
     ~toscSend !? { ~toscSend.valueArray(["/matrix/globalsettings",
         s[\openThresh], s[\closeThresh], s[\transientBars], keep.size] ++ keep.collect({ |v| v.asString })) }
 };
+~matBpm = ~matBpm ? 120;
+~matSetBpm = { |bpm|
+    var b = bpm.asFloat.clip(20, 300);
+    ~matBpm = b;
+    (~lp[\clock] ? TempoClock.default).tempo = b / 60;
+    ~toscSend !? { ~toscSend.("/matrix/bpm", b) };
+};
+~matBpmPush = { ~toscSend !? { ~toscSend.("/matrix/bpm", ~matBpm) } };
 ~matCurrentName = ~matCurrentName ? nil;
 ~matAllNames = { (~matNames.(~matPresetDir) ++ ~matNames.(~matDir)).as(Set).asArray.sort };
 ~matNextPreset = {
@@ -1112,6 +1120,14 @@ OSCdef(\mat_globalsettings_get, { |msg, time, addr|
     ~toscTouch !? { ~toscTouch.(addr) };
     ~matGlobalSettingsPush.()
 }, '/matrix/globalsettings/get');
+OSCdef(\mat_bpm, { |msg, time, addr|
+    ~toscTouch !? { ~toscTouch.(addr) };
+    ~matSetBpm.((msg[1] ? 120))
+}, '/matrix/bpm');
+OSCdef(\mat_bpm_get, { |msg, time, addr|
+    ~toscTouch !? { ~toscTouch.(addr) };
+    ~matBpmPush.()
+}, '/matrix/bpm/get');
 
 OSCdef(\mat_stop, { |msg, time, addr|
     ~toscTouch !? { ~toscTouch.(addr) };

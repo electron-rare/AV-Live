@@ -135,6 +135,14 @@ feat.load;
 (~loaded == \aaa_x).not.if({ pass = false; "FAIL: next did not wrap to aaa_x".postln });
 ~matLoad = ~matLoadReal;
 
+// -- O: bpm sets the matrix clock tempo + tracks ~matBpm --
+~matSetBpm.(140);
+(~matBpm == 140).not.if({ pass = false; "FAIL: ~matBpm not 140".postln });
+(((~lp[\clock] ? TempoClock.default).tempo - (140 / 60)).abs < 1e-6).not.if({ pass = false; "FAIL: clock tempo not 140 bpm".postln });
+~matSetBpm.(500);                                       // clamps to 300
+(~matBpm == 300).not.if({ pass = false; "FAIL: bpm not clamped to 300".postln });
+~matSetBpm.(120);                                       // restore
+
 pass.if({ "GLOBALACT PASS".postln }, { "GLOBALACT FAIL".postln });
 0.exit;
 )
