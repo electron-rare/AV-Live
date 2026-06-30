@@ -127,6 +127,9 @@ button.queued { animation: queued-blink 600ms ease-in-out infinite alternate; }
   border: 1px solid #335; border-radius: 6px; padding: 7px 6px; font-size: 14px;
   cursor: pointer; -webkit-appearance: none; appearance: none; }
 .mat-action-btn { width: auto; padding: 8px 14px; font-size: 14px; flex-shrink: 0; }
+.mat-action-btn.armed { background: #2a4d2a; color: #9f9; border-color: #4a4;
+  animation: matArmedPulse 1s ease-in-out infinite; }
+@keyframes matArmedPulse { 0%,100% { opacity: 1; } 50% { opacity: .55; } }
 .mat-refresh-btn { width: auto; padding: 8px 12px; font-size: 16px; flex-shrink: 0;
   background: #1a2a1a; border-color: #2a4a2a; color: #4d9; }
 .mvoice-label { position: sticky; left: 0; z-index: 2; background: #111; }

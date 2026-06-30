@@ -116,6 +116,19 @@ document.addEventListener("DOMContentLoaded", () => {
     const n = document.getElementById("matrix-list").value;
     if (n) send("/matrix/load", n);
   });
+  // Queued load: arm the selected preset to swap at the next loop wrap.
+  const matLoadNext = document.getElementById("matrix-loadnext");
+  if (matLoadNext) matLoadNext.addEventListener("click", () => {
+    const n = document.getElementById("matrix-list").value;
+    if (n) send("/matrix/loadnext", n);
+  });
+  on("/matrix/queued", (args) => {
+    const name = (args && args[0] != null) ? String(args[0]) : "";
+    if (matLoadNext) {
+      matLoadNext.classList.toggle("armed", name.length > 0);
+      matLoadNext.textContent = name.length > 0 ? "SUIVANT → " + name : "SUIVANT";
+    }
+  });
   const matRefresh = document.getElementById("matrix-refresh");
   if (matRefresh) matRefresh.addEventListener("click", () => send("/matrix/list"));
 });
