@@ -190,7 +190,8 @@ final class ARBodySession: NSObject, ObservableObject, ARSessionDelegate {
             var firstBody: ARBodyAnchor?
             for anchor in frame.anchors {
                 guard let body = anchor as? ARBodyAnchor else { continue }
-                self.publishUSB(pid: count, timestamp: t, body: body)
+                self.publishUSB(pid: count, timestamp: t, body: body,
+                                camera: frame.camera)
                 if count == 0 { firstBody = body }
                 count += 1
             }
@@ -321,7 +322,7 @@ final class ARBodySession: NSObject, ObservableObject, ARSessionDelegate {
     // MARK: - USB skeleton
 
     private func publishUSB(pid: Int, timestamp: TimeInterval,
-                             body: ARBodyAnchor) {
+                             body: ARBodyAnchor, camera: ARCamera) {
         guard usbState == .connected else { return }
         let skeleton = body.skeleton
         let transforms = skeleton.jointModelTransforms
@@ -339,6 +340,27 @@ final class ARBodySession: NSObject, ObservableObject, ARSessionDelegate {
                  pid: Int16(clamping: pid),
                  timestamp: timestamp,
                  payload: payload.encoded())
+
+        // 2D projected skeleton: viewport-normalized [0,1] coords per joint.
+        var p2 = Skeleton2DPayload()
+        let orient = currentInterfaceOrientation()
+        for i in 0..<min(Skeleton2DPayload.jointCount, transforms.count) {
+            let w = root * transforms[i]
+            let p3 = SIMD3<Float>(w.columns.3.x, w.columns.3.y, w.columns.3.z)
+            let proj = camera.projectPoint(p3,
+                                           orientation: orient,
+                                           viewportSize: viewportSize)
+            let nx = Float(proj.x / max(viewportSize.width, 1))
+            let ny = Float(proj.y / max(viewportSize.height, 1))
+            if nx.isFinite && ny.isFinite {
+                p2.points[i] = SIMD2(nx, ny)
+                p2.valid[i] = skeleton.isJointTracked(i)
+            }
+        }
+        usb.send(tag: .skeleton2D,
+                 pid: Int16(clamping: pid),
+                 timestamp: timestamp,
+                 payload: p2.encoded())
     }
 
 }
