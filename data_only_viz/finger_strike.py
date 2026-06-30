@@ -149,10 +149,15 @@ class PinchDetector:
     """
 
     def __init__(self, ratio_on: float = 0.45, ratio_off: float = 0.65,
-                 refractory_ms: float = 250.0, history_slots: int = 2) -> None:
+                 refractory_ms: float = 250.0, history_slots: int = 2,
+                 margin: float = 0.20) -> None:
         self.ratio_on = ratio_on
         self.ratio_off = ratio_off
         self.refractory_s = refractory_ms / 1000.0
+        # Only the single nearest fingertip may engage, and only if it is at
+        # least `margin` (in size-normalized units) nearer than the runner-up.
+        # Rejects the adjacent-finger ambiguity when fingers curl together.
+        self.margin = margin
         self._state = [[_PinchState() for _ in range(4)]
                        for _ in range(history_slots)]
 
@@ -169,17 +174,27 @@ class PinchDetector:
             my = _finite(_coord(lm[MIDDLE_MCP], "y", 1), 0.5)
             size = math.hypot(mx - wx, my - wy)
             size = size if size > 1e-4 else 1e-4
-            for i, tip_idx in enumerate(PINCH_TIPS):
+            ratios = []
+            for tip_idx in PINCH_TIPS:
                 fx = _finite(_coord(lm[tip_idx], "x", 0), 0.5)
                 fy = _finite(_coord(lm[tip_idx], "y", 1), 0.5)
-                ratio = math.hypot(fx - tx, fy - ty) / size
+                ratios.append(math.hypot(fx - tx, fy - ty) / size)
+            # closest-wins + margin: pick the single nearest fingertip, and treat
+            # it as a pinch only if it is clearly nearer than the runner-up.
+            order = sorted(range(4), key=lambda j: ratios[j])
+            nearest, runner = order[0], order[1]
+            winner = nearest if (
+                ratios[nearest] < self.ratio_on
+                and (ratios[runner] - ratios[nearest]) >= self.margin
+            ) else -1
+            for i in range(4):
                 st = self._state[slot][i]
                 if st.engaged:
-                    if ratio > self.ratio_off:
+                    # release when this finger opens, or another finger took over.
+                    if i != winner or ratios[i] > self.ratio_off:
                         st.engaged = False
                         events.append(PinchEvent(hand=slot, finger=i + 1, state=0))
-                elif ratio < self.ratio_on and (
-                        t_now - st.last_t) >= self.refractory_s:
+                elif i == winner and (t_now - st.last_t) >= self.refractory_s:
                     st.engaged = True
                     st.last_t = t_now
                     events.append(PinchEvent(hand=slot, finger=i + 1, state=1))

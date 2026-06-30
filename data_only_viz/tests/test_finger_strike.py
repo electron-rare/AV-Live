@@ -144,3 +144,37 @@ def test_pinch_hand_disappear_emits_release():
     release = det.step([], 0.2)                       # hand gone
     assert len(engage) == 1 and engage[0].state == 1
     assert len(release) == 1 and release[0].state == 0
+
+
+def _pinch_hand_multi(thumb_xy, tips):
+    """21-kp hand (size 0.3); `tips` maps finger 0..3 (index/middle/ring/pinky)
+    -> (x,y) for that fingertip. Unlisted fingertips are parked far from thumb."""
+    lm = [[0.5, 0.5, 0.0] for _ in range(21)]
+    lm[0] = [0.5, 0.8, 0.0]                       # WRIST
+    lm[9] = [0.5, 0.5, 0.0]                       # MIDDLE_MCP -> size 0.3
+    lm[4] = [thumb_xy[0], thumb_xy[1], 0.0]       # THUMB_TIP
+    far = [(0.9, 0.5), (0.9, 0.6), (0.9, 0.7), (0.9, 0.8)]
+    for i, idx in enumerate((8, 12, 16, 20)):     # PINCH_TIPS
+        x, y = tips.get(i, far[i])
+        lm[idx] = [x, y, 0.0]
+    return lm
+
+
+def test_pinch_closest_finger_wins():
+    # index ratio ~0.067, middle ratio ~0.33 -> margin 0.27 >= 0.20 -> index only.
+    det = PinchDetector(ratio_on=0.45, ratio_off=0.65, refractory_ms=0)
+    det.step([_pinch_hand_multi((0.5, 0.5), {})], 0.0)             # open
+    ev = det.step([_pinch_hand_multi((0.5, 0.5),
+                                     {0: (0.52, 0.5), 1: (0.60, 0.5)})], 0.1)
+    assert len(ev) == 1
+    assert ev[0].finger == 1 and ev[0].state == 1                 # index only
+
+
+def test_pinch_ambiguous_adjacent_fires_nothing():
+    # index ratio ~0.067, middle ratio ~0.10 -> margin 0.033 < 0.20 -> no winner.
+    # (both are below ratio_on, so the OLD per-finger logic would fire both.)
+    det = PinchDetector(ratio_on=0.45, ratio_off=0.65, refractory_ms=0)
+    det.step([_pinch_hand_multi((0.5, 0.5), {})], 0.0)             # open
+    ev = det.step([_pinch_hand_multi((0.5, 0.5),
+                                     {0: (0.52, 0.5), 1: (0.53, 0.5)})], 0.1)
+    assert ev == []
