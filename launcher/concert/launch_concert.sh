@@ -26,7 +26,9 @@ export PINCH_ENABLE="${PINCH_ENABLE:-1}"
 # Gestures use the iPhone Vision hands exclusively (stable, rotation-invariant);
 # the Mac MediaPipe hand detector is skipped under --iphone-usb (multi.py).
 export FINGER_SOURCE="${FINGER_SOURCE:-iphone}"
-export POSE_FILTER=median+kalman+lookahead+ik+arkit_fuse
+# ARKit is now the body source (built directly in multi.py under --iphone-usb),
+# so arkit_fuse (which spliced ARKit into MediaPipe pose) is no longer needed.
+export POSE_FILTER=median+kalman+lookahead+ik
 # CONCERT_MIRROR=0 in the environment disables the video mirror.
 
 PY="$REPO/data_only_viz/.venv/bin/python"
