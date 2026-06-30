@@ -42,6 +42,47 @@ public struct SkeletonPayload: Equatable {
     }
 }
 
+/// 91 ARKit joints in 2-D image space + a per-joint validity flag.
+public struct Skeleton2DPayload: Equatable {
+    public static let jointCount = 91
+    /// 91 * 2 * 4 bytes (floats) + 91 validity bytes.
+    public static let byteCount = jointCount * 8 + jointCount
+
+    public var points: [SIMD2<Float>]
+    public var valid: [Bool]
+
+    public init() {
+        points = Array(repeating: .zero, count: Self.jointCount)
+        valid = Array(repeating: false, count: Self.jointCount)
+    }
+
+    public func encoded() -> Data {
+        var d = Data(capacity: Self.byteCount)
+        for p in points {
+            d.appendBE(p.x.bitPattern); d.appendBE(p.y.bitPattern)
+        }
+        for v in valid { d.append(v ? 1 : 0) }
+        return d
+    }
+
+    public init?(decoding data: Data) {
+        guard data.count == Self.byteCount else { return nil }
+        let b = [UInt8](data)
+        self.init()
+        var o = 0
+        for i in 0..<Self.jointCount {
+            func f() -> Float {
+                let v = Float(bitPattern:
+                    UInt32(bigEndianBytes: b[o..<o+4]))
+                o += 4; return v
+            }
+            points[i] = SIMD2(f(), f())
+        }
+        let floatBytes = Self.jointCount * 8
+        for i in 0..<Self.jointCount { valid[i] = b[floatBytes + i] != 0 }
+    }
+}
+
 /// One HEVC access unit + a keyframe flag.
 public struct VideoPayload: Equatable {
     public var isKeyframe: Bool
