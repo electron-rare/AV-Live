@@ -107,6 +107,34 @@ feat.load;
 (~matGlobalSettings[\breakdownKeep] == [\kick, \hats]).not.if({ pass = false; "FAIL: breakdownKeep not restored".postln });
 ("rm -f '" ++ (~matDir +/+ "zz_gset_test.matrix") ++ "'").systemCmd;
 
+// -- L: mute group silences only its voices --
+~matSetTransient.(\mute, ~matDrumVoices);
+(~matEffColor.(\kick, 0, 3) == 0).not.if({ pass = false; "FAIL: muteDrums keeps kick".postln });
+(~matEffColor.(\sub, 4, 3) == 3).not.if({ pass = false; "FAIL: muteDrums silenced melo sub".postln });
+~matTransient = nil;
+// -- M: param transients set stretch / rev channels (via ~matSetTransient directly;
+//       ~matFireGlobal was stubbed by earlier groups, and the 6 dispatch lines are
+//       trivial transcription verified live in Task 7) --
+~matSetTransient.(\doubleTime, []);
+(~matTxStretch.value == 0.5).not.if({ pass = false; "FAIL: doubleTime stretch != 0.5".postln });
+~matTransient = nil;
+~matSetTransient.(\washReverb, []);
+(~matTxRev.value > 0).not.if({ pass = false; "FAIL: washReverb rev not boosted".postln });
+~matTransient = nil;
+~matSetTransient.(\halfTime, []);
+(~matTxStretch.value == 2.0).not.if({ pass = false; "FAIL: halfTime stretch != 2.0".postln });
+~matTransient = nil;
+// -- N: next loads the following preset in sorted order --
+~loaded = nil; ~matLoadReal = ~matLoad; ~matLoad = { |n| ~loaded = n.asSymbol };
+~matAllNames = { [\aaa_x, \bbb_y, \ccc_z] };            // stub the list deterministically
+~matCurrentName = \aaa_x;
+~matNextPreset.();
+(~loaded == \bbb_y).not.if({ pass = false; "FAIL: next did not load bbb_y".postln });
+~matCurrentName = \ccc_z;                               // wrap to first
+~matNextPreset.();
+(~loaded == \aaa_x).not.if({ pass = false; "FAIL: next did not wrap to aaa_x".postln });
+~matLoad = ~matLoadReal;
+
 pass.if({ "GLOBALACT PASS".postln }, { "GLOBALACT FAIL".postln });
 0.exit;
 )

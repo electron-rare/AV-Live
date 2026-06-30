@@ -216,7 +216,7 @@ File.exists(~matDir).not.if({ ("mkdir -p " ++ ~matDir.quote).systemCmd });
     Pchain(
         Pbind(*([
             \matGlow, Pfunc { |e| ~matEmitTrig.(vi, (e[\amp] ? spec[\amp]).clip(0, 1)); 0 },
-            \stretch, spec[\stretch],
+            \stretch, (spec[\stretch] * ~matTxStretch.value),
             \amp,     Pfunc({ (spec[\amp] ? 1.0) * volOf.value })
         ] ++ instPair ++ cdPairs ++ freqPair ++ modPairs)),
         base
@@ -245,7 +245,7 @@ File.exists(~matDir).not.if({ ("mkdir -p " ++ ~matDir.quote).systemCmd });
         \amp, Pfunc { |e|
             var s = spec[\steps][e[\stepIdx]];
             ((spec[\amp] ? 1.0) * (s.isNil.if({ 0 }, { s[\vel] }))) * volOf.value },
-        \stretch, spec[\stretch],
+        \stretch, (spec[\stretch] * ~matTxStretch.value),
         \dur, ~matBeatsPerBar / 16
     ] ++ freqPair ++ instPair ++ cdPairs ++ modPairs))
 };
@@ -274,8 +274,8 @@ File.exists(~matDir).not.if({ ("mkdir -p " ++ ~matDir.quote).systemCmd });
                     cdPairs = cdPairs ++ [\pan, spec[\pan]] });
                 (spec[\res].notNil and: { ~matResVoices.includes(name) }).if({
                     cdPairs = cdPairs ++ [\res, spec[\res]] });
-                (spec[\rev].notNil).if({
-                    cdPairs = cdPairs ++ [\rev, spec[\rev]] });
+                ((spec[\rev].notNil) or: { ~matTxRev.value > 0 }).if({
+                    cdPairs = cdPairs ++ [\rev, ((spec[\rev] ? 0) + ~matTxRev.value).clip(0, 1)] });
                 (~matStepsEmpty.(spec[\steps]).not).if({
                     ~matColorStepPattern.(name, vi, color, spec, volOf, instPair, cdPairs)
                 }, {
@@ -375,6 +375,11 @@ File.exists(~matDir).not.if({ ("mkdir -p " ++ ~matDir.quote).systemCmd });
 );
 ~matGlobalActions = ~matGlobalActions ? [\fill, \drop, \evolve, \breakdown];  // slots 0..3
 ~matHandState     = ~matHandState     ? IdentityDictionary[\L -> \unknown, \R -> \unknown];
+~matDrumVoices = ~matDrumVoices ? [\kick,\hats,\clap,\ride,\rim,\sweep,\fx,\snare,\crash,\shaker,\perc,\tom];
+~matMeloVoices = ~matMeloVoices ? [\sub,\acid,\arp,\lead,\stab,\pad,\reese,\bells,\melody,\chord];
+// transient param channels read by ~matVariation (1.0/0.0 when no transient or a colour-only kind)
+~matTxStretch = { (~matTransient.notNil).if({ ~matTransient[\stretch] ? 1.0 }, { 1.0 }) };
+~matTxRev     = { (~matTransient.notNil).if({ ~matTransient[\rev] ? 0.0 }, { 0.0 }) };
 
 // effective colour for a voice this bar, given any active transient (grid untouched)
 ~matEffColor = { |name, vi, base|
@@ -384,13 +389,17 @@ File.exists(~matDir).not.if({ ("mkdir -p " ++ ~matDir.quote).systemCmd });
         (k == \drop).if({ 0 },
         { (k == \fill).if({ (base == 0).if({ 0 }, { 6 }) },
         { (k == \breakdown).if({ ((t[\voices] ? []).includes(name)).if({ base }, { 0 }) },
-        { base }) }) })
+        { (k == \mute).if({ ((t[\voices] ? []).includes(name)).if({ 0 }, { base }) },
+        { base }) }) }) })
     })
 };
 
 // set a transient + re-source now (effect lands at the next bar via Pdef quant)
 ~matSetTransient = { |kind, voices|
-    ~matTransient = (kind: kind, voices: (voices ? []), bars: (~matGlobalSettings[\transientBars] ? 1));
+    var stretch = (kind == \doubleTime).if({ 0.5 }, { (kind == \halfTime).if({ 2.0 }, { 1.0 }) });
+    var rev = (kind == \washReverb).if({ 0.4 }, { 0.0 });
+    ~matTransient = (kind: kind, voices: (voices ? []), bars: (~matGlobalSettings[\transientBars] ? 1),
+                     stretch: stretch, rev: rev);
     ~matVoices.size.do { |i| ~matLastColor[i] = -1 };
     (~lp[\matPlaying] == true).if({ ~matApplyBar.(~lp[\matBar] ? 0) });
 };
@@ -426,6 +435,12 @@ File.exists(~matDir).not.if({ ("mkdir -p " ++ ~matDir.quote).systemCmd });
     (act == \drop).if({ ~matSetTransient.(\drop, []) });
     (act == \breakdown).if({ ~matSetTransient.(\breakdown, ~matGlobalSettings[\breakdownKeep] ? [\kick, \sub]) });
     (act == \evolve).if({ ~matRelanceEvolve.() });
+    (act == \muteDrums).if({ ~matSetTransient.(\mute, ~matDrumVoices) });
+    (act == \muteMelo).if({ ~matSetTransient.(\mute, ~matMeloVoices) });
+    (act == \doubleTime).if({ ~matSetTransient.(\doubleTime, []) });
+    (act == \halfTime).if({ ~matSetTransient.(\halfTime, []) });
+    (act == \washReverb).if({ ~matSetTransient.(\washReverb, []) });
+    (act == \next).if({ ~matNextPreset.() });
 };
 
 // derive open/closed per hand from openness (hysteresis); fire only on an
@@ -452,6 +467,17 @@ File.exists(~matDir).not.if({ ("mkdir -p " ++ ~matDir.quote).systemCmd });
     var s = ~matGlobalSettings; var keep = s[\breakdownKeep] ? [];
     ~toscSend !? { ~toscSend.valueArray(["/matrix/globalsettings",
         s[\openThresh], s[\closeThresh], s[\transientBars], keep.size] ++ keep.collect({ |v| v.asString })) }
+};
+~matCurrentName = ~matCurrentName ? nil;
+~matAllNames = { (~matNames.(~matPresetDir) ++ ~matNames.(~matDir)).as(Set).asArray.sort };
+~matNextPreset = {
+    var names = ~matAllNames.value;
+    (names.size > 0).if({
+        var i = names.indexOf(~matCurrentName) ? -1;
+        var nxt = names[(i + 1) % names.size];
+        ~matLoad.(nxt);
+        ~toscSend !? { ~toscSend.("/matrix/loaded", nxt.asString) };
+    });
 };
 
 // -- ~matPush : push playhead position to all TouchOSC clients --
@@ -888,6 +914,7 @@ OSCdef(\mat_steps_get, { |msg, time, addr|
     var safe = ~matSafeName.(name);
     var up   = ~matDir       +/+ (safe ++ ".matrix");
     var pp   = ~matPresetDir +/+ (safe ++ ".matrix");
+    ~matCurrentName = safe.asSymbol;
     File.exists(up).if({ ~matLoadFile.(up) }, { ~matLoadFile.(pp) })
 };
 
