@@ -1152,7 +1152,8 @@ def to_sc(name, arc_fn, instkit, melodies, extra, post=None):
             "\\muteDrums, \\muteMelo, \\washReverb, \\next ],\n"
             "'globalSettings': ( 'transientBars': 1, "
             "'breakdownKeep': [ \\kick, \\sub ] ),\n"
-            "'pinchHoldMs': 300\n)\n"
+            "'pinchHoldMs': 300,\n"
+            "'fistThresh': 0.15\n)\n"
             % (rows, isyms, cds, vms, vps))
 
 

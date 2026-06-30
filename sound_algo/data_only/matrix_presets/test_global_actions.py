@@ -39,5 +39,11 @@ missing_phms = [os.path.basename(f) for f in files
                 if EXPECT_PHMS not in open(f, encoding="utf-8").read()]
 check(not missing_phms, "pinchHoldMs missing in: %s" % missing_phms[:5])
 
+EXPECT_FTH = "'fistThresh': 0.15"
+check(EXPECT_FTH in sample, "to_sc output missing fistThresh")
+missing_fth = [os.path.basename(f) for f in files
+               if EXPECT_FTH not in open(f, encoding="utf-8").read()]
+check(not missing_fth, "fistThresh missing in: %s" % missing_fth[:5])
+
 print("GLOBALACT-PY PASS" if ok else "GLOBALACT-PY FAIL")
 sys.exit(0 if ok else 1)

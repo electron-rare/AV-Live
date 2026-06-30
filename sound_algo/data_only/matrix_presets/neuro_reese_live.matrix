@@ -52,5 +52,6 @@
 'voicePoses': [ [], [], [], [], [], [], [], [], [], [], [], [], [], [], [], [], [], [], [], [], [], [] ],
 'globalActions': [ \fill, \drop, \breakdown, \evolve, \muteDrums, \muteMelo, \washReverb, \next ],
 'globalSettings': ( 'transientBars': 1, 'breakdownKeep': [ \kick, \sub ] ),
-'pinchHoldMs': 300
+'pinchHoldMs': 300,
+'fistThresh': 0.15
 )
