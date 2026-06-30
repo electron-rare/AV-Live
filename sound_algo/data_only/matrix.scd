@@ -410,8 +410,10 @@ File.exists(~matDir).not.if({ ("mkdir -p " ++ ~matDir.quote).systemCmd });
 //    ÉVOLUE mutates it; otherwise evolve mutates as before. --
 ~matWrapStep = {
     ~matQueuedLoad.notNil.if({
-        ~matLoad.(~matQueuedLoad);
+        var name = ~matQueuedLoad;
+        ~matLoad.(name);
         ~matQueuedLoad = nil;
+        ~toscSend !? { ~toscSend.("/matrix/loaded", name) };   // name tracks the actual swap
         ~toscSend !? { ~toscSend.("/matrix/queued", "") };
     }, {
         ~matEvolve.if({ ~matEvolveStep.() });
@@ -961,8 +963,10 @@ OSCdef(\mat_save, { |msg, time, addr|
 }, '/matrix/save');
 
 OSCdef(\mat_load, { |msg, time, addr|
+    var name = msg[1].asString;
     ~toscTouch !? { ~toscTouch.(addr) };
-    ~matLoad.(msg[1].asString)
+    ~matLoad.(name);
+    ~toscSend !? { ~toscSend.("/matrix/loaded", name) };       // web: track loaded name
 }, '/matrix/load');
 
 OSCdef(\mat_loadnext, { |msg, time, addr|
@@ -973,6 +977,7 @@ OSCdef(\mat_loadnext, { |msg, time, addr|
         ~toscSend !? { ~toscSend.("/matrix/queued", name) };
     }, {
         ~matLoad.(name);                                        // not playing -> load now
+        ~toscSend !? { ~toscSend.("/matrix/loaded", name) };
         ~toscSend !? { ~toscSend.("/matrix/queued", "") };
     });
 }, '/matrix/loadnext');

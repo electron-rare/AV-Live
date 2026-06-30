@@ -129,6 +129,12 @@ document.addEventListener("DOMContentLoaded", () => {
       matLoadNext.textContent = name.length > 0 ? "SUIVANT → " + name : "SUIVANT";
     }
   });
+  // A loaded matrix fills the name field, so SAUVER updates it in place.
+  on("/matrix/loaded", (args) => {
+    const name = (args && args[0] != null) ? String(args[0]) : "";
+    const nameInput = document.getElementById("matrix-name");
+    if (nameInput && name.length > 0) nameInput.value = name;
+  });
   const matRefresh = document.getElementById("matrix-refresh");
   if (matRefresh) matRefresh.addEventListener("click", () => send("/matrix/list"));
 });
