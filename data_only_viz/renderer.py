@@ -15,6 +15,7 @@ sous lock a chaque frame (60 fps).
 from __future__ import annotations
 
 import logging
+import os
 import struct
 import time
 from pathlib import Path
@@ -42,6 +43,7 @@ from Metal import (
 # pyobjc detecte automatiquement l'implementation par signature.
 from MetalKit import MTKView  # noqa: F401  (utilise par d'autres modules)
 
+from .arkit_skeleton import arkit_segments
 from .mesh_topology import (
     BODY_TRIANGLES,
     FACE_TRIANGLES,
@@ -49,6 +51,10 @@ from .mesh_topology import (
     build_face_triangles_dynamic,
 )
 from .state import State
+
+# Draw the full ARKit 91-joint body (topology-driven) instead of the
+# MP33-reduced body. Set ARKIT_FULL_SKELETON=0 to fall back to MP33.
+ARKIT_FULL = os.environ.get("ARKIT_FULL_SKELETON", "1") != "0"
 
 LOG = logging.getLogger("renderer")
 
@@ -314,7 +320,9 @@ class MetalRenderer(NSObject):
 
         Priorise MediaPipe (body 33 + face 478 + 2 mains 21) si disponible
         et present ; sinon fallback COCO 17 keypoints YOLO."""
-        if not s.pose_alive():
+        use_arkit = (ARKIT_FULL and bool(s.arkit_parents)
+                     and bool(s.persons_arkit_2d))
+        if not use_arkit and not s.pose_alive():
             return 0
 
         buf = self._skel_cpu_buf
@@ -333,6 +341,29 @@ class MetalRenderer(NSObject):
             segs += 1
             return True
 
+        def push_seg(ax, ay, bx, by, conf, pid):
+            """Like push() but takes raw normalized [0,1] coords."""
+            nonlocal segs
+            if segs >= SKEL_MAX_SEGS:
+                return False
+            cax = ax * 2.0 - 1.0; cay = 1.0 - ay * 2.0
+            cbx = bx * 2.0 - 1.0; cby = 1.0 - by * 2.0
+            i = segs * 10
+            buf[i+0] = cax; buf[i+1] = cay; buf[i+2] = 0.0
+            buf[i+3] = conf; buf[i+4] = float(pid)
+            buf[i+5] = cbx; buf[i+6] = cby; buf[i+7] = 0.0
+            buf[i+8] = conf; buf[i+9] = float(pid)
+            segs += 1
+            return True
+
+        if use_arkit:
+            parents = s.arkit_parents
+            for pid, arr2d in s.persons_arkit_2d.items():
+                valid = s.persons_arkit_2d_valid.get(pid)
+                for (ax, ay, bx, by) in arkit_segments(arr2d, valid, parents):
+                    if not push_seg(ax, ay, bx, by, 1.0, pid):
+                        break
+
         if self._mp_bones is not None and (
             s.persons_body or s.persons_face or s.persons_hands or
             s.body_present or s.face_present or s.hands_present
@@ -343,7 +374,7 @@ class MetalRenderer(NSObject):
             ids_b = s.persons_body_ids or list(range(len(s.persons_body)))
             ids_f = s.persons_face_ids or list(range(len(s.persons_face)))
             ids_h = s.persons_hands_ids or list(range(len(s.persons_hands)))
-            for i, body_kp in enumerate(s.persons_body):
+            for i, body_kp in enumerate([] if use_arkit else s.persons_body):
                 pid = ids_b[i] if i < len(ids_b) else i
                 for a, b in body_bones:
                     if a >= len(body_kp) or b >= len(body_kp): continue
@@ -364,7 +395,7 @@ class MetalRenderer(NSObject):
                     if not push(hand_kp[a], hand_kp[b], 1.0, pid + 5): break
             # ----- FALLBACK single-person si persons_* vides -----
             if not (s.persons_body or s.persons_face or s.persons_hands):
-                if s.body_present:
+                if s.body_present and not use_arkit:
                     for a, b in body_bones:
                         if a >= len(s.body_kp) or b >= len(s.body_kp): continue
                         A = s.body_kp[a]; B = s.body_kp[b]
