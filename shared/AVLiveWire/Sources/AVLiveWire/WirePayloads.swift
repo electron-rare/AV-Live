@@ -195,3 +195,52 @@ public struct FacePayload: Equatable {
         points = pts
     }
 }
+
+/// Self-describing skeleton topology: joint names + parent indices.
+/// Sent once per connection so consumers draw bones generically
+/// (parent -> child) with no hardcoded joint mapping.
+/// Layout (big-endian): u16 jointCount; per joint [u8 nameLen + utf8];
+/// then per joint i16 parent (-1 = root).
+public struct TopologyPayload: Equatable {
+    public var jointNames: [String]
+    public var parents: [Int16]
+    public init(jointNames: [String], parents: [Int16]) {
+        self.jointNames = jointNames
+        self.parents = parents
+    }
+
+    public func encoded() -> Data {
+        var d = Data()
+        d.appendBE(UInt16(min(jointNames.count, 65535)))
+        for name in jointNames {
+            let bytes = Array(name.utf8.prefix(255))
+            d.append(UInt8(bytes.count))
+            d.append(contentsOf: bytes)
+        }
+        for p in parents { d.appendBE(UInt16(bitPattern: p)) }
+        return d
+    }
+
+    public init?(decoding data: Data) {
+        let b = [UInt8](data)
+        guard b.count >= 2 else { return nil }
+        let n = Int(UInt16(bigEndianBytes: b[0..<2]))
+        var o = 2
+        var names: [String] = []
+        for _ in 0..<n {
+            guard o < b.count else { return nil }
+            let len = Int(b[o]); o += 1
+            guard o + len <= b.count else { return nil }
+            names.append(String(decoding: b[o..<o+len], as: UTF8.self))
+            o += len
+        }
+        guard o + n * 2 <= b.count else { return nil }
+        var ps: [Int16] = []
+        for _ in 0..<n {
+            ps.append(Int16(bitPattern: UInt16(bigEndianBytes: b[o..<o+2])))
+            o += 2
+        }
+        jointNames = names
+        parents = ps
+    }
+}

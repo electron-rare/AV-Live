@@ -7,6 +7,7 @@ public enum FrameTag: UInt8 {
     case hands = 4
     case face = 5
     case skeleton2D = 6
+    case topology = 7
 }
 
 /// Fixed-size frame header. Layout (big-endian):
