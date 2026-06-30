@@ -79,6 +79,22 @@ export function resetGlobalActions() {
   matGlobalActions = ["fill", "drop", "evolve", "breakdown"];
 }
 
+export let matGlobalSettings = { openThresh: 0.65, closeThresh: 0.30, transientBars: 1, breakdownKeep: ["kick", "sub"] };
+export function setGlobalSetting(key, value) { matGlobalSettings[key] = value; }
+export function resetGlobalSettings() {
+  matGlobalSettings = { openThresh: 0.65, closeThresh: 0.30, transientBars: 1, breakdownKeep: ["kick", "sub"] };
+}
+// Decode /matrix/globalsettings args: [openThresh, closeThresh, transientBars, keepN, keep0..]
+export function parseGlobalSettings(args) {
+  const openThresh = Number(args[0]);
+  const closeThresh = Number(args[1]);
+  const transientBars = Math.round(Number(args[2]));
+  const keepN = Math.round(Number(args[3])) || 0;
+  const breakdownKeep = [];
+  for (let k = 0; k < keepN; k++) breakdownKeep.push(String(args[4 + k]));
+  return { openThresh, closeThresh, transientBars, breakdownKeep };
+}
+
 export const MATRIX_MOD_TARGETS = {
   kick:["none","amp","pan","rev"], hats:["none","amp","pan","rev"], clap:["none","amp","pan","rev"], perc:["none","amp","cutoff","pan","rev","pitch"],
   sub:["none","amp","pan","rev","res","pitch"], acid:["none","amp","cutoff","pan","rev","res","pitch"], arp:["none","amp","cutoff","pan","rev","res","pitch"],
@@ -172,7 +188,7 @@ export function saveMatState() {
   try { localStorage.setItem(MATRIX_STORAGE_KEY,
     JSON.stringify({ grid: matGrid, inst: matInst, cdef: matColorDefs,
                      vmod: matVoiceMods, vpose: matVoicePoses,
-                     gact: matGlobalActions })); } catch (_e) {}
+                     gact: matGlobalActions, gset: matGlobalSettings })); } catch (_e) {}
 }
 
 export function loadMatState() {
@@ -199,6 +215,8 @@ export function loadMatState() {
       if (Array.isArray(raw.vmod) && raw.vmod.length === MATRIX_VOICES.length) matVoiceMods = raw.vmod;
       if (Array.isArray(raw.vpose) && raw.vpose.length === MATRIX_VOICES.length) matVoicePoses = raw.vpose;
       if (Array.isArray(raw.gact) && raw.gact.length === 4) matGlobalActions = raw.gact;
+      if (raw.gset && typeof raw.gset === "object" && Array.isArray(raw.gset.breakdownKeep))
+        matGlobalSettings = raw.gset;
       return; }
     if (Array.isArray(raw) && raw.length === MATRIX_VOICES.length) { matGrid = raw; return; }   // legacy: bare grid
   } catch (_e) {}

@@ -118,3 +118,25 @@ test("setGlobalAction mutates a slot", () => {
   assert.equal(matGlobalActions[2], "fill");
   setGlobalAction(2, "evolve");   // restore default
 });
+
+import { matGlobalSettings, setGlobalSetting, parseGlobalSettings }
+  from "../public/control/js/matrix-state.js";
+
+test("default global settings", () => {
+  assert.equal(matGlobalSettings.openThresh, 0.65);
+  assert.equal(matGlobalSettings.closeThresh, 0.30);
+  assert.equal(matGlobalSettings.transientBars, 1);
+  assert.deepEqual(matGlobalSettings.breakdownKeep, ["kick", "sub"]);
+});
+test("setGlobalSetting mutates one key", () => {
+  setGlobalSetting("closeThresh", 0.4);
+  assert.equal(matGlobalSettings.closeThresh, 0.4);
+  setGlobalSetting("closeThresh", 0.30);
+});
+test("parseGlobalSettings decodes the OSC arg layout", () => {
+  const s = parseGlobalSettings([0.7, 0.2, 3, 2, "kick", "snare"]);
+  assert.equal(s.openThresh, 0.7);
+  assert.equal(s.closeThresh, 0.2);
+  assert.equal(s.transientBars, 3);
+  assert.deepEqual(s.breakdownKeep, ["kick", "snare"]);
+});
