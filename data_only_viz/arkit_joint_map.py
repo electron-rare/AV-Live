@@ -25,9 +25,15 @@ MP33_NUM_LANDMARKS = 33
 # Used by multi_hmr_worker for cam-translation z lock.
 ARKIT_PELVIS_IDX = 1
 
+# ARKit head joint index in the 91-joint enum.
+# Tentatively mapped to index 51 (head_joint in Apple's canonical ordering).
+# VERIFY LIVE (controller will confirm the index on the rig)
+ARKIT_HEAD_IDX = 51
+
 # (arkit_joint_idx, mediapipe_pose_idx). Match the body slots used
 # by the SMPL-X body fusion in multi.py.
 ARKIT91_TO_MP33: tuple[tuple[int, int], ...] = (
+    (ARKIT_HEAD_IDX, 0),  # head_joint -> NOSE (anchor; VERIFY LIVE)
     (50, 11),   # left_shoulder_1_joint -> L_SHOULDER
     (32, 12),   # right_shoulder_1_joint -> R_SHOULDER
     (53, 13),   # left_arm_joint -> L_ELBOW
@@ -43,3 +49,43 @@ ARKIT91_TO_MP33: tuple[tuple[int, int], ...] = (
     (65, 31),   # left_toes_joint -> L_FOOT_INDEX
     (60, 32),   # right_toes_joint -> R_FOOT_INDEX
 )
+
+
+def arkit_body_2d(arr2d) -> list:
+    """Map a 91×2 normalized ARKit 2D skeleton to a MediaPipe Pose-33 list.
+
+    Mapped slots get c=1.0; all other slots default to c=0.0 (low confidence).
+
+    Args:
+        arr2d: array-like of shape (91, 2), image-normalized coords [0..1].
+
+    Returns:
+        list of 33 PoseKp instances.
+    """
+    from .state import PoseKp  # noqa: PLC0415
+    body: list = [PoseKp() for _ in range(MP33_NUM_LANDMARKS)]
+    for ai, mp in ARKIT91_TO_MP33:
+        if mp < MP33_NUM_LANDMARKS and ai < len(arr2d):
+            body[mp] = PoseKp(x=float(arr2d[ai][0]), y=float(arr2d[ai][1]),
+                              z=0.0, c=1.0)
+    return body
+
+
+def arkit_body_3d(arr3d) -> list:
+    """Map a 91×3 world ARKit skeleton to a MediaPipe Pose-33 Kp3D list.
+
+    Mapped slots get c=1.0; all other slots default to c=0.0 (low confidence).
+
+    Args:
+        arr3d: array-like of shape (91, 3), metric world coords (metres).
+
+    Returns:
+        list of 33 Kp3D instances.
+    """
+    from .state import Kp3D  # noqa: PLC0415
+    body: list = [Kp3D() for _ in range(MP33_NUM_LANDMARKS)]
+    for ai, mp in ARKIT91_TO_MP33:
+        if mp < MP33_NUM_LANDMARKS and ai < len(arr3d):
+            body[mp] = Kp3D(x=float(arr3d[ai][0]), y=float(arr3d[ai][1]),
+                            z=float(arr3d[ai][2]), c=1.0)
+    return body

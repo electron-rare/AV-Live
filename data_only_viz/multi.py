@@ -22,6 +22,7 @@ from pathlib import Path
 import numpy as np
 
 from .action_head_pub import ActionHeadPublisher
+from .arkit_joint_map import arkit_body_2d, arkit_body_3d
 from .euro_filter import SkeletonFilter
 from .pose_bridge import PoseSoundBridge
 from .pose_filter import PoseFilterChain
@@ -411,9 +412,9 @@ class MultiWorker:
                                   data=frame_rgb)
             ts = int(time.monotonic() * 1000) - t0_ms
             try:
-                pose_res = pose.detect_for_video(mp_img, ts)
-                face_res = face.detect_for_video(mp_img, ts)
-                # iphone-usb: hands come from the iPhone Vision stream, skip Mac MP.
+                # iphone-usb: body+face come from ARKit; skip Mac MediaPipe inference.
+                pose_res = None if self.iphone_usb else pose.detect_for_video(mp_img, ts)
+                face_res = None if self.iphone_usb else face.detect_for_video(mp_img, ts)
                 hand_res = None if self.iphone_usb else hand.detect_for_video(mp_img, ts)
             except Exception as e:  # noqa: BLE001
                 LOG.warning("inference: %s", e)
@@ -429,7 +430,7 @@ class MultiWorker:
             # fournit aussi z, plus precis que rien). pose_world_landmarks
             # donnerait des metres mais on garde un repere coherent avec face/hands.
             bodies = []
-            pose_list = pose_res.pose_landmarks or []
+            pose_list = (pose_res.pose_landmarks if pose_res is not None else None) or []
             for landmarks_list in pose_list:
                 kp_list = []
                 for lm in landmarks_list[:33]:
@@ -443,7 +444,7 @@ class MultiWorker:
             # Aligned 1:1 with pose_landmarks order. Empty fallback if
             # the MediaPipe build doesn't populate it.
             bodies3d: list[list[Kp3D]] = []
-            world_list = getattr(pose_res, "pose_world_landmarks", None) or []
+            world_list = (getattr(pose_res, "pose_world_landmarks", None) if pose_res is not None else None) or []
             for landmarks_list in world_list:
                 kp3_list: list[Kp3D] = []
                 for lm in landmarks_list[:33]:
@@ -455,13 +456,26 @@ class MultiWorker:
                 bodies3d.append(kp3_list)
 
             faces = []
-            for landmarks_list in (face_res.face_landmarks or []):
+            for landmarks_list in ((face_res.face_landmarks if face_res is not None else None) or []):
                 kp_list = []
                 for lm in landmarks_list[:478]:
                     z = float(lm.z) if lm.z is not None else 0.0
                     kp_list.append(PoseKp(
                         x=float(lm.x), y=float(lm.y), z=z, c=1.0))
                 faces.append(kp_list)
+
+            # iphone-usb: bodies + bodies3d come from ARKit skeleton (2D + 3D).
+            # MP inference was skipped above; rebuild from state.persons_arkit_*.
+            # faces stays [] — ARKit has no face landmarks at this layer.
+            if self.iphone_usb:
+                with self.state.lock():
+                    _a2d = dict(self.state.persons_arkit_2d)
+                    _a3d = dict(self.state.persons_arkit_joints)
+                _pid = min(_a2d.keys()) if _a2d else None
+                if _pid is not None:
+                    bodies = [arkit_body_2d(_a2d[_pid])]
+                    _arr3d = _a3d.get(_pid)
+                    bodies3d = [arkit_body_3d(_arr3d)] if _arr3d is not None else []
 
             hands = []
             for landmarks_list in ((hand_res.hand_landmarks if hand_res is not None else None) or []):
