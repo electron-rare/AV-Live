@@ -106,37 +106,35 @@ test("global action choices include the 4 core actions + none", () => {
   for (const id of ["none", "fill", "drop", "breakdown", "evolve"])
     assert.ok(ids.includes(id), `missing action ${id}`);
 });
-test("four gesture slots in fixed order", () => {
-  assert.equal(GLOBAL_SLOTS.length, 4);
-  assert.deepEqual(GLOBAL_SLOTS.map((s) => s.key), [0, 1, 2, 3]);
+test("eight pinch gesture slots in fixed order", () => {
+  assert.equal(GLOBAL_SLOTS.length, 8);
+  assert.deepEqual(GLOBAL_SLOTS.map((s) => s.key), [0, 1, 2, 3, 4, 5, 6, 7]);
 });
-test("default mapping is fill/drop/evolve/breakdown", () => {
-  assert.deepEqual(matGlobalActions, ["fill", "drop", "evolve", "breakdown"]);
+test("default mapping is the 8-finger spread", () => {
+  assert.deepEqual(matGlobalActions,
+    ["fill", "drop", "breakdown", "evolve", "muteDrums", "muteMelo", "washReverb", "next"]);
 });
 test("setGlobalAction mutates a slot", () => {
-  setGlobalAction(2, "fill");
-  assert.equal(matGlobalActions[2], "fill");
-  setGlobalAction(2, "evolve");   // restore default
+  setGlobalAction(7, "fill");
+  assert.equal(matGlobalActions[7], "fill");
+  setGlobalAction(7, "next");   // restore default
 });
 
 import { matGlobalSettings, setGlobalSetting, parseGlobalSettings }
   from "../public/control/js/matrix-state.js";
 
-test("default global settings", () => {
-  assert.equal(matGlobalSettings.openThresh, 0.65);
-  assert.equal(matGlobalSettings.closeThresh, 0.30);
+test("default global settings (no thresholds)", () => {
   assert.equal(matGlobalSettings.transientBars, 1);
   assert.deepEqual(matGlobalSettings.breakdownKeep, ["kick", "sub"]);
+  assert.equal(matGlobalSettings.openThresh, undefined);
 });
 test("setGlobalSetting mutates one key", () => {
   setGlobalSetting("closeThresh", 0.4);
   assert.equal(matGlobalSettings.closeThresh, 0.4);
   setGlobalSetting("closeThresh", 0.30);
 });
-test("parseGlobalSettings decodes the OSC arg layout", () => {
-  const s = parseGlobalSettings([0.7, 0.2, 3, 2, "kick", "snare"]);
-  assert.equal(s.openThresh, 0.7);
-  assert.equal(s.closeThresh, 0.2);
+test("parseGlobalSettings decodes [transientBars, keepN, keep0..]", () => {
+  const s = parseGlobalSettings([3, 2, "kick", "snare"]);
   assert.equal(s.transientBars, 3);
   assert.deepEqual(s.breakdownKeep, ["kick", "snare"]);
 });

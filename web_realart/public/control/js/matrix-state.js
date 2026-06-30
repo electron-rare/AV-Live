@@ -71,31 +71,27 @@ export const GLOBAL_ACTION_CHOICES = [
   { id: "washReverb", label: "Wash reverb" }, { id: "next", label: "Suivant" },
 ];
 export const GLOBAL_SLOTS = [
-  { key: 0, label: "Main G ouverte" }, { key: 1, label: "Main G fermée" },
-  { key: 2, label: "Main D ouverte" }, { key: 3, label: "Main D fermée" },
+  { key: 0, label: "Pince MG index" }, { key: 1, label: "Pince MG majeur" },
+  { key: 2, label: "Pince MG annulaire" }, { key: 3, label: "Pince MG auriculaire" },
+  { key: 4, label: "Pince MD index" }, { key: 5, label: "Pince MD majeur" },
+  { key: 6, label: "Pince MD annulaire" }, { key: 7, label: "Pince MD auriculaire" },
 ];
-export let matGlobalActions = ["fill", "drop", "evolve", "breakdown"];
-export function setGlobalAction(slot, id) {
-  if (slot >= 0 && slot < 4) matGlobalActions[slot] = id;
-}
+export let matGlobalActions = ["fill", "drop", "breakdown", "evolve", "muteDrums", "muteMelo", "washReverb", "next"];
+export function setGlobalAction(slot, id) { if (slot >= 0 && slot < 8) matGlobalActions[slot] = id; }
 export function resetGlobalActions() {
-  matGlobalActions = ["fill", "drop", "evolve", "breakdown"];
+  matGlobalActions = ["fill", "drop", "breakdown", "evolve", "muteDrums", "muteMelo", "washReverb", "next"];
 }
 
-export let matGlobalSettings = { openThresh: 0.65, closeThresh: 0.30, transientBars: 1, breakdownKeep: ["kick", "sub"] };
+export let matGlobalSettings = { transientBars: 1, breakdownKeep: ["kick", "sub"] };
 export function setGlobalSetting(key, value) { matGlobalSettings[key] = value; }
-export function resetGlobalSettings() {
-  matGlobalSettings = { openThresh: 0.65, closeThresh: 0.30, transientBars: 1, breakdownKeep: ["kick", "sub"] };
-}
-// Decode /matrix/globalsettings args: [openThresh, closeThresh, transientBars, keepN, keep0..]
+export function resetGlobalSettings() { matGlobalSettings = { transientBars: 1, breakdownKeep: ["kick", "sub"] }; }
+// Decode /matrix/globalsettings args: [transientBars, keepN, keep0..]
 export function parseGlobalSettings(args) {
-  const openThresh = Number(args[0]);
-  const closeThresh = Number(args[1]);
-  const transientBars = Math.round(Number(args[2]));
-  const keepN = Math.round(Number(args[3])) || 0;
+  const transientBars = Math.round(Number(args[0]));
+  const keepN = Math.round(Number(args[1])) || 0;
   const breakdownKeep = [];
-  for (let k = 0; k < keepN; k++) breakdownKeep.push(String(args[4 + k]));
-  return { openThresh, closeThresh, transientBars, breakdownKeep };
+  for (let k = 0; k < keepN; k++) breakdownKeep.push(String(args[2 + k]));
+  return { transientBars, breakdownKeep };
 }
 
 export const MATRIX_MOD_TARGETS = {
@@ -217,7 +213,7 @@ export function loadMatState() {
       // SC remains authoritative; these are UI display caches only.
       if (Array.isArray(raw.vmod) && raw.vmod.length === MATRIX_VOICES.length) matVoiceMods = raw.vmod;
       if (Array.isArray(raw.vpose) && raw.vpose.length === MATRIX_VOICES.length) matVoicePoses = raw.vpose;
-      if (Array.isArray(raw.gact) && raw.gact.length === 4) matGlobalActions = raw.gact;
+      if (Array.isArray(raw.gact) && raw.gact.length === 8) matGlobalActions = raw.gact;
       if (raw.gset && typeof raw.gset === "object" && Array.isArray(raw.gset.breakdownKeep))
         matGlobalSettings = raw.gset;
       return; }
