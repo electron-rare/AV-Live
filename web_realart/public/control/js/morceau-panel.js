@@ -37,8 +37,7 @@ export function init() {
   if (sHost) {
     const sendSettings = () => {
       const s = matGlobalSettings;
-      send("/matrix/globalsettings", s.openThresh, s.closeThresh, s.transientBars,
-           s.breakdownKeep.length, ...s.breakdownKeep);
+      send("/matrix/globalsettings", s.transientBars, s.breakdownKeep.length, ...s.breakdownKeep);
       saveMatState();
     };
     const slider = (key, label, min, max, step) => {
@@ -59,8 +58,6 @@ export function init() {
       return { inp, out };
     };
     const ctl = {
-      openThresh: slider("openThresh", "Seuil ouvert", 0.5, 0.95, 0.01),
-      closeThresh: slider("closeThresh", "Seuil fermé (sensibilité)", 0.05, 0.6, 0.01),
       transientBars: slider("transientBars", "Durée (mesures)", 1, 8, 1),
     };
     const keepWrap = document.createElement("div");
@@ -85,12 +82,8 @@ export function init() {
     sHost.appendChild(keepWrap);
     on("/matrix/globalsettings", (args) => {
       const s = parseGlobalSettings(args);
-      setGlobalSetting("openThresh", s.openThresh);
-      setGlobalSetting("closeThresh", s.closeThresh);
       setGlobalSetting("transientBars", s.transientBars);
       setGlobalSetting("breakdownKeep", s.breakdownKeep);
-      ctl.openThresh.inp.value = s.openThresh; ctl.openThresh.out.textContent = s.openThresh;
-      ctl.closeThresh.inp.value = s.closeThresh; ctl.closeThresh.out.textContent = s.closeThresh;
       ctl.transientBars.inp.value = s.transientBars; ctl.transientBars.out.textContent = s.transientBars;
       MATRIX_VOICES.forEach((v) => { keepBoxes[v].checked = s.breakdownKeep.includes(v); });
       saveMatState();
@@ -98,10 +91,22 @@ export function init() {
     onOpen(() => send("/matrix/globalsettings/get"));
     send("/matrix/globalsettings/get");
   }
+  const bpm = document.getElementById("matrix-bpm");
+  const bpmOut = document.getElementById("matrix-bpm-out");
+  if (bpm) {
+    bpm.addEventListener("input", () => { if (bpmOut) bpmOut.textContent = bpm.value; });
+    bpm.addEventListener("change", () => send("/matrix/bpm", +bpm.value));
+    on("/matrix/bpm", (args) => {
+      const v = Math.round(Number(args[0]));
+      if (Number.isFinite(v)) { bpm.value = v; if (bpmOut) bpmOut.textContent = v; }
+    });
+    onOpen(() => send("/matrix/bpm/get"));
+    send("/matrix/bpm/get");
+  }
   on("/matrix/globalaction", (args) => {
     const slot = Math.round(Number(args[0]));
     const id = String(args[1] || "none");
-    if (slot >= 0 && slot < 4 && selects[slot]) {
+    if (slot >= 0 && slot < 8 && selects[slot]) {
       selects[slot].value = id;
       setGlobalAction(slot, id);
       saveMatState();

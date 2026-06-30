@@ -245,3 +245,6 @@ button.queued { animation: queued-blink 600ms ease-in-out infinite alternate; }
 .morceau-keep { display: flex; flex-wrap: wrap; gap: 2px 8px; margin-top: 4px; font-size: 11px; color: #aaa; }
 .morceau-keep > span { flex-basis: 100%; color: #888; }
 .morceau-keep-box { display: inline-flex; align-items: center; gap: 2px; }
+.morceau-global { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-bottom: 8px; }
+.morceau-global .morceau-bpm { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; color: #ccc; }
+.morceau-global .morceau-bpm output { min-width: 2.5em; text-align: right; color: #8c8; }
