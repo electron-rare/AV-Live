@@ -144,6 +144,10 @@ class State:
     # (metres, hip-centered). Fresh = updated within < 1 s.
     persons_arkit_joints: dict = field(default_factory=dict)
     persons_arkit_last_t: dict = field(default_factory=dict)
+    # ARKit 2D projected skeleton (Task 3): 91×2 float32 arrays (normalized
+    # screen coords 0..1) per pid. Updated by IphoneUSBSource on TAG_SKELETON2D.
+    persons_arkit_2d: dict[int, "np.ndarray"] = field(default_factory=dict)
+    persons_arkit_2d_t: dict[int, float] = field(default_factory=dict)
 
     # ---- LiDAR / ICP mesh fusion (Task 8 - 2026-05-14) ----
     # Set by the LidarTCPReader poller; consumed by FusionWorker.run_once.

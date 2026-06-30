@@ -18,7 +18,8 @@ import cv2
 import numpy as np
 
 from data_only_viz.scripts.iphone_usb_bridge import (
-    connect_device, decode_skeleton, iter_frames, TAG_SKELETON,
+    connect_device, decode_skeleton, decode_skeleton2D,
+    iter_frames, TAG_SKELETON, TAG_SKELETON2D,
 )
 from data_only_viz.state import PoseKp
 
@@ -148,6 +149,13 @@ class IphoneUSBSource:
                                         arr[i] = (x, y, z)
                                 self.state.persons_arkit_joints[pid] = arr
                                 self.state.persons_arkit_last_t[pid] = time.perf_counter()
+                    elif tag == TAG_SKELETON2D and self.state is not None:
+                        pts = decode_skeleton2D(payload)
+                        if pts is not None:
+                            arr = np.array([[x, y] for (x, y, _v) in pts], dtype=np.float32)
+                            with self.state.lock():
+                                self.state.persons_arkit_2d[pid] = arr
+                                self.state.persons_arkit_2d_t[pid] = time.perf_counter()
                     elif tag == TAG_HANDS:
                         hands = _decode_hands(payload)
                         if hands is not None and self.state is not None:

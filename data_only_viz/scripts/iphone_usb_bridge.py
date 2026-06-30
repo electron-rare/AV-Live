@@ -44,6 +44,9 @@ TAG_SKELETON = 1
 JOINT_COUNT = 91
 SKEL_FLOAT_BYTES = JOINT_COUNT * 3 * 4          # 1092
 SKEL_BYTES = SKEL_FLOAT_BYTES + JOINT_COUNT     # 1183
+TAG_SKELETON2D = 6                               # wire: skeleton2D (face=5 taken)
+SKEL2D_FLOAT_BYTES = JOINT_COUNT * 2 * 4        # 728
+SKEL2D_BYTES = SKEL2D_FLOAT_BYTES + JOINT_COUNT # 819
 MAX_PAYLOAD = 8 * 1024 * 1024
 
 LOG = logging.getLogger("iphone_usb_bridge")
@@ -167,6 +170,19 @@ def decode_skeleton(payload: bytes):
         (floats[i * 3], floats[i * 3 + 1], floats[i * 3 + 2], valid[i] != 0)
         for i in range(JOINT_COUNT)
     ]
+
+
+def decode_skeleton2D(payload: bytes):
+    """Return [(x, y, valid), ...] of length 91 (normalized 0..1), or None.
+
+    Wire layout: 91 × (x f32 BE, y f32 BE) = 728 bytes, then 91 validity bytes.
+    Total: SKEL2D_BYTES = 819.
+    """
+    if len(payload) != SKEL2D_BYTES:
+        return None
+    floats = struct.unpack(">" + "f" * (JOINT_COUNT * 2), payload[:SKEL2D_FLOAT_BYTES])
+    valid = payload[SKEL2D_FLOAT_BYTES:]
+    return [(floats[i * 2], floats[i * 2 + 1], valid[i] != 0) for i in range(JOINT_COUNT)]
 
 
 # --------------------------------------------------------------------------
