@@ -407,10 +407,15 @@ File.exists(~matDir).not.if({ ("mkdir -p " ++ ~matDir.quote).systemCmd });
     });
 };
 
-// one mutation from a base snapshot + re-source (the evolve one-shot)
+// one mutation + re-source (the evolve one-shot). When the evolve toggle is
+// OFF, snapshot/mutate/discard so ~matBaseGrid (owned by the toggle: non-nil
+// iff evolve active) is never leaked across a preset load. When ON, keep the
+// persistent base and just re-mutate from it.
 ~matRelanceEvolve = {
-    ~matBaseGrid.isNil.if({ ~matBaseGrid = ~lp[\matrix].collect({ |row| row.copy }) });
+    var hadBase = ~matBaseGrid.notNil;
+    hadBase.not.if({ ~matBaseGrid = ~lp[\matrix].collect({ |row| row.copy }) });
     ~matEvolveStep.();
+    hadBase.not.if({ ~matBaseGrid = nil });
     ~matVoices.size.do { |i| ~matLastColor[i] = -1 };
     (~lp[\matPlaying] == true).if({ ~matApplyBar.(~lp[\matBar] ? 0) });
 };

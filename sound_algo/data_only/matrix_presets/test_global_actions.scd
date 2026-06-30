@@ -67,6 +67,19 @@ feat.load;
 (~matGlobalActions == [\evolve, \breakdown, \fill, \drop]).not.if({ pass = false; "FAIL: globalActions not round-tripped".postln });
 ("rm -f '" ++ (~matDir +/+ "zz_gact_test.matrix") ++ "'").systemCmd;
 
+// -- I: evolve one-shot must not leak ~matBaseGrid when the toggle is off,
+//       and must mutate from the CURRENT grid (not a stale snapshot) --
+~matEvolve = false; ~matBaseGrid = nil;
+~lp[\matrix] = Array.fill(~matVoices.size, { Array.fill(~matBars, 0) });
+~lp[\matrix][0][0] = 3;                                  // gridA: kick bar0 active
+~matRelanceEvolve.();
+(~matBaseGrid.isNil).not.if({ pass = false; "FAIL: evolve one-shot leaked baseGrid".postln });
+~lp[\matrix] = Array.fill(~matVoices.size, { Array.fill(~matBars, 0) });
+~lp[\matrix][1][5] = 2;                                  // gridB: hats bar5 active
+~matRelanceEvolve.();
+(~lp[\matrix][0][0] == 0).not.if({ pass = false; "FAIL: stale gridA cell resurrected by evolve".postln });
+(~lp[\matrix][1][5] > 0).not.if({ pass = false; "FAIL: gridB active cell lost by evolve".postln });
+
 pass.if({ "GLOBALACT PASS".postln }, { "GLOBALACT FAIL".postln });
 0.exit;
 )
