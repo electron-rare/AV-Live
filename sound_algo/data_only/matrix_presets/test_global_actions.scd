@@ -114,18 +114,37 @@ feat.load;
 (~matBpm == 300).not.if({ pass = false; "FAIL: bpm not clamped to 300".postln });
 ~matSetBpm.(120);                                       // restore
 
-// -- P: a pinch fires the mapped global action (slot = hand*4 + finger-1) --
+// -- P: pinch hold-to-fire (engage doesn't fire; fires past hold; release cancels) --
+~matPinchRoutine !? { ~matPinchRoutine.stop };
 ~matGlobalActions = [\fill, \drop, \breakdown, \evolve, \muteDrums, \muteMelo, \washReverb, \next];
+~matPinchHoldMs = 300; ~matTransient = nil;
+~matPinchHeld = Array.fill(8, nil); ~matPinchFired = Array.fill(8, false);
+OSCdef(\mat_ev_pinch).func.value(['/pose/pinch', 0, 0, 1, 1]);   // L index engage -> slot 0 held
+(~matTransient.isNil).not.if({ pass = false; "FAIL: engage fired immediately".postln });
+(~matPinchHeld[0].isNil).if({ pass = false; "FAIL: engage did not record hold".postln });
+~matPinchHeld[0] = Main.elapsedTime - 0.5;                       // simulate 500ms held (> 300)
+~matPinchTick.();
+(~matTransient.notNil and: { ~matTransient[\kind] == \fill }).not.if({ pass = false; "FAIL: hold did not fire fill".postln });
 ~matTransient = nil;
-OSCdef(\mat_ev_pinch).func.value(['/pose/pinch', 0, 0, 1]);   // L index -> slot 0 -> fill
-(~matTransient.notNil and: { ~matTransient[\kind] == \fill }).not.if({ pass = false; "FAIL: L-index pinch != fill".postln });
-~matTransient = nil;
-OSCdef(\mat_ev_pinch).func.value(['/pose/pinch', 0, 1, 1]);   // R index -> slot 4 -> muteDrums (kind \mute)
-(~matTransient.notNil and: { ~matTransient[\kind] == \mute }).not.if({ pass = false; "FAIL: R-index pinch != muteDrums".postln });
-~matTransient = nil;
-OSCdef(\mat_ev_pinch).func.value(['/pose/pinch', 0, 1, 3]);   // R ring -> slot 6 -> washReverb
-(~matTransient.notNil and: { ~matTransient[\kind] == \washReverb }).not.if({ pass = false; "FAIL: R-ring pinch != washReverb".postln });
-~matTransient = nil;
+~matPinchHeld = Array.fill(8, nil); ~matPinchFired = Array.fill(8, false);
+OSCdef(\mat_ev_pinch).func.value(['/pose/pinch', 0, 1, 1, 1]);   // R index engage -> slot 4
+OSCdef(\mat_ev_pinch).func.value(['/pose/pinch', 0, 1, 1, 0]);   // release before hold
+~matPinchTick.();
+(~matTransient.isNil).not.if({ pass = false; "FAIL: released-early pinch fired".postln });
+(~matPinchHeld[4].isNil).not.if({ pass = false; "FAIL: release did not clear hold".postln });
+OSCdef(\mat_pinchhold).func.value(['/matrix/pinchhold', 500]);
+(~matPinchHoldMs == 500).not.if({ pass = false; "FAIL: pinchhold not set".postln });
+~matPinchHoldMs = 300;
+// pinchHoldMs save/load roundtrip
+~matInstruments = ~matInstruments ? Array.fill(~matVoices.size, { \default });
+~matColorDefs   = ~matColorDefs   ? Array.fill(~matVoices.size, { ~matDefaultColorDefs.value });
+~matSavedNames  = ~matSavedNames  ? Set.new;
+~matPinchHoldMs = 420;
+~matSave.("zz_phms_test");
+~matPinchHoldMs = 300;
+~matLoadFile.(~matDir +/+ "zz_phms_test.matrix");
+(~matPinchHoldMs == 420).not.if({ pass = false; "FAIL: pinchHoldMs not restored".postln });
+("rm -f '" ++ (~matDir +/+ "zz_phms_test.matrix") ++ "'").systemCmd;
 
 pass.if({ "GLOBALACT PASS".postln }, { "GLOBALACT FAIL".postln });
 0.exit;

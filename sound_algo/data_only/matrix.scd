@@ -445,6 +445,24 @@ File.exists(~matDir).not.if({ ("mkdir -p " ++ ~matDir.quote).systemCmd });
     8.do { |i| ~toscSend !? { ~toscSend.("/matrix/globalaction", i, (~matGlobalActions[i] ? \none).asString) } }
 };
 
+// -- pinch hold-to-fire state + tick --
+~matPinchHoldMs = ~matPinchHoldMs ? 300;
+~matPinchHeld   = ~matPinchHeld   ? Array.fill(8, nil);    // engage time (Main.elapsedTime) or nil
+~matPinchFired  = ~matPinchFired  ? Array.fill(8, false);
+~matPinchHoldPush = { ~toscSend !? { ~toscSend.("/matrix/pinchhold", ~matPinchHoldMs) } };
+~matPinchTick = {
+    8.do { |slot|
+        (~matPinchHeld[slot].notNil).if({
+            var prog = (((Main.elapsedTime - ~matPinchHeld[slot]) * 1000) / ~matPinchHoldMs).clip(0, 1);
+            ~toscSend !? { ~toscSend.("/matrix/pinchprogress", slot, prog) };
+            ((prog >= 1.0) and: { ~matPinchFired[slot].not }).if({
+                ~matPinchFired[slot] = true;
+                ~matFireGlobal.(slot);
+            });
+        });
+    };
+};
+
 // push settings to surfaces: transientBars, keepN, keep0..
 ~matGlobalSettingsPush = {
     var s = ~matGlobalSettings; var keep = s[\breakdownKeep] ? [];
@@ -768,7 +786,8 @@ OSCdef(\mat_steps_get, { |msg, time, addr|
         voiceMods:  ~matVoices.collect({ |name| ~matVoiceMods[name]  ? [] }),
         voicePoses: ~matVoices.collect({ |name| ~matVoicePoses[name] ? [] }),
         globalActions: ~matGlobalActions,
-        globalSettings: ~matGlobalSettings
+        globalSettings: ~matGlobalSettings,
+        pinchHoldMs: ~matPinchHoldMs
     );
     File.use(path, "w", { |f| f.write(payload.asCompileString) });
     ~matSavedNames.add(safe.asSymbol);
@@ -877,6 +896,7 @@ OSCdef(\mat_steps_get, { |msg, time, addr|
                 (g[\breakdownKeep].notNil and: { g[\breakdownKeep].isArray }).if({
                     ~matGlobalSettings[\breakdownKeep] = g[\breakdownKeep].collect({ |v| v.asSymbol }) });
             });
+            ~matPinchHoldMs = ((raw.isArray.not) and: { raw[\pinchHoldMs].notNil }).if({ raw[\pinchHoldMs].asFloat.clip(50, 2000) }, { 300 });
             ~lp[\matPlaying].if({ ~matApplyBar.(~lp[\matBar]) });
             ~matGridPush.();
             ~matInstrPush.();
@@ -886,6 +906,7 @@ OSCdef(\mat_steps_get, { |msg, time, addr|
             ~matEvolvePush.();
             ~matGlobalActionsPush.();
             ~matGlobalSettingsPush.();
+            ~matPinchHoldPush.();
             ("[matrix] loaded " ++ path).postln;
             true
         }, {
@@ -1044,8 +1065,21 @@ OSCdef(\mat_ev_finger, { |msg| ~matPoseFire.(~matEventFinger.(msg[2] ? 0, msg[3]
 OSCdef(\mat_ev_pinch, { |msg|
     var hand = (msg[2] ? 0).asInteger;
     var finger = (msg[3] ? 1).asInteger;
-    ~matPoseFire.(~matEventPinch.(hand, finger));          // per-voice pinch bindings (unchanged)
-    ~matFireGlobal.((hand * 4) + (finger - 1));            // global action by pinch slot 0..7
+    var state = (msg[4] ? 1).asInteger;
+    var slot = (hand * 4) + (finger - 1);
+    (state == 1).if({
+        ~matPoseFire.(~matEventPinch.(hand, finger));      // per-voice pinch bindings on engage
+        (slot >= 0 and: { slot < 8 }).if({
+            ~matPinchHeld[slot] = Main.elapsedTime;
+            ~matPinchFired[slot] = false;
+        });
+    }, {
+        (slot >= 0 and: { slot < 8 }).if({
+            ~matPinchHeld[slot] = nil;
+            ~matPinchFired[slot] = false;
+            ~toscSend !? { ~toscSend.("/matrix/pinchprogress", slot, 0) };
+        });
+    });
 }, '/pose/pinch');
 
 OSCdef(\mat_pose, { |msg, time, addr|
@@ -1101,6 +1135,15 @@ OSCdef(\mat_globalsettings_get, { |msg, time, addr|
     ~toscTouch !? { ~toscTouch.(addr) };
     ~matGlobalSettingsPush.()
 }, '/matrix/globalsettings/get');
+OSCdef(\mat_pinchhold, { |msg, time, addr|
+    ~toscTouch !? { ~toscTouch.(addr) };
+    ~matPinchHoldMs = (msg[1] ? 300).asFloat.clip(50, 2000);
+    ~matPinchHoldPush.()
+}, '/matrix/pinchhold');
+OSCdef(\mat_pinchhold_get, { |msg, time, addr|
+    ~toscTouch !? { ~toscTouch.(addr) };
+    ~matPinchHoldPush.()
+}, '/matrix/pinchhold/get');
 OSCdef(\mat_bpm, { |msg, time, addr|
     ~toscTouch !? { ~toscTouch.(addr) };
     ~matSetBpm.((msg[1] ? 120))
@@ -1236,6 +1279,9 @@ OSCdef(\mat_audition, { |msg, time, addr|
 };
 ~matModValuesRoutine !? { ~matModValuesRoutine.stop };
 ~matModValuesRoutine = Routine({ loop { ~matModValuesPush.(); (1/12).wait } }).play(AppClock);
+
+~matPinchRoutine !? { ~matPinchRoutine.stop };
+~matPinchRoutine = Routine({ loop { ~matPinchTick.(); (1/30).wait } }).play(AppClock);
 
 // own capture listeners (independent of the pose pipeline's internal dicts)
 OSCdef(\mat_mod_hands, { |msg|
