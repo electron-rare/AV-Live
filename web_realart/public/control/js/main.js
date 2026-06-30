@@ -10,6 +10,7 @@ import { init as initSequencer } from "./sequencer.js";
 import { init as initLaunchpad } from "./launchpad.js";
 import { init as initGrid, renderMatrix } from "./matrix-grid.js";
 import { init as initVoiceEditor } from "./voice-editor.js";
+import { init as initMorceauPanel } from "./morceau-panel.js";
 
 function installPaletteVars() {
   const root = document.documentElement.style;
@@ -57,6 +58,7 @@ document.addEventListener("DOMContentLoaded", () => {
   initLaunchpad();
   initVoiceEditor();
   initGrid();
+  initMorceauPanel();
 
   // Generic OSC buttons
   document.querySelectorAll("[data-osc]").forEach((el) =>

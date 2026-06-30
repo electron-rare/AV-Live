@@ -225,3 +225,15 @@ button.queued { animation: queued-blink 600ms ease-in-out infinite alternate; }
 /* --- Matrix evolve toggle --- */
 .mat-evolve { padding: 2px 8px; flex: none; }
 .mat-evolve.on { background: #1a8; color: #000; }
+
+/* --- Morceau panel --- */
+.morceau-panel { margin-top: 12px; padding: 8px; border-top: 1px solid #333;
+  background: #161616; border-radius: 6px; }
+.morceau-title { font-size: 12px; text-transform: uppercase; letter-spacing: .05em;
+  color: #888; margin-bottom: 6px; }
+.morceau-slots { display: grid; grid-template-columns: repeat(2, 1fr);
+  gap: 6px 12px; }
+.morceau-slot { display: flex; align-items: center; justify-content: space-between;
+  gap: 6px; font-size: 13px; color: #ccc; }
+.morceau-slot select { flex: 0 0 auto; background: #222; color: #eee;
+  border: 1px solid #444; border-radius: 4px; padding: 2px 4px; }
