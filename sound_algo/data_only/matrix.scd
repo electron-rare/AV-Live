@@ -492,28 +492,27 @@ File.exists(~matDir).not.if({ ("mkdir -p " ++ ~matDir.quote).systemCmd });
 // Other dirs (e.g. shipped presets): scan via ls+tmpfile (systemCmd is
 // synchronous and works headless; pathMatch/Pipe.getLine are unreliable).
 ~matNames = { |dir|
-    (dir == ~matDir).if({
-        ~matSavedNames.asArray
-    }, {
-        var ext = ".matrix";
-        var result = [];
-        File.exists(dir).if({
-            var tmp = "/tmp/_av_live_matnames_.txt";
-            ("ls -1 '" ++ dir ++ "' > '" ++ tmp ++ "' 2>/dev/null").systemCmd;
-            File.exists(tmp).if({
-                var content = File.use(tmp, "r", { |f| f.readAllString });
-                ("rm -f '" ++ tmp ++ "'").systemCmd;
-                content.split($\n).do({ |fn|
-                    (fn.size > ext.size and: {
-                        fn.copyRange(fn.size - ext.size, fn.size - 1) == ext
-                    }).if({
-                        result = result.add(fn.copyRange(0, fn.size - ext.size - 1).asSymbol)
-                    })
+    var ext = ".matrix";
+    var result = [];
+    File.exists(dir).if({
+        var tmp = "/tmp/_av_live_matnames_.txt";
+        ("ls -1 '" ++ dir ++ "' > '" ++ tmp ++ "' 2>/dev/null").systemCmd;
+        File.exists(tmp).if({
+            var content = File.use(tmp, "r", { |f| f.readAllString });
+            ("rm -f '" ++ tmp ++ "'").systemCmd;
+            content.split($\n).do({ |fn|
+                (fn.size > ext.size and: {
+                    fn.copyRange(fn.size - ext.size, fn.size - 1) == ext
+                }).if({
+                    result = result.add(fn.copyRange(0, fn.size - ext.size - 1).asSymbol)
                 })
             })
-        });
-        result
-    })
+        })
+    });
+    // user dir: union the disk scan with in-memory saves (covers a just-saved
+    // name even if the fs scan races); other dirs: pure disk scan.
+    (dir == ~matDir).if({ result = (result ++ ~matSavedNames.asArray).as(Set).asArray });
+    result
 };
 
 // -- ~matGridPush : send full 512-int grid row-major to surfaces --
