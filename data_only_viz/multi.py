@@ -369,7 +369,10 @@ class MultiWorker:
 
         if self.iphone_usb:
             from .iphone_usb_source import IphoneUSBSource  # noqa: PLC0415
-            cap = IphoneUSBSource(self.state, write_hands=False)
+            # write_hands=True: the iPhone Vision hands ARE the hand source under
+            # --iphone-usb (rendering + /pose/hands openness + pinch). The Mac
+            # MediaPipe hand detector is skipped below.
+            cap = IphoneUSBSource(self.state, write_hands=True)
             if not cap.start():
                 LOG.error("iphone USB source unavailable (app running? phone unlocked?)")
                 return
@@ -410,7 +413,8 @@ class MultiWorker:
             try:
                 pose_res = pose.detect_for_video(mp_img, ts)
                 face_res = face.detect_for_video(mp_img, ts)
-                hand_res = hand.detect_for_video(mp_img, ts)
+                # iphone-usb: hands come from the iPhone Vision stream, skip Mac MP.
+                hand_res = None if self.iphone_usb else hand.detect_for_video(mp_img, ts)
             except Exception as e:  # noqa: BLE001
                 LOG.warning("inference: %s", e)
                 time.sleep(self.period)
@@ -460,7 +464,7 @@ class MultiWorker:
                 faces.append(kp_list)
 
             hands = []
-            for landmarks_list in (hand_res.hand_landmarks or []):
+            for landmarks_list in ((hand_res.hand_landmarks if hand_res is not None else None) or []):
                 kp_list = []
                 for lm in landmarks_list[:21]:
                     z = float(lm.z) if lm.z is not None else 0.0
@@ -503,20 +507,27 @@ class MultiWorker:
             if not hasattr(self, "_dbg_b3d_t") or t_now - self._dbg_b3d_t > 5.0:
                 LOG.info("body3d: n=%d (pose_world_landmarks)", len(bodies3d))
                 self._dbg_b3d_t = t_now
+            # iphone-usb: action_head_pub emits /pose/hands from the iPhone hands
+            # (in persons_hands); don't double-emit a (skipped) MP hand set here.
             self._sound_bridge.send(
                 bodies, ids_body, t_now,
                 persons_face=faces, persons_face_ids=ids_face,
-                persons_hands=hands, persons_hands_ids=ids_hand,
+                persons_hands=(None if self.iphone_usb else hands),
+                persons_hands_ids=(None if self.iphone_usb else ids_hand),
                 persons_body3d=bodies3d, persons_body3d_ids=ids_body3d)
 
             with self.state.lock():
                 self.state.persons_body = bodies
                 self.state.persons_face = faces
-                self.state.persons_hands = hands
+                # iphone-usb: persons_hands is owned by IphoneUSBSource (iPhone
+                # Vision hands); don't clobber it with the skipped Mac MP result.
+                if not self.iphone_usb:
+                    self.state.persons_hands = hands
                 self.state.persons_body_ids  = ids_body
                 self.state.persons_body3d = bodies3d
                 self.state.persons_face_ids  = ids_face
-                self.state.persons_hands_ids = ids_hand
+                if not self.iphone_usb:
+                    self.state.persons_hands_ids = ids_hand
                 # Compat single-person (1ere personne)
                 if bodies:
                     self.state.body_present = True
