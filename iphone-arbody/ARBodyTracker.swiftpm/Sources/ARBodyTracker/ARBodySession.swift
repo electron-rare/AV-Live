@@ -353,7 +353,7 @@ final class ARBodySession: NSObject, ObservableObject, ARSessionDelegate {
             let nx = Float(proj.x / max(viewportSize.width, 1))
             let ny = Float(proj.y / max(viewportSize.height, 1))
             if nx.isFinite && ny.isFinite {
-                p2.points[i] = SIMD2(nx, ny)
+                p2.points[i] = SIMD2<Float>(nx, ny)
                 p2.valid[i] = skeleton.isJointTracked(i)
             }
         }
