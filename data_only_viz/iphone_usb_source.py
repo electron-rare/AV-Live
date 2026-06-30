@@ -91,12 +91,17 @@ class IphoneUSBSource:
         self._opened = False
 
     def start(self) -> bool:
+        # Try an immediate connect, but do NOT give up if the iPhone app isn't
+        # streaming yet: start the read thread regardless. _run retries the
+        # connect (with backoff) until the app appears, so a startup race (app
+        # not ready / phone locked at launch) recovers the same way a mid-session
+        # drop does -- no data_only_viz restart needed.
         sock = connect_device()
         if sock is None:
-            LOG.error("iphone usb: no device / connect failed")
-            return False
-        self._sock = sock
-        self._opened = True
+            LOG.warning("iphone usb: no device yet -- thread will keep retrying")
+        else:
+            self._sock = sock
+            self._opened = True
         self._thread = threading.Thread(
             target=self._run, args=(sock,), name="iphone_usb_src", daemon=True)
         self._thread.start()
@@ -107,6 +112,13 @@ class IphoneUSBSource:
 
     def _run(self, sock) -> None:
         while not self._stop.is_set():
+            if sock is None:                      # no connection yet (startup or post-drop)
+                sock = self._reconnect()
+                if sock is None:                  # release() was called while waiting
+                    break
+                self._sock = sock
+                self._opened = True
+                LOG.info("iphone usb connected")
             try:
                 for tag, pid, payload in iter_frames(sock):
                     if self._stop.is_set():
@@ -161,15 +173,9 @@ class IphoneUSBSource:
             with self._lock:
                 self._frame = None
             self._opened = False
-            if self._stop.is_set():
-                break
-            LOG.info("iphone usb stream ended — reconnecting...")
-            sock = self._reconnect()
-            if sock is None:
-                break
-            self._sock = sock
-            self._opened = True
-            LOG.info("iphone usb reconnected")
+            sock = None                           # forces the reconnect at the loop top
+            if not self._stop.is_set():
+                LOG.info("iphone usb stream ended -- reconnecting...")
         self._opened = False
 
     def _reconnect(self):
