@@ -61,6 +61,24 @@ export const POSE_EVENT_CHOICES = [
   { id:"__custom__", label:"Personnalisé…" }
 ];
 
+// Global morceau actions: fixed 4 gesture slots, editable mapping (Phase 1).
+export const GLOBAL_ACTION_CHOICES = [
+  { id: "none", label: "—" }, { id: "fill", label: "Fill" },
+  { id: "drop", label: "Drop" }, { id: "breakdown", label: "Breakdown" },
+  { id: "evolve", label: "Relance + evolve" },
+];
+export const GLOBAL_SLOTS = [
+  { key: 0, label: "Main G ouverte" }, { key: 1, label: "Main G fermée" },
+  { key: 2, label: "Main D ouverte" }, { key: 3, label: "Main D fermée" },
+];
+export let matGlobalActions = ["fill", "drop", "evolve", "breakdown"];
+export function setGlobalAction(slot, id) {
+  if (slot >= 0 && slot < 4) matGlobalActions[slot] = id;
+}
+export function resetGlobalActions() {
+  matGlobalActions = ["fill", "drop", "evolve", "breakdown"];
+}
+
 export const MATRIX_MOD_TARGETS = {
   kick:["none","amp","pan","rev"], hats:["none","amp","pan","rev"], clap:["none","amp","pan","rev"], perc:["none","amp","cutoff","pan","rev","pitch"],
   sub:["none","amp","pan","rev","res","pitch"], acid:["none","amp","cutoff","pan","rev","res","pitch"], arp:["none","amp","cutoff","pan","rev","res","pitch"],
@@ -153,7 +171,8 @@ export function parseModValues(args) {
 export function saveMatState() {
   try { localStorage.setItem(MATRIX_STORAGE_KEY,
     JSON.stringify({ grid: matGrid, inst: matInst, cdef: matColorDefs,
-                     vmod: matVoiceMods, vpose: matVoicePoses })); } catch (_e) {}
+                     vmod: matVoiceMods, vpose: matVoicePoses,
+                     gact: matGlobalActions })); } catch (_e) {}
 }
 
 export function loadMatState() {
@@ -179,6 +198,7 @@ export function loadMatState() {
       // SC remains authoritative; these are UI display caches only.
       if (Array.isArray(raw.vmod) && raw.vmod.length === MATRIX_VOICES.length) matVoiceMods = raw.vmod;
       if (Array.isArray(raw.vpose) && raw.vpose.length === MATRIX_VOICES.length) matVoicePoses = raw.vpose;
+      if (Array.isArray(raw.gact) && raw.gact.length === 4) matGlobalActions = raw.gact;
       return; }
     if (Array.isArray(raw) && raw.length === MATRIX_VOICES.length) { matGrid = raw; return; }   // legacy: bare grid
   } catch (_e) {}

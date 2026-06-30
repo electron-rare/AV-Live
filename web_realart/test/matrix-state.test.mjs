@@ -97,3 +97,24 @@ test("MOD_TARGET_LABELS covers pitch and res", () => {
   assert.ok(MOD_TARGET_LABELS.pitch);
   assert.ok(MOD_TARGET_LABELS.res);
 });
+
+import { GLOBAL_ACTION_CHOICES, GLOBAL_SLOTS, matGlobalActions, setGlobalAction }
+  from "../public/control/js/matrix-state.js";
+
+test("global action choices include the 4 core actions + none", () => {
+  const ids = GLOBAL_ACTION_CHOICES.map((c) => c.id);
+  for (const id of ["none", "fill", "drop", "breakdown", "evolve"])
+    assert.ok(ids.includes(id), `missing action ${id}`);
+});
+test("four gesture slots in fixed order", () => {
+  assert.equal(GLOBAL_SLOTS.length, 4);
+  assert.deepEqual(GLOBAL_SLOTS.map((s) => s.key), [0, 1, 2, 3]);
+});
+test("default mapping is fill/drop/evolve/breakdown", () => {
+  assert.deepEqual(matGlobalActions, ["fill", "drop", "evolve", "breakdown"]);
+});
+test("setGlobalAction mutates a slot", () => {
+  setGlobalAction(2, "fill");
+  assert.equal(matGlobalActions[2], "fill");
+  setGlobalAction(2, "evolve");   // restore default
+});
