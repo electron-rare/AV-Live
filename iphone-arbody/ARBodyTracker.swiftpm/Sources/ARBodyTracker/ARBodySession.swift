@@ -67,7 +67,14 @@ final class ARBodySession: NSObject, ObservableObject, ARSessionDelegate {
         super.init()
         session.delegate = self
         usb.onState = { [weak self] s in
-            Task { @MainActor in self?.usbState = s }
+            Task { @MainActor in
+                guard let self else { return }
+                let was = self.usbState
+                self.usbState = s
+                if s == .connected && was != .connected {
+                    self.publishTopology()
+                }
+            }
         }
         videoEncoder.onPayload = { [weak self] payload in
             Task { @MainActor in
@@ -336,6 +343,21 @@ final class ARBodySession: NSObject, ObservableObject, ARSessionDelegate {
                  pid: Int16(clamping: pid),
                  timestamp: timestamp,
                  payload: p2.encoded())
+    }
+
+    /// Send the ARKit body joint names + parent indices once, so the Mac
+    /// renders bones generically. Static data — available before any body
+    /// is tracked, so it is safe to emit right after connect.
+    @MainActor
+    private func publishTopology() {
+        guard usbState == .connected else { return }
+        let def = ARSkeletonDefinition.defaultBody3D
+        let names = def.jointNames
+        let parents = def.parentIndices.map { Int16(clamping: $0) }
+        let payload = TopologyPayload(jointNames: names, parents: parents)
+        usb.send(tag: .topology, pid: -1,
+                 timestamp: lastFrameTime,
+                 payload: payload.encoded())
     }
 
 }
