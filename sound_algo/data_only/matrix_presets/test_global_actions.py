@@ -5,7 +5,7 @@ import sys, os, glob
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import generate_presets as G
 
-EXPECT = r"'globalActions': [ \fill, \drop, \evolve, \breakdown ]"
+EXPECT = r"'globalActions': [ \fill, \drop, \breakdown, \evolve, \muteDrums, \muteMelo, \washReverb, \next ]"
 ok = True
 
 def check(c, m):
@@ -27,8 +27,7 @@ missing = [os.path.basename(f) for f in files
            if EXPECT not in open(f, encoding="utf-8").read()]
 check(not missing, "globalActions missing in: %s" % missing[:5])
 
-EXPECT_SET = ("'globalSettings': ( 'openThresh': 0.65, 'closeThresh': 0.3, "
-              "'transientBars': 1, 'breakdownKeep': [ \\kick, \\sub ] )")
+EXPECT_SET = "'globalSettings': ( 'transientBars': 1, 'breakdownKeep': [ \\kick, \\sub ] )"
 check(EXPECT_SET in sample, "to_sc output missing globalSettings default")
 missing_set = [os.path.basename(f) for f in files
                if EXPECT_SET not in open(f, encoding="utf-8").read()]
