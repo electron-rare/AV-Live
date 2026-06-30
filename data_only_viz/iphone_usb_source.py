@@ -21,10 +21,12 @@ from data_only_viz.scripts.iphone_usb_bridge import (
     connect_device, decode_skeleton, decode_skeleton2D,
     iter_frames, TAG_SKELETON, TAG_SKELETON2D,
 )
+from data_only_viz.arkit_topology import decode_topology
 from data_only_viz.state import PoseKp
 
 TAG_VIDEO = 2
 TAG_HANDS = 4
+TAG_TOPOLOGY = 7
 LOG = logging.getLogger("iphone_usb_source")
 
 _HAND_BYTES = 1 + 21 * 12   # chirality:u8 + 21 × (x,y,z) × 4 bytes BE f32
@@ -152,10 +154,22 @@ class IphoneUSBSource:
                     elif tag == TAG_SKELETON2D and self.state is not None:
                         pts = decode_skeleton2D(payload)
                         if pts is not None:
-                            arr = np.array([[x, y] for (x, y, _v) in pts], dtype=np.float32)
+                            arr = np.array([[x, y] for (x, y, _v) in pts],
+                                           dtype=np.float32)
+                            valid = np.array([v for (_x, _y, v) in pts],
+                                             dtype=bool)
                             with self.state.lock():
                                 self.state.persons_arkit_2d[pid] = arr
-                                self.state.persons_arkit_2d_t[pid] = time.perf_counter()
+                                self.state.persons_arkit_2d_valid[pid] = valid
+                                self.state.persons_arkit_2d_t[pid] = \
+                                    time.perf_counter()
+                    elif tag == TAG_TOPOLOGY and self.state is not None:
+                        topo = decode_topology(payload)
+                        if topo is not None:
+                            names, parents = topo
+                            with self.state.lock():
+                                self.state.arkit_joint_names = names
+                                self.state.arkit_parents = parents
                     elif tag == TAG_HANDS:
                         hands = _decode_hands(payload)
                         if hands is not None and self.state is not None:

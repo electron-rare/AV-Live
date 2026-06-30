@@ -148,6 +148,9 @@ class State:
     # screen coords 0..1) per pid. Updated by IphoneUSBSource on TAG_SKELETON2D.
     persons_arkit_2d: dict[int, "np.ndarray"] = field(default_factory=dict)
     persons_arkit_2d_t: dict[int, float] = field(default_factory=dict)
+    persons_arkit_2d_valid: dict = field(default_factory=dict)
+    arkit_joint_names: list = field(default_factory=list)
+    arkit_parents: list = field(default_factory=list)
 
     # ---- LiDAR / ICP mesh fusion (Task 8 - 2026-05-14) ----
     # Set by the LidarTCPReader poller; consumed by FusionWorker.run_once.
