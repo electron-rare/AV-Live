@@ -38,9 +38,9 @@ for v in VOICES:
     for (_s, t, _d) in default_mods(v):
         check(t in _MOD_TARGETS[v], "ineligible %s->%s on %s" % (_s, t, v))
 
-# poses: danse->gate on fx/sweep only
-check(default_poses("fx") == [("danse", "gate")], "fx pose")
-check(default_poses("sweep") == [("danse", "gate")], "sweep pose")
+# poses: no defaults (pose->voice triggers are opt-in)
+check(default_poses("fx") == [], "fx no pose default")
+check(default_poses("sweep") == [], "sweep no pose default")
 check(default_poses("kick") == [], "kick no pose")
 
 print("TEST PASS" if ok else "TEST FAIL")

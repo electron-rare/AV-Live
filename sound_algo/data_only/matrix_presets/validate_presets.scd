@@ -1,7 +1,7 @@
 // Headless validator: load all generated .matrix presets via the engine.
 // Run: /Applications/SuperCollider.app/Contents/MacOS/sclang \
 //        sound_algo/data_only/matrix_presets/validate_presets.scd
-// Expected output: VALIDATE PASS  (no ERROR lines, 28 presets loaded OK)
+// Expected output: VALIDATE PASS  (no ERROR lines, 84 presets loaded OK)
 // Also asserts techno_drive carries non-empty voiceMods + voicePoses.
 (
 var featureFile = PathName(thisProcess.nowExecutingPath).pathOnly ++ "../matrix.scd";
@@ -47,11 +47,11 @@ names.do { |name|
     )
 };
 
-(nOK == 28).not.if({
+(nOK == 84).not.if({
     pass = false;
-    ("FAIL count: expected 28, got " ++ nOK ++ " OK, " ++ nFail ++ " failed").postln
+    ("FAIL count: expected 84, got " ++ nOK ++ " OK, " ++ nFail ++ " failed").postln
 }, {
-    ("OK: " ++ nOK ++ "/28 presets loaded").postln
+    ("OK: " ++ nOK ++ "/84 presets loaded").postln
 });
 
 // -- 2. Load peak_drop and assert new role-adapted default mappings --
@@ -59,7 +59,7 @@ names.do { |name|
 //    kick (drums role) → 2 body bindings, first source = \bodyVitesse
 //    fx   (fx role)   → danse→gate pose binding
 {
-    var path = ~matPresetDir +/+ "peak_drop.matrix";
+    var path = ~matPresetDir +/+ "peak_drop_live.matrix";
     var vpass;
     ~matVoices.do { |v| ~matVoiceMods[v] = []; ~matVoicePoses[v] = [] };
     try {
@@ -85,14 +85,11 @@ names.do { |name|
         ("FAIL peak_drop kick voiceMods (expected 2, src=bodyVitesse): "
             ++ ~matVoiceMods[\kick]).postln
     });
-    // fx (vi=18, fx role): danse→gate pose
-    vpass = vpass
-        and: { (~matVoicePoses[\fx].notNil and: { ~matVoicePoses[\fx].size == 1 })
-            and: { (~matVoicePoses[\fx][0][\poseId] == \danse)
-                and: { ~matVoicePoses[\fx][0][\action] == \gate } } };
+    // fx (vi=18): pose->voice triggers are opt-in now -> no default binding
+    vpass = vpass and: { (~matVoicePoses[\fx] ? []).size == 0 };
     vpass.not.if({
         pass = false;
-        ("FAIL peak_drop fx voicePoses (expected danse→gate): "
+        ("FAIL peak_drop fx voicePoses (expected empty): "
             ++ ~matVoicePoses[\fx]).postln
     });
     vpass.if({ "DEFAULTS PASS".postln }, { "DEFAULTS FAIL".postln })

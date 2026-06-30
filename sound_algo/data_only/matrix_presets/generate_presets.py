@@ -552,8 +552,11 @@ def default_mods(voice):
 
 
 def default_poses(voice):
-    """Fixed default pose bindings: danse->gate swells the FX voices."""
-    return [("danse", "gate")] if voice in ("fx", "sweep") else []
+    """No default pose bindings: pose->voice triggers are opt-in (added per voice
+    in the editor). A default danse->gate on fx/sweep used to fire those voices
+    whenever the dancer was classified 'danse' -- surprising in matrix mode, so
+    removed. (Continuous pose MODULATION still comes from default_mods.)"""
+    return []
 
 
 def emit_sc_mod_binding(source, target, depth):
