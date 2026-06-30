@@ -20,6 +20,10 @@ export PATH=/opt/homebrew/bin:$PATH
 # delegate has headroom and stays fluid AND stable. Override with
 # MEDIAPIPE_DELEGATE=gpu only for short sessions where you accept the crash risk.
 export MEDIAPIPE_DELEGATE="${MEDIAPIPE_DELEGATE:-cpu}"
+# Finger pinches drive the matrix global actions (8 slots). Enabling the pinch
+# detector also enables the air-piano finger-strike detector, inert unless a
+# voice has a finger binding (none by default).
+export FINGER_PIANO="${FINGER_PIANO:-1}"
 export POSE_FILTER=median+kalman+lookahead+ik+arkit_fuse
 # CONCERT_MIRROR=0 in the environment disables the video mirror.
 
