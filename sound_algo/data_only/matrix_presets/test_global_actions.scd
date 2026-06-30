@@ -24,13 +24,13 @@ feat.load;
 (~matEffColor.(\kick, 0, 4) == 0).not.if({ pass = false; "FAIL: drop->0".postln });
 
 // -- D: breakdown -> only kept voices survive --
-~matSetTransient.(\breakdown, ~matBreakdownKeep);
+~matSetTransient.(\breakdown, ~matGlobalSettings[\breakdownKeep] ? [\kick, \sub]);
 (~matEffColor.(\kick, 0, 3) == 3).not.if({ pass = false; "FAIL: breakdown keeps kick".postln });
 (~matEffColor.(\hats, 1, 3) == 0).not.if({ pass = false; "FAIL: breakdown cuts hats".postln });
 
 // -- E: transient expires after ~matTransientBars ticks --
 ~matSetTransient.(\drop, []);
-~matTransientBars.do { ~matTransientTick.() };
+(~matGlobalSettings[\transientBars] ? 1).do { ~matTransientTick.() };
 (~matTransient.isNil).not.if({ pass = false; "FAIL: transient not cleared after ticks".postln });
 (~matEffColor.(\kick, 0, 2) == 2).not.if({ pass = false; "FAIL: post-expire normal colour".postln });
 
@@ -79,6 +79,33 @@ feat.load;
 ~matRelanceEvolve.();
 (~lp[\matrix][0][0] == 0).not.if({ pass = false; "FAIL: stale gridA cell resurrected by evolve".postln });
 (~lp[\matrix][1][5] > 0).not.if({ pass = false; "FAIL: gridB active cell lost by evolve".postln });
+
+// -- J: settings drive detection thresholds + transient duration --
+~matGlobalSettings[\openThresh] = 0.8; ~matGlobalSettings[\closeThresh] = 0.2;
+~matHandState[\L] = \unknown;
+~matHandFlip.(\L, 0.5, 0.5, 0, 1);     // 0.5 is in the new deadband -> stays unknown, no fire
+~fired = nil; ~matFireGlobal = { |slot| ~fired = slot };
+~matHandFlip.(\L, 0.5, 0.85, 0, 1);    // >=0.8 open -> baseline (from unknown, no fire)
+(~fired.isNil).not.if({ pass = false; "FAIL: settings open baseline fired".postln });
+~matHandFlip.(\L, 0.5, 0.15, 0, 1);    // <=0.2 -> closed -> fire slot1
+(~fired == 1).not.if({ pass = false; "FAIL: settings close threshold no fire".postln });
+~matGlobalSettings[\transientBars] = 3;
+~matFireGlobal = { |slot| };           // restore no-op-ish (real one not needed here)
+~matSetTransient.(\drop, []);
+(~matTransient[\bars] == 3).not.if({ pass = false; "FAIL: transientBars not from settings".postln });
+~matTransient = nil;
+// -- K: settings save/load roundtrip --
+~matInstruments = ~matInstruments ? Array.fill(~matVoices.size, { \default });
+~matColorDefs   = ~matColorDefs   ? Array.fill(~matVoices.size, { ~matDefaultColorDefs.value });
+~matSavedNames  = ~matSavedNames  ? Set.new;
+~matGlobalSettings = (openThresh: 0.7, closeThresh: 0.25, transientBars: 2, breakdownKeep: [\kick, \hats]);
+~matSave.("zz_gset_test");
+~matGlobalSettings = (openThresh: 0.65, closeThresh: 0.30, transientBars: 1, breakdownKeep: [\kick, \sub]);
+~matLoadFile.(~matDir +/+ "zz_gset_test.matrix");
+(~matGlobalSettings[\openThresh] == 0.7).not.if({ pass = false; "FAIL: openThresh not restored".postln });
+(~matGlobalSettings[\transientBars] == 2).not.if({ pass = false; "FAIL: transientBars not restored".postln });
+(~matGlobalSettings[\breakdownKeep] == [\kick, \hats]).not.if({ pass = false; "FAIL: breakdownKeep not restored".postln });
+("rm -f '" ++ (~matDir +/+ "zz_gset_test.matrix") ++ "'").systemCmd;
 
 pass.if({ "GLOBALACT PASS".postln }, { "GLOBALACT FAIL".postln });
 0.exit;

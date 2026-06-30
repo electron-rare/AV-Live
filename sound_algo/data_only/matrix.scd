@@ -370,11 +370,10 @@ File.exists(~matDir).not.if({ ("mkdir -p " ++ ~matDir.quote).systemCmd });
 
 // -- global morceau actions: momentary transient overrides + gesture mapping --
 ~matTransient     = ~matTransient     ? nil;          // (kind:, voices:[Symbol], bars:Int) or nil
-~matTransientBars = ~matTransientBars ? 1;            // Phase 1: 1 bar (Phase 2 reads settings)
-~matBreakdownKeep = ~matBreakdownKeep ? [\kick, \sub];
+~matGlobalSettings = ~matGlobalSettings ? (
+    openThresh: 0.65, closeThresh: 0.30, transientBars: 1, breakdownKeep: [\kick, \sub]
+);
 ~matGlobalActions = ~matGlobalActions ? [\fill, \drop, \evolve, \breakdown];  // slots 0..3
-~matOpenThresh    = ~matOpenThresh    ? 0.65;
-~matCloseThresh   = ~matCloseThresh   ? 0.30;
 ~matHandState     = ~matHandState     ? IdentityDictionary[\L -> \unknown, \R -> \unknown];
 
 // effective colour for a voice this bar, given any active transient (grid untouched)
@@ -391,7 +390,7 @@ File.exists(~matDir).not.if({ ("mkdir -p " ++ ~matDir.quote).systemCmd });
 
 // set a transient + re-source now (effect lands at the next bar via Pdef quant)
 ~matSetTransient = { |kind, voices|
-    ~matTransient = (kind: kind, voices: (voices ? []), bars: ~matTransientBars);
+    ~matTransient = (kind: kind, voices: (voices ? []), bars: (~matGlobalSettings[\transientBars] ? 1));
     ~matVoices.size.do { |i| ~matLastColor[i] = -1 };
     (~lp[\matPlaying] == true).if({ ~matApplyBar.(~lp[\matBar] ? 0) });
 };
@@ -425,7 +424,7 @@ File.exists(~matDir).not.if({ ("mkdir -p " ++ ~matDir.quote).systemCmd });
     var act = (~matGlobalActions[slot]) ? \none;
     (act == \fill).if({ ~matSetTransient.(\fill, []) });
     (act == \drop).if({ ~matSetTransient.(\drop, []) });
-    (act == \breakdown).if({ ~matSetTransient.(\breakdown, ~matBreakdownKeep) });
+    (act == \breakdown).if({ ~matSetTransient.(\breakdown, ~matGlobalSettings[\breakdownKeep] ? [\kick, \sub]) });
     (act == \evolve).if({ ~matRelanceEvolve.() });
 };
 
@@ -435,8 +434,8 @@ File.exists(~matDir).not.if({ ("mkdir -p " ++ ~matDir.quote).systemCmd });
     var present = x > 0.001;
     var prev = (~matHandState[hand]) ? \unknown;
     var cur = present.if({
-        (openness >= ~matOpenThresh).if({ \open },
-        { (openness <= ~matCloseThresh).if({ \closed }, { prev }) })
+        (openness >= (~matGlobalSettings[\openThresh] ? 0.65)).if({ \open },
+        { (openness <= (~matGlobalSettings[\closeThresh] ? 0.30)).if({ \closed }, { prev }) })
     }, { \unknown });
     ((prev == \open) and: { cur == \closed }).if({ ~matFireGlobal.(closeSlot) });
     ((prev == \closed) and: { cur == \open }).if({ ~matFireGlobal.(openSlot) });
@@ -446,6 +445,13 @@ File.exists(~matDir).not.if({ ("mkdir -p " ++ ~matDir.quote).systemCmd });
 // push the 4-slot mapping to surfaces (symbols sent as strings)
 ~matGlobalActionsPush = {
     4.do { |i| ~toscSend !? { ~toscSend.("/matrix/globalaction", i, (~matGlobalActions[i] ? \none).asString) } }
+};
+
+// push settings to surfaces: openThresh, closeThresh, transientBars, keepN, keep0..
+~matGlobalSettingsPush = {
+    var s = ~matGlobalSettings; var keep = s[\breakdownKeep] ? [];
+    ~toscSend !? { ~toscSend.valueArray(["/matrix/globalsettings",
+        s[\openThresh], s[\closeThresh], s[\transientBars], keep.size] ++ keep.collect({ |v| v.asString })) }
 };
 
 // -- ~matPush : push playhead position to all TouchOSC clients --
@@ -744,7 +750,8 @@ OSCdef(\mat_steps_get, { |msg, time, addr|
         colorDefs: ~matColorDefs.collect({ |defs| (1..6).collect({ |c| defs[c] }) }),
         voiceMods:  ~matVoices.collect({ |name| ~matVoiceMods[name]  ? [] }),
         voicePoses: ~matVoices.collect({ |name| ~matVoicePoses[name] ? [] }),
-        globalActions: ~matGlobalActions
+        globalActions: ~matGlobalActions,
+        globalSettings: ~matGlobalSettings
     );
     File.use(path, "w", { |f| f.write(payload.asCompileString) });
     ~matSavedNames.add(safe.asSymbol);
@@ -845,6 +852,16 @@ OSCdef(\mat_steps_get, { |msg, time, addr|
             ((raw.isArray.not) and: { raw[\globalActions].notNil and: { raw[\globalActions].isArray } }).if({
                 raw[\globalActions].do { |s, i| (i < 4 and: { s.notNil }).if({ ~matGlobalActions[i] = s.asSymbol }) }
             });
+            // restore global settings (default when absent/legacy)
+            ~matGlobalSettings = (openThresh: 0.65, closeThresh: 0.30, transientBars: 1, breakdownKeep: [\kick, \sub]);
+            ((raw.isArray.not) and: { raw[\globalSettings].notNil and: { raw[\globalSettings].isKindOf(Event) } }).if({
+                var g = raw[\globalSettings];
+                g[\openThresh].notNil.if({ ~matGlobalSettings[\openThresh] = g[\openThresh].asFloat });
+                g[\closeThresh].notNil.if({ ~matGlobalSettings[\closeThresh] = g[\closeThresh].asFloat });
+                g[\transientBars].notNil.if({ ~matGlobalSettings[\transientBars] = g[\transientBars].asInteger });
+                (g[\breakdownKeep].notNil and: { g[\breakdownKeep].isArray }).if({
+                    ~matGlobalSettings[\breakdownKeep] = g[\breakdownKeep].collect({ |v| v.asSymbol }) });
+            });
             ~lp[\matPlaying].if({ ~matApplyBar.(~lp[\matBar]) });
             ~matGridPush.();
             ~matInstrPush.();
@@ -853,6 +870,7 @@ OSCdef(\mat_steps_get, { |msg, time, addr|
             ~matVoices.size.do { |vi| ~matVoiceModPush.(vi); ~matVoicePosePush.(vi) };
             ~matEvolvePush.();
             ~matGlobalActionsPush.();
+            ~matGlobalSettingsPush.();
             ("[matrix] loaded " ++ path).postln;
             true
         }, {
@@ -1048,6 +1066,25 @@ OSCdef(\mat_globalaction_get, { |msg, time, addr|
     ~toscTouch !? { ~toscTouch.(addr) };
     ~matGlobalActionsPush.()
 }, '/matrix/globalaction/get');
+OSCdef(\mat_globalsettings, { |msg, time, addr|
+    var op = (msg[1] ? 0.65).asFloat.clip(0.5, 0.95);
+    var cl = (msg[2] ? 0.30).asFloat.clip(0.05, 0.6);
+    var tb = (msg[3] ? 1).asInteger.clip(1, 8);
+    var keepN = (msg[4] ? 0).asInteger.clip(0, 22);
+    ~toscTouch !? { ~toscTouch.(addr) };
+    cl = cl.min(op - 0.05);                                 // enforce close < open (deadband)
+    ~matGlobalSettings[\openThresh] = op;
+    ~matGlobalSettings[\closeThresh] = cl;
+    ~matGlobalSettings[\transientBars] = tb;
+    (keepN > 0).if({
+        ~matGlobalSettings[\breakdownKeep] = (0..(keepN - 1)).collect({ |k| (msg[5 + k] ? \kick).asSymbol })
+    });
+    ~matGlobalSettingsPush.()
+}, '/matrix/globalsettings');
+OSCdef(\mat_globalsettings_get, { |msg, time, addr|
+    ~toscTouch !? { ~toscTouch.(addr) };
+    ~matGlobalSettingsPush.()
+}, '/matrix/globalsettings/get');
 
 OSCdef(\mat_stop, { |msg, time, addr|
     ~toscTouch !? { ~toscTouch.(addr) };
