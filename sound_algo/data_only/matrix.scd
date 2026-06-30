@@ -424,6 +424,25 @@ File.exists(~matDir).not.if({ ("mkdir -p " ++ ~matDir.quote).systemCmd });
     (act == \evolve).if({ ~matRelanceEvolve.() });
 };
 
+// derive open/closed per hand from openness (hysteresis); fire only on an
+// established open<->closed flip. Absent hand (x<=0) resets state (no fire).
+~matHandFlip = { |hand, x, openness, openSlot, closeSlot|
+    var present = x > 0.001;
+    var prev = (~matHandState[hand]) ? \unknown;
+    var cur = present.if({
+        (openness >= ~matOpenThresh).if({ \open },
+        { (openness <= ~matCloseThresh).if({ \closed }, { prev }) })
+    }, { \unknown });
+    ((prev == \open) and: { cur == \closed }).if({ ~matFireGlobal.(closeSlot) });
+    ((prev == \closed) and: { cur == \open }).if({ ~matFireGlobal.(openSlot) });
+    ~matHandState[hand] = cur;
+};
+
+// push the 4-slot mapping to surfaces (symbols sent as strings)
+~matGlobalActionsPush = {
+    4.do { |i| ~toscSend !? { ~toscSend.("/matrix/globalaction", i, (~matGlobalActions[i] ? \none).asString) } }
+};
+
 // -- ~matPush : push playhead position to all TouchOSC clients --
 ~matPush = {
     ~toscSend !? { ~toscSend.("/matrix/playhead", ~lp[\matBar]) }
@@ -719,7 +738,8 @@ OSCdef(\mat_steps_get, { |msg, time, addr|
         instruments: ~matInstruments.collect({ |x| (x ? \default) }),
         colorDefs: ~matColorDefs.collect({ |defs| (1..6).collect({ |c| defs[c] }) }),
         voiceMods:  ~matVoices.collect({ |name| ~matVoiceMods[name]  ? [] }),
-        voicePoses: ~matVoices.collect({ |name| ~matVoicePoses[name] ? [] })
+        voicePoses: ~matVoices.collect({ |name| ~matVoicePoses[name] ? [] }),
+        globalActions: ~matGlobalActions
     );
     File.use(path, "w", { |f| f.write(payload.asCompileString) });
     ~matSavedNames.add(safe.asSymbol);
@@ -815,6 +835,11 @@ OSCdef(\mat_steps_get, { |msg, time, addr|
                     });
                 }
             });
+            // restore global morceau actions (default when absent/legacy)
+            ~matGlobalActions = [\fill, \drop, \evolve, \breakdown];
+            ((raw.isArray.not) and: { raw[\globalActions].notNil and: { raw[\globalActions].isArray } }).if({
+                raw[\globalActions].do { |s, i| (i < 4 and: { s.notNil }).if({ ~matGlobalActions[i] = s.asSymbol }) }
+            });
             ~lp[\matPlaying].if({ ~matApplyBar.(~lp[\matBar]) });
             ~matGridPush.();
             ~matInstrPush.();
@@ -822,6 +847,7 @@ OSCdef(\mat_steps_get, { |msg, time, addr|
             ~matVoices.size.do { |vi| (1..6).do { |c| ~matStepsPush.(vi, c) } };
             ~matVoices.size.do { |vi| ~matVoiceModPush.(vi); ~matVoicePosePush.(vi) };
             ~matEvolvePush.();
+            ~matGlobalActionsPush.();
             ("[matrix] loaded " ++ path).postln;
             true
         }, {
@@ -1004,6 +1030,20 @@ OSCdef(\mat_evolverate, { |msg, time, addr|
     ~matEvolvePush.()
 }, '/matrix/evolverate');
 
+OSCdef(\mat_globalaction, { |msg, time, addr|
+    var slot = (msg[1] ? 0).asInteger;
+    var sym  = (msg[2] ? \none).asSymbol;
+    ~toscTouch !? { ~toscTouch.(addr) };
+    (slot >= 0 and: { slot < 4 }).if({
+        ~matGlobalActions[slot] = sym;
+        ~toscSend !? { ~toscSend.("/matrix/globalaction", slot, sym.asString) };
+    })
+}, '/matrix/globalaction');
+OSCdef(\mat_globalaction_get, { |msg, time, addr|
+    ~toscTouch !? { ~toscTouch.(addr) };
+    ~matGlobalActionsPush.()
+}, '/matrix/globalaction/get');
+
 OSCdef(\mat_stop, { |msg, time, addr|
     ~toscTouch !? { ~toscTouch.(addr) };
     ~matStop.()
@@ -1141,6 +1181,8 @@ OSCdef(\mat_mod_hands, { |msg|
     ~matModCache[\rOpen]     = msg[8] ? 0;
     ~matModCache[\handSpeed] = ((msg[5] ? 0) max: (msg[9] ? 0));
     ~matModCache[\handDist]  = msg[10] ? 0;
+    ~matHandFlip.(\L, msg[2] ? 0, msg[4] ? 0, 0, 1);
+    ~matHandFlip.(\R, msg[6] ? 0, msg[8] ? 0, 2, 3);
 }, '/pose/hands');
 
 OSCdef(\mat_mod_center, { |msg|
