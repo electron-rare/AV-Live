@@ -463,6 +463,48 @@ File.exists(~matDir).not.if({ ("mkdir -p " ++ ~matDir.quote).systemCmd });
     };
 };
 
+// -- fist hold-to-fire state + edge detector + tick --
+~matFistThresh = ~matFistThresh ? 0.15;
+~matFistState  = ~matFistState  ? Array.fill(2, \unknown);
+~matFistHeld   = ~matFistHeld   ? Array.fill(2, nil);
+~matFistFired  = ~matFistFired  ? Array.fill(2, false);
+~matFistThreshPush = { ~toscSend !? { ~toscSend.("/matrix/fisthresh", ~matFistThresh) } };
+~matFistReloadCurrent = {
+    ~matCurrentName.notNil.if({
+        ~matLoad.(~matCurrentName);
+        ~toscSend !? { ~toscSend.("/matrix/loaded", ~matCurrentName.asString) };
+    });
+};
+// fist edge from openness (hysteresis + presence guard). hand 0 = L, 1 = R.
+~matFistEdge = { |hand, x, openness|
+    var present = x > 0.001;
+    var prev = ~matFistState[hand] ? \unknown;
+    var cur = present.if({
+        (openness <= ~matFistThresh).if({ \fist },
+        { (openness >= (~matFistThresh + 0.15)).if({ \open }, { prev }) })
+    }, { \unknown });
+    ((prev != \fist) and: { cur == \fist }).if({
+        ~matFistHeld[hand] = Main.elapsedTime; ~matFistFired[hand] = false;
+    });
+    ((prev == \fist) and: { cur != \fist }).if({
+        ~matFistHeld[hand] = nil; ~matFistFired[hand] = false;
+        ~toscSend !? { ~toscSend.("/matrix/fistprogress", hand, 0) };
+    });
+    ~matFistState[hand] = cur;
+};
+~matFistTick = {
+    2.do { |hand|
+        (~matFistHeld[hand].notNil).if({
+            var prog = (((Main.elapsedTime - ~matFistHeld[hand]) * 1000) / ~matPinchHoldMs).clip(0, 1);
+            ~toscSend !? { ~toscSend.("/matrix/fistprogress", hand, prog) };
+            ((prog >= 1.0) and: { ~matFistFired[hand].not }).if({
+                ~matFistFired[hand] = true;
+                (hand == 0).if({ ~matFistReloadCurrent.() }, { ~matNextPreset.() });
+            });
+        });
+    };
+};
+
 // push settings to surfaces: transientBars, keepN, keep0..
 ~matGlobalSettingsPush = {
     var s = ~matGlobalSettings; var keep = s[\breakdownKeep] ? [];
@@ -787,7 +829,8 @@ OSCdef(\mat_steps_get, { |msg, time, addr|
         voicePoses: ~matVoices.collect({ |name| ~matVoicePoses[name] ? [] }),
         globalActions: ~matGlobalActions,
         globalSettings: ~matGlobalSettings,
-        pinchHoldMs: ~matPinchHoldMs
+        pinchHoldMs: ~matPinchHoldMs,
+        fistThresh: ~matFistThresh
     );
     File.use(path, "w", { |f| f.write(payload.asCompileString) });
     ~matSavedNames.add(safe.asSymbol);
@@ -897,6 +940,7 @@ OSCdef(\mat_steps_get, { |msg, time, addr|
                     ~matGlobalSettings[\breakdownKeep] = g[\breakdownKeep].collect({ |v| v.asSymbol }) });
             });
             ~matPinchHoldMs = ((raw.isArray.not) and: { raw[\pinchHoldMs].notNil }).if({ raw[\pinchHoldMs].asFloat.clip(50, 2000) }, { 300 });
+            ~matFistThresh = ((raw.isArray.not) and: { raw[\fistThresh].notNil }).if({ raw[\fistThresh].asFloat.clip(0.05, 0.5) }, { 0.15 });
             ~lp[\matPlaying].if({ ~matApplyBar.(~lp[\matBar]) });
             ~matGridPush.();
             ~matInstrPush.();
@@ -907,6 +951,7 @@ OSCdef(\mat_steps_get, { |msg, time, addr|
             ~matGlobalActionsPush.();
             ~matGlobalSettingsPush.();
             ~matPinchHoldPush.();
+            ~matFistThreshPush.();
             ("[matrix] loaded " ++ path).postln;
             true
         }, {
@@ -1144,6 +1189,15 @@ OSCdef(\mat_pinchhold_get, { |msg, time, addr|
     ~toscTouch !? { ~toscTouch.(addr) };
     ~matPinchHoldPush.()
 }, '/matrix/pinchhold/get');
+OSCdef(\mat_fisthresh, { |msg, time, addr|
+    ~toscTouch !? { ~toscTouch.(addr) };
+    ~matFistThresh = (msg[1] ? 0.15).asFloat.clip(0.05, 0.5);
+    ~matFistThreshPush.()
+}, '/matrix/fisthresh');
+OSCdef(\mat_fisthresh_get, { |msg, time, addr|
+    ~toscTouch !? { ~toscTouch.(addr) };
+    ~matFistThreshPush.()
+}, '/matrix/fisthresh/get');
 OSCdef(\mat_bpm, { |msg, time, addr|
     ~toscTouch !? { ~toscTouch.(addr) };
     ~matSetBpm.((msg[1] ? 120))
@@ -1281,7 +1335,7 @@ OSCdef(\mat_audition, { |msg, time, addr|
 ~matModValuesRoutine = Routine({ loop { ~matModValuesPush.(); (1/12).wait } }).play(AppClock);
 
 ~matPinchRoutine !? { ~matPinchRoutine.stop };
-~matPinchRoutine = Routine({ loop { ~matPinchTick.(); (1/30).wait } }).play(AppClock);
+~matPinchRoutine = Routine({ loop { ~matPinchTick.(); ~matFistTick.(); (1/30).wait } }).play(AppClock);
 
 // own capture listeners (independent of the pose pipeline's internal dicts)
 OSCdef(\mat_mod_hands, { |msg|
@@ -1293,6 +1347,8 @@ OSCdef(\mat_mod_hands, { |msg|
     ~matModCache[\rOpen]     = msg[8] ? 0;
     ~matModCache[\handSpeed] = ((msg[5] ? 0) max: (msg[9] ? 0));
     ~matModCache[\handDist]  = msg[10] ? 0;
+    ~matFistEdge.(0, msg[2] ? 0, msg[4] ? 0);
+    ~matFistEdge.(1, msg[6] ? 0, msg[8] ? 0);
 }, '/pose/hands');
 
 OSCdef(\mat_mod_center, { |msg|
