@@ -123,3 +123,24 @@ def test_pinch_refractory_blocks():
     b = det.step([_pinch_hand(*_PINCH)], 0.10)  # within 200 ms -> blocked
     assert len(a) == 1
     assert b == []
+
+
+def test_pinch_engage_release_emits_both_edges():
+    """Engage emits state=1; subsequent open emits state=0 (same finger)."""
+    det = PinchDetector(ratio_on=0.45, ratio_off=0.65, refractory_ms=0)
+    det.step([_pinch_hand(*_OPEN)], 0.0)
+    engage = det.step([_pinch_hand(*_PINCH)], 0.1)   # engage edge
+    release = det.step([_pinch_hand(*_OPEN)], 0.2)   # release edge
+    assert len(engage) == 1 and engage[0].state == 1
+    assert len(release) == 1 and release[0].state == 0
+    assert release[0].hand == 0 and release[0].finger == 1
+
+
+def test_pinch_hand_disappear_emits_release():
+    """When an engaged hand disappears, a release edge is synthesised."""
+    det = PinchDetector(ratio_on=0.45, ratio_off=0.65, refractory_ms=0)
+    det.step([_pinch_hand(*_OPEN)], 0.0)
+    engage = det.step([_pinch_hand(*_PINCH)], 0.1)   # engage
+    release = det.step([], 0.2)                       # hand gone
+    assert len(engage) == 1 and engage[0].state == 1
+    assert len(release) == 1 and release[0].state == 0

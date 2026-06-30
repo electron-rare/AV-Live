@@ -1,4 +1,4 @@
-"""Tests for PoseSoundBridge.send_finger."""
+"""Tests for PoseSoundBridge.send_finger and send_pinch."""
 from __future__ import annotations
 
 from unittest.mock import MagicMock
@@ -34,3 +34,38 @@ def test_send_finger_emits_expected_osc():
     assert isinstance(args[0], int) and not isinstance(args[0], bool)
     assert isinstance(args[1], int) and isinstance(args[2], int)
     assert all(isinstance(a, float) for a in args[3:7])
+
+
+def test_send_pinch_emits_state_as_4th_arg():
+    """send_pinch must put the edge state (1=engage, 0=release) as 4th arg."""
+    b = _bridge()
+
+    class _FakePinchEvent:
+        hand = 0
+        finger = 1
+        state = 1
+
+    b.send_pinch(_FakePinchEvent())
+    b._client.send_message.assert_called_once()
+    addr, args = b._client.send_message.call_args[0]
+    assert addr == "/pose/pinch"
+    assert args[0] == 0          # pid
+    assert args[1] == 0          # hand
+    assert args[2] == 1          # finger
+    assert args[3] == 1          # state (engage edge)
+    assert len(args) == 4
+
+
+def test_send_pinch_release_state_is_zero():
+    """Release edge: state=0 appears as 4th arg."""
+    b = _bridge()
+
+    class _FakeRelease:
+        hand = 1
+        finger = 2
+        state = 0
+
+    b.send_pinch(_FakeRelease())
+    addr, args = b._client.send_message.call_args[0]
+    assert addr == "/pose/pinch"
+    assert args[3] == 0          # state = release

@@ -129,6 +129,7 @@ class FingerStrikeDetector:
 class PinchEvent:
     hand: int          # 0 = left slot (leftmost cx), 1 = right slot
     finger: int        # 1..4 = index, middle, ring, pinky (thumb is trigger)
+    state: int = 1     # 1 = engage edge, 0 = release edge
 
 
 class _PinchState:
@@ -176,13 +177,16 @@ class PinchDetector:
                 if st.engaged:
                     if ratio > self.ratio_off:
                         st.engaged = False
+                        events.append(PinchEvent(hand=slot, finger=i + 1, state=0))
                 elif ratio < self.ratio_on and (
                         t_now - st.last_t) >= self.refractory_s:
                     st.engaged = True
                     st.last_t = t_now
-                    events.append(PinchEvent(hand=slot, finger=i + 1))
+                    events.append(PinchEvent(hand=slot, finger=i + 1, state=1))
         for slot in range(len(self._state)):
             if slot not in present:
                 for i in range(4):
-                    self._state[slot][i].engaged = False
+                    if self._state[slot][i].engaged:
+                        self._state[slot][i].engaged = False
+                        events.append(PinchEvent(hand=slot, finger=i + 1, state=0))
         return events

@@ -398,8 +398,8 @@ class PoseSoundBridge:
         self._vj("/pose/finger", args)
 
     def send_pinch(self, ev) -> None:
-        """Emit one thumb-to-finger pinch event (clip toggle trigger)."""
-        args = [0, int(ev.hand), int(ev.finger)]
+        """Emit a thumb-to-finger pinch edge (state 1=engage, 0=release)."""
+        args = [0, int(ev.hand), int(ev.finger), int(getattr(ev, "state", 1))]
         try:
             self._client.send_message("/pose/pinch", args)
         except OSError:
