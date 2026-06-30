@@ -152,3 +152,11 @@ test("default pinch hold ms + setter", () => {
   assert.equal(matPinchHoldMs, 450);
   setPinchHoldMs(300);
 });
+
+import { matFistThresh, setFistThresh } from "../public/control/js/matrix-state.js";
+test("default fist threshold + setter", () => {
+  assert.equal(matFistThresh, 0.15);
+  setFistThresh(0.3);
+  assert.equal(matFistThresh, 0.3);
+  setFistThresh(0.15);
+});

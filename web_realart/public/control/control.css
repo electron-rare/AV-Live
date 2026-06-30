@@ -251,3 +251,6 @@ button.queued { animation: queued-blink 600ms ease-in-out infinite alternate; }
 .morceau-global { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-bottom: 8px; }
 .morceau-global .morceau-bpm { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; color: #ccc; }
 .morceau-global .morceau-bpm output { min-width: 2.5em; text-align: right; color: #8c8; }
+.morceau-fists { display: flex; flex-direction: column; gap: 4px; }
+.morceau-fist { position: relative; font-size: 12px; color: #ccc; padding: 2px 4px;
+  background: #1c1c1c; border-radius: 4px; }
