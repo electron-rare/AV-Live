@@ -21,7 +21,7 @@ def encode_topology(names: list[str], parents: list[int]) -> bytes:
     return bytes(out)
 
 
-def decode_topology(payload: bytes):
+def decode_topology(payload: bytes) -> tuple[list[str], list[int]] | None:
     """Return (joint_names, parents) or None if malformed."""
     if len(payload) < 2:
         return None

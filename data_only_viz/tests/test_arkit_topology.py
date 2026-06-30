@@ -26,3 +26,8 @@ def test_rejects_truncated():
 
 def test_rejects_too_short():
     assert decode_topology(b"\x00") is None
+
+
+def test_rejects_truncated_parents():
+    # 1 joint "a", parents section missing.
+    assert decode_topology(b"\x00\x01\x01a") is None
