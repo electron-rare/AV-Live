@@ -296,7 +296,7 @@ File.exists(~matDir).not.if({ ("mkdir -p " ++ ~matDir.quote).systemCmd });
 // Re-sourcing a playing Pdef updates it at the next quant boundary (smooth for v1).
 ~matApplyBar = { |bar|
     ~matVoices.do { |name, vi|
-        var color = ~lp[\matrix][vi][bar];
+        var color = ~matEffColor.(name, vi, ~lp[\matrix][vi][bar]);
         var key   = ("lp_" ++ name).asSymbol;
         Pdef.all.includesKey(key).if({
             (color == 0).if(
@@ -368,6 +368,62 @@ File.exists(~matDir).not.if({ ("mkdir -p " ++ ~matDir.quote).systemCmd });
     ~matEvolvePush.()
 };
 
+// -- global morceau actions: momentary transient overrides + gesture mapping --
+~matTransient     = ~matTransient     ? nil;          // (kind:, voices:[Symbol], bars:Int) or nil
+~matTransientBars = ~matTransientBars ? 1;            // Phase 1: 1 bar (Phase 2 reads settings)
+~matBreakdownKeep = ~matBreakdownKeep ? [\kick, \sub];
+~matGlobalActions = ~matGlobalActions ? [\fill, \drop, \evolve, \breakdown];  // slots 0..3
+~matOpenThresh    = ~matOpenThresh    ? 0.65;
+~matCloseThresh   = ~matCloseThresh   ? 0.30;
+~matHandState     = ~matHandState     ? IdentityDictionary[\L -> \unknown, \R -> \unknown];
+
+// effective colour for a voice this bar, given any active transient (grid untouched)
+~matEffColor = { |name, vi, base|
+    var t = ~matTransient;
+    t.isNil.if({ base }, {
+        var k = t[\kind];
+        (k == \drop).if({ 0 },
+        { (k == \fill).if({ (base == 0).if({ 0 }, { 6 }) },
+        { (k == \breakdown).if({ ((t[\voices] ? []).includes(name)).if({ base }, { 0 }) },
+        { base }) }) })
+    })
+};
+
+// set a transient + re-source now (effect lands at the next bar via Pdef quant)
+~matSetTransient = { |kind, voices|
+    ~matTransient = (kind: kind, voices: (voices ? []), bars: ~matTransientBars);
+    ~matVoices.size.do { |i| ~matLastColor[i] = -1 };
+    (~lp[\matPlaying] == true).if({ ~matApplyBar.(~lp[\matBar] ? 0) });
+};
+
+// count one bar of transient use; clear + force re-source when exhausted (routine-only)
+~matTransientTick = {
+    ~matTransient.notNil.if({
+        ~matTransient[\bars] = ~matTransient[\bars] - 1;
+        (~matTransient[\bars] <= 0).if({
+            ~matTransient = nil;
+            ~matVoices.size.do { |i| ~matLastColor[i] = -1 };
+        });
+    });
+};
+
+// one mutation from a base snapshot + re-source (the evolve one-shot)
+~matRelanceEvolve = {
+    ~matBaseGrid.isNil.if({ ~matBaseGrid = ~lp[\matrix].collect({ |row| row.copy }) });
+    ~matEvolveStep.();
+    ~matVoices.size.do { |i| ~matLastColor[i] = -1 };
+    (~lp[\matPlaying] == true).if({ ~matApplyBar.(~lp[\matBar] ? 0) });
+};
+
+// dispatch the action mapped to a gesture slot (0=LHopen,1=LHclosed,2=RHopen,3=RHclosed)
+~matFireGlobal = { |slot|
+    var act = (~matGlobalActions[slot]) ? \none;
+    (act == \fill).if({ ~matSetTransient.(\fill, []) });
+    (act == \drop).if({ ~matSetTransient.(\drop, []) });
+    (act == \breakdown).if({ ~matSetTransient.(\breakdown, ~matBreakdownKeep) });
+    (act == \evolve).if({ ~matRelanceEvolve.() });
+};
+
 // -- ~matPush : push playhead position to all TouchOSC clients --
 ~matPush = {
     ~toscSend !? { ~toscSend.("/matrix/playhead", ~lp[\matBar]) }
@@ -430,6 +486,7 @@ File.exists(~matDir).not.if({ ("mkdir -p " ++ ~matDir.quote).systemCmd });
     ~matRoutine = Routine({
         loop {
             ~matApplyBar.(~lp[\matBar]);
+            ~matTransientTick.();
             ~toscSend !? { ~toscSend.("/matrix/playhead", ~lp[\matBar]) };
             ~matBeatsPerBar.wait;
             ~matPrevBar  = ~lp[\matBar];
