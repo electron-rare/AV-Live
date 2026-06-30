@@ -64,6 +64,7 @@
 ~matDir        = ~matDir        ? "~/.config/av-live/matrices".standardizePath;
 ~matPresetDir  = ~matPresetDir  ? (PathName(thisProcess.nowExecutingPath).pathOnly ++ "matrix_presets");
 ~matSavedNames = ~matSavedNames ? Set.new;
+~matQueuedLoad = ~matQueuedLoad ? nil;   // armed preset name for /matrix/loadnext (nil = none)
 File.exists(~matDir).not.if({ ("mkdir -p " ++ ~matDir.quote).systemCmd });
 
 // -- ~matBaseFor : capture base Pdef source once (lazy, per voice name symbol) --
@@ -404,6 +405,19 @@ File.exists(~matDir).not.if({ ("mkdir -p " ++ ~matDir.quote).systemCmd });
     ~matPush.()
 };
 
+// -- ~matWrapStep : runs once per loop wrap. A queued load (/matrix/loadnext)
+//    wins over evolve so a freshly loaded preset plays one clean cycle before
+//    ÉVOLUE mutates it; otherwise evolve mutates as before. --
+~matWrapStep = {
+    ~matQueuedLoad.notNil.if({
+        ~matLoad.(~matQueuedLoad);
+        ~matQueuedLoad = nil;
+        ~toscSend !? { ~toscSend.("/matrix/queued", "") };
+    }, {
+        ~matEvolve.if({ ~matEvolveStep.() });
+    });
+};
+
 // -- ~matPlay : start the playhead Routine from bar 0, looping over ~matBars --
 ~matPlay = {
     var clock = ~lp[\clock] ? TempoClock.default;
@@ -418,8 +432,8 @@ File.exists(~matDir).not.if({ ("mkdir -p " ++ ~matDir.quote).systemCmd });
             ~matBeatsPerBar.wait;
             ~matPrevBar  = ~lp[\matBar];
             ~lp[\matBar] = ~matNextBar.value;
-            // loop wrapped (playhead jumped backward) -> mutate one cycle
-            (~matEvolve and: { ~lp[\matBar] < ~matPrevBar }).if({ ~matEvolveStep.() });
+            // loop wrapped (playhead jumped backward) -> queued load wins, else mutate
+            (~lp[\matBar] < ~matPrevBar).if({ ~matWrapStep.() });
         }
     }).play(clock, quant: ~matBeatsPerBar);
     // -- per-step playhead: emits /matrix/stephead s (0..15) every 16th note --
@@ -950,6 +964,18 @@ OSCdef(\mat_load, { |msg, time, addr|
     ~toscTouch !? { ~toscTouch.(addr) };
     ~matLoad.(msg[1].asString)
 }, '/matrix/load');
+
+OSCdef(\mat_loadnext, { |msg, time, addr|
+    var name = msg[1].asString;
+    ~toscTouch !? { ~toscTouch.(addr) };
+    ~lp[\matPlaying].if({
+        ~matQueuedLoad = name;                                  // armed: swaps at next wrap
+        ~toscSend !? { ~toscSend.("/matrix/queued", name) };
+    }, {
+        ~matLoad.(name);                                        // not playing -> load now
+        ~toscSend !? { ~toscSend.("/matrix/queued", "") };
+    });
+}, '/matrix/loadnext');
 
 OSCdef(\mat_list, { |msg, time, addr|
     ~toscTouch !? { ~toscTouch.(addr) };
