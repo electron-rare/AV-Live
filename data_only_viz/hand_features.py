@@ -10,10 +10,18 @@ from collections import deque
 
 WRIST, THUMB_TIP, MIDDLE_MCP, PINKY_TIP = 0, 4, 9, 20
 
-NEUTRAL_HAND = {"cx": 0.5, "cy": 0.5, "openness": 0.0, "speed": 0.0}
+# index/middle/ring/pinky tips + their MCP knuckles, for the "all fingers
+# curled" fist metric (thumb excluded — a fist curls the four fingers).
+_FINGER_TIPS = (8, 12, 16, 20)
+_FINGER_MCPS = (5, 9, 13, 17)
+
+NEUTRAL_HAND = {"cx": 0.5, "cy": 0.5, "openness": 0.0, "speed": 0.0, "fist": 0.0}
 
 # openness calibration: (span/size) maps fist~0.3 -> 0, open~2.0 -> 1
 _OPEN_LO, _OPEN_HI = 0.5, 2.0
+# fist calibration: per-finger tip->MCP distance / hand size. curled ~0.25,
+# extended ~0.75. closedness = 1 at/below LO, 0 at/above HI.
+_EXT_LO, _EXT_HI = 0.25, 0.75
 
 
 def _finite(v: float, fallback: float) -> float:
@@ -51,7 +59,15 @@ class HandFeatureExtractor:
                           ys[THUMB_TIP] - ys[PINKY_TIP])
         openness = _clamp((span / size - _OPEN_LO) / (_OPEN_HI - _OPEN_LO),
                           0.0, 1.0)
-        return {"cx": cx, "cy": cy, "openness": openness}
+        # fist = 1.0 only when ALL four fingers are curled to the palm (min over
+        # fingers): one extended finger drops it toward 0, so a true fist is
+        # required rather than just a small thumb-pinky span.
+        fist = 1.0
+        for tip, mcp in zip(_FINGER_TIPS, _FINGER_MCPS):
+            ext = math.hypot(xs[tip] - xs[mcp], ys[tip] - ys[mcp]) / size
+            curled = _clamp(1.0 - (ext - _EXT_LO) / (_EXT_HI - _EXT_LO), 0.0, 1.0)
+            fist = min(fist, curled)
+        return {"cx": cx, "cy": cy, "openness": openness, "fist": fist}
 
     def _speed(self, slot: int, cx: float, cy: float) -> float:
         buf = self._buf[slot]

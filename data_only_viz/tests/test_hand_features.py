@@ -100,3 +100,34 @@ def test_numpy_row_landmarks_finite_features():
     assert math.isfinite(hand["cy"])
     assert math.isfinite(hand["openness"])
     assert hand["openness"] > 0.8  # span/size = 2.0, same as test_open_hand
+
+
+def _fist_hand(tip_ext):
+    """All 4 finger MCPs at center; each fingertip placed tip_ext*size away
+    (so the per-finger tip->MCP ratio == tip_ext). size (wrist->mcp9) = 0.10."""
+    cx, cy = 0.5, 0.5
+    pts = [LM(cx, cy) for _ in range(21)]
+    pts[0] = LM(cx, cy + 0.10)                # wrist -> size 0.10
+    for mcp in (5, 9, 13, 17):
+        pts[mcp] = LM(cx, cy)
+    for tip in (8, 12, 16, 20):
+        pts[tip] = LM(cx + tip_ext * 0.10, cy)
+    pts[4] = LM(cx - 0.05, cy)                # thumb
+    return pts
+
+
+def test_fist_all_fingers_curled():
+    out = HandFeatureExtractor().step([_fist_hand(0.20)])   # tips at knuckles
+    assert (out["L"] or out["R"])["fist"] > 0.9
+
+
+def test_open_hand_is_not_a_fist():
+    out = HandFeatureExtractor().step([_fist_hand(0.80)])   # fingers extended
+    assert (out["L"] or out["R"])["fist"] < 0.1
+
+
+def test_one_extended_finger_breaks_the_fist():
+    h = _fist_hand(0.20)                                    # all curled...
+    h[8] = LM(0.5 + 0.80 * 0.10, 0.5)                       # ...except the index
+    out = HandFeatureExtractor().step([h])
+    assert (out["L"] or out["R"])["fist"] < 0.1            # min over fingers
