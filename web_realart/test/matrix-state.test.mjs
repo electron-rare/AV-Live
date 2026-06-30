@@ -144,3 +144,11 @@ test("extended action choices include phase-2 actions", () => {
   for (const id of ["muteDrums", "muteMelo", "doubleTime", "halfTime", "washReverb", "next"])
     assert.ok(ids.includes(id), `missing action ${id}`);
 });
+
+import { matPinchHoldMs, setPinchHoldMs } from "../public/control/js/matrix-state.js";
+test("default pinch hold ms + setter", () => {
+  assert.equal(matPinchHoldMs, 300);
+  setPinchHoldMs(450);
+  assert.equal(matPinchHoldMs, 450);
+  setPinchHoldMs(300);
+});

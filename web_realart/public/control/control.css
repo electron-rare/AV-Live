@@ -231,10 +231,13 @@ button.queued { animation: queued-blink 600ms ease-in-out infinite alternate; }
   background: #161616; border-radius: 6px; }
 .morceau-title { font-size: 12px; text-transform: uppercase; letter-spacing: .05em;
   color: #888; margin-bottom: 6px; }
-.morceau-slots { display: grid; grid-template-columns: repeat(2, 1fr);
-  gap: 6px 12px; }
-.morceau-slot { display: flex; align-items: center; justify-content: space-between;
+.morceau-slots { display: grid; grid-auto-flow: column; grid-template-rows: repeat(4, auto);
+  grid-template-columns: 1fr 1fr; gap: 6px 12px; }
+.morceau-slot { position: relative; display: flex; align-items: center; justify-content: space-between;
   gap: 6px; font-size: 13px; color: #ccc; }
+.morceau-slot-fill { position: absolute; left: 0; bottom: 0; height: 2px; width: 0%;
+  background: #8c8; transition: width 60ms linear; pointer-events: none; }
+.morceau-slot-fill.fired { background: #cc2; height: 100%; opacity: 0.25; }
 .morceau-slot select { flex: 0 0 auto; background: #222; color: #eee;
   border: 1px solid #444; border-radius: 4px; padding: 2px 4px; }
 

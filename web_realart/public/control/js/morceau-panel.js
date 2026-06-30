@@ -5,6 +5,7 @@ import { send, on, onOpen } from "./osc.js";
 import {
   GLOBAL_ACTION_CHOICES, GLOBAL_SLOTS, matGlobalActions, setGlobalAction, saveMatState,
   matGlobalSettings, setGlobalSetting, parseGlobalSettings,
+  matPinchHoldMs, setPinchHoldMs,
 } from "./matrix-state.js";
 import { MATRIX_VOICES } from "./matrix-state.js";
 
@@ -12,6 +13,7 @@ export function init() {
   const host = document.getElementById("morceau-slots");
   if (!host) return;
   const selects = [];
+  const fills = [];
   GLOBAL_SLOTS.forEach((slot) => {
     const wrap = document.createElement("label");
     wrap.className = "morceau-slot";
@@ -30,7 +32,19 @@ export function init() {
     });
     selects[slot.key] = sel;
     wrap.appendChild(sel);
+    const fill = document.createElement("div");
+    fill.className = "morceau-slot-fill";
+    wrap.appendChild(fill);
+    fills[slot.key] = fill;
     host.appendChild(wrap);
+  });
+  on("/matrix/pinchprogress", (args) => {
+    const slot = Math.round(Number(args[0]));
+    const prog = Number(args[1]) || 0;
+    const f = fills[slot];
+    if (!f) return;
+    f.style.width = (prog * 100) + "%";
+    f.classList.toggle("fired", prog >= 1);
   });
   // --- Réglages: thresholds, transient duration, breakdown kept-voices ---
   const sHost = document.getElementById("morceau-settings");
@@ -60,6 +74,22 @@ export function init() {
     const ctl = {
       transientBars: slider("transientBars", "Durée (mesures)", 1, 8, 1),
     };
+    const holdRow = document.createElement("label");
+    holdRow.className = "morceau-set-row";
+    const hSpan = document.createElement("span"); hSpan.textContent = "Maintien pince (ms)";
+    const hInp = document.createElement("input");
+    hInp.type = "range"; hInp.min = 50; hInp.max = 2000; hInp.step = 10; hInp.value = matPinchHoldMs;
+    const hOut = document.createElement("output"); hOut.textContent = matPinchHoldMs;
+    hInp.addEventListener("input", () => { hOut.textContent = hInp.value; });
+    hInp.addEventListener("change", () => { setPinchHoldMs(+hInp.value); send("/matrix/pinchhold", +hInp.value); saveMatState(); });
+    holdRow.append(hSpan, hInp, hOut);
+    sHost.appendChild(holdRow);
+    on("/matrix/pinchhold", (args) => {
+      const v = Math.round(Number(args[0]));
+      if (Number.isFinite(v)) { hInp.value = v; hOut.textContent = v; setPinchHoldMs(v); saveMatState(); }
+    });
+    onOpen(() => send("/matrix/pinchhold/get"));
+    send("/matrix/pinchhold/get");
     const keepWrap = document.createElement("div");
     keepWrap.className = "morceau-keep";
     const keepTitle = document.createElement("span");
