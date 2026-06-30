@@ -1147,7 +1147,9 @@ def to_sc(name, arc_fn, instkit, melodies, extra, post=None):
     return ("(\n'grid': [\n%s\n],\n'instruments': [ %s ],\n"
             "'colorDefs': [\n%s\n],\n"
             "'voiceMods': [ %s ],\n"
-            "'voicePoses': [ %s ]\n)\n" % (rows, isyms, cds, vms, vps))
+            "'voicePoses': [ %s ],\n"
+            "'globalActions': [ \\fill, \\drop, \\evolve, \\breakdown ]\n)\n"
+            % (rows, isyms, cds, vms, vps))
 
 
 def main():
