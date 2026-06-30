@@ -2,7 +2,6 @@ import ARKit
 import AVLiveWire
 import Combine
 import Foundation
-import RealityKit
 import SwiftUI
 import Vision
 
@@ -53,8 +52,6 @@ final class ARBodySession: NSObject, ObservableObject, ARSessionDelegate {
     private let bodyParents: [Int] =
         ARSkeletonDefinition.defaultBody3D.parentIndices
 
-    let arView = ARView(frame: .zero)
-
     nonisolated static func thermalString(
         _ s: ProcessInfo.ThermalState) -> String {
         switch s {
@@ -68,10 +65,7 @@ final class ARBodySession: NSObject, ObservableObject, ARSessionDelegate {
 
     override init() {
         super.init()
-        arView.session = session
-        arView.session.delegate = self
-        arView.environment.background = .color(.black)
-        arView.debugOptions = []
+        session.delegate = self
         usb.onState = { [weak self] s in
             Task { @MainActor in self?.usbState = s }
         }
@@ -164,7 +158,7 @@ final class ARBodySession: NSObject, ObservableObject, ARSessionDelegate {
                 self.videoEncoder.encode(img, pts: t)
             }
 
-            // Vision hands+face at ~15 fps, off-main, drop if busy.
+            // Vision hands at ~15 fps, off-main, drop if busy.
             if t - self.lastVisionTime >= 1.0 / 15.0 {
                 self.visionAttempts += 1
                 if self.visionBusy {
@@ -248,17 +242,16 @@ final class ARBodySession: NSObject, ObservableObject, ARSessionDelegate {
     /// indices without re-reading the ARKit skeleton definition.
     var bodyParentIndices: [Int] { bodyParents }
 
-    // MARK: - Vision hand + face capture
+    // MARK: - Vision hand capture
 
     nonisolated func runVision(on pixelBuffer: CVPixelBuffer,
                                timestamp t: TimeInterval) {
         let handReq = VNDetectHumanHandPoseRequest()
         handReq.maximumHandCount = 2
-        let faceReq = VNDetectFaceLandmarksRequest()
         let handler = VNImageRequestHandler(
             cvPixelBuffer: pixelBuffer, orientation: .right, options: [:])
         let t0 = Date()
-        try? handler.perform([handReq, faceReq])
+        try? handler.perform([handReq])
         let ms = Date().timeIntervalSince(t0) * 1000.0
         Task { @MainActor in
             self.visionMs = self.visionMs == 0
@@ -291,31 +284,11 @@ final class ARBodySession: NSObject, ObservableObject, ARSessionDelegate {
                 isRight: obs.chirality == .right, points: p))
         }
 
-        // ---- face (most prominent) ----
-        var facePayload: FacePayload?
-        if let face = (faceReq.results ?? []).first,
-           let all = face.landmarks?.allPoints {
-            let bb = face.boundingBox
-            let pts = all.normalizedPoints.map { np -> SIMD2<Float> in
-                // landmark points are relative to the face bbox.
-                let x = bb.origin.x + Double(np.x) * bb.size.width
-                let y = bb.origin.y + Double(np.y) * bb.size.height
-                return SIMD2(Float(x), Float(1.0 - y))
-            }
-            facePayload = FacePayload(
-                confidence: face.confidence, points: pts)
-        }
-
         let handsData = HandsPayload(hands: handsOut).encoded()
-        let faceData = facePayload?.encoded()
         Task { @MainActor in
             guard self.usbState == .connected else { return }
             self.usb.send(tag: .hands, pid: -1,
                           timestamp: t, payload: handsData)
-            if let faceData {
-                self.usb.send(tag: .face, pid: -1,
-                              timestamp: t, payload: faceData)
-            }
         }
     }
 
@@ -363,10 +336,4 @@ final class ARBodySession: NSObject, ObservableObject, ARSessionDelegate {
                  payload: p2.encoded())
     }
 
-}
-
-struct ARViewContainer: UIViewRepresentable {
-    @ObservedObject var session: ARBodySession
-    func makeUIView(context: Context) -> ARView { session.arView }
-    func updateUIView(_ uiView: ARView, context: Context) {}
 }

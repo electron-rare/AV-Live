@@ -1,6 +1,5 @@
 import SwiftUI
 import ARKit
-import RealityKit
 import UIKit
 
 struct ContentView: View {
@@ -88,7 +87,7 @@ struct ContentView: View {
                     .foregroundStyle(.white.opacity(0.35))
             }
         } else {
-            ARViewContainer(session: session)
+            Color.black
         }
     }
 
