@@ -155,14 +155,63 @@ def apply_colors(g):
     return g
 
 
-def make_live_continuous(g):
+def make_live_continuous(g, style="techno"):
     """Live = the plateau groove tiled across all 64 bars: full from bar 0, no
-    intro ramp, no breakdown. The intro builds to it, the outro descends from it."""
+    intro ramp, no breakdown (the intro builds to it, the outro descends from it),
+    then per-style variation so the full loop breathes."""
     ps, pn = SECTIONS["P"]            # (32, 16)
     for row in g:
         plateau = row[ps:ps + pn]
         for b in range(len(row)):
             row[b] = plateau[(b - ps) % pn]
+    _live_variation(g, style)
+    return g
+
+
+# morceau -> style group (for the per-style live variation); default "techno"
+LIVE_STYLE = {}
+for _s, _names in {
+    "techno": ("techno_drive", "detroit_soul", "peak_drop", "rave_stab", "acid_journey"),
+    "psy":    ("dub_techno", "psytrance_roll", "minimal_hypno", "hypnotic_arp"),
+    "trance": ("trance_euphoria", "melodic_builder", "melodic_deep", "progressive_lift", "synthwave_drive"),
+    "breaks": ("breakbeat", "bass_science", "jungle_amen", "dnb_roller", "footwork_chop", "neuro_reese", "tribal_perc"),
+    "electro": ("electro_808", "ebm_body", "electro_funk"),
+    "industrial": ("schranz_drive", "industrial_grind", "hardcore_punk"),
+    "ambient": ("ambient_intro",),
+}.items():
+    for _n in _names:
+        LIVE_STYLE[_n] = _s
+
+# per-style variation profile: `busy` voices recoloured in `busy_blocks` (0-3) to
+# `busy_color` (rhythmic 2/4, melodic 3); `fill` voices' active cells -> 6 on the
+# last 2 bars of every block. Active cells only -> full density preserved.
+LIVE_VAR = {
+    "techno":     dict(busy=["hats", "perc"],         busy_blocks=[1, 3], busy_color=4, fill=["snare", "clap", "perc"]),
+    "psy":        dict(busy=["acid", "arp", "reese"],  busy_blocks=[1, 3], busy_color=3, fill=["perc"]),
+    "trance":     dict(busy=["arp", "lead"],           busy_blocks=[2],    busy_color=3, fill=["snare", "clap"]),
+    "breaks":     dict(busy=["snare", "shaker"],       busy_blocks=[1, 3], busy_color=2, fill=["snare", "perc", "tom"]),
+    "electro":    dict(busy=["hats", "clap"],          busy_blocks=[1, 3], busy_color=2, fill=["clap", "perc"]),
+    "industrial": dict(busy=["perc", "tom"],           busy_blocks=[1, 3], busy_color=2, fill=["kick", "perc", "tom"]),
+    "ambient":    dict(busy=["bells", "melody"],       busy_blocks=[2],    busy_color=3, fill=[]),
+}
+
+
+def _live_variation(g, style):
+    """Per-style life in the full loop: recolour active cells in some blocks
+    (busier/octave) + phrase-end fills. Active cells only -> density kept."""
+    prof = LIVE_VAR.get(style, LIVE_VAR["techno"])
+    for blk in prof["busy_blocks"]:
+        for v in prof["busy"]:
+            vi = VI[v]
+            for b in range(blk * 16, blk * 16 + 16):
+                if g[vi][b] > 0:
+                    g[vi][b] = prof["busy_color"]
+    for blk in range(BARS // 16):
+        for v in prof["fill"]:
+            vi = VI[v]
+            for b in (blk * 16 + 14, blk * 16 + 15):
+                if g[vi][b] > 0:
+                    g[vi][b] = 6
     return g
 
 
@@ -1107,7 +1156,8 @@ def main():
     n = 0
     for name, m in MORCEAUX.items():
         for sec in ("intro", "live", "outro"):
-            post = make_live_continuous if sec == "live" else None
+            post = ((lambda nm: (lambda gg: make_live_continuous(gg, LIVE_STYLE.get(nm, "techno"))))(name)
+                    if sec == "live" else None)
             sc = to_sc("%s_%s" % (name, sec), m[sec], m["instkit"], m["melodies"], m["extra"], post)
             with open(os.path.join(here, "%s_%s.matrix" % (name, sec)), "w") as f:
                 f.write(sc)

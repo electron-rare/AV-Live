@@ -15,7 +15,7 @@ def grid_of(name, sec):
     if m.get("extra"): m["extra"](g)
     G.apply_colors(g)
     if sec == "live":
-        G.make_live_continuous(g)        # mirror the generator: live is a full loop
+        G.make_live_continuous(g, G.LIVE_STYLE.get(name, "techno"))   # mirror the generator
     return g
 
 def active_in(g, lo, hi):  # count non-zero cells in bar range [lo, hi)
@@ -38,6 +38,10 @@ for name, m in G.MORCEAUX.items():
           "%s live not full from start (%d vs plateau %d)" % (name, p022, p3248))
     check(p3248 > 0 and abs(p4864 - p3248) <= 0.15 * p3248,
           "%s live has a breakdown dip (%d vs plateau %d)" % (name, p4864, p3248))
+    # the live loop must breathe: its four 16-bar blocks are not all identical
+    blocks_differ = any(
+        len({tuple(row[i*16:i*16+16]) for i in range(4)}) > 1 for row in live)
+    check(blocks_differ, "%s live has no variation (4 identical blocks)" % name)
 
 print("TEST PASS" if ok else "TEST FAIL")
 sys.exit(0 if ok else 1)
