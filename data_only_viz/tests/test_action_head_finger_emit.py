@@ -52,3 +52,47 @@ def test_emit_fingers_noop_when_disabled(monkeypatch):
     pub.state.persons_hands = [_hand(0.46)]
     pub._emit_fingers(0.04)
     assert not pub.bridge.send_finger.called
+
+
+def _pub_envs(monkeypatch, finger_piano: str, pinch_enable: str):
+    """Build a publisher with both gates set independently."""
+    monkeypatch.setenv("FINGER_PIANO", finger_piano)
+    monkeypatch.setenv("PINCH_ENABLE", pinch_enable)
+    monkeypatch.setenv("FINGER_STRIKE_VEL", "0.02")
+    monkeypatch.setenv("FINGER_STRIKE_REFRACTORY_MS", "120")
+    from data_only_viz.action_head_pub import ActionHeadPublisher
+    pub = ActionHeadPublisher.__new__(ActionHeadPublisher)
+    pub.state = _FakeState()
+    pub.bridge = MagicMock()
+    pub._init_finger_piano()
+    return pub
+
+
+def test_emit_pinch_fires_when_pinch_enabled(monkeypatch):
+    # PINCH_ENABLE on, FINGER_PIANO off -> pinches still emit (decoupled).
+    pub = _pub_envs(monkeypatch, finger_piano="0", pinch_enable="1")
+    pub._pinch_det = MagicMock()
+    pub._pinch_det.step.return_value = [MagicMock(hand=0, finger=1)]
+    pub.state.persons_hands = [_hand(0.40)]
+    pub._emit_pinch(0.0)
+    assert pub.bridge.send_pinch.called
+
+
+def test_emit_pinch_off_when_pinch_disabled_even_with_finger_piano(monkeypatch):
+    # Decouple: FINGER_PIANO on but PINCH_ENABLE off -> no pinch emitted.
+    pub = _pub_envs(monkeypatch, finger_piano="1", pinch_enable="0")
+    pub._pinch_det = MagicMock()
+    pub._pinch_det.step.return_value = [MagicMock(hand=0, finger=1)]
+    pub.state.persons_hands = [_hand(0.40)]
+    pub._emit_pinch(0.0)
+    assert not pub.bridge.send_pinch.called
+
+
+def test_emit_fingers_off_when_only_pinch_enabled(monkeypatch):
+    # Decouple: PINCH_ENABLE on, FINGER_PIANO off -> air-piano stays silent.
+    pub = _pub_envs(monkeypatch, finger_piano="0", pinch_enable="1")
+    pub.state.persons_hands = [_hand(0.40)]
+    pub._emit_fingers(0.00)
+    pub.state.persons_hands = [_hand(0.46)]
+    pub._emit_fingers(0.04)
+    assert not pub.bridge.send_finger.called

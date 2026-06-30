@@ -172,6 +172,11 @@ class ActionHeadPublisher(threading.Thread):
         self._finger_enabled = os.environ.get("FINGER_PIANO", "0") not in (
             "0", "", "false", "False",
         )
+        # Pinch detection is gated independently of the air-piano finger-strike:
+        # the matrix global actions want pinches WITHOUT the finger-strike "piano".
+        self._pinch_enabled = os.environ.get("PINCH_ENABLE", "0") not in (
+            "0", "", "false", "False",
+        )
         vel = float(os.environ.get("FINGER_STRIKE_VEL", "0.02"))
         refr = float(os.environ.get("FINGER_STRIKE_REFRACTORY_MS", "120"))
         self._finger_det = FingerStrikeDetector(
@@ -220,8 +225,9 @@ class ActionHeadPublisher(threading.Thread):
             self.bridge.send_finger(ev)
 
     def _emit_pinch(self, t_now: float) -> None:
-        """Detect thumb-to-finger pinches (clip toggles) and emit /pose/pinch."""
-        if not getattr(self, "_finger_enabled", False):
+        """Detect thumb-to-finger pinches (matrix global actions) and emit
+        /pose/pinch. Gated by PINCH_ENABLE, independently of the air-piano."""
+        if not getattr(self, "_pinch_enabled", False):
             return
         hands, used, _ip = self._pick_hands()
         for ev in self._pinch_det.step(hands, t_now):
