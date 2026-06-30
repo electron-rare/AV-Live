@@ -114,6 +114,9 @@ class IphoneUSBSource:
         return self._opened
 
     def _run(self, sock) -> None:
+        if self.state is not None:
+            with self.state.lock():
+                self.state.mirror_2d = self._mirror
         while not self._stop.is_set():
             if sock is None:                      # no connection yet (startup or post-drop)
                 sock = self._reconnect()

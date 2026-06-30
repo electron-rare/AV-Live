@@ -327,6 +327,9 @@ class MetalRenderer(NSObject):
 
         buf = self._skel_cpu_buf
         segs = 0
+        # Mirror overlays in X to match the (already mirrored) iPhone video
+        # background. Display-only: gesture data is untouched.
+        mirror = bool(getattr(s, "mirror_2d", False))
 
         def push(A, B, conf, pid):
             """Empile un segment (2 verts) dans le buffer CPU prealloque."""
@@ -335,6 +338,8 @@ class MetalRenderer(NSObject):
                 return False
             ax = A.x * 2.0 - 1.0; ay = 1.0 - A.y * 2.0
             bx = B.x * 2.0 - 1.0; by = 1.0 - B.y * 2.0
+            if mirror:
+                ax = -ax; bx = -bx
             i = segs * 10
             buf[i+0] = ax; buf[i+1] = ay; buf[i+2] = float(A.z); buf[i+3] = conf; buf[i+4] = float(pid)
             buf[i+5] = bx; buf[i+6] = by; buf[i+7] = float(B.z); buf[i+8] = conf; buf[i+9] = float(pid)
@@ -348,6 +353,8 @@ class MetalRenderer(NSObject):
                 return False
             cax = ax * 2.0 - 1.0; cay = 1.0 - ay * 2.0
             cbx = bx * 2.0 - 1.0; cby = 1.0 - by * 2.0
+            if mirror:
+                cax = -cax; cbx = -cbx
             i = segs * 10
             buf[i+0] = cax; buf[i+1] = cay; buf[i+2] = 0.0
             buf[i+3] = conf; buf[i+4] = float(pid)

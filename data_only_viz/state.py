@@ -151,6 +151,8 @@ class State:
     persons_arkit_2d_valid: dict = field(default_factory=dict)
     arkit_joint_names: list = field(default_factory=list)
     arkit_parents: list = field(default_factory=list)
+    # iPhone video is mirrored (CONCERT_MIRROR); renderer mirrors overlays to match.
+    mirror_2d: bool = False
 
     # ---- LiDAR / ICP mesh fusion (Task 8 - 2026-05-14) ----
     # Set by the LidarTCPReader poller; consumed by FusionWorker.run_once.
