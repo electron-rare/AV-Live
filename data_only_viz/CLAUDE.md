@@ -32,12 +32,25 @@ Python **3.11+** requis. `pyproject.toml` est la source de vérité — ne jamai
 
 - État partagé multi-thread : `state.py` expose `State.lock()` — toujours mutationner sous lock.
 - Filtrage temporel : `euro_filter.py` (One Euro Filter) sur les keypoints avant tracker.
-- ARKit fusion : `iphone_osc_listener.py` consume /body3d/kp UDP :57128
-  → `state.persons_arkit_joints`. `pose_filter.py::ArkitFuse` (stage
-  `arkit_fuse`) splices the 14 mapped body slots into MediaPipe pose
-  before kalman ; `multi_hmr_worker::arkit_pelvis_z_override` locks the
-  SMPL-X cam translation z to the ARKit pelvis. Mapping in
-  `arkit_joint_map.py`.
+- ARKit body source (**`--iphone-usb`, défaut concert 2026-06-30**) : le corps
+  vient **100% ARKit**, le pose+face MediaPipe du Mac sont **coupés** (comme les
+  mains, cf. `4c0794a`). L'app iPhone envoie le squelette 2D projeté (frame
+  AVLiveWire `skeleton2D`, tag **6**) → `state.persons_arkit_2d` ; le 3D monde
+  arrive via la frame `skeleton` → `state.persons_arkit_joints`.
+  `multi.py` reconstruit `bodies`/`bodies3d` (MP33) via
+  `arkit_joint_map.arkit_body_2d`/`arkit_body_3d` (slots mappés c=1, sinon c=0 ;
+  pid le plus bas, single-person). `/pose/mouth` + le mesh visage disparaissent.
+  `POSE_FILTER` **sans `arkit_fuse`** (ARKit EST la source). Décode :
+  `scripts/iphone_usb_bridge.decode_skeleton2D` (819 octets = 91×2 f32 BE + 91
+  valid). Mapping 14 joints + ancre tête `ARKIT_HEAD_IDX` dans `arkit_joint_map.py`
+  (index à confirmer live). **L'iPhone doit être en PAYSAGE** (ARKit body tracking
+  spamme `ABPKPersonIDTracker: Portrait image is not supported` sinon).
+- ARKit fusion (**legacy, chemin webcam + OSC**) : `iphone_osc_listener.py`
+  consume /body3d/kp UDP :57128 → `state.persons_arkit_joints`.
+  `pose_filter.py::ArkitFuse` (stage `arkit_fuse`) splices the 14 mapped body
+  slots into MediaPipe pose before kalman ; `multi_hmr_worker::arkit_pelvis_z_override`
+  locks the SMPL-X cam translation z to the ARKit pelvis. Mapping in
+  `arkit_joint_map.py`. (Supersédé par l'ARKit body source sous `--iphone-usb`.)
 - Association multi-personne : `tracker.py` IoU-based, `scipy.optimize.linear_sum_assignment`.
 - Shaders Metal dans `shaders/` (`.metal`), recompilés au runtime ; topologie mesh (SMPL faces) en binaire dans `mesh_topology.py`.
 - OSC out : `osc_listener.py` / `pose_bridge.py` — destination `oscope-of` sur `:57123`.
