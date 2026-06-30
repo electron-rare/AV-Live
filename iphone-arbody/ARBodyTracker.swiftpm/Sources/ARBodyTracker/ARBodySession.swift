@@ -166,7 +166,9 @@ final class ARBodySession: NSObject, ObservableObject, ARSessionDelegate {
                 } else {
                     self.lastVisionTime = t
                     self.visionBusy = true
-                    let buf = img   // CVPixelBuffer captured for the worker
+                    // CVPixelBuffer is non-Sendable; this is a deliberate
+                    // single-owner handoff to the Vision worker queue.
+                    nonisolated(unsafe) let buf = img
                     self.visionQueue.async {
                         self.runVision(on: buf, timestamp: t)
                         Task { @MainActor in self.visionBusy = false }
