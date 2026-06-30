@@ -12,7 +12,7 @@ feat.load;
 ~lp[\matPlaying] = false;
 
 // -- A: defaults --
-(~matGlobalActions == [\fill, \drop, \evolve, \breakdown]).not.if({ pass = false; "FAIL: default mapping".postln });
+(~matGlobalActions == [\fill, \drop, \breakdown, \evolve, \muteDrums, \muteMelo, \washReverb, \next]).not.if({ pass = false; "FAIL: default mapping".postln });
 
 // -- B: fill -> active voices read colour 6, silent voices stay 0 --
 ~matSetTransient.(\fill, []);
@@ -42,29 +42,15 @@ feat.load;
 ~matFireGlobal.(0);   // slot 0 = fill
 (~matTransient.notNil and: { ~matTransient[\kind] == \fill }).not.if({ pass = false; "FAIL: fire slot0->fill".postln });
 
-// -- G: hand-flip detection (no fire on appear/disappear; fire on open<->closed) --
-~fired = nil; ~matFireGlobal = { |slot| ~fired = slot };   // stub to capture the slot
-~matHandState[\L] = \unknown;
-~matHandFlip.(\L, 0.5, 0.9, 0, 1);                          // appear OPEN -> baseline, no fire
-(~fired.isNil).not.if({ pass = false; "FAIL: fired on appearance".postln });
-~matHandFlip.(\L, 0.5, 0.1, 0, 1);                          // OPEN->CLOSED -> fire closeSlot(1)
-(~fired == 1).not.if({ pass = false; "FAIL: open->closed did not fire slot1".postln });
-~fired = nil;
-~matHandFlip.(\L, 0.5, 0.9, 0, 1);                          // CLOSED->OPEN -> fire openSlot(0)
-(~fired == 0).not.if({ pass = false; "FAIL: closed->open did not fire slot0".postln });
-~fired = nil;
-~matHandFlip.(\L, 0.0, 0.0, 0, 1);                          // disappear -> reset, no fire
-(~fired.isNil).not.if({ pass = false; "FAIL: fired on disappearance".postln });
-
 // -- H: mapping save/load roundtrip --
 ~matInstruments = ~matInstruments ? Array.fill(~matVoices.size, { \default });
 ~matColorDefs   = ~matColorDefs   ? Array.fill(~matVoices.size, { ~matDefaultColorDefs.value });
 ~matSavedNames  = ~matSavedNames  ? Set.new;
-~matGlobalActions = [\evolve, \breakdown, \fill, \drop];     // non-default
+~matGlobalActions = [\evolve, \breakdown, \fill, \drop, \muteMelo, \washReverb, \muteDrums, \next];     // non-default 8-slot
 ~matSave.("zz_gact_test");
-~matGlobalActions = [\fill, \drop, \evolve, \breakdown];     // clobber, then reload
+~matGlobalActions = [\fill, \drop, \breakdown, \evolve, \muteDrums, \muteMelo, \washReverb, \next];     // clobber, then reload
 ~matLoadFile.(~matDir +/+ "zz_gact_test.matrix");
-(~matGlobalActions == [\evolve, \breakdown, \fill, \drop]).not.if({ pass = false; "FAIL: globalActions not round-tripped".postln });
+(~matGlobalActions == [\evolve, \breakdown, \fill, \drop, \muteMelo, \washReverb, \muteDrums, \next]).not.if({ pass = false; "FAIL: globalActions not round-tripped".postln });
 ("rm -f '" ++ (~matDir +/+ "zz_gact_test.matrix") ++ "'").systemCmd;
 
 // -- I: evolve one-shot must not leak ~matBaseGrid when the toggle is off,
@@ -80,29 +66,14 @@ feat.load;
 (~lp[\matrix][0][0] == 0).not.if({ pass = false; "FAIL: stale gridA cell resurrected by evolve".postln });
 (~lp[\matrix][1][5] > 0).not.if({ pass = false; "FAIL: gridB active cell lost by evolve".postln });
 
-// -- J: settings drive detection thresholds + transient duration --
-~matGlobalSettings[\openThresh] = 0.8; ~matGlobalSettings[\closeThresh] = 0.2;
-~matHandState[\L] = \unknown;
-~matHandFlip.(\L, 0.5, 0.5, 0, 1);     // 0.5 is in the new deadband -> stays unknown, no fire
-~fired = nil; ~matFireGlobal = { |slot| ~fired = slot };
-~matHandFlip.(\L, 0.5, 0.85, 0, 1);    // >=0.8 open -> baseline (from unknown, no fire)
-(~fired.isNil).not.if({ pass = false; "FAIL: settings open baseline fired".postln });
-~matHandFlip.(\L, 0.5, 0.15, 0, 1);    // <=0.2 -> closed -> fire slot1
-(~fired == 1).not.if({ pass = false; "FAIL: settings close threshold no fire".postln });
-~matGlobalSettings[\transientBars] = 3;
-~matFireGlobal = { |slot| };           // restore no-op-ish (real one not needed here)
-~matSetTransient.(\drop, []);
-(~matTransient[\bars] == 3).not.if({ pass = false; "FAIL: transientBars not from settings".postln });
-~matTransient = nil;
 // -- K: settings save/load roundtrip --
 ~matInstruments = ~matInstruments ? Array.fill(~matVoices.size, { \default });
 ~matColorDefs   = ~matColorDefs   ? Array.fill(~matVoices.size, { ~matDefaultColorDefs.value });
 ~matSavedNames  = ~matSavedNames  ? Set.new;
-~matGlobalSettings = (openThresh: 0.7, closeThresh: 0.25, transientBars: 2, breakdownKeep: [\kick, \hats]);
+~matGlobalSettings = (transientBars: 2, breakdownKeep: [\kick, \hats]);
 ~matSave.("zz_gset_test");
-~matGlobalSettings = (openThresh: 0.65, closeThresh: 0.30, transientBars: 1, breakdownKeep: [\kick, \sub]);
+~matGlobalSettings = (transientBars: 1, breakdownKeep: [\kick, \sub]);
 ~matLoadFile.(~matDir +/+ "zz_gset_test.matrix");
-(~matGlobalSettings[\openThresh] == 0.7).not.if({ pass = false; "FAIL: openThresh not restored".postln });
 (~matGlobalSettings[\transientBars] == 2).not.if({ pass = false; "FAIL: transientBars not restored".postln });
 (~matGlobalSettings[\breakdownKeep] == [\kick, \hats]).not.if({ pass = false; "FAIL: breakdownKeep not restored".postln });
 ("rm -f '" ++ (~matDir +/+ "zz_gset_test.matrix") ++ "'").systemCmd;
@@ -142,6 +113,19 @@ feat.load;
 ~matSetBpm.(500);                                       // clamps to 300
 (~matBpm == 300).not.if({ pass = false; "FAIL: bpm not clamped to 300".postln });
 ~matSetBpm.(120);                                       // restore
+
+// -- P: a pinch fires the mapped global action (slot = hand*4 + finger-1) --
+~matGlobalActions = [\fill, \drop, \breakdown, \evolve, \muteDrums, \muteMelo, \washReverb, \next];
+~matTransient = nil;
+OSCdef(\mat_ev_pinch).func.value(['/pose/pinch', 0, 0, 1]);   // L index -> slot 0 -> fill
+(~matTransient.notNil and: { ~matTransient[\kind] == \fill }).not.if({ pass = false; "FAIL: L-index pinch != fill".postln });
+~matTransient = nil;
+OSCdef(\mat_ev_pinch).func.value(['/pose/pinch', 0, 1, 1]);   // R index -> slot 4 -> muteDrums (kind \mute)
+(~matTransient.notNil and: { ~matTransient[\kind] == \mute }).not.if({ pass = false; "FAIL: R-index pinch != muteDrums".postln });
+~matTransient = nil;
+OSCdef(\mat_ev_pinch).func.value(['/pose/pinch', 0, 1, 3]);   // R ring -> slot 6 -> washReverb
+(~matTransient.notNil and: { ~matTransient[\kind] == \washReverb }).not.if({ pass = false; "FAIL: R-ring pinch != washReverb".postln });
+~matTransient = nil;
 
 pass.if({ "GLOBALACT PASS".postln }, { "GLOBALACT FAIL".postln });
 0.exit;
