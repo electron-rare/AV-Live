@@ -53,6 +53,7 @@ from .hand_display import (
     panel_frame,
     panel_segments,
 )
+from .hand_slots import route_hands
 from .mesh_topology import (
     BODY_TRIANGLES,
     FACE_TRIANGLES,
@@ -163,6 +164,11 @@ class MetalRenderer(NSObject):
         self._arkit_bone_max = float(os.environ.get("ARKIT_BONE_MAX", "0.5"))
         self._hand_gate = HandPersistenceGate(
             min_frames=int(os.environ.get("HAND_PERSIST_FRAMES", "3"))
+        )
+        # Safety knob: swap the two routed hand slots if the iPhone app's
+        # camera config inverts Vision chirality (fix live without redeploy).
+        self._hand_swap_lr = os.environ.get("HAND_SWAP_LR", "0") not in (
+            "0", "", "false", "False",
         )
         self._init_skel_cpu_buffer()
         self._init_mesh_cpu_buffer()
@@ -485,39 +491,29 @@ class MetalRenderer(NSObject):
         # even when use_arkit is True). Hands from s.persons_hands only.
         if self._mp_bones is not None:
             _body_b, _face_b, lhand_bones_p, _ = self._mp_bones
-            # Filter hands by persistence gate before routing to panels.
-            hands = [h for h, ok in zip(s.persons_hands, _hand_draw_flags) if ok]
+            # Filter hands by persistence gate + plausibility before routing
+            # to panels (a ghost hand must not steal a slot from a real one).
+            keep = [
+                ok and hand_plausible(h, conf_min=self._hand_conf_min)
+                for h, ok in zip(s.persons_hands, _hand_draw_flags)
+            ]
+            gated_hands = [h for h, k in zip(s.persons_hands, keep) if k]
             chir_src = getattr(s, "persons_hands_chirality", None) or []
+            # Keep chirality aligned with the gated hands (same filter mask).
             if chir_src and len(chir_src) == len(s.persons_hands):
-                chir = [c for c, ok in zip(chir_src, _hand_draw_flags) if ok]
+                gated_chir = [c for c, k in zip(chir_src, keep) if k]
             else:
-                chir = []
+                gated_chir = None
             asp = float(s.width) / float(s.height) if s.width and s.height else 1.0
 
-            # Route hands to left/right panels via chirality when available,
-            # otherwise by screen position (mirror-aware).
-            left_kp = None
-            right_kp = None
-            if chir and len(chir) == len(hands):
-                # chirality: 0 = left hand, 1 = right hand
-                for h_kp, c in zip(hands, chir):
-                    if c == 0 and left_kp is None:
-                        left_kp = h_kp
-                    elif c == 1 and right_kp is None:
-                        right_kp = h_kp
-            else:
-                # Fallback: order plausible hands by screen cx, mirror-aware.
-                # Screen left has low cx normally; high cx when video is mirrored.
-                plausible = [
-                    (h_kp, sum(p.x for p in h_kp) / len(h_kp))
-                    for h_kp in hands
-                    if hand_plausible(h_kp, conf_min=self._hand_conf_min)
-                ]
-                plausible.sort(key=lambda t: -t[1] if mirror else t[1])
-                if plausible:
-                    left_kp = plausible[0][0]
-                if len(plausible) >= 2:
-                    right_kp = plausible[1][0]
+            # Route to L/R panels. mirror= passed for cx fallback path;
+            # no near_min — panels show far hands as user proximity feedback.
+            slotted = route_hands(
+                gated_hands, gated_chir,
+                mirror=mirror,
+                swap=self._hand_swap_lr,
+            )
+            left_kp, right_kp = slotted
 
             # Draw frame (pid 7) then wireframe (pid 5 left / 6 right)
             for side_name, h_kp, pid_s in (

@@ -1,9 +1,12 @@
-"""Air-piano finger strike detection from raw MediaPipe hand joints.
+"""Air-piano finger strike detection from pre-routed hand slots.
 
-Mirrors hand_features.py conventions (L/R slotting by cx, finite-guarded
-coordinate extraction). A "strike" is a fast downward motion of a fingertip
-RELATIVE to its base knuckle, so translating the whole hand does not fire all
-fingers. Output feeds the OSC /pose/finger route consumed by SuperCollider.
+A "strike" is a fast downward motion of a fingertip RELATIVE to its base
+knuckle, so translating the whole hand does not fire all fingers. Output feeds
+the OSC /pose/finger route consumed by SuperCollider.
+
+Consumers call route_hands() (hand_slots) once per tick and pass the resulting
+2-element [left|None, right|None] list to FingerStrikeDetector.step() and
+PinchDetector.step(). slot 0 = left hand (matrix "MG"), slot 1 = right.
 """
 from __future__ import annotations
 
@@ -24,26 +27,9 @@ MIDDLE_MCP: int = 9
 PINCH_TIPS: tuple[int, ...] = (8, 12, 16, 20)
 
 
-def order_hands_by_cx(hands: list, max_slots: int) -> list:
-    """Return up to max_slots hand-landmark lists ordered leftmost-first
-    (slot 0 = L), matching HandFeatureExtractor / FingerStrikeDetector."""
-    cand = []
-    for lm in hands:
-        try:
-            if lm is None or len(lm) < 21:
-                continue
-        except TypeError:
-            continue
-        xs = [_finite(_coord(p, "x", 0), 0.5) for p in lm[:21]]
-        cx = _clamp(sum(xs) / len(xs), 0.0, 1.0)
-        cand.append((cx, lm))
-    cand.sort(key=lambda c: c[0])
-    return [lm for _cx, lm in cand[:max_slots]]
-
-
 @dataclass
 class StrikeEvent:
-    hand: int          # 0 = left slot (leftmost cx), 1 = right slot
+    hand: int          # 0 = left slot, 1 = right slot
     finger: int        # 0..4 = thumb, index, middle, ring, pinky
     strike_speed: float
     z: float
@@ -70,27 +56,19 @@ class FingerStrikeDetector:
         self._state = [[_FingerState() for _ in range(5)]
                        for _ in range(history_slots)]
 
-    def _slot_hands(self, hands: list) -> list:
-        """Validate and order hands leftmost-first (slot 0 = L), like
-        HandFeatureExtractor. Returns up to 2 (cx, landmarks) ordered."""
-        cand = []
-        for lm in hands:
-            try:
-                if lm is None or len(lm) < 21:
-                    continue
-            except TypeError:
-                continue
-            xs = [_finite(_coord(p, "x", 0), 0.5) for p in lm[:21]]
-            cx = _clamp(sum(xs) / len(xs), 0.0, 1.0)
-            cand.append((cx, lm))
-        cand.sort(key=lambda c: c[0])
-        return cand[:len(self._state)]
+    def step(self, slotted: list, t_now: float) -> list[StrikeEvent]:
+        """Process a pre-routed 2-slot hand list [left|None, right|None].
 
-    def step(self, hands: list, t_now: float) -> list[StrikeEvent]:
-        ordered = self._slot_hands(hands)
-        present = set(range(len(ordered)))
+        Absent slots (None) reset their finger state so re-entry does not
+        produce spurious velocity spikes.
+        """
         events: list[StrikeEvent] = []
-        for slot, (_cx, lm) in enumerate(ordered):
+        for slot, lm in enumerate(slotted):
+            if lm is None:
+                for f in range(5):
+                    self._state[slot][f].prev_rel = None
+                    self._state[slot][f].armed = True
+                continue
             for f in range(5):
                 tip = lm[FINGERTIPS[f]]
                 base = lm[FINGER_BASES[f]]
@@ -116,18 +94,12 @@ class FingerStrikeDetector:
                         tipx=_finite(_coord(tip, "x", 0), 0.5),
                         tipy=tip_y,
                     ))
-        # reset slots not present this tick so re-entry does not spike
-        for slot in range(len(self._state)):
-            if slot not in present:
-                for f in range(5):
-                    self._state[slot][f].prev_rel = None
-                    self._state[slot][f].armed = True
         return events
 
 
 @dataclass
 class PinchEvent:
-    hand: int          # 0 = left slot (leftmost cx), 1 = right slot
+    hand: int          # 0 = left slot, 1 = right slot
     finger: int        # 1..4 = index, middle, ring, pinky (thumb is trigger)
     state: int = 1     # 1 = engage edge, 0 = release edge
 
@@ -169,17 +141,27 @@ class PinchDetector:
         self.ext_ratio = ext_ratio
         self.ext_min = int(ext_min)
         # Engage fires only after debounce_frames consecutive qualifying
-        # frames; release stays immediate. 1 = no debounce. (Enforced in
-        # step(); wired fully by the debounce task.)
+        # frames; release stays immediate. 1 = no debounce.
         self.debounce_frames = max(1, int(debounce_frames))
         self._state = [[_PinchState() for _ in range(4)]
                        for _ in range(history_slots)]
 
-    def step(self, hands: list, t_now: float) -> list[PinchEvent]:
-        ordered = order_hands_by_cx(hands, len(self._state))
-        present = set(range(len(ordered)))
+    def step(self, slotted: list, t_now: float) -> list[PinchEvent]:
+        """Process a pre-routed 2-slot hand list [left|None, right|None].
+
+        Absent slots synthesise release edges for any engaged fingers and
+        reset debounce state.
+        """
         events: list[PinchEvent] = []
-        for slot, lm in enumerate(ordered):
+        for slot, lm in enumerate(slotted):
+            if lm is None:
+                for i in range(4):
+                    st = self._state[slot][i]
+                    st.qual = 0
+                    if st.engaged:
+                        st.engaged = False
+                        events.append(PinchEvent(hand=slot, finger=i + 1, state=0))
+                continue
             tx = _finite(_coord(lm[THUMB_TIP], "x", 0), 0.5)
             ty = _finite(_coord(lm[THUMB_TIP], "y", 1), 0.5)
             wx = _finite(_coord(lm[WRIST], "x", 0), 0.5)
@@ -228,12 +210,4 @@ class PinchDetector:
                         events.append(PinchEvent(hand=slot, finger=i + 1, state=1))
                 else:
                     st.qual = 0
-        for slot in range(len(self._state)):
-            if slot not in present:
-                for i in range(4):
-                    st = self._state[slot][i]
-                    st.qual = 0
-                    if st.engaged:
-                        st.engaged = False
-                        events.append(PinchEvent(hand=slot, finger=i + 1, state=0))
         return events

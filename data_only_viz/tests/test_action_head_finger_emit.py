@@ -18,6 +18,8 @@ class _FakeState:
 
 def _hand(index_tip_y: float, base_y: float = 0.4):
     lm = [[0.3, base_y, 0.0] for _ in range(21)]
+    lm[0] = [0.3, base_y + 0.15, 0.0]     # wrist 0.15 below center -> hand_size 0.15
+    lm[9] = [0.3, base_y, 0.0]             # middle-MCP at center -> size 0.15 > near_min
     lm[FINGERTIPS[1]] = [0.3, index_tip_y, 0.0]
     lm[FINGER_BASES[1]] = [0.3, base_y, 0.0]
     return lm

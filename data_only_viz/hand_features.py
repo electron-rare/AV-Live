@@ -78,31 +78,37 @@ class HandFeatureExtractor:
         buf.append((cx, cy))
         return _clamp(spd, 0.0, 1.0)
 
-    def step(self, hands: list) -> dict:
-        feats = []
-        for lm in hands:
-            try:
-                valid = lm is not None and len(lm) >= 21
-            except TypeError:
-                continue
-            if valid:
-                feats.append(self._features(lm))
-        if not feats:
+    def step(self, hands: list, chirality=None) -> dict:
+        from data_only_viz.hand_slots import route_hands
+        left_lm, right_lm = route_hands(hands, chirality)
+
+        if left_lm is None and right_lm is None:
             self._buf[0].clear()
             self._buf[1].clear()
             return {"L": None, "R": None, "dist": 0.0}
-        feats.sort(key=lambda f: f["cx"])           # leftmost first
-        left = feats[0]
-        right = feats[-1] if len(feats) > 1 else None
-        left["speed"] = self._speed(0, left["cx"], left["cy"])
-        out_l = left
+
+        out_l = None
         out_r = None
-        dist = 0.0
-        if right is not None:
-            right["speed"] = self._speed(1, right["cx"], right["cy"])
-            out_r = right
-            dist = _clamp(math.hypot(right["cx"] - left["cx"],
-                                     right["cy"] - left["cy"]), 0.0, 1.0)
+
+        if left_lm is not None:
+            lf = self._features(left_lm)
+            lf["speed"] = self._speed(0, lf["cx"], lf["cy"])
+            out_l = lf
+        else:
+            self._buf[0].clear()
+
+        if right_lm is not None:
+            rf = self._features(right_lm)
+            rf["speed"] = self._speed(1, rf["cx"], rf["cy"])
+            out_r = rf
         else:
             self._buf[1].clear()
+
+        dist = 0.0
+        if out_l is not None and out_r is not None:
+            dist = _clamp(
+                math.hypot(out_r["cx"] - out_l["cx"], out_r["cy"] - out_l["cy"]),
+                0.0, 1.0,
+            )
+
         return {"L": out_l, "R": out_r, "dist": dist}

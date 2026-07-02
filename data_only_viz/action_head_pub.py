@@ -154,11 +154,13 @@ class ActionHeadPublisher(threading.Thread):
         """Lock state, extract hand features, emit /pose/hands once per tick."""
         with self.state.lock():
             hands = list(getattr(self.state, "persons_hands", None) or [])
+            chirality = list(getattr(self.state, "persons_hands_chirality", None) or [])
             if not hands and getattr(self.state, "hands_present", False):
                 lkp = getattr(self.state, "left_hand_kp", None)
                 rkp = getattr(self.state, "right_hand_kp", None)
                 hands = [h for h in (lkp, rkp) if h is not None and len(h) > 0]
-        feats = self._hand_ext.step(hands)
+                chirality = []
+        feats = self._hand_ext.step(hands, chirality or None)
         with self.state.lock():
             self.state.hand_feats = feats
         self.bridge.send_hands(feats, t_now)
@@ -198,28 +200,42 @@ class ActionHeadPublisher(threading.Thread):
         # "iphone" / "mediapipe".
         self._finger_source = os.environ.get("FINGER_SOURCE", "auto").lower()
         self._fdbg_n = 0
+        # Safety knob: swap the two routed slots if the iPhone app's camera
+        # config inverts Vision chirality (fix live without redeploy).
+        self._hand_swap_lr = os.environ.get("HAND_SWAP_LR", "0") not in (
+            "0", "", "false", "False",
+        )
+        self._hand_near_min = float(os.environ.get("HAND_NEAR_MIN", "0.10"))
 
-    def _pick_hands(self) -> tuple[list, str, bool]:
-        """Return (hands, source_label, ip_fresh) per FINGER_SOURCE policy."""
+    def _pick_hands(self) -> tuple[list, list, str, bool]:
+        """Return (hands, chirality, source_label, ip_fresh) per FINGER_SOURCE policy."""
         with self.state.lock():
             mp_hands = list(getattr(self.state, "persons_hands", None) or [])
             ip_hands = list(getattr(self.state, "persons_hands_iphone", None) or [])
             ip_t = getattr(self.state, "persons_hands_iphone_t", 0.0)
+            ip_chir = list(getattr(self.state, "persons_hands_chirality", None) or [])
         ip_fresh = bool(ip_hands) and (time.perf_counter() - ip_t) < 0.5
         src = getattr(self, "_finger_source", "auto")
         if src == "iphone":
-            return ip_hands, "iphone", ip_fresh
+            return ip_hands, ip_chir, "iphone", ip_fresh
         if src == "mediapipe":
-            return mp_hands, "mediapipe", ip_fresh
-        return (ip_hands, "iphone", ip_fresh) if ip_fresh else (
-            mp_hands, "mediapipe", ip_fresh)
+            return mp_hands, [], "mediapipe", ip_fresh
+        if ip_fresh:
+            return ip_hands, ip_chir, "iphone", ip_fresh
+        return mp_hands, [], "mediapipe", ip_fresh
 
     def _emit_fingers(self, t_now: float) -> None:
         """Detect finger strikes (air-piano) and emit /pose/finger."""
         if not getattr(self, "_finger_enabled", False):
             return
-        hands, used, ip_fresh = self._pick_hands()
-        events = self._finger_det.step(hands, t_now)
+        from data_only_viz.hand_slots import route_hands
+        hands, chirality, used, ip_fresh = self._pick_hands()
+        slotted = route_hands(
+            hands, chirality or None,
+            swap=getattr(self, "_hand_swap_lr", False),
+            near_min=getattr(self, "_hand_near_min", 0.10),
+        )
+        events = self._finger_det.step(slotted, t_now)
         if getattr(self, "_finger_dbg", False):
             self._fdbg_n += 1
             if events or self._fdbg_n % 30 == 0:
@@ -233,8 +249,14 @@ class ActionHeadPublisher(threading.Thread):
         /pose/pinch. Gated by PINCH_ENABLE, independently of the air-piano."""
         if not getattr(self, "_pinch_enabled", False):
             return
-        hands, used, _ip = self._pick_hands()
-        for ev in self._pinch_det.step(hands, t_now):
+        from data_only_viz.hand_slots import route_hands
+        hands, chirality, used, _ip = self._pick_hands()
+        slotted = route_hands(
+            hands, chirality or None,
+            swap=getattr(self, "_hand_swap_lr", False),
+            near_min=getattr(self, "_hand_near_min", 0.10),
+        )
+        for ev in self._pinch_det.step(slotted, t_now):
             if getattr(self, "_finger_dbg", False):
                 LOG.info("pinch dbg: src=%s hand=%d finger=%d",
                          used, ev.hand, ev.finger)
