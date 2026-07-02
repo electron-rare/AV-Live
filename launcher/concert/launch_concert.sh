@@ -20,11 +20,15 @@ export PATH=/opt/homebrew/bin:$PATH
 # delegate has headroom and stays fluid AND stable. Override with
 # MEDIAPIPE_DELEGATE=gpu only for short sessions where you accept the crash risk.
 export MEDIAPIPE_DELEGATE="${MEDIAPIPE_DELEGATE:-cpu}"
-# Finger pinches (matrix global actions + per-voice pinch bindings) are
-# DISABLED by default. PINCH_ENABLE gates ONLY the pinch detector; set
-# PINCH_ENABLE=1 to re-enable. The air-piano finger-strike (FINGER_PIANO)
-# stays off independently.
-export PINCH_ENABLE="${PINCH_ENABLE:-0}"
+# Finger pinches drive the 8 matrix global actions. ENABLED by default
+# since 2026-07-02: the full gate chain (plausibility, persistence, near,
+# facing, open-hand, debounce) was validated live. PINCH_ENABLE=0 disables.
+export PINCH_ENABLE="${PINCH_ENABLE:-1}"
+# iPhone rides PORTRAIT since 2026-07-02 (better hand detection, ARKit
+# body still tracks). The HEVC stream arrives sensor-landscape: rotate the
+# displayed video ccw. The 2D landmark streams arrive already uprighted
+# (see iphone_usb_source) and are not rotated.
+export VIDEO_ROTATE="${VIDEO_ROTATE:-ccw}"
 # Gestures use the iPhone Vision hands exclusively (stable, rotation-invariant);
 # the Mac MediaPipe hand detector is skipped under --iphone-usb (multi.py).
 export FINGER_SOURCE="${FINGER_SOURCE:-iphone}"
