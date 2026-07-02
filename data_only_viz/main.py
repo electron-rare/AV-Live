@@ -648,12 +648,11 @@ class AppDelegate(NSObject):
                     self._state.active_scene = scene
                 LOG.info("[audio] scene -> %s", scene)
                 return None
-        # wxcvbn -> preset bundle: gated OFF by default (VIZ_SOURCE_KEYS=1
-        # re-enables) — a stray keypress mid-performance switches the audio
-        # scene. The 0-9 numeric bundles stay active.
+        # wxcvbn + 0-9 -> preset bundles: ALL gated OFF by default
+        # (VIZ_SOURCE_KEYS=1 re-enables) — stray keypresses mid-performance
+        # switch the audio scene (user-disabled live 2026-07-02).
         _src_maps = ((*KEYMAP_SOURCE, *KEYMAP_SOURCE_NUM)
-                     if getattr(self, "_source_keys", False)
-                     else KEYMAP_SOURCE_NUM)
+                     if getattr(self, "_source_keys", False) else ())
         for kk, source, scene, viz in _src_maps:
             if key == kk or k == kk:
                 # Audio : envoie a sclang

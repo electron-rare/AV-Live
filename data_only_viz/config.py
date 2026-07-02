@@ -42,7 +42,7 @@ HAND_HOLD_FRAMES            2         int    gesture slot hold: frames to carry 
 ARKIT_BONE_MAX              0.5       float  max bone length (norm) for ARKit skeleton
 ARKIT_FULL_SKELETON         "1"       bool   draw full 91-joint ARKit body (!=0 = True)
 VIZ_HUD                     "0"       bool   show debug HUD overlay
-VIZ_SOURCE_KEYS             "0"       bool   wxcvbn source-bundle shortcuts (off: perf safety)
+VIZ_SOURCE_KEYS             "0"       bool   wxcvbn + 0-9 source-bundle shortcuts (off: perf safety)
 VIZ_AUDIO_KEYS              "0"       bool   qsdfghjkl audio-scene shortcuts (off: perf safety; m stays)
 IPHONE_OSC_PORT             57128     int    UDP port for iPhone ARBodyTracker /body3d/kp
 CONCERT_MIRROR              "1"       bool   mirror video horizontally (!=0 = True)
