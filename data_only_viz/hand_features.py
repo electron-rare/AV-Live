@@ -43,11 +43,21 @@ def _clamp(v: float, lo: float, hi: float) -> float:
 
 
 class HandFeatureExtractor:
-    def __init__(self, history: int = 5):
+    def __init__(self, history: int = 5, fist_enable: bool | None = None):
         self._history = max(2, history)
         # two routed slots (hand_slots.route_hands): 0 = user's left (L),
         # 1 = user's right (R); cx fallback when chirality is absent.
         self._buf = [deque(maxlen=self._history), deque(maxlen=self._history)]
+        # Master fist kill-switch: user-disabled live 2026-07-02 (too many
+        # false held-fist actions). fist stays 0.0 for BOTH hands whatever
+        # the per-slot fist_enabled kwarg says. FIST_ENABLE=1 re-enables.
+        # TODO: migrate the env read to VizConfig once config.py is free.
+        if fist_enable is None:
+            import os
+            fist_enable = os.environ.get("FIST_ENABLE", "0") not in (
+                "0", "", "false", "False",
+            )
+        self._fist_enable = fist_enable
 
     def _features(self, lm: list) -> dict:
         xs = [_finite(_coord(p, "x", 0), 0.5) for p in lm[:21]]
@@ -98,7 +108,7 @@ class HandFeatureExtractor:
 
         if left_lm is not None:
             lf = self._features(left_lm)
-            if not fist_enabled[0]:
+            if not (self._fist_enable and fist_enabled[0]):
                 lf["fist"] = 0.0
             lf["speed"] = self._speed(0, lf["cx"], lf["cy"])
             out_l = lf
@@ -107,7 +117,7 @@ class HandFeatureExtractor:
 
         if right_lm is not None:
             rf = self._features(right_lm)
-            if not fist_enabled[1]:
+            if not (self._fist_enable and fist_enabled[1]):
                 rf["fist"] = 0.0
             rf["speed"] = self._speed(1, rf["cx"], rf["cy"])
             out_r = rf

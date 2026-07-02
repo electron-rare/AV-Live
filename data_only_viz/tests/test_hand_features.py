@@ -117,19 +117,19 @@ def _fist_hand(tip_ext):
 
 
 def test_fist_all_fingers_curled():
-    out = HandFeatureExtractor().step([_fist_hand(0.20)])   # tips at knuckles
+    out = HandFeatureExtractor(fist_enable=True).step([_fist_hand(0.20)])   # tips at knuckles
     assert (out["L"] or out["R"])["fist"] > 0.9
 
 
 def test_open_hand_is_not_a_fist():
-    out = HandFeatureExtractor().step([_fist_hand(0.80)])   # fingers extended
+    out = HandFeatureExtractor(fist_enable=True).step([_fist_hand(0.80)])   # fingers extended
     assert (out["L"] or out["R"])["fist"] < 0.1
 
 
 def test_one_extended_finger_breaks_the_fist():
     h = _fist_hand(0.20)                                    # all curled...
     h[8] = LM(0.5 + 0.80 * 0.10, 0.5)                       # ...except the index
-    out = HandFeatureExtractor().step([h])
+    out = HandFeatureExtractor(fist_enable=True).step([h])
     assert (out["L"] or out["R"])["fist"] < 0.1            # min over fingers
 
 
@@ -171,7 +171,7 @@ def test_fist_enabled_false_zeroes_fist_preserves_openness():
 
 def test_fist_enabled_true_computes_fist():
     """fist_enabled=(True, True) leaves fist computation unchanged."""
-    ext = HandFeatureExtractor()
+    ext = HandFeatureExtractor(fist_enable=True)
     h = _fist_hand(0.20)
     out = ext.step([h], fist_enabled=(True, True))
     hand = out["L"] or out["R"]
@@ -225,3 +225,19 @@ def test_fist_enabled_per_slot_independence():
     assert out["L"]["fist"] == 0.0
     # R slot (cx~0.8) should compute normally (open -> fist < 0.1)
     assert out["R"]["fist"] < 0.1
+
+
+def test_fist_kill_switch_default_off(monkeypatch):
+    """FIST_ENABLE unset -> fist forced 0.0 even on a perfect fist
+    (user-disabled live 2026-07-02); continuous features unaffected."""
+    monkeypatch.delenv("FIST_ENABLE", raising=False)
+    out = HandFeatureExtractor().step([_fist_hand(0.20)])
+    hand = out["L"] or out["R"]
+    assert hand["fist"] == 0.0
+    assert hand["openness"] < 0.2
+
+
+def test_fist_kill_switch_env_reenable(monkeypatch):
+    monkeypatch.setenv("FIST_ENABLE", "1")
+    out = HandFeatureExtractor().step([_fist_hand(0.20)])
+    assert (out["L"] or out["R"])["fist"] > 0.9
