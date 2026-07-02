@@ -162,22 +162,25 @@ class AppDelegate(NSObject):
         LOG.info("window shown + key focus forced + floating level")
 
         # 2b) HUD : overlay NSTextView semi-transparent au-dessus du MTKView.
-        # NSTextView prend en charge le rendu CoreText sans avoir a passer
-        # par un MTLBuffer texte. On le pose comme subview du MTKView.
-        self._hud = NSTextView.alloc().initWithFrame_(
-            NSMakeRect(12, 12, 340, 240))
-        self._hud.setEditable_(False)
-        self._hud.setSelectable_(False)
-        self._hud.setDrawsBackground_(True)
-        self._hud.setBackgroundColor_(
-            NSColor.colorWithCalibratedRed_green_blue_alpha_(0, 0, 0, 0.45))
-        self._hud.setFont_(NSFont.fontWithName_size_("Menlo", 11))
-        self._hud.setTextColor_(NSColor.whiteColor())
-        self._hud.setAutoresizingMask_(NSViewHeightSizable)
-        self._mtkview.addSubview_(self._hud)
-        # Timer 10 Hz, rafraichit le texte avec les valeurs du State.
-        self._hudTimer = NSTimer.scheduledTimerWithTimeInterval_target_selector_userInfo_repeats_(
-            0.1, self, "refreshHud:", None, True)
+        # OFF by default (performance display); VIZ_HUD=1 brings the debug
+        # panel back. It would also collide with the left-hand side panel.
+        self._hud = None
+        self._hudTimer = None
+        if os.environ.get("VIZ_HUD", "0") not in ("0", "", "false", "False"):
+            self._hud = NSTextView.alloc().initWithFrame_(
+                NSMakeRect(12, 12, 340, 240))
+            self._hud.setEditable_(False)
+            self._hud.setSelectable_(False)
+            self._hud.setDrawsBackground_(True)
+            self._hud.setBackgroundColor_(
+                NSColor.colorWithCalibratedRed_green_blue_alpha_(0, 0, 0, 0.45))
+            self._hud.setFont_(NSFont.fontWithName_size_("Menlo", 11))
+            self._hud.setTextColor_(NSColor.whiteColor())
+            self._hud.setAutoresizingMask_(NSViewHeightSizable)
+            self._mtkview.addSubview_(self._hud)
+            # Timer 10 Hz, rafraichit le texte avec les valeurs du State.
+            self._hudTimer = NSTimer.scheduledTimerWithTimeInterval_target_selector_userInfo_repeats_(
+                0.1, self, "refreshHud:", None, True)
 
         # 2c) Timer webcam update (NSImageView fullscreen deja cree en 2a)
         self._camTimer = NSTimer.scheduledTimerWithTimeInterval_target_selector_userInfo_repeats_(
@@ -485,6 +488,8 @@ class AppDelegate(NSObject):
     def refreshHud_(self, _timer):  # noqa: N802
         """Format le HUD avec la valeur courante des flux + correspondance
         avec le rendu visuel. Appele a 10 Hz par NSTimer."""
+        if self._hud is None:
+            return
         s = self._state
         with s.lock():
             mode = s.viz_mode
@@ -590,7 +595,9 @@ class AppDelegate(NSObject):
         if key == "F":
             self._window.toggleFullScreen_(None); return None
         if key == "H":
-            self._hud.setHidden_(not self._hud.isHidden()); return None
+            if self._hud is not None:
+                self._hud.setHidden_(not self._hud.isHidden())
+            return None
         if key == "C":  # Shift+C : toggle webcam overlay
             self._cam.setHidden_(not self._cam.isHidden()); return None
         # azertyuiop -> video (viz mode)
