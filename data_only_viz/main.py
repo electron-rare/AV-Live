@@ -161,7 +161,19 @@ class AppDelegate(NSObject):
         self._window.makeFirstResponder_(self._container)
         LOG.info("window shown + key focus forced + floating level")
 
-        # 2b) HUD : overlay NSTextView semi-transparent au-dessus du MTKView.
+        # 2b.1) Keyboard monitors — installed here so they are always active
+        # regardless of which pose backend is chosen (or even when --pose is
+        # omitted).  The original placement at the END of _start_pose_worker
+        # was unreachable because every normal backend path returns early.
+        # Global monitor is read-only; we ignore its return to avoid
+        # double-triggering alongside the local monitor.
+        self._kb_monitor = NSEvent.addLocalMonitorForEventsMatchingMask_handler_(
+            NSEventMaskKeyDown, self._on_key)
+        self._kb_global = NSEvent.addGlobalMonitorForEventsMatchingMask_handler_(
+            NSEventMaskKeyDown, self._on_key_global)
+        LOG.info("keyboard monitors installed (local + global)")
+
+        # 2b.2) HUD : overlay NSTextView semi-transparent au-dessus du MTKView.
         # OFF by default (performance display); VIZ_HUD=1 brings the debug
         # panel back. It would also collide with the left-hand side panel.
         self._hud = None
@@ -444,20 +456,6 @@ class AppDelegate(NSObject):
         self._pose_worker = PoseWorker(
             self._state, device=self._opts.pose_device)
         self._pose_worker.start()
-
-        # 4) Hook clavier : local (app au focus) + global (app au fond).
-        # Le global monitor est read-only mais permet de garder le pilotage
-        # quand l'utilisateur a une autre app au premier plan (IDE,
-        # browser). On ignore le retour pour le global (sinon double-trigger).
-        self._kb_monitor = NSEvent.addLocalMonitorForEventsMatchingMask_handler_(
-            NSEventMaskKeyDown, self._on_key)
-        self._kb_global = NSEvent.addGlobalMonitorForEventsMatchingMask_handler_(
-            NSEventMaskKeyDown, self._on_key_global)
-        # Force le focus initial pour que le local monitor reçoive
-        # tout de suite les touches sans nécessiter un clic.
-        NSApp().activateIgnoringOtherApps_(True)
-        self._window.makeKeyAndOrderFront_(None)
-        self._window.makeFirstResponder_(self._container)
 
     _cam_log_count = 0
 
