@@ -35,6 +35,7 @@ HAND_CONF_MIN               0.45      float  min hand landmark confidence to ren
 HAND_PERSIST_FRAMES         3         int    consecutive frames before a hand track is drawn; 1=off
 HAND_SWAP_LR                "0"       bool   Safety knob: invert Vision chirality (validated correct live 2026-07-02; keep 0 unless a future iPhone app build flips it)
 HAND_NEAR_MIN               0.10      float  min hand size (norm) to consider "near"
+HAND_FACE_MIN               0.5       float  palm-spread ratio threshold: slot activates gestures only when facing >= this (side-on < 0.4, facing ~0.7-1.0)
 HAND_PERSIST_GRACE          2         int    grace frames before dropping a hand track on Vision miss (0 = strict)
 HAND_NEAR_OFF               0.08      float  hand size below which near gate deactivates (hysteresis off-threshold)
 HAND_HOLD_FRAMES            2         int    gesture slot hold: frames to carry last hand on Vision miss
@@ -125,6 +126,7 @@ class VizConfig:
     hand_near_min: float = 0.10
     hand_near_off: float = 0.08
     hand_hold_frames: int = 2
+    hand_face_min: float = 0.5
     arkit_bone_max: float = 0.5
     arkit_full_skeleton: bool = True
 
@@ -272,6 +274,7 @@ class VizConfig:
             hand_near_min=_float("HAND_NEAR_MIN", 0.10),
             hand_near_off=_float("HAND_NEAR_OFF", 0.08),
             hand_hold_frames=_int("HAND_HOLD_FRAMES", 2),
+            hand_face_min=_float("HAND_FACE_MIN", 0.5),
             arkit_bone_max=_float("ARKIT_BONE_MAX", 0.5),
             # ARKIT_FULL_SKELETON uses != "0" convention (empty = True)
             arkit_full_skeleton=_bool_ne0("ARKIT_FULL_SKELETON", True),

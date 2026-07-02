@@ -12,6 +12,7 @@ import pytest
 from data_only_viz.hand_display import (
     HandPersistenceGate,
     arkit_2d_fresh,
+    hand_facing,
     hand_plausible,
     hand_size,
     segment_ok,
@@ -558,3 +559,60 @@ def test_gate_grace_ghost_stays_suppressed():
     gate.step([])        # miss=1 ≤ grace → track [0.5, 0.5, 1, 1] survives
     # Reappears: count increments to 2 (still not established)
     assert gate.step([hand]) == [False]
+
+
+# ---------------------------------------------------------------------------
+# hand_facing
+# ---------------------------------------------------------------------------
+
+def _make_facing_kp(wrist_x=0.5, wrist_y=0.7, size=0.15, spread=0.14) -> list[Kp]:
+    """21-kp hand with index-MCP(5) and pinky-MCP(17) spread wide in x."""
+    kp = _make_hand(wrist_x=wrist_x, wrist_y=wrist_y, size=size)
+    kp[5] = Kp(x=wrist_x - spread / 2, y=wrist_y - size / 2)
+    kp[17] = Kp(x=wrist_x + spread / 2, y=wrist_y - size / 2)
+    return kp
+
+
+def _make_sideon_kp(wrist_x=0.5, wrist_y=0.7, size=0.15) -> list[Kp]:
+    """21-kp hand with index-MCP(5) and pinky-MCP(17) almost co-located."""
+    kp = _make_hand(wrist_x=wrist_x, wrist_y=wrist_y, size=size)
+    kp[5] = Kp(x=wrist_x, y=wrist_y - size / 2)
+    kp[17] = Kp(x=wrist_x + 0.005, y=wrist_y - size / 2)
+    return kp
+
+
+def test_hand_facing_camera_above_threshold():
+    """A palm facing the camera has a spread ratio >= 0.7."""
+    kp = _make_facing_kp(size=0.15, spread=0.14)
+    # facing = 0.14 / 0.15 ~ 0.93
+    assert hand_facing(kp) >= 0.7
+
+
+def test_hand_facing_side_on_below_threshold():
+    """A side-on palm has a spread ratio < 0.4."""
+    kp = _make_sideon_kp(size=0.15)
+    # facing = 0.005 / 0.15 ~ 0.033
+    assert hand_facing(kp) < 0.4
+
+
+def test_hand_facing_zero_size_returns_zero():
+    """Guard: when hand_size is ~0 (degenerate hand), returns 0.0."""
+    kp = _make_hand(wrist_x=0.5, wrist_y=0.5, size=0.0)
+    # Force wrist and MCP to the same position so hand_size = 0
+    kp[0] = Kp(x=0.5, y=0.5)
+    kp[9] = Kp(x=0.5, y=0.5)
+    assert hand_facing(kp) == 0.0
+
+
+def test_hand_facing_list_format():
+    """hand_facing also accepts list-style kp ([x, y, z]) as used in hand_slots tests."""
+    # Build a 21-element list-of-lists
+    lm = [[0.5, 0.5, 0.0] for _ in range(21)]
+    lm[0] = [0.5, 0.7, 0.0]    # wrist
+    lm[9] = [0.5, 0.55, 0.0]   # middle-MCP, size = 0.15
+    # Wide spread: index-MCP and pinky-MCP 0.14 apart in x
+    lm[5] = [0.43, 0.62, 0.0]
+    lm[17] = [0.57, 0.62, 0.0]
+    f = hand_facing(lm)
+    # facing = 0.14 / 0.15 ~ 0.93
+    assert f >= 0.7

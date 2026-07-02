@@ -23,6 +23,7 @@ import math
 # ---- micro-helpers imported from hand_features (acyclic: hand_features only
 # imports hand_slots lazily inside step(), so a top-level import here is safe) ---
 from .hand_features import _finite, _coord, _clamp
+from .hand_display import hand_facing as _hand_facing
 
 
 def _hand_size(hand) -> float:
@@ -134,14 +135,21 @@ class GestureSlotStabilizer:
         hold_frames: int = 2,
         near_on: float = 0.10,
         near_off: float = 0.08,
+        face_min: float = 0.5,
     ) -> None:
         self._hold = hold_frames
         self._near_on = near_on
         self._near_off = near_off
+        self._face_min = face_min
+        # face_off uses 0.8× hysteresis (mirrors the near on/off pattern) so that
+        # a slot active at face_min does not flap when facing oscillates near the
+        # threshold — it only deactivates when facing drops below face_off.
+        self._face_off = 0.8 * face_min
         # Per-slot state
         self._last: list = [None, None]       # last seen hand object
         self._miss: list[int] = [0, 0]        # consecutive miss count
         self._near_active: list[bool] = [False, False]
+        self._face_active: list[bool] = [False, False]
         self._out: list = [None, None]         # last step() output (for active_flags)
         # Hold-tracking: True when previous step() output was a held replay.
         self._held_flag: list[bool] = [False, False]
@@ -175,28 +183,38 @@ class GestureSlotStabilizer:
                 else:
                     if size >= self._near_on:
                         self._near_active[i] = True
-                # Track the hand regardless of near state
+                # Update face hysteresis (face_off = 0.8 * face_min)
+                facing = _hand_facing(hand)
+                if self._face_active[i]:
+                    if facing < self._face_off:
+                        self._face_active[i] = False
+                else:
+                    if facing >= self._face_min:
+                        self._face_active[i] = True
+                # Track the hand regardless of near/face state
                 self._last[i] = hand
                 self._miss[i] = 0
-                # Output only if near-active
-                out[i] = hand if self._near_active[i] else None
+                # Output only if near-active AND facing the camera
+                out[i] = hand if (self._near_active[i] and self._face_active[i]) else None
             else:
                 # Hand absent this frame
                 self._resumed[i] = False
                 self._miss[i] += 1
                 if self._miss[i] <= self._hold:
-                    # Hold: output last hand if it was near-active
-                    if self._near_active[i] and self._last[i] is not None:
+                    # Hold: output last hand only if it was near+face-active
+                    if (self._near_active[i] and self._face_active[i]
+                            and self._last[i] is not None):
                         self._held_flag[i] = True
                         out[i] = self._last[i]
                     else:
-                        # Not near-active: no hold replay; slot stays None
+                        # Not active: no hold replay; slot stays None
                         self._held_flag[i] = False
                 else:
-                    # Past hold limit — clear near_active so next appearance
-                    # must re-qualify from near_on.
+                    # Past hold limit — clear both gates so next appearance
+                    # must re-qualify from near_on and face_min.
                     self._held_flag[i] = False
                     self._near_active[i] = False
+                    self._face_active[i] = False
                     out[i] = None
         self._out = out
         return out

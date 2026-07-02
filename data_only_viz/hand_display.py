@@ -1,6 +1,12 @@
 """Pure geometry helpers for hand overlay filtering and panel rendering.
 
 No Metal, no numpy, no pyobjc — safe to unit-test anywhere.
+
+Panel frame status indicator color legend (used in renderer.py):
+  pid 7 conf 0.3  →  status 0: absent (dim frame)
+  pid 7 conf 1.0  →  status 1: detected (plausible+established, not armed)
+  pid 8 conf 1.0  →  status 2: armed (near + facing camera)
+  pid 9 conf 1.0  →  status 3: pinch engaged (double-stroke bold)
 """
 from __future__ import annotations
 
@@ -54,6 +60,27 @@ def hand_size(kp: list[_HasXYC]) -> float:
     w = kp[0]
     m = kp[9]
     return math.hypot(m.x - w.x, m.y - w.y)
+
+
+def hand_facing(kp: list) -> float:
+    """Palm-spread ratio for camera-facing detection.
+
+    Returns dist(index-MCP kp[5], pinky-MCP kp[17]) / hand_size(kp).
+    A palm facing the camera spans ~70-100 % of hand_size; a side-on
+    hand collapses to < 40 %.  Returns 0.0 when hand_size is ~0.
+
+    Accepts both attribute-style (.x/.y) and index-style ([x, y, ...]) kp.
+    """
+    def _gx(p: object) -> float:
+        return float(p.x) if hasattr(p, "x") else float(p[0])  # type: ignore[index]
+
+    def _gy(p: object) -> float:
+        return float(p.y) if hasattr(p, "y") else float(p[1])  # type: ignore[index]
+
+    sz = math.hypot(_gx(kp[9]) - _gx(kp[0]), _gy(kp[9]) - _gy(kp[0]))
+    if sz < 1e-6:
+        return 0.0
+    return math.hypot(_gx(kp[17]) - _gx(kp[5]), _gy(kp[17]) - _gy(kp[5])) / sz
 
 
 def hand_plausible(

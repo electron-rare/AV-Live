@@ -205,7 +205,24 @@ def test_result_always_length_2():
 # ---------------------------------------------------------------------------
 
 def _near_hand(cx: float = 0.5, size: float = 0.15) -> list:
-    """Hand with hand_size == size (near enough for near_on=0.10)."""
+    """Near hand (size >= near_on=0.10) that also passes the face gate.
+
+    kp[5]/kp[17] spread by 0.12 → facing = 0.12/0.15 = 0.8 >= face_min=0.5.
+    All tests that verify near-hysteresis / hold / resumed behavior should use
+    this helper so they continue to pass after the facing gate was added.
+    """
+    lm = _hand(cx=cx, size=size)
+    lm[5] = [cx - 0.06, 0.5, 0.0]   # index-MCP
+    lm[17] = [cx + 0.06, 0.5, 0.0]  # pinky-MCP → spread=0.12, facing≈0.8
+    return lm
+
+
+def _sideon_near_hand(cx: float = 0.5, size: float = 0.15) -> list:
+    """Near hand (size >= near_on) whose kp[5]==kp[17] → facing=0.0 (fails face gate).
+
+    Use this for tests that specifically verify the face gate rejects a side-on
+    palm even when the hand is close enough to pass the near gate.
+    """
     return _hand(cx=cx, size=size)
 
 
@@ -356,3 +373,52 @@ def test_resumed_flags_independent_per_slot():
     r = stab.resumed_flags()
     assert r[0] is True,  "slot 0 just transitioned held -> real"
     assert r[1] is False, "slot 1 was never held"
+
+
+# ---------------------------------------------------------------------------
+# GestureSlotStabilizer — face gate
+# ---------------------------------------------------------------------------
+
+def test_stab_face_gate_sideon_never_activates():
+    """A side-on hand (facing=0.0) never activates the slot even when near."""
+    stab = GestureSlotStabilizer(hold_frames=2, near_on=0.10, near_off=0.08)
+    h = _sideon_near_hand()   # size=0.15 >= near_on, but facing=0.0 < face_min=0.5
+    out1 = stab.step([h, None])
+    out2 = stab.step([h, None])
+    assert out1[0] is None, "side-on: slot must be None (face gate rejects)"
+    assert out2[0] is None, "side-on: slot still None after two frames"
+    assert stab.active_flags() == (False, False)
+
+
+def test_stab_face_gate_facing_activates():
+    """A near, camera-facing hand activates the slot (passes both gates)."""
+    stab = GestureSlotStabilizer(hold_frames=2, near_on=0.10, near_off=0.08)
+    h = _near_hand()   # size=0.15 >= near_on, facing=0.8 >= face_min=0.5
+    stab.step([h, None])
+    out = stab.step([h, None])
+    assert out[0] is h, "near+facing hand must be in slot 0"
+    assert stab.active_flags() == (True, False)
+
+
+def test_stab_face_gate_hysteresis_stays_active_between_thresholds():
+    """Once active, slot stays active when facing drops between face_off and face_min.
+
+    face_min=0.5, face_off=0.4.  A hand that was facing (0.8) then turns
+    slightly side-on to facing=0.43 must NOT deactivate (hysteresis protects
+    against flapping).  Only a drop below face_off (0.4) would deactivate.
+    """
+    stab = GestureSlotStabilizer(hold_frames=2, near_on=0.10, near_off=0.08)
+    # Activate: near+facing hand
+    h_facing = _near_hand()               # facing=0.8
+    stab.step([h_facing, None])
+    assert stab.step([h_facing, None])[0] is h_facing
+
+    # Build a hand with facing=0.43 (between face_off=0.4 and face_min=0.5)
+    # size=0.15, spread=0.43*0.15=0.0645
+    h_mid = _hand()
+    h_mid[5] = [0.5 - 0.032, 0.5, 0.0]
+    h_mid[17] = [0.5 + 0.032, 0.5, 0.0]   # dist≈0.064/0.15≈0.43
+
+    out = stab.step([h_mid, None])
+    assert out[0] is h_mid, "hysteresis: slot stays active between face_off and face_min"
+    assert stab.active_flags() == (True, False)

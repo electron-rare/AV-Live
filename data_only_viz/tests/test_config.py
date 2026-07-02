@@ -395,3 +395,15 @@ def test_multiworker_period_formula_for_iphone_usb():
     assert "target_fps" in sig.parameters, (
         "MultiWorker.__init__ must accept target_fps kwarg"
     )
+
+
+def test_hand_face_min_default():
+    """VizConfig.from_env({}) exposes hand_face_min with a default of 0.5."""
+    cfg = VizConfig.from_env({})
+    assert cfg.hand_face_min == 0.5
+
+
+def test_hand_face_min_env_override():
+    """HAND_FACE_MIN env var is parsed as float and stored in hand_face_min."""
+    cfg = VizConfig.from_env({"HAND_FACE_MIN": "0.3"})
+    assert cfg.hand_face_min == pytest.approx(0.3)

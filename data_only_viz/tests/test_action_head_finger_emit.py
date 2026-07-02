@@ -38,6 +38,11 @@ def _hand(index_tip_y: float, base_y: float = 0.4, c: float = 1.0):
     lm[9] = _Kp(0.3, base_y, 0.0, c)            # middle-MCP at center -> size 0.15 > near_min
     lm[FINGERTIPS[1]] = _Kp(0.3, index_tip_y, 0.0, c)
     lm[FINGER_BASES[1]] = _Kp(0.3, base_y, 0.0, c)
+    # Spread index-MCP(5) and pinky-MCP(17) AFTER FINGER_BASES[1]=5 assignment
+    # so lm[5] is not overwritten. facing = 0.12/0.15 = 0.8 >= face_min=0.5.
+    # Only x changes; y=base_y is preserved so FingerStrikeDetector base_y is correct.
+    lm[5] = _Kp(0.3 - 0.06, base_y, 0.0, c)
+    lm[17] = _Kp(0.3 + 0.06, base_y, 0.0, c)
     return lm
 
 

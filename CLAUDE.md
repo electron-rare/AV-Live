@@ -87,6 +87,7 @@ Toujours répondre en français à l'utilisateur. Code, commentaires de code, co
 | `HAND_PERSIST_GRACE` | `2` | grace frames before dropping a hand track (0 = strict per-frame) |
 | `HAND_NEAR_OFF` | `0.08` | hand size hysteresis off-threshold for gesture slot stabilizer |
 | `HAND_HOLD_FRAMES` | `2` | gesture slot: frames to hold last hand on Vision miss |
+| `HAND_FACE_MIN` | `0.5` | palm-spread ratio threshold — gesture slot arms only when hand_facing >= this (palm-facing ~0.7-1.0, side-on < 0.4; 0.8× hysteresis for off) |
 | `ARKIT_BONE_MAX` | `0.5` | max ARKit body bone length in normalized units; longer bones are skipped (tracking-loss garbage filter) |
 | `PINCH_ENABLE` | `0` | enable pinch gesture detection |
 | `VIZ_HUD` | `0` | show debug HUD overlay |
