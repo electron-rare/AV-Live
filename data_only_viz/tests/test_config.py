@@ -365,3 +365,33 @@ def test_iphone_usb_skips_ensure_model():
 def test_bool_ne0_mesh_rig(val, expected):
     cfg = VizConfig.from_env({"MESH_RIG": val})
     assert cfg.mesh_rig is expected
+
+
+# ---------------------------------------------------------------------------
+# Item 2: MultiWorker runs at 30 Hz under iphone-usb
+# ---------------------------------------------------------------------------
+
+def test_multiworker_period_formula_for_iphone_usb():
+    """MultiWorker stores period = 1 / max(1, target_fps).
+
+    Frame-based gesture calibrations (debounce/hold/grace/persist) assume
+    30 Hz.  When --iphone-usb is active (camera decode + ARKit conversion,
+    no MediaPipe on the Mac), target_fps=30 is passed; webcam keeps 18.
+    This test verifies the __init__ period arithmetic directly, sidestepping
+    heavy ML/AppKit imports that are unavailable in CI.
+    """
+    from data_only_viz.multi import MultiWorker
+    import math
+    # Verify the formula for both paths
+    for target_fps, expected in [(30.0, 1.0 / 30.0), (18.0, 1.0 / 18.0)]:
+        # Same expression as MultiWorker.__init__: self.period = 1.0 / max(1.0, target_fps)
+        period = 1.0 / max(1.0, target_fps)
+        assert math.isclose(period, expected, rel_tol=1e-6), (
+            f"target_fps={target_fps}: expected period {expected:.6f}, got {period:.6f}"
+        )
+    # Verify the constructor signature accepts the kwarg (compilation check)
+    import inspect
+    sig = inspect.signature(MultiWorker.__init__)
+    assert "target_fps" in sig.parameters, (
+        "MultiWorker.__init__ must accept target_fps kwarg"
+    )

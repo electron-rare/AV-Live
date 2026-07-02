@@ -390,9 +390,15 @@ class AppDelegate(NSObject):
         if _cfg.av_live_mediapipe:
             try:
                 from .multi import MultiWorker
+                _iphone_usb = getattr(self._opts, "iphone_usb", False)
+                # iphone-usb path: camera decode + ARKit conversion is cheap
+                # (no MediaPipe inference on the Mac).  Frame-based gesture
+                # calibrations (debounce/hold/grace/persist) assume 30 Hz.
+                # Keep 18 Hz for the webcam MediaPipe path (M5 CPU protection).
                 self._pose_worker = MultiWorker(
                     self._state, num_persons=4,
-                    iphone_usb=getattr(self._opts, "iphone_usb", False))
+                    iphone_usb=_iphone_usb,
+                    target_fps=30.0 if _iphone_usb else 18.0)
                 self._pose_worker.start()
                 LOG.info("worker: MediaPipe Multi (Pose+Face+Hand × 4)")
                 return
