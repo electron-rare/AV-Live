@@ -161,6 +161,7 @@ class ActionHeadPublisher(threading.Thread):
         self._emit_hands(t_now)
         self._emit_fingers(t_now)
         self._emit_pinch(t_now)
+        self._update_gesture_slot_status()
 
     def _emit_hands(self, t_now: float) -> None:
         """Lock state, extract hand features, emit /pose/hands once per tick."""
@@ -241,6 +242,7 @@ class ActionHeadPublisher(threading.Thread):
             hold_frames=cfg.hand_hold_frames,
             near_on=cfg.hand_near_min,
             near_off=cfg.hand_near_off,
+            face_min=cfg.hand_face_min,
         )
         self._gesture_conf_min = cfg.hand_conf_min
         # Gesture-path gate stepped at ~30 Hz (publisher tick) — correctly
@@ -251,6 +253,7 @@ class ActionHeadPublisher(threading.Thread):
         self._tick_hands: list | None = None
         self._tick_chir: list = []
         self._tick_mirror: bool = False
+        self._tick_raw_slotted: list = [None, None]
 
     def _pick_hands(self) -> tuple[list, list, str, bool, bool]:
         """Return (hands, chirality, source_label, ip_fresh, mirror).
@@ -311,6 +314,7 @@ class ActionHeadPublisher(threading.Thread):
             near_min=0.0,
             mirror=mirror,
         )
+        self._tick_raw_slotted = list(raw)  # save pre-stabilizer routing for status
         return self._stab.step(raw)
 
     def _emit_fingers(self, t_now: float) -> None:
@@ -344,6 +348,31 @@ class ActionHeadPublisher(threading.Thread):
                 LOG.info("pinch dbg: src=%s hand=%d finger=%d",
                          used, ev.hand, ev.finger)
             self.bridge.send_pinch(ev)
+
+    def _update_gesture_slot_status(self) -> None:
+        """Compute per-slot gesture status and write it to state.
+
+        Status values: 0=absent, 1=detected(plausible+established, not armed),
+        2=armed(near+facing), 3=pinch engaged.
+        Called once per tick after all emitters have run.
+        """
+        stab = getattr(self, "_stab", None)
+        if stab is None:
+            return
+        pinch_det = getattr(self, "_pinch_det", None)
+        raw = getattr(self, "_tick_raw_slotted", [None, None])
+        active = stab.active_flags()
+        engaged = pinch_det.engaged_slots() if pinch_det is not None else (False, False)
+        status = [0, 0]
+        for slot in range(2):
+            if engaged[slot]:
+                status[slot] = 3
+            elif active[slot]:
+                status[slot] = 2
+            elif raw[slot] is not None:
+                status[slot] = 1
+        with self.state.lock():
+            self.state.gesture_slot_status = status
 
     def _read_sources(self) -> tuple[
         list[tuple[int, np.ndarray, np.ndarray, float, np.ndarray]] | None,

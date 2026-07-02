@@ -335,3 +335,31 @@ def test_reset_slot_does_not_affect_other_slot():
 
     # slot 1 unchanged
     assert det._state[1][1].prev_rel is not None, "slot 1 must be unaffected"
+
+
+# ---------------------------------------------------------------------------
+# PinchDetector.engaged_slots
+# ---------------------------------------------------------------------------
+
+def test_engaged_slots_both_false_initially():
+    """Fresh PinchDetector: no pinch engaged in either slot."""
+    det = PinchDetector()
+    assert det.engaged_slots() == (False, False)
+
+
+def test_engaged_slots_true_for_engaged_slot():
+    """engaged_slots() reflects per-slot engaged state correctly."""
+    det = PinchDetector()
+    det._state[0][0].engaged = True   # slot 0, index finger
+    s0, s1 = det.engaged_slots()
+    assert s0 is True,  "slot 0 has an engaged finger"
+    assert s1 is False, "slot 1 has no engaged finger"
+
+
+def test_engaged_slots_false_after_release():
+    """Clearing engaged flag → engaged_slots returns False for that slot."""
+    det = PinchDetector()
+    det._state[1][2].engaged = True   # slot 1, ring finger
+    assert det.engaged_slots()[1] is True
+    det._state[1][2].engaged = False
+    assert det.engaged_slots() == (False, False)

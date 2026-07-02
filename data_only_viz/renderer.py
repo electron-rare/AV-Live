@@ -528,20 +528,39 @@ class MetalRenderer(NSObject):
             )
             left_kp, right_kp = slotted
 
-            # Draw frame (pid 7) then wireframe (pid 5 left / 6 right)
-            for side_name, h_kp, pid_s in (
+            # Panel frame colored by gesture status (read from state, already under lock):
+            # pid 7 conf 0.3 = status 0 (absent, dim)
+            # pid 7 conf 1.0 = status 1 (detected, normal)
+            # pid 8 conf 1.0 = status 2 (armed: near+facing)
+            # pid 9 conf 1.0 = status 3 (pinch engaged, double-stroke)
+            _slot_status = getattr(s, "gesture_slot_status", [0, 0])
+            for _si, (side_name, h_kp, pid_s) in enumerate((
                 ("left",  left_kp,  5),
                 ("right", right_kp, 6),
-            ):
-                if h_kp is None:
-                    continue
-                for seg in panel_frame(side_name, asp):
-                    push_panel(*seg, 1.0, 7)
-                for seg in panel_segments(
-                    h_kp, side_name, lhand_bones_p, asp,
-                    mirror=mirror, conf_min=self._hand_conf_min,
-                ):
-                    push_panel(*seg, 1.0, pid_s)
+            )):
+                _st = _slot_status[_si] if _si < len(_slot_status) else 0
+                _frame_segs = panel_frame(side_name, asp)
+                if _st == 0:
+                    for seg in _frame_segs:
+                        push_panel(*seg, 0.3, 7)          # absent: dim
+                elif _st == 1:
+                    for seg in _frame_segs:
+                        push_panel(*seg, 1.0, 7)          # detected: normal
+                elif _st == 2:
+                    for seg in _frame_segs:
+                        push_panel(*seg, 1.0, 8)          # armed: distinct palette color
+                else:  # 3: pinch engaged
+                    _off = 0.001                           # tiny offset for bold double-stroke
+                    for seg in _frame_segs:
+                        push_panel(*seg, 1.0, 9)
+                        ax, ay, bx, by = seg
+                        push_panel(ax + _off, ay, bx + _off, by, 1.0, 9)
+                if h_kp is not None:
+                    for seg in panel_segments(
+                        h_kp, side_name, lhand_bones_p, asp,
+                        mirror=mirror, conf_min=self._hand_conf_min,
+                    ):
+                        push_panel(*seg, 1.0, pid_s)
 
         if segs == 0:
             return 0

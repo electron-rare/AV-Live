@@ -176,6 +176,10 @@ class State:
     latest_bgr_id: int = 0
     latest_bgr_t: float = 0.0
 
+    # Gesture slot status per hand slot (written by action_head_pub, read by renderer):
+    # 0=absent, 1=detected(plausible+established not armed), 2=armed(near+facing), 3=pinch engaged
+    gesture_slot_status: list[int] = field(default_factory=lambda: [0, 0])
+
     # Renderer
     width: int = 1280
     height: int = 720

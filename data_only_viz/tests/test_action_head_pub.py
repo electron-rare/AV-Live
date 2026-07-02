@@ -342,3 +342,46 @@ def test_emit_hands_features_require_establishment(monkeypatch) -> None:
     pub._tick(t_now=3.0)
     feats_est, _ = bridge.send_hands.call_args_list[-1][0]
     assert feats_est["L"] is not None  # now established
+
+
+# ---------------------------------------------------------------------------
+# Gesture slot status
+# ---------------------------------------------------------------------------
+
+def test_gesture_status_defaults_to_zero_with_no_hands() -> None:
+    """With no hands, _update_gesture_slot_status() writes [0, 0]."""
+    from data_only_viz.action_head_pub import ActionHeadPublisher
+    state = _FakeState()
+    state.gesture_slot_status = [99, 99]  # sentinel: should be overwritten
+    bridge = MagicMock()
+    pub = ActionHeadPublisher(state, bridge, ckpt_path=None)
+    pub._update_gesture_slot_status()
+    assert state.gesture_slot_status == [0, 0]
+
+
+def test_gesture_status_armed_when_stab_active() -> None:
+    """gesture_slot_status[slot]=2 when stabilizer output is non-None (arm state)."""
+    from data_only_viz.action_head_pub import ActionHeadPublisher
+    state = _FakeState()
+    state.gesture_slot_status = [0, 0]
+    bridge = MagicMock()
+    pub = ActionHeadPublisher(state, bridge, ckpt_path=None)
+    # Directly mark slot 0 as active in the stabilizer's output cache
+    pub._stab._out[0] = object()
+    pub._update_gesture_slot_status()
+    assert state.gesture_slot_status[0] == 2, "armed slot must report status 2"
+    assert state.gesture_slot_status[1] == 0, "idle slot must report status 0"
+
+
+def test_gesture_status_engaged_when_pinch_active() -> None:
+    """gesture_slot_status[slot]=3 when a pinch is engaged in that slot."""
+    from data_only_viz.action_head_pub import ActionHeadPublisher
+    state = _FakeState()
+    state.gesture_slot_status = [0, 0]
+    bridge = MagicMock()
+    pub = ActionHeadPublisher(state, bridge, ckpt_path=None)
+    pub._stab._out[1] = object()               # slot 1 armed
+    pub._pinch_det._state[1][0].engaged = True  # slot 1 finger engaged
+    pub._update_gesture_slot_status()
+    assert state.gesture_slot_status[0] == 0, "slot 0: idle"
+    assert state.gesture_slot_status[1] == 3, "slot 1: engaged pinch = status 3"

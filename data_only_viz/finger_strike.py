@@ -161,6 +161,13 @@ class PinchDetector:
         self._state = [[_PinchState() for _ in range(4)]
                        for _ in range(history_slots)]
 
+    def engaged_slots(self) -> tuple[bool, bool]:
+        """Return (slot0_has_engaged_pinch, slot1_has_engaged_pinch)."""
+        return (
+            any(self._state[0][i].engaged for i in range(4)),
+            any(self._state[1][i].engaged for i in range(4)),
+        )
+
     def step(self, slotted: list, t_now: float) -> list[PinchEvent]:
         """Process a pre-routed 2-slot hand list [left|None, right|None].
 
