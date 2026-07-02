@@ -1,12 +1,17 @@
 """Pure (no-device) unit tests for iphone_usb_source helpers.
 
-Tests _to_annexb and _decode_hands without any hardware or network connection.
+Tests _to_annexb, _decode_hands, and apply_skeleton_joints without any
+hardware or network connection.
 """
 import struct
 
+import numpy as np
 import pytest
 
-from data_only_viz.iphone_usb_source import _to_annexb, _decode_hands, _HAND_BYTES
+from data_only_viz.iphone_usb_source import (
+    _to_annexb, _decode_hands, _HAND_BYTES,
+    apply_skeleton_joints, _ARKIT_JOINTS,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -180,3 +185,104 @@ def test_decode_hands_confidence_clamped_out_of_range():
     # hand_high: raw z preserved, c clamped to 1
     assert abs(hands[1][0].z - 1.7) < 1e-5
     assert hands[1][0].c == 1.0
+
+
+# ---------------------------------------------------------------------------
+# apply_skeleton_joints — B4 tearing fix (chantier 2)
+# ---------------------------------------------------------------------------
+
+def _make_all_valid_joints(value: float = 0.1) -> list[tuple[float, float, float, bool]]:
+    """Return _ARKIT_JOINTS tuples all marked valid with a constant value."""
+    return [(value, value, value, True)] * _ARKIT_JOINTS
+
+
+def _make_joints_with_mask(
+    values: "list[tuple[float, float, float]]",
+    valid_mask: "list[bool]",
+) -> list[tuple[float, float, float, bool]]:
+    """Zip (x,y,z) values with a validity mask into the joints wire format."""
+    return [(x, y, z, v) for (x, y, z), v in zip(values, valid_mask)]
+
+
+def test_apply_skeleton_joints_fresh_pid_returns_correct_shape():
+    """prev=None → zeros array of shape (_ARKIT_JOINTS, 3), dtype float32."""
+    joints = [(0.0, 0.0, 0.0, False)] * _ARKIT_JOINTS
+    result = apply_skeleton_joints(None, joints)
+    assert result.shape == (_ARKIT_JOINTS, 3)
+    assert result.dtype == np.float32
+    assert (result == 0).all()
+
+
+def test_apply_skeleton_joints_returns_new_array_each_call():
+    """Each call returns a different array object — never the same reference.
+
+    This is the core identity guarantee for the B4 tearing fix: readers that
+    captured a reference to arr1 continue to see a consistent arr1 even while
+    the writer has moved on to arr2.
+    """
+    joints1 = _make_all_valid_joints(0.1)
+    arr1 = apply_skeleton_joints(None, joints1)
+
+    joints2 = _make_all_valid_joints(0.9)
+    arr2 = apply_skeleton_joints(arr1, joints2)
+
+    assert arr2 is not arr1
+
+
+def test_apply_skeleton_joints_preserves_values_not_valid_this_frame():
+    """Joints with valid=False in update 2 keep their values from update 1.
+
+    Update 1 sets all joints to their index value.  Update 2 marks only
+    joint 0 as valid with a new value.  Joints 1..N-1 must be unchanged.
+    """
+    # Update 1: every joint valid, joint i has x=float(i)
+    joints1 = [(float(i), 0.0, 0.0, True) for i in range(_ARKIT_JOINTS)]
+    arr1 = apply_skeleton_joints(None, joints1)
+
+    # Update 2: only joint 0 valid (new value), rest invalid
+    vals2 = [(99.0, 99.0, 99.0)] * _ARKIT_JOINTS
+    mask2 = [i == 0 for i in range(_ARKIT_JOINTS)]
+    joints2 = _make_joints_with_mask(vals2, mask2)
+    arr2 = apply_skeleton_joints(arr1, joints2)
+
+    # Joint 0: overwritten by update 2
+    assert abs(arr2[0, 0] - 99.0) < 1e-5
+
+    # Joints 1..N-1: preserved from update 1
+    for i in range(1, _ARKIT_JOINTS):
+        assert abs(arr2[i, 0] - float(i)) < 1e-5, f"joint {i} not preserved"
+
+
+def test_apply_skeleton_joints_valid_joints_applied():
+    """Valid joints from update 2 overwrite the previous values correctly."""
+    joints1 = _make_all_valid_joints(0.0)
+    arr1 = apply_skeleton_joints(None, joints1)
+
+    joints2 = [(1.0, 2.0, 3.0, True)] * _ARKIT_JOINTS
+    arr2 = apply_skeleton_joints(arr1, joints2)
+
+    assert abs(arr2[5, 0] - 1.0) < 1e-5
+    assert abs(arr2[5, 1] - 2.0) < 1e-5
+    assert abs(arr2[5, 2] - 3.0) < 1e-5
+
+
+def test_apply_skeleton_joints_wrong_shape_prev_discarded():
+    """prev_arr with wrong shape is discarded and output starts from zeros."""
+    wrong_shape = np.ones((10, 3), dtype=np.float32)
+    joints = [(0.5, 0.5, 0.5, True)] * _ARKIT_JOINTS
+    result = apply_skeleton_joints(wrong_shape, joints)
+    assert result.shape == (_ARKIT_JOINTS, 3)
+    assert abs(result[0, 0] - 0.5) < 1e-5
+
+
+def test_apply_skeleton_joints_does_not_mutate_prev():
+    """apply_skeleton_joints must never modify the array passed as prev_arr."""
+    joints1 = _make_all_valid_joints(1.0)
+    arr1 = apply_skeleton_joints(None, joints1)
+    arr1_copy = arr1.copy()
+
+    joints2 = _make_all_valid_joints(2.0)
+    apply_skeleton_joints(arr1, joints2)
+
+    # arr1 must be byte-for-byte identical to what it was before the call
+    np.testing.assert_array_equal(arr1, arr1_copy)

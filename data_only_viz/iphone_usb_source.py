@@ -88,6 +88,36 @@ def _to_annexb(data: bytes) -> bytes:
     return bytes(out)
 
 
+def apply_skeleton_joints(
+    prev_arr: "np.ndarray | None",
+    joints: "list[tuple[float, float, float, bool]]",
+    n_joints: int = _ARKIT_JOINTS,
+) -> np.ndarray:
+    """Return a NEW array with valid joints from *joints* applied.
+
+    Joints not marked valid this frame keep their values from *prev_arr*
+    (copy semantics — never mutates *prev_arr*).  Callers holding a
+    reference to the previous array continue to see a consistent snapshot
+    even without a lock, eliminating the tearing race described in B4.
+
+    Args:
+        prev_arr: Array currently stored for this pid, or None / wrong shape.
+        joints:   Iterable of (x, y, z, valid) from decode_skeleton().
+        n_joints: Expected joint count (default _ARKIT_JOINTS = 91).
+
+    Returns:
+        A fresh np.ndarray of shape (n_joints, 3), dtype float32.
+    """
+    if prev_arr is None or prev_arr.shape != (n_joints, 3):
+        new_arr = np.zeros((n_joints, 3), dtype=np.float32)
+    else:
+        new_arr = prev_arr.copy()
+    for i, (x, y, z, valid) in enumerate(joints):
+        if valid:
+            new_arr[i] = (x, y, z)
+    return new_arr
+
+
 class IphoneUSBSource:
     def __init__(self, state=None, target_size=(640, 480),
                  write_hands: bool = True, mirror: bool = True) -> None:
@@ -160,13 +190,9 @@ class IphoneUSBSource:
                         joints = decode_skeleton(payload)
                         if joints is not None:
                             with self.state.lock():
-                                arr = self.state.persons_arkit_joints.get(pid)
-                                if arr is None or arr.shape != (_ARKIT_JOINTS, 3):
-                                    arr = np.zeros((_ARKIT_JOINTS, 3), dtype=np.float32)
-                                for i, (x, y, z, valid) in enumerate(joints):
-                                    if valid:
-                                        arr[i] = (x, y, z)
-                                self.state.persons_arkit_joints[pid] = arr
+                                prev = self.state.persons_arkit_joints.get(pid)
+                                new_arr = apply_skeleton_joints(prev, joints)
+                                self.state.persons_arkit_joints[pid] = new_arr
                                 self.state.persons_arkit_last_t[pid] = time.perf_counter()
                     elif tag == TAG_SKELETON2D and self.state is not None:
                         pts = decode_skeleton2D(payload)
