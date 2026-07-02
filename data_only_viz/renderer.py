@@ -171,6 +171,7 @@ class MetalRenderer(NSObject):
         # future iPhone app build flips it.
         self._hand_swap_lr = _cfg.hand_swap_lr
         self._arkit_full = _cfg.arkit_full_skeleton
+        self._skel_width = max(1, int(_cfg.skel_line_width))
         self._init_skel_cpu_buffer()
         self._init_mesh_cpu_buffer()
         self._build_pipelines()
@@ -432,11 +433,21 @@ class MetalRenderer(NSObject):
                         valid = ~fmask
                     elif len(valid) == len(fmask):
                         valid = valid & ~fmask
+                # Bold strokes: Metal lines are 1px, so each bone is drawn
+                # in concentric offset passes (SKEL_LINE_WIDTH approx px).
+                _w = getattr(self, "_skel_width", 1)
+                _o = 1.0 / max(1, s.height or 720)
+                _offsets = [(0.0, 0.0)]
+                for _r in range(1, _w):
+                    _d = _r * _o
+                    _offsets += [(_d, 0.0), (-_d, 0.0), (0.0, _d), (0.0, -_d)]
                 for (ax, ay, bx, by) in arkit_segments(
                     arr2d, valid, parents, max_len=self._arkit_bone_max
                 ):
-                    if not push_seg(ax, ay, bx, by, 1.0, pid):
-                        break
+                    for _dx, _dy in _offsets:
+                        if not push_seg(ax + _dx, ay + _dy,
+                                        bx + _dx, by + _dy, 1.0, pid):
+                            break
 
         if self._mp_bones is not None and (
             s.persons_body or s.persons_face or s.persons_hands or

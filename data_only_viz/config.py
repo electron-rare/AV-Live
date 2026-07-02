@@ -45,6 +45,7 @@ VIZ_HUD                     "0"       bool   show debug HUD overlay
 VIZ_SOURCE_KEYS             "0"       bool   wxcvbn + 0-9 source-bundle shortcuts (off: perf safety)
 VIZ_AUDIO_KEYS              "0"       bool   qsdfghjkl audio-scene shortcuts (off: perf safety; m stays)
 VIZ_DEFAULT_MODE            "auto"    str    fixed boot viz mode (e.g. voronoi); disables auto-openpos
+SKEL_LINE_WIDTH             "4"       int    body skeleton stroke width, approx px (1 = thin)
 IPHONE_OSC_PORT             57128     int    UDP port for iPhone ARBodyTracker /body3d/kp
 CONCERT_MIRROR              "1"       bool   mirror video horizontally (!=0 = True)
 ICP_FUSION                  "0"       bool   enable ICP LiDAR fusion (only "1" = True)
@@ -147,6 +148,9 @@ class VizConfig:
     # appear). A fixed mode also DISABLES the auto-openpos timer so it is
     # truly always on (user request live 2026-07-02: t/voronoi permanent).
     viz_default_mode: str = "auto"
+    # Approximate body-skeleton stroke width in pixels (multi-pass offsets;
+    # Metal lines are 1px). 1 = thin historical look.
+    skel_line_width: int = 4
 
     # ---- iPhone OSC ------------------------------------------------------
     iphone_osc_port: int = 57128
@@ -297,6 +301,7 @@ class VizConfig:
             viz_source_keys=_bool_std("VIZ_SOURCE_KEYS", False),
             viz_audio_keys=_bool_std("VIZ_AUDIO_KEYS", False),
             viz_default_mode=_str("VIZ_DEFAULT_MODE", "auto"),
+            skel_line_width=_int("SKEL_LINE_WIDTH", 4),
             iphone_osc_port=_int("IPHONE_OSC_PORT", 57128),
             concert_mirror=_bool_ne0("CONCERT_MIRROR", True),
             # ICP_FUSION / MULTIHMR_AUTOCAST use strict "1" convention
