@@ -165,8 +165,11 @@ class ActionHeadPublisher(threading.Thread):
                 rkp = getattr(self.state, "right_hand_kp", None)
                 hands = [h for h in (lkp, rkp) if h is not None and len(h) > 0]
                 chirality = []
+        stab = getattr(self, "_stab", None)
+        fist_enabled = stab.active_flags() if stab is not None else (True, True)
         feats = self._hand_ext.step(hands, chirality or None,
-                                    swap=getattr(self, "_hand_swap_lr", False))
+                                    swap=getattr(self, "_hand_swap_lr", False),
+                                    fist_enabled=fist_enabled)
         with self.state.lock():
             self.state.hand_feats = feats
         self.bridge.send_hands(feats, t_now)

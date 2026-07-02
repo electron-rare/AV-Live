@@ -79,7 +79,8 @@ class HandFeatureExtractor:
         buf.append((cx, cy))
         return _clamp(spd, 0.0, 1.0)
 
-    def step(self, hands: list, chirality=None, swap: bool = False) -> dict:
+    def step(self, hands: list, chirality=None, swap: bool = False,
+             fist_enabled: tuple = (True, True)) -> dict:
         from data_only_viz.hand_slots import route_hands
         # swap must mirror the gesture path (HAND_SWAP_LR) or per-voice
         # L/R mods contradict pinch/strike in the same performance.
@@ -95,6 +96,8 @@ class HandFeatureExtractor:
 
         if left_lm is not None:
             lf = self._features(left_lm)
+            if not fist_enabled[0]:
+                lf["fist"] = 0.0
             lf["speed"] = self._speed(0, lf["cx"], lf["cy"])
             out_l = lf
         else:
@@ -102,6 +105,8 @@ class HandFeatureExtractor:
 
         if right_lm is not None:
             rf = self._features(right_lm)
+            if not fist_enabled[1]:
+                rf["fist"] = 0.0
             rf["speed"] = self._speed(1, rf["cx"], rf["cy"])
             out_r = rf
         else:

@@ -153,3 +153,53 @@ def test_no_swap_keeps_source_chirality():
     out = ext.step([a, b], [1, 0], swap=False)
     assert out["L"]["cx"] == pytest.approx(0.70, abs=0.01)   # chir 0 -> L
     assert out["R"]["cx"] == pytest.approx(0.30, abs=0.01)
+
+
+# ---------------------------------------------------------------------------
+# fist_enabled gate
+# ---------------------------------------------------------------------------
+
+def test_fist_enabled_false_zeroes_fist_preserves_openness():
+    """fist_enabled=(False, False) forces fist=0 but leaves openness intact."""
+    ext = HandFeatureExtractor()
+    h = _fist_hand(0.20)   # all curled -> fist > 0.9 normally
+    out = ext.step([h], fist_enabled=(False, False))
+    hand = out["L"] or out["R"]
+    assert hand["fist"] == 0.0, "fist must be zeroed when disabled"
+    assert hand["openness"] < 0.2, "openness unaffected"
+
+
+def test_fist_enabled_true_computes_fist():
+    """fist_enabled=(True, True) leaves fist computation unchanged."""
+    ext = HandFeatureExtractor()
+    h = _fist_hand(0.20)
+    out = ext.step([h], fist_enabled=(True, True))
+    hand = out["L"] or out["R"]
+    assert hand["fist"] > 0.9
+
+
+def test_fist_enabled_per_slot_independence():
+    """fist_enabled masks only the specified slot."""
+    ext = HandFeatureExtractor()
+    # Build two 21-kp hands with distinct wrist positions for L/R routing
+    # Left hand: cx~0.2, all fingers curled (fist)
+    h_fist = _fist_hand(0.20)
+    h_fist[0] = LM(0.2, 0.6)
+    h_fist[9] = LM(0.2, 0.5)
+    for mcp in (5, 13, 17):
+        h_fist[mcp] = LM(0.2, 0.5)
+    for tip in (8, 12, 16, 20):
+        h_fist[tip] = LM(0.2 + 0.20 * 0.10, 0.5)
+    # Right hand: cx~0.8, fingers extended (open)
+    h_open = _fist_hand(0.80)
+    h_open[0] = LM(0.8, 0.6)
+    h_open[9] = LM(0.8, 0.5)
+    for mcp in (5, 13, 17):
+        h_open[mcp] = LM(0.8, 0.5)
+    for tip in (8, 12, 16, 20):
+        h_open[tip] = LM(0.8 + 0.80 * 0.10, 0.5)
+    out = ext.step([h_fist, h_open], fist_enabled=(False, True))
+    # L slot (cx~0.2) should have fist=0 even though it's curled
+    assert out["L"]["fist"] == 0.0
+    # R slot (cx~0.8) should compute normally (open -> fist < 0.1)
+    assert out["R"]["fist"] < 0.1
