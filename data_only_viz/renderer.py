@@ -169,6 +169,7 @@ class MetalRenderer(NSObject):
         # Chirality validated correct live 2026-07-02; keep False unless a
         # future iPhone app build flips it.
         self._hand_swap_lr = _cfg.hand_swap_lr
+        self._arkit_full = _cfg.arkit_full_skeleton
         self._init_skel_cpu_buffer()
         self._init_mesh_cpu_buffer()
         self._build_pipelines()
@@ -339,7 +340,7 @@ class MetalRenderer(NSObject):
         Priorise MediaPipe (body 33 + face 478 + 2 mains 21) si disponible
         et present ; sinon fallback COCO 17 keypoints YOLO."""
         _arkit_now = time.perf_counter()
-        use_arkit = (ARKIT_FULL and bool(s.arkit_parents)
+        use_arkit = (getattr(self, '_arkit_full', ARKIT_FULL) and bool(s.arkit_parents)
                      and arkit_2d_fresh(s.persons_arkit_2d_t, _arkit_now))
         if not use_arkit and not s.pose_alive():
             return 0

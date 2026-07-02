@@ -20,24 +20,9 @@ from __future__ import annotations
 
 import math
 
-
-# ---- micro-helpers (duplicated from hand_features to avoid circular import) ---
-
-def _finite(v: float, fallback: float) -> float:
-    return v if isinstance(v, float) and math.isfinite(v) else fallback
-
-
-def _coord(p, attr: str, idx: int, fallback: float = 0.5) -> float:
-    if hasattr(p, attr):
-        return float(getattr(p, attr))
-    try:
-        return float(p[idx])
-    except (TypeError, IndexError):
-        return fallback
-
-
-def _clamp(v: float, lo: float, hi: float) -> float:
-    return lo if v < lo else hi if v > hi else v
+# ---- micro-helpers imported from hand_features (acyclic: hand_features only
+# imports hand_slots lazily inside step(), so a top-level import here is safe) ---
+from .hand_features import _finite, _coord, _clamp
 
 
 def _hand_size(hand) -> float:

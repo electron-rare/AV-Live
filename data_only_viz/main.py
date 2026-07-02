@@ -281,9 +281,9 @@ class AppDelegate(NSObject):
         # stage no-ops. Activated via POSE_FILTER=...+arkit_fuse.
         try:
             from .iphone_osc_listener import IphoneOSCListener
-            self._iphone_osc = IphoneOSCListener(self._state)
+            self._iphone_osc = IphoneOSCListener(self._state, port=_cfg.iphone_osc_port)
             self._iphone_osc.start()
-            LOG.info("worker: + iPhone OSC listener :57128")
+            LOG.info("worker: + iPhone OSC listener :%d", _cfg.iphone_osc_port)
         except Exception as e:  # noqa: BLE001
             LOG.warning("iphone OSC listener start failed (%s)", e)
         # ICP LiDAR fusion (opt-in via ICP_FUSION=1). Parallel to the
