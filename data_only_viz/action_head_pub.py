@@ -24,6 +24,7 @@ from data_only_viz.action_head import (
     J3D_FINGERS_PER_HAND,
     LABELS,
 )
+from data_only_viz.hand_display import hand_plausible, HandPersistenceGate
 from data_only_viz.hand_slots import route_hands
 
 LOG = logging.getLogger("action_head_pub")
@@ -163,15 +164,32 @@ class ActionHeadPublisher(threading.Thread):
 
     def _emit_hands(self, t_now: float) -> None:
         """Lock state, extract hand features, emit /pose/hands once per tick."""
-        with self.state.lock():
-            hands = list(getattr(self.state, "persons_hands", None) or [])
-            chirality = list(getattr(self.state, "persons_hands_chirality", None) or [])
-            mirror = bool(getattr(self.state, "mirror_2d", False))
-            if not hands and getattr(self.state, "hands_present", False):
-                lkp = getattr(self.state, "left_hand_kp", None)
-                rkp = getattr(self.state, "right_hand_kp", None)
-                hands = [h for h in (lkp, rkp) if h is not None and len(h) > 0]
-                chirality = []
+        if getattr(self, "_tick_hands", None) is not None:
+            # Fast path: validated by _step_stab this tick (audit R3/R4: single lock).
+            hands = self._tick_hands
+            chirality = self._tick_chir
+            mirror = self._tick_mirror
+        else:
+            # Fallback for standalone calls (unit tests bypassing _tick).
+            with self.state.lock():
+                hands = list(getattr(self.state, "persons_hands", None) or [])
+                chirality = list(getattr(self.state, "persons_hands_chirality", None) or [])
+                mirror = bool(getattr(self.state, "mirror_2d", False))
+                if not hands and getattr(self.state, "hands_present", False):
+                    lkp = getattr(self.state, "left_hand_kp", None)
+                    rkp = getattr(self.state, "right_hand_kp", None)
+                    hands = [h for h in (lkp, rkp) if h is not None and len(h) > 0]
+                    chirality = []
+            # Inline plausibility gate only (no persistence gate in this path).
+            conf_min = getattr(self, "_gesture_conf_min", 0.0)
+            def _plausible_fb(h):
+                try:
+                    return hand_plausible(h, conf_min=conf_min)
+                except (AttributeError, TypeError):
+                    return True
+            plausible_mask = [_plausible_fb(h) for h in hands]
+            hands = [h for h, ok in zip(hands, plausible_mask) if ok]
+            chirality = [c for c, ok in zip(chirality, plausible_mask) if ok]
         stab = getattr(self, "_stab", None)
         fist_enabled = stab.active_flags() if stab is not None else (True, True)
         feats = self._hand_ext.step(hands, chirality or None,
@@ -224,6 +242,15 @@ class ActionHeadPublisher(threading.Thread):
             near_on=cfg.hand_near_min,
             near_off=cfg.hand_near_off,
         )
+        self._gesture_conf_min = cfg.hand_conf_min
+        # Gesture-path gate stepped at ~30 Hz (publisher tick) — correctly
+        # cadenced, unlike the renderer's 60 fps instance (audit R6).
+        self._gesture_gate = HandPersistenceGate(
+            min_frames=cfg.hand_persist_frames, grace=cfg.hand_persist_grace
+        )
+        self._tick_hands: list | None = None
+        self._tick_chir: list = []
+        self._tick_mirror: bool = False
 
     def _pick_hands(self) -> tuple[list, list, str, bool, bool]:
         """Return (hands, chirality, source_label, ip_fresh, mirror).
@@ -250,7 +277,7 @@ class ActionHeadPublisher(threading.Thread):
         return mp_hands, [], "mediapipe", ip_fresh, mirror
 
     def _step_stab(self) -> list:
-        """Pick hands, route with near_min=0, step gesture stabilizer.
+        """Pick hands, apply quality gates, route, step gesture stabilizer.
 
         Called once per tick from _tick() to share the result across all
         three gesture emitters.  Also callable directly from emitters when
@@ -258,8 +285,28 @@ class ActionHeadPublisher(threading.Thread):
         without going through _tick).
         """
         hands, chir, _, _, mirror = self._pick_hands()
+
+        # 1. Plausibility gate: reject out-of-frame / undersized / low-conf ghosts.
+        # Raw numpy-array hands (no .x/.y/.c protocol) are passed through unchanged
+        # so _build_hands_map / action-head model paths keep working.
+        def _plausible(h):
+            try:
+                return hand_plausible(h, conf_min=self._gesture_conf_min)
+            except (AttributeError, TypeError):
+                return True
+        plausible_mask = [_plausible(h) for h in hands]
+        plausible_hands = [h for h, ok in zip(hands, plausible_mask) if ok]
+        plausible_chir = [c for c, ok in zip(chir, plausible_mask) if ok]
+
+        # 2. Establishment gate: anti-ghost temporal filter; same chirality mask
+        #    keeps chir[i] aligned with plausible_hands[i] through both filters.
+        established_mask = self._gesture_gate.step(plausible_hands)
+        self._tick_hands = [h for h, ok in zip(plausible_hands, established_mask) if ok]
+        self._tick_chir = [c for c, ok in zip(plausible_chir, established_mask) if ok]
+        self._tick_mirror = mirror
+
         raw = route_hands(
-            hands, chir or None,
+            self._tick_hands, self._tick_chir or None,
             swap=getattr(self, "_hand_swap_lr", False),
             near_min=0.0,
             mirror=mirror,
