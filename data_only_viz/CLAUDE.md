@@ -43,8 +43,12 @@ Python **3.11+** requis. `pyproject.toml` est la source de vérité — ne jamai
   `POSE_FILTER` **sans `arkit_fuse`** (ARKit EST la source). Décode :
   `scripts/iphone_usb_bridge.decode_skeleton2D` (819 octets = 91×2 f32 BE + 91
   valid). Mapping 14 joints + ancre tête `ARKIT_HEAD_IDX` dans `arkit_joint_map.py`
-  (index à confirmer live). **L'iPhone doit être en PAYSAGE** (ARKit body tracking
-  spamme `ABPKPersonIDTracker: Portrait image is not supported` sinon).
+  (index à confirmer live). **Orientation : PORTRAIT validé live 2026-07-02**
+  (meilleure détection des mains, ARKit body suit — l'ancienne contrainte
+  paysage de 2026-06-30 ne se reproduit plus). La vidéo HEVC arrive en repère
+  capteur paysage → `VIDEO_ROTATE=ccw` (défaut launcher concert) la redresse ;
+  les DEUX flux 2D (skeleton2D + mains Vision) arrivent déjà droits et ne sont
+  PAS tournés (knobs `IPHONE_SKEL_ROTATE`/`IPHONE_HANDS_ROTATE` si besoin).
 - ARKit fusion (**legacy, chemin webcam + OSC**) : `iphone_osc_listener.py`
   consume /body3d/kp UDP :57128 → `state.persons_arkit_joints`.
   `pose_filter.py::ArkitFuse` (stage `arkit_fuse`) splices the 14 mapped body
