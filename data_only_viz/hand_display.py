@@ -2,11 +2,19 @@
 
 No Metal, no numpy, no pyobjc — safe to unit-test anywhere.
 
-Panel frame status indicator color legend (used in renderer.py):
-  pid 7 conf 0.3  →  status 0: absent (dim frame)
-  pid 7 conf 1.0  →  status 1: detected (plausible+established, not armed)
-  pid 8 conf 1.0  →  status 2: armed (near + facing camera)
-  pid 9 conf 1.0  →  status 3: pinch engaged (double-stroke bold)
+Panel frame legend (renderer.py):
+  pid 7 conf=0.25+0.75*q  →  status 0: absent (q=0); status 1: detected (q≥0.30)
+  pid 8 conf=0.25+0.75*q  →  status 2: armed (near+facing camera, q≥0.30)
+  pid 9 conf=1.0 (q forced)→  status 3: pinch engaged
+  Thickness: 1 stroke always; +1 at q≥0.50; +1 at q≥0.85 or status==3.
+  See gesture_quality() for the continuous quality formula.
+
+Position gauges (renderer.py, drawn around each panel):
+  X gauge: horizontal rail BELOW panel (pid 7, conf 0.4 or 0.25 if absent);
+           vertical notch marker at cx position (pid 5/6, conf 1.0).
+  Y gauge: vertical rail on outer side (pid 7, conf 0.4 or 0.25 if absent);
+           horizontal notch marker at cy position (pid 5/6, conf 1.0).
+  See gauge_segments() — marker x is mirror-flipped if mirror=True.
 """
 from __future__ import annotations
 
@@ -366,3 +374,149 @@ class HandPersistenceGate:
 
         self._tracks = new_tracks
         return result
+
+
+# ---------------------------------------------------------------------------
+# Gauge layout constants
+# ---------------------------------------------------------------------------
+
+#: Normalised gap between a panel edge and its adjacent gauge rail.
+GAUGE_GAP: float = 0.012
+
+#: Half the tick length (total = 2 * GAUGE_TICK_HALF), in normalised coords.
+GAUGE_TICK_HALF: float = 0.004
+
+#: Parallel offset for the second stroke of a bold-notch marker.
+GAUGE_BOLD: float = 0.001
+
+
+# ---------------------------------------------------------------------------
+# Continuous quality score
+# ---------------------------------------------------------------------------
+
+def gesture_quality(
+    hand: object,
+    *,
+    face_min: float,
+    near_on: float,
+    engaged: bool = False,
+) -> float:
+    """Continuous quality score ∈ [0, 1] for one gesture slot.
+
+    Drives panel frame brightness and stroke thickness in renderer.py.
+
+    Args:
+        hand:     21-kp hand object (attribute-style .x/.y) or None.
+                  ``None`` → 0.0 (slot absent or not yet validated by gates).
+        face_min: palm-spread ratio at which the slot is considered fully
+                  armed (from GestureSlotStabilizer; default env 0.5).
+        near_on:  wrist-to-middle-MCP distance (normalised) at which the slot
+                  is fully near (from GestureSlotStabilizer; default 0.10).
+        engaged:  True when a pinch is held for this slot → forces 1.0.
+
+    Returns:
+        quality ∈ [0, 1]:
+        * 0.0 when ``hand`` is None.
+        * 1.0 when ``engaged`` is True.
+        * else: 0.30·established + 0.35·facing_norm + 0.35·near_norm
+          where established = 1.0 (hand passed plausibility + temporal gates),
+          facing_norm = clamp((hand_facing(hand) − 0.25) / (face_min − 0.25), 0, 1),
+          near_norm   = clamp((hand_size(hand) − 0.5·near_on) / (0.5·near_on), 0, 1).
+    """
+    if hand is None:
+        return 0.0
+    if engaged:
+        return 1.0
+    # facing_norm: 0 at facing = 0.25, 1 at facing = face_min.
+    denom_f = face_min - 0.25
+    if denom_f > 1e-9:
+        facing_norm = min(1.0, max(0.0, (hand_facing(hand) - 0.25) / denom_f))
+    else:
+        # face_min ≤ 0.25 — any spread qualifies.
+        facing_norm = 1.0
+    # near_norm: 0 at hand_size = 0.5·near_on, 1 at hand_size = near_on.
+    half_on = 0.5 * near_on
+    if half_on > 1e-9:
+        near_norm = min(1.0, max(0.0, (hand_size(hand) - half_on) / half_on))
+    else:
+        near_norm = 1.0
+    return 0.30 + 0.35 * facing_norm + 0.35 * near_norm
+
+
+# ---------------------------------------------------------------------------
+# Position gauges
+# ---------------------------------------------------------------------------
+
+def gauge_segments(
+    cx: float | None,
+    cy: float | None,
+    side: str,
+    aspect: float,
+    mirror: bool = False,
+    *,
+    content_pid: int = 5,
+    rail_pid: int = 7,
+) -> list[tuple[float, float, float, float, float, int]]:
+    """Rail + marker segments for the X and Y position gauges around a panel.
+
+    X gauge: a horizontal rail placed GAUGE_GAP below the panel bottom edge,
+             spanning the full panel width.  A bold vertical notch marks the
+             hand's cx position on the rail.
+
+    Y gauge: a vertical rail placed GAUGE_GAP outside the panel's outer edge
+             (left of the left panel, right of the right panel), spanning the
+             full panel height.  A bold horizontal notch marks cy.
+
+    Args:
+        cx:          Normalised hand centre-x ∈ [0, 1], or None when absent.
+        cy:          Normalised hand centre-y ∈ [0, 1], or None when absent.
+        side:        "left" or "right".
+        aspect:      View width / view height (> 0).
+        mirror:      If True, flip the cx marker position (1 − cx) so it moves
+                     in the same direction as the mirrored video.  cy is never
+                     flipped.
+        content_pid: pid for marker segments (5 = left slot, 6 = right slot).
+        rail_pid:    pid for rail segments (default 7).
+
+    Returns:
+        List of (ax, ay, bx, by, conf, pid) tuples ready to feed
+        ``push_panel`` in the renderer.  When cx/cy is None the rails are
+        drawn dim (conf 0.25) with no marker; otherwise rails use conf 0.4
+        and markers use conf 1.0.
+    """
+    x0, y0, x1, y1 = panel_rect(side, aspect)
+    has_data = cx is not None and cy is not None
+    rail_conf = 0.4 if has_data else 0.25
+    out: list[tuple[float, float, float, float, float, int]] = []
+
+    # ---- X gauge: horizontal rail below panel ----
+    xg_y = y1 + GAUGE_GAP
+    out.append((x0, xg_y, x1, xg_y, rail_conf, rail_pid))
+    if has_data:
+        assert cx is not None and cy is not None  # narrowing for type checkers
+        cx_eff = 1.0 - cx if mirror else cx
+        mx = x0 + cx_eff * (x1 - x0)
+        # Bold vertical notch: two parallel vertical ticks
+        out.append((mx, xg_y - GAUGE_TICK_HALF, mx, xg_y + GAUGE_TICK_HALF,
+                    1.0, content_pid))
+        out.append((mx + GAUGE_BOLD, xg_y - GAUGE_TICK_HALF,
+                    mx + GAUGE_BOLD, xg_y + GAUGE_TICK_HALF,
+                    1.0, content_pid))
+
+    # ---- Y gauge: vertical rail on outer side ----
+    if side == "left":
+        yg_x = x0 - GAUGE_GAP
+    else:
+        yg_x = x1 + GAUGE_GAP
+    out.append((yg_x, y0, yg_x, y1, rail_conf, rail_pid))
+    if has_data:
+        assert cx is not None and cy is not None
+        my = y0 + cy * (y1 - y0)
+        # Bold horizontal notch: two parallel horizontal ticks
+        out.append((yg_x - GAUGE_TICK_HALF, my, yg_x + GAUGE_TICK_HALF, my,
+                    1.0, content_pid))
+        out.append((yg_x - GAUGE_TICK_HALF, my + GAUGE_BOLD,
+                    yg_x + GAUGE_TICK_HALF, my + GAUGE_BOLD,
+                    1.0, content_pid))
+
+    return out

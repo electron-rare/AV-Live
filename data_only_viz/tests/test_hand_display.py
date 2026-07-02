@@ -12,6 +12,8 @@ import pytest
 from data_only_viz.hand_display import (
     HandPersistenceGate,
     arkit_2d_fresh,
+    gauge_segments,
+    gesture_quality,
     hand_facing,
     hand_plausible,
     hand_size,
@@ -19,6 +21,8 @@ from data_only_viz.hand_display import (
     panel_rect,
     panel_segments,
     panel_frame,
+    GAUGE_GAP,
+    GAUGE_TICK_HALF,
     PANEL_SIDE,
     PANEL_MARGIN,
     PANEL_INNER,
@@ -616,3 +620,153 @@ def test_hand_facing_list_format():
     f = hand_facing(lm)
     # facing = 0.14 / 0.15 ~ 0.93
     assert f >= 0.7
+
+
+# ---------------------------------------------------------------------------
+# gesture_quality
+# ---------------------------------------------------------------------------
+
+def _make_quality_hand(size: float = 0.10, facing: float = 0.7) -> list[Kp]:
+    """21-kp hand with precise hand_size and hand_facing values.
+
+    hand_size  = wrist(kp[0]) to middle-MCP(kp[9]) distance = size
+    hand_facing = dist(kp[5], kp[17]) / hand_size = facing
+    """
+    kp = _make_hand(wrist_x=0.5, wrist_y=0.5, size=size, c=1.0)
+    spread = facing * size
+    mid_y = 0.5 - size / 2
+    kp[5] = Kp(x=0.5 - spread / 2, y=mid_y)
+    kp[17] = Kp(x=0.5 + spread / 2, y=mid_y)
+    return kp
+
+
+def test_quality_absent_hand_returns_zero():
+    """hand=None → quality 0.0 regardless of other params."""
+    assert gesture_quality(None, face_min=0.5, near_on=0.10) == 0.0
+
+
+def test_quality_engaged_forces_one():
+    """engaged=True → quality 1.0 regardless of hand geometry."""
+    hand = _make_quality_hand(size=0.05, facing=0.1)  # far and side-on
+    assert gesture_quality(hand, face_min=0.5, near_on=0.10, engaged=True) == 1.0
+
+
+def test_quality_far_but_fully_facing():
+    """Hand at near-threshold (size=0.5*near_on) but fully facing → 0.65.
+
+    near_norm = 0.0 (at lower bound), facing_norm = 1.0 → 0.30 + 0.35 = 0.65.
+    """
+    face_min, near_on = 0.5, 0.10
+    # size = 0.5 * near_on = 0.05 → near_norm = 0
+    # facing = face_min = 0.5 → facing_norm = (0.5-0.25)/(0.5-0.25) = 1.0
+    hand = _make_quality_hand(size=0.05, facing=face_min)
+    q = gesture_quality(hand, face_min=face_min, near_on=near_on)
+    assert math.isclose(q, 0.65, rel_tol=1e-6), f"expected 0.65, got {q}"
+
+
+def test_quality_near_but_side_on():
+    """Hand fully near (size=near_on) but side-on (facing=0.25) → 0.65.
+
+    facing_norm = 0.0 (at lower bound), near_norm = 1.0 → 0.30 + 0.35 = 0.65.
+    """
+    face_min, near_on = 0.5, 0.10
+    # size = near_on = 0.10 → near_norm = (0.10-0.05)/0.05 = 1.0
+    # facing = 0.25 → facing_norm = (0.25-0.25)/0.25 = 0.0
+    hand = _make_quality_hand(size=near_on, facing=0.25)
+    q = gesture_quality(hand, face_min=face_min, near_on=near_on)
+    assert math.isclose(q, 0.65, rel_tol=1e-6), f"expected 0.65, got {q}"
+
+
+def test_quality_full_caps_at_one():
+    """Hand well above near_on and facing threshold → quality = 1.0."""
+    face_min, near_on = 0.5, 0.10
+    hand = _make_quality_hand(size=0.20, facing=0.9)  # near_norm=1, facing_norm=1
+    q = gesture_quality(hand, face_min=face_min, near_on=near_on)
+    assert math.isclose(q, 1.0, rel_tol=1e-6), f"expected 1.0, got {q}"
+
+
+def test_quality_monotonic_in_size():
+    """For fixed full-facing, quality increases strictly with hand size."""
+    face_min, near_on = 0.5, 0.10
+    facing = face_min  # facing_norm = 1.0 at exactly face_min
+    sizes = [0.5 * near_on, 0.75 * near_on, near_on]
+    qs = [gesture_quality(_make_quality_hand(size=s, facing=facing),
+                          face_min=face_min, near_on=near_on)
+          for s in sizes]
+    assert qs[0] < qs[1] < qs[2], f"not monotone: {qs}"
+
+
+# ---------------------------------------------------------------------------
+# gauge_segments
+# ---------------------------------------------------------------------------
+
+def test_gauge_segments_no_data_returns_two_dim_rails():
+    """cx/cy=None → 2 rail segments (dim, no markers)."""
+    segs = gauge_segments(None, None, "left", aspect=1.0)
+    # Exactly 2 rails: one horizontal (X gauge), one vertical (Y gauge)
+    assert len(segs) == 2, f"expected 2 rail segs, got {len(segs)}"
+    confs = [s[4] for s in segs]
+    assert all(c == 0.25 for c in confs), f"dim conf expected 0.25, got {confs}"
+    pids = [s[5] for s in segs]
+    assert all(p == 7 for p in pids), f"rail pid should be 7, got {pids}"
+
+
+def test_gauge_segments_with_data_returns_rails_and_markers():
+    """cx/cy provided → 2 rails + 2 X-marker ticks + 2 Y-marker ticks = 6 total."""
+    segs = gauge_segments(0.5, 0.5, "left", aspect=1.0)
+    assert len(segs) == 6, f"expected 6 segments (2 rail + 4 marker), got {len(segs)}"
+    rail_segs = [s for s in segs if s[5] == 7]
+    marker_segs = [s for s in segs if s[5] != 7]
+    assert len(rail_segs) == 2 and len(marker_segs) == 4
+
+
+def test_gauge_x_marker_centered_on_rail():
+    """cx=0.5 → primary X marker tick is at x = (x0+x1)/2 of the panel."""
+    x0, _y0, x1, _y1 = panel_rect("left", aspect=1.0)
+    center_x = (x0 + x1) / 2.0
+    segs = gauge_segments(0.5, 0.5, "left", aspect=1.0, content_pid=5)
+    # X marker ticks are vertical segments (same x on both endpoints), pid != 7
+    x_marker_segs = [s for s in segs
+                     if s[5] != 7 and math.isclose(s[0], s[2], abs_tol=1e-9)]
+    assert x_marker_segs, "no vertical X-marker ticks found"
+    # The primary tick (minimum x) should land at center_x; the bold-offset
+    # tick is at center_x + GAUGE_BOLD (a tiny offset for visual thickness).
+    primary_x = min(s[0] for s in x_marker_segs)
+    assert math.isclose(primary_x, center_x, rel_tol=1e-6), \
+        f"primary X marker at {primary_x}, expected {center_x}"
+
+
+def test_gauge_mirror_flips_x_marker():
+    """mirror=True → X marker at 1-cx (mirrored position), cx unchanged for Y."""
+    x0, _y0, x1, _y1 = panel_rect("left", aspect=1.0)
+    cx = 0.3
+    # Without mirror: marker at x0 + 0.3*(x1-x0)
+    segs_norm = gauge_segments(cx, 0.5, "left", 1.0, mirror=False, content_pid=5)
+    # With mirror: marker at x0 + 0.7*(x1-x0)
+    segs_mirr = gauge_segments(cx, 0.5, "left", 1.0, mirror=True, content_pid=5)
+    # Extract first X-marker tick (vertical segment, pid=5)
+    def _x_tick_x(segs):
+        for ax, ay, bx, by, c, p in segs:
+            if p == 5 and math.isclose(ax, bx, rel_tol=1e-9):
+                return ax
+        return None
+    xn = _x_tick_x(segs_norm)
+    xm = _x_tick_x(segs_mirr)
+    assert xn is not None and xm is not None
+    expected_n = x0 + cx * (x1 - x0)
+    expected_m = x0 + (1.0 - cx) * (x1 - x0)
+    assert math.isclose(xn, expected_n, rel_tol=1e-6), f"normal: {xn} != {expected_n}"
+    assert math.isclose(xm, expected_m, rel_tol=1e-6), f"mirror: {xm} != {expected_m}"
+
+
+def test_gauge_y_rail_below_panel_x_rail():
+    """X gauge rail y-coordinate is below the panel bottom edge."""
+    _x0, _y0, _x1, y1 = panel_rect("left", aspect=1.0)
+    segs = gauge_segments(0.5, 0.5, "left", 1.0)
+    # Horizontal rail: ay == by (same y, spanning x)
+    h_rail = [s for s in segs if math.isclose(s[1], s[3], rel_tol=1e-9)
+              and s[5] == 7]
+    assert h_rail, "no horizontal rail segment"
+    rail_y = h_rail[0][1]
+    assert rail_y > y1, f"X gauge rail y={rail_y} should be below panel y1={y1}"
+    assert math.isclose(rail_y, y1 + GAUGE_GAP, rel_tol=1e-6)

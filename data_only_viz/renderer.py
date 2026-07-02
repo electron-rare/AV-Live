@@ -47,6 +47,7 @@ from .arkit_skeleton import arkit_segments, finger_joint_mask
 from .hand_display import (
     HandPersistenceGate,
     arkit_2d_fresh,
+    gauge_segments,
     hand_plausible,
     hand_size,
     segment_ok,
@@ -528,33 +529,47 @@ class MetalRenderer(NSObject):
             )
             left_kp, right_kp = slotted
 
-            # Panel frame colored by gesture status (read from state, already under lock):
-            # pid 7 conf 0.3 = status 0 (absent, dim)
-            # pid 7 conf 1.0 = status 1 (detected, normal)
-            # pid 8 conf 1.0 = status 2 (armed: near+facing)
-            # pid 9 conf 1.0 = status 3 (pinch engaged, double-stroke)
+            # Panel frame: status drives hue (pid 7/8/9), quality drives
+            # brightness (0.25+0.75*q) and thickness (1..3 stroke passes).
+            # pid 7 conf=0.25+0.75*q  →  status 0: absent (q=0)
+            #                          →  status 1: detected (q≥0.30)
+            # pid 8 conf=0.25+0.75*q  →  status 2: armed (near+facing)
+            # pid 9 conf=1.0 (q=1.0)  →  status 3: pinch engaged
+            # Thickness: pass 1 always; pass 2 at q≥0.50; pass 3 at q≥0.85 or status==3.
             _slot_status = getattr(s, "gesture_slot_status", [0, 0])
+            _slot_quality = getattr(s, "gesture_slot_quality", [0.0, 0.0])
+            _hf_all = getattr(s, "hand_feats", None) or {}
             for _si, (side_name, h_kp, pid_s) in enumerate((
                 ("left",  left_kp,  5),
                 ("right", right_kp, 6),
             )):
                 _st = _slot_status[_si] if _si < len(_slot_status) else 0
+                _q = float(_slot_quality[_si]) if _si < len(_slot_quality) else 0.0
+                _fconf = 0.25 + 0.75 * _q
+                # Status drives hue (pid selection)
+                _fpid = 9 if _st == 3 else (8 if _st == 2 else 7)
                 _frame_segs = panel_frame(side_name, asp)
-                if _st == 0:
-                    for seg in _frame_segs:
-                        push_panel(*seg, 0.3, 7)          # absent: dim
-                elif _st == 1:
-                    for seg in _frame_segs:
-                        push_panel(*seg, 1.0, 7)          # detected: normal
-                elif _st == 2:
-                    for seg in _frame_segs:
-                        push_panel(*seg, 1.0, 8)          # armed: distinct palette color
-                else:  # 3: pinch engaged
-                    _off = 0.001                           # tiny offset for bold double-stroke
-                    for seg in _frame_segs:
-                        push_panel(*seg, 1.0, 9)
-                        ax, ay, bx, by = seg
-                        push_panel(ax + _off, ay, bx + _off, by, 1.0, 9)
+                # Pass 1: always
+                for seg in _frame_segs:
+                    push_panel(*seg, _fconf, _fpid)
+                # Pass 2: thicker when quality ≥ 0.50
+                if _q >= 0.5:
+                    for ax, ay, bx, by in _frame_segs:
+                        push_panel(ax + 0.001, ay, bx + 0.001, by, _fconf, _fpid)
+                # Pass 3: boldest when quality ≥ 0.85 or pinch engaged
+                if _q >= 0.85 or _st == 3:
+                    for ax, ay, bx, by in _frame_segs:
+                        push_panel(ax + 0.002, ay, bx + 0.002, by, _fconf, _fpid)
+                # Position gauges (X below / Y outer-side)
+                _slot_key = "L" if side_name == "left" else "R"
+                _slot_hf = _hf_all.get(_slot_key)
+                _g_cx = _slot_hf["cx"] if _slot_hf else None
+                _g_cy = _slot_hf["cy"] if _slot_hf else None
+                for ax, ay, bx, by, gconf, gpid in gauge_segments(
+                    _g_cx, _g_cy, side_name, asp, mirror,
+                    content_pid=pid_s,
+                ):
+                    push_panel(ax, ay, bx, by, gconf, gpid)
                 if h_kp is not None:
                     for seg in panel_segments(
                         h_kp, side_name, lhand_bones_p, asp,

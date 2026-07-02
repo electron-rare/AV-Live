@@ -24,7 +24,7 @@ from data_only_viz.action_head import (
     J3D_FINGERS_PER_HAND,
     LABELS,
 )
-from data_only_viz.hand_display import hand_plausible, HandPersistenceGate
+from data_only_viz.hand_display import gesture_quality, hand_plausible, HandPersistenceGate
 from data_only_viz.hand_slots import route_hands
 
 LOG = logging.getLogger("action_head_pub")
@@ -350,10 +350,11 @@ class ActionHeadPublisher(threading.Thread):
             self.bridge.send_pinch(ev)
 
     def _update_gesture_slot_status(self) -> None:
-        """Compute per-slot gesture status and write it to state.
+        """Compute per-slot gesture status and quality, write both to state.
 
         Status values: 0=absent, 1=detected(plausible+established, not armed),
         2=armed(near+facing), 3=pinch engaged.
+        Quality ∈ [0, 1]: continuous intensity for frame brightness + thickness.
         Called once per tick after all emitters have run.
         """
         stab = getattr(self, "_stab", None)
@@ -364,6 +365,9 @@ class ActionHeadPublisher(threading.Thread):
         active = stab.active_flags()
         engaged = pinch_det.engaged_slots() if pinch_det is not None else (False, False)
         status = [0, 0]
+        quality = [0.0, 0.0]
+        face_min = stab._face_min
+        near_on = stab._near_on
         for slot in range(2):
             if engaged[slot]:
                 status[slot] = 3
@@ -371,8 +375,15 @@ class ActionHeadPublisher(threading.Thread):
                 status[slot] = 2
             elif raw[slot] is not None:
                 status[slot] = 1
+            quality[slot] = gesture_quality(
+                raw[slot],
+                face_min=face_min,
+                near_on=near_on,
+                engaged=bool(engaged[slot]),
+            )
         with self.state.lock():
             self.state.gesture_slot_status = status
+            self.state.gesture_slot_quality = quality
 
     def _read_sources(self) -> tuple[
         list[tuple[int, np.ndarray, np.ndarray, float, np.ndarray]] | None,
