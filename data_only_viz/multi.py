@@ -132,12 +132,13 @@ class MultiWorker:
         self._pid_missing: dict[int, int] = {}
         self._pid_last_bbox: dict[int, tuple[float, float, float, float]] = {}
         # Discrimination thresholds — tunable via env.
-        import os as _os
-        self._ghost_min_visible = int(_os.environ.get("POSE_GHOST_MIN_VISIBLE", "10"))
-        self._ghost_min_conf = float(_os.environ.get("POSE_GHOST_MIN_CONF", "0.5"))
-        self._hand_min_visible = int(_os.environ.get("POSE_HAND_MIN_VISIBLE", "15"))
-        self._face_min_visible = int(_os.environ.get("POSE_FACE_MIN_VISIBLE", "50"))
-        self._nms_iou = float(_os.environ.get("POSE_NMS_IOU", "0.7"))
+        from .config import VizConfig as _VizConfig
+        _cfg = _VizConfig.from_env()
+        self._ghost_min_visible = _cfg.pose_ghost_min_visible
+        self._ghost_min_conf = _cfg.pose_ghost_min_conf
+        self._hand_min_visible = _cfg.pose_hand_min_visible
+        self._face_min_visible = _cfg.pose_face_min_visible
+        self._nms_iou = _cfg.pose_nms_iou
         # Counters exposed for debug.
         self._n_ghost_dropped = 0
         self._n_hand_dropped = 0
@@ -305,68 +306,79 @@ class MultiWorker:
         self._stop.set()
 
     def _run(self) -> None:
+        from .config import VizConfig as _VizConfig
+        _cfg = _VizConfig.from_env()
+        _rot = _cfg.video_rotate
+        LOG.info("video rotate = %s (env VIDEO_ROTATE: none/ccw/cw/180)", _rot)
+
         try:
             import cv2
-            import mediapipe as mp
-            from mediapipe.tasks.python import BaseOptions
-            from mediapipe.tasks.python.vision import (
-                PoseLandmarker, PoseLandmarkerOptions,
-                FaceLandmarker, FaceLandmarkerOptions,
-                HandLandmarker, HandLandmarkerOptions,
-                RunningMode,
-            )
         except ModuleNotFoundError as e:
-            LOG.error("deps manquantes : %s — uv sync --extra pose", e)
+            LOG.error("deps manquantes (cv2) : %s", e)
             return
 
-        try:
-            pose_p = _ensure_model("pose")
-            face_p = _ensure_model("face")
-            hand_p = _ensure_model("hand")
-        except Exception as e:  # noqa: BLE001
-            LOG.error("download models failed: %s", e)
-            return
+        # MediaPipe landmarkers: only loaded when Mac webcam is the source.
+        # Under --iphone-usb, body+face come from ARKit; loading MP here
+        # would waste RAM and slow concert boot.
+        pose = face = hand = _deleg = _mp = None
+        if not self.iphone_usb:
+            try:
+                import mediapipe as _mp
+                from mediapipe.tasks.python import BaseOptions
+                from mediapipe.tasks.python.vision import (
+                    PoseLandmarker, PoseLandmarkerOptions,
+                    FaceLandmarker, FaceLandmarkerOptions,
+                    HandLandmarker, HandLandmarkerOptions,
+                    RunningMode,
+                )
+            except ModuleNotFoundError as e:
+                LOG.error("deps manquantes : %s — uv sync --extra pose", e)
+                return
 
-        # GPU delegate (Metal sur macOS) : libere le CPU pour OSC, state,
-        # mesh_rigger. Multi-HMR remote macm1 + MediaPipe GPU M5 =
-        # workload distribue. Toggle via MEDIAPIPE_DELEGATE=cpu si plante.
-        import os as _os
-        _deleg_name = _os.environ.get("MEDIAPIPE_DELEGATE", "gpu").lower()
-        _deleg = (BaseOptions.Delegate.GPU if _deleg_name == "gpu"
-                  else BaseOptions.Delegate.CPU)
-        LOG.info("MediaPipe delegate = %s (env MEDIAPIPE_DELEGATE)",
-                 _deleg.name)
-        _rot = _os.environ.get("VIDEO_ROTATE", "none").lower()
-        LOG.info("video rotate = %s (env VIDEO_ROTATE: none/ccw/cw/180)", _rot)
-        pose = PoseLandmarker.create_from_options(PoseLandmarkerOptions(
-            base_options=BaseOptions(model_asset_path=str(pose_p),
-                                     delegate=_deleg),
-            running_mode=RunningMode.VIDEO,
-            num_poses=self.num_persons,
-            min_pose_detection_confidence=self.min_conf,
-            min_pose_presence_confidence=self.min_conf,
-            min_tracking_confidence=self.min_conf,
-        ))
-        face = FaceLandmarker.create_from_options(FaceLandmarkerOptions(
-            base_options=BaseOptions(model_asset_path=str(face_p),
-                                     delegate=_deleg),
-            running_mode=RunningMode.VIDEO,
-            num_faces=self.num_persons,
-            min_face_detection_confidence=self.min_conf,
-            min_face_presence_confidence=self.min_conf,
-            min_tracking_confidence=self.min_conf,
-        ))
-        hand = HandLandmarker.create_from_options(HandLandmarkerOptions(
-            base_options=BaseOptions(model_asset_path=str(hand_p),
-                                     delegate=_deleg),
-            running_mode=RunningMode.VIDEO,
-            num_hands=self.num_persons * 2,
-            min_hand_detection_confidence=self.min_conf,
-            min_hand_presence_confidence=self.min_conf,
-            min_tracking_confidence=self.min_conf,
-        ))
-        LOG.info("3 landmarkers prets (num=%d, delegate=%s)",
-                 self.num_persons, _deleg.name)
+            try:
+                pose_p = _ensure_model("pose")
+                face_p = _ensure_model("face")
+                hand_p = _ensure_model("hand")
+            except Exception as e:  # noqa: BLE001
+                LOG.error("download models failed: %s", e)
+                return
+
+            # GPU delegate (Metal sur macOS) : libere le CPU pour OSC, state,
+            # mesh_rigger. Toggle via MEDIAPIPE_DELEGATE=cpu si plante.
+            _deleg_name = _cfg.mediapipe_delegate
+            _deleg = (BaseOptions.Delegate.GPU if _deleg_name == "gpu"
+                      else BaseOptions.Delegate.CPU)
+            LOG.info("MediaPipe delegate = %s (env MEDIAPIPE_DELEGATE)",
+                     _deleg.name)
+            pose = PoseLandmarker.create_from_options(PoseLandmarkerOptions(
+                base_options=BaseOptions(model_asset_path=str(pose_p),
+                                         delegate=_deleg),
+                running_mode=RunningMode.VIDEO,
+                num_poses=self.num_persons,
+                min_pose_detection_confidence=self.min_conf,
+                min_pose_presence_confidence=self.min_conf,
+                min_tracking_confidence=self.min_conf,
+            ))
+            face = FaceLandmarker.create_from_options(FaceLandmarkerOptions(
+                base_options=BaseOptions(model_asset_path=str(face_p),
+                                         delegate=_deleg),
+                running_mode=RunningMode.VIDEO,
+                num_faces=self.num_persons,
+                min_face_detection_confidence=self.min_conf,
+                min_face_presence_confidence=self.min_conf,
+                min_tracking_confidence=self.min_conf,
+            ))
+            hand = HandLandmarker.create_from_options(HandLandmarkerOptions(
+                base_options=BaseOptions(model_asset_path=str(hand_p),
+                                         delegate=_deleg),
+                running_mode=RunningMode.VIDEO,
+                num_hands=self.num_persons * 2,
+                min_hand_detection_confidence=self.min_conf,
+                min_hand_presence_confidence=self.min_conf,
+                min_tracking_confidence=self.min_conf,
+            ))
+            LOG.info("3 landmarkers prets (num=%d, delegate=%s)",
+                     self.num_persons, _deleg.name)
 
         if self.iphone_usb:
             from .iphone_usb_source import IphoneUSBSource  # noqa: PLC0415
@@ -398,28 +410,31 @@ class MultiWorker:
             # et l'encodage JPEG : detection + overlay + affichage coherents.
             frame_bgr = _apply_video_rotate(frame_bgr, _rot)
             h, w = frame_bgr.shape[:2]
-            # MediaPipe GPU delegate on macOS uploads via CVPixelBuffer
-            # which only accepts 4-channel formats. SRGB (3ch) crashes
-            # in gpu_buffer_storage_cv_pixel_buffer.cc with
-            # "unsupported ImageFrame format: 1". Use SRGBA when on GPU.
-            if _deleg == BaseOptions.Delegate.GPU:
-                frame_rgba = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2RGBA)
-                mp_img = mp.Image(image_format=mp.ImageFormat.SRGBA,
-                                  data=frame_rgba)
-            else:
-                frame_rgb = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2RGB)
-                mp_img = mp.Image(image_format=mp.ImageFormat.SRGB,
-                                  data=frame_rgb)
             ts = int(time.monotonic() * 1000) - t0_ms
-            try:
-                # iphone-usb: body+face come from ARKit; skip Mac MediaPipe inference.
-                pose_res = None if self.iphone_usb else pose.detect_for_video(mp_img, ts)
-                face_res = None if self.iphone_usb else face.detect_for_video(mp_img, ts)
-                hand_res = None if self.iphone_usb else hand.detect_for_video(mp_img, ts)
-            except Exception as e:  # noqa: BLE001
-                LOG.warning("inference: %s", e)
-                time.sleep(self.period)
-                continue
+            if self.iphone_usb:
+                # body+face come from ARKit (IphoneUSBSource); skip MP inference.
+                pose_res = face_res = hand_res = None
+            else:
+                # MediaPipe GPU delegate on macOS uploads via CVPixelBuffer
+                # which only accepts 4-channel formats. SRGB (3ch) crashes
+                # in gpu_buffer_storage_cv_pixel_buffer.cc with
+                # "unsupported ImageFrame format: 1". Use SRGBA when on GPU.
+                if _deleg == BaseOptions.Delegate.GPU:
+                    frame_rgba = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2RGBA)
+                    mp_img = _mp.Image(image_format=_mp.ImageFormat.SRGBA,
+                                      data=frame_rgba)
+                else:
+                    frame_rgb = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2RGB)
+                    mp_img = _mp.Image(image_format=_mp.ImageFormat.SRGB,
+                                      data=frame_rgb)
+                try:
+                    pose_res = pose.detect_for_video(mp_img, ts)
+                    face_res = face.detect_for_video(mp_img, ts)
+                    hand_res = hand.detect_for_video(mp_img, ts)
+                except Exception as e:  # noqa: BLE001
+                    LOG.warning("inference: %s", e)
+                    time.sleep(self.period)
+                    continue
 
             # Encode webcam JPEG pour overlay
             ok2, jpg = cv2.imencode(".jpg", frame_bgr,
@@ -565,5 +580,10 @@ class MultiWorker:
             if dt < self.period:
                 time.sleep(self.period - dt)
         cap.release()
-        pose.close(); face.close(); hand.close()
+        if pose is not None:
+            pose.close()
+        if face is not None:
+            face.close()
+        if hand is not None:
+            hand.close()
         LOG.info("multi worker stopped")

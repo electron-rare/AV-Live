@@ -178,7 +178,8 @@ class AppDelegate(NSObject):
         # panel back. It would also collide with the left-hand side panel.
         self._hud = None
         self._hudTimer = None
-        if os.environ.get("VIZ_HUD", "0") not in ("0", "", "false", "False"):
+        from .config import VizConfig as _VizConfig
+        if _VizConfig.from_env().viz_hud:
             self._hud = NSTextView.alloc().initWithFrame_(
                 NSMakeRect(12, 12, 340, 240))
             self._hud.setEditable_(False)
@@ -272,6 +273,8 @@ class AppDelegate(NSObject):
         # 2. Apple Vision body pose (fallback si MediaPipe casse)
         # 3. CoreML pose, DETRPose, Holistic, YOLO — fallbacks
         import os as _os
+        from .config import VizConfig as _VizConfig
+        _cfg = _VizConfig.from_env()
         # iPhone ARBodyTracker (option 2 LiDAR fusion) : always-on
         # listener on :57128. Harmless if no iPhone is broadcasting ;
         # state.persons_arkit_joints stays empty and the arkit_fuse
@@ -288,8 +291,8 @@ class AppDelegate(NSObject):
         # joints. Requires a calibrated extrinsic on disk (see
         # scripts/calibrate_lidar.py) and an iPhone LiDAR stream
         # broadcasting on ICP_LIDAR_HOST:ICP_LIDAR_PORT.
-        if _os.environ.get("ICP_FUSION", "0") == "1":
-            host = _os.environ.get("ICP_LIDAR_HOST")
+        if _cfg.icp_fusion:
+            host = _cfg.icp_lidar_host
             if not host:
                 LOG.warning("ICP_FUSION=1 but ICP_LIDAR_HOST unset — "
                             "fusion disabled")
@@ -299,11 +302,11 @@ class AppDelegate(NSObject):
                     self._icp_fusion = IcpFusionThread(
                         self._state,
                         host=host,
-                        port=int(_os.environ.get("ICP_LIDAR_PORT", "5500")),
+                        port=_cfg.icp_lidar_port,
                     )
                     self._icp_fusion.start()
-                    LOG.info("worker: + ICP LiDAR fusion -> %s:%s", host,
-                             _os.environ.get("ICP_LIDAR_PORT", "5500"))
+                    LOG.info("worker: + ICP LiDAR fusion -> %s:%d",
+                             host, _cfg.icp_lidar_port)
                 except Exception as e:  # noqa: BLE001
                     LOG.warning("icp fusion start failed (%s)", e)
         # 0. Multi-HMR (SMPL-X 10475 verts mesh dense) — opt-in via flag
@@ -319,8 +322,7 @@ class AppDelegate(NSObject):
                     # the freshest frame and drain the freshest result.
                     self._pose_worker = MultiHMRWorker(
                         self._state, num_persons=4,
-                        target_fps=float(_os.environ.get(
-                            "MULTIHMR_LOOP_FPS", "30.0")),
+                        target_fps=_cfg.multihmr_loop_fps,
                         device=getattr(self._opts, "pose_device", "mps"),
                         det_thresh=getattr(self._opts, "det_thresh", 0.15),
                         nms_kernel_size=getattr(
@@ -334,7 +336,7 @@ class AppDelegate(NSObject):
                     # issues introduced by the hybrid rigging path).
                     self._smplx_tcp = SMPLXTCPSender(
                         self._state,
-                        enable_rigging=os.environ.get("MESH_RIG", "1") != "0",
+                        enable_rigging=_cfg.mesh_rig,
                     )
                     self._smplx_tcp.start()
                     LOG.info("worker: Multi-HMR + SMPL-X (mesh dense)")
@@ -350,8 +352,7 @@ class AppDelegate(NSObject):
                     # AV_LIVE_PARALLEL_POSE=apple_vision pour ne garder que
                     # le path ANE (face/hand fin disparait), ou =mediapipe
                     # pour ne garder que CPU.
-                    parallel = _os.environ.get(
-                        "AV_LIVE_PARALLEL_POSE", "both")
+                    parallel = _cfg.av_live_parallel_pose
                     if parallel in ("apple_vision", "both"):
                         try:
                             from .apple_vision_pose import AppleVisionPoseWorker
@@ -386,7 +387,7 @@ class AppDelegate(NSObject):
         # 1. MediaPipe Multi : DEFAUT pour le mapping sonore + openpos
         # (33 body + 478 face + 21x2 hands × 4 personnes). Skip via
         # AV_LIVE_MEDIAPIPE=0 si on prefere body-only ANE-accelere.
-        if _os.environ.get("AV_LIVE_MEDIAPIPE") != "0":
+        if _cfg.av_live_mediapipe:
             try:
                 from .multi import MultiWorker
                 self._pose_worker = MultiWorker(
@@ -399,7 +400,7 @@ class AppDelegate(NSObject):
                 LOG.warning("MediaPipe Multi unavailable (%s) — fallback", e)
         # 2. Apple Vision body pose : fallback si MediaPipe casse.
         # Body only, 13 joints, pas de face/hands.
-        if _os.environ.get("AV_LIVE_APPLE_VISION") != "0":
+        if _cfg.av_live_apple_vision:
             try:
                 from .apple_vision_pose import AppleVisionPoseWorker
                 if AppleVisionPoseWorker.is_available():
@@ -413,7 +414,7 @@ class AppDelegate(NSObject):
                          "(macOS < 11 ?) — fallback")
             except Exception as e:  # noqa: BLE001
                 LOG.warning("Apple Vision pose indisponible (%s) — fallback", e)
-        if _os.environ.get("AV_LIVE_COREML") != "0":
+        if _cfg.av_live_coreml:
             try:
                 from .coreml_pose import CoreMLPoseWorker
                 if CoreMLPoseWorker.is_available():
@@ -428,7 +429,7 @@ class AppDelegate(NSObject):
                          "puis relancer pour activer le pipeline ANE")
             except Exception as e:  # noqa: BLE001
                 LOG.warning("CoreML pose indisponible (%s) — fallback", e)
-        if _os.environ.get("AV_LIVE_DETRPOSE") == "1":
+        if _cfg.av_live_detrpose:
             try:
                 from .detrpose import DETRPoseWorker, is_available
                 if is_available():
