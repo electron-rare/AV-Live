@@ -164,7 +164,7 @@ class MetalRenderer(NSObject):
         _cfg = _VizConfig.from_env()
         self._hand_conf_min = _cfg.hand_conf_min
         self._arkit_bone_max = _cfg.arkit_bone_max
-        self._hand_gate = HandPersistenceGate(min_frames=_cfg.hand_persist_frames)
+        self._hand_gate = HandPersistenceGate(min_frames=_cfg.hand_persist_frames, grace=_cfg.hand_persist_grace)
         # Safety knob: invert Vision chirality interpretation.
         # Chirality validated correct live 2026-07-02; keep False unless a
         # future iPhone app build flips it.

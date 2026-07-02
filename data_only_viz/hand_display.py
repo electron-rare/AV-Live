@@ -258,8 +258,13 @@ class HandPersistenceGate:
 
     Tracks each hand by wrist position (landmark 0).  A hand is only
     drawable once the same wrist position has been matched for
-    *min_frames* consecutive calls.  A track that goes unmatched for even
-    one frame is immediately dropped (resets the consecutive count).
+    *min_frames* consecutive calls.
+
+    With ``grace=0`` (default) a track that goes unmatched for even one
+    frame is immediately dropped (resets the consecutive count).  With
+    ``grace>0`` an unmatched track survives up to *grace* consecutive
+    missed calls, so a single Vision drop-frame does not wipe the
+    accumulated count and cause a 4-frame visual flicker.
 
     min_frames=1 disables gating: every incoming hand is drawable on the
     first call (useful for the single-person MediaPipe fallback path).
@@ -270,10 +275,11 @@ class HandPersistenceGate:
     for a display gate; do not reuse for gesture-state tracking.
     """
 
-    def __init__(self, min_frames: int = 3, radius: float = 0.15) -> None:
+    def __init__(self, min_frames: int = 3, radius: float = 0.15, grace: int = 0) -> None:
         self._min_frames = min_frames
         self._radius = radius
-        # Each track: [wrist_x, wrist_y, consecutive_count]
+        self._grace = grace
+        # Each track: [wrist_x, wrist_y, consecutive_count, miss_count]
         self._tracks: list[list] = []
 
     def step(self, hands: list) -> list[bool]:
@@ -302,9 +308,10 @@ class HandPersistenceGate:
             # Find the nearest existing track within radius (greedy).
             best_dist = float("inf")
             best_t = -1
-            for t_idx, (tx, ty, _count) in enumerate(self._tracks):
+            for t_idx, track in enumerate(self._tracks):
                 if t_idx in used:
                     continue
+                tx, ty = track[0], track[1]
                 d = math.hypot(wx - tx, wy - ty)
                 if d < best_dist and d < self._radius:
                     best_dist = d
@@ -313,13 +320,19 @@ class HandPersistenceGate:
             if best_t >= 0:
                 used.add(best_t)
                 new_count = self._tracks[best_t][2] + 1
-                new_tracks.append([wx, wy, new_count])
+                new_tracks.append([wx, wy, new_count, 0])  # reset miss
                 result[h_idx] = new_count >= self._min_frames
             else:
-                # New track — starts at count 1.
-                new_tracks.append([wx, wy, 1])
+                # New track — starts at count 1, miss 0.
+                new_tracks.append([wx, wy, 1, 0])
                 result[h_idx] = 1 >= self._min_frames
 
-        # Unmatched tracks are dropped (not carried into new_tracks).
+        # Carry forward unmatched tracks within grace window.
+        for t_idx, track in enumerate(self._tracks):
+            if t_idx not in used:
+                miss = track[3] + 1
+                if miss <= self._grace:
+                    new_tracks.append([track[0], track[1], track[2], miss])
+
         self._tracks = new_tracks
         return result

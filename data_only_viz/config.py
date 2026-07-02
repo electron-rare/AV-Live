@@ -35,6 +35,9 @@ HAND_CONF_MIN               0.45      float  min hand landmark confidence to ren
 HAND_PERSIST_FRAMES         3         int    frames to persist hand after disappearance
 HAND_SWAP_LR                "0"       bool   Safety knob: invert Vision chirality (validated correct live 2026-07-02; keep 0 unless a future iPhone app build flips it)
 HAND_NEAR_MIN               0.10      float  min hand size (norm) to consider "near"
+HAND_PERSIST_GRACE          2         int    grace frames before dropping a hand track on Vision miss (0 = strict)
+HAND_NEAR_OFF               0.08      float  hand size below which near gate deactivates (hysteresis off-threshold)
+HAND_HOLD_FRAMES            2         int    gesture slot hold: frames to carry last hand on Vision miss
 ARKIT_BONE_MAX              0.5       float  max bone length (norm) for ARKit skeleton
 ARKIT_FULL_SKELETON         "1"       bool   draw full 91-joint ARKit body (!=0 = True)
 VIZ_HUD                     "0"       bool   show debug HUD overlay
@@ -117,8 +120,11 @@ class VizConfig:
     # ---- Hand display / gesture ------------------------------------------
     hand_conf_min: float = 0.45
     hand_persist_frames: int = 3
+    hand_persist_grace: int = 2
     hand_swap_lr: bool = False
     hand_near_min: float = 0.10
+    hand_near_off: float = 0.08
+    hand_hold_frames: int = 2
     arkit_bone_max: float = 0.5
     arkit_full_skeleton: bool = True
 
@@ -261,8 +267,11 @@ class VizConfig:
             pinch_debounce_frames=_int("PINCH_DEBOUNCE_FRAMES", 3),
             hand_conf_min=_float("HAND_CONF_MIN", 0.45),
             hand_persist_frames=_int("HAND_PERSIST_FRAMES", 3),
+            hand_persist_grace=_int("HAND_PERSIST_GRACE", 2),
             hand_swap_lr=_bool_std("HAND_SWAP_LR", False),
             hand_near_min=_float("HAND_NEAR_MIN", 0.10),
+            hand_near_off=_float("HAND_NEAR_OFF", 0.08),
+            hand_hold_frames=_int("HAND_HOLD_FRAMES", 2),
             arkit_bone_max=_float("ARKIT_BONE_MAX", 0.5),
             # ARKIT_FULL_SKELETON uses != "0" convention (empty = True)
             arkit_full_skeleton=_bool_ne0("ARKIT_FULL_SKELETON", True),

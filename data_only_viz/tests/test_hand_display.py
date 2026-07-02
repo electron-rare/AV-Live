@@ -502,3 +502,59 @@ def test_gate_greedy_no_double_assign():
     result = gate.step([h1, h2])
     # Both should have count=2 >= min_frames=2
     assert result == [True, True]
+
+
+# ---------------------------------------------------------------------------
+# HandPersistenceGate — grace frames
+# ---------------------------------------------------------------------------
+
+def test_gate_grace_zero_is_strict():
+    """grace=0 restores original strict behavior (1 miss drops the track)."""
+    gate = HandPersistenceGate(min_frames=3, grace=0)
+    hand = _make_hand(wrist_x=0.5, wrist_y=0.5)
+    for _ in range(3):
+        gate.step([hand])  # establish count=3
+    gate.step([])           # miss=1 > grace=0 → dropped
+    assert gate.step([hand]) == [False]  # fresh count=1
+
+
+def test_gate_grace_preserves_track_across_one_miss():
+    """With grace=2, a 1-frame hole preserves the established count."""
+    gate = HandPersistenceGate(min_frames=3, grace=2)
+    hand = _make_hand(wrist_x=0.5, wrist_y=0.5)
+    for _ in range(3):
+        gate.step([hand])  # establish count=3
+    gate.step([])            # miss=1 ≤ grace → track survives
+    result = gate.step([hand])  # matches surviving track: count=4
+    assert result == [True]
+
+
+def test_gate_grace_gap_frame_has_empty_result():
+    """During a grace frame (no hands input), result list is empty."""
+    gate = HandPersistenceGate(min_frames=3, grace=2)
+    hand = _make_hand(wrist_x=0.5, wrist_y=0.5)
+    for _ in range(3):
+        gate.step([hand])
+    assert gate.step([]) == []  # no hands → result is []
+
+
+def test_gate_grace_drops_after_grace_plus_one_misses():
+    """After grace+1 consecutive misses the track is dropped."""
+    gate = HandPersistenceGate(min_frames=3, grace=2)
+    hand = _make_hand(wrist_x=0.5, wrist_y=0.5)
+    for _ in range(3):
+        gate.step([hand])   # establish
+    for _ in range(3):      # 3 misses: miss=1,2,3 → last one > grace=2 → dropped
+        gate.step([])
+    assert gate.step([hand]) == [False]  # fresh count=1
+
+
+def test_gate_grace_ghost_stays_suppressed():
+    """A ghost appearing 1 frame then disappearing never becomes drawable
+    (count=1 < min_frames=3 even after being carried by grace)."""
+    gate = HandPersistenceGate(min_frames=3, grace=2)
+    hand = _make_hand(wrist_x=0.5, wrist_y=0.5)
+    gate.step([hand])   # count=1
+    gate.step([])        # miss=1 ≤ grace → track [0.5, 0.5, 1, 1] survives
+    # Reappears: count increments to 2 (still not established)
+    assert gate.step([hand]) == [False]
