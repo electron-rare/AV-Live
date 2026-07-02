@@ -29,10 +29,10 @@ PINCH_RATIO_OFF             0.65      float  dist/size above which pinch re-arms
 PINCH_REFRACTORY_MS         250       float  min ms between pinches per finger
 PINCH_MARGIN                0.20      float  extra margin added to pinch zone
 PINCH_EXT_RATIO             1.35      float  extended-pinch activation ratio
-PINCH_EXT_MIN               2         int    min frames for extended-pinch debounce
+PINCH_EXT_MIN               2         int    min extended fingers for a pinch to fire; 0 disables open-hand gate
 PINCH_DEBOUNCE_FRAMES       3         int    debounce frames for pinch state machine
 HAND_CONF_MIN               0.45      float  min hand landmark confidence to render
-HAND_PERSIST_FRAMES         3         int    frames to persist hand after disappearance
+HAND_PERSIST_FRAMES         3         int    consecutive frames before a hand track is drawn; 1=off
 HAND_SWAP_LR                "0"       bool   Safety knob: invert Vision chirality (validated correct live 2026-07-02; keep 0 unless a future iPhone app build flips it)
 HAND_NEAR_MIN               0.10      float  min hand size (norm) to consider "near"
 HAND_PERSIST_GRACE          2         int    grace frames before dropping a hand track on Vision miss (0 = strict)

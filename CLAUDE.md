@@ -44,7 +44,7 @@ Toujours répondre en français à l'utilisateur. Code, commentaires de code, co
 | `MULTIHMR_SERVER_BACKEND` | `pyobjc` | server: `pyobjc` or `coremltools` |
 | `MULTIHMR_LOOP_FPS` | `30` | Python worker loop target_fps |
 | `AVBODY_HOST` | `127.0.0.1` | route TCP mesh + OSC to remote AVLiveBody |
-| `MEDIAPIPE_DELEGATE` | `cpu` | `gpu` Metal SRGBA (faster, flake on M5) |
+| `MEDIAPIPE_DELEGATE` | `gpu` | Metal SRGBA (faster); `cpu` fallback for stability |
 | `POSE_FILTER` | `median+kalman+lookahead+ik` | filter chain stages |
 | `MULTIHMR_REID` | `dino` | DINO cosine matching, `iou` fallback |
 
@@ -88,6 +88,9 @@ Toujours répondre en français à l'utilisateur. Code, commentaires de code, co
 | `HAND_NEAR_OFF` | `0.08` | hand size hysteresis off-threshold for gesture slot stabilizer |
 | `HAND_HOLD_FRAMES` | `2` | gesture slot: frames to hold last hand on Vision miss |
 | `ARKIT_BONE_MAX` | `0.5` | max ARKit body bone length in normalized units; longer bones are skipped (tracking-loss garbage filter) |
+| `PINCH_ENABLE` | `0` | enable pinch gesture detection |
+| `VIZ_HUD` | `0` | show debug HUD overlay |
+| `CONCERT_MIRROR` | `1` | mirror video horizontally (!=0 enables) |
 
 ## Conventions globales
 
