@@ -23,6 +23,9 @@ def arkit_segments(arr2d, valid, parents, max_len: float = 0.5, bounds: float = 
     parents: parent index per joint (-1 = root).
     max_len: maximum bone length in normalized units; bones longer than this
              are skipped (garbage coords during ARKit tracking loss).
+             Caveat: on an extreme close-up (subject filling the frame) a
+             legit bone can approach 0.5 — raise ARKIT_BONE_MAX live if
+             the skeleton visibly loses bones when very near the camera.
     bounds:  margin outside [0,1] that is still accepted; endpoints outside
              [-bounds, 1+bounds] in x or y are rejected.
     """

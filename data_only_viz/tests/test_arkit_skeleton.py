@@ -80,3 +80,16 @@ def test_segments_in_bounds_endpoint_passes():
     parents = [-1, 0]
     segs = arkit_segments(arr2d, valid, parents, bounds=0.1)
     assert len(segs) == 1
+
+
+def test_segments_legacy_diagonal_bone_now_filtered():
+    """Regression pin: the pre-filter test fixtures used a full-diagonal
+    bone (0,0)->(0.5,0.5), length ~0.707. The max_len=0.5 default now
+    REJECTS it — this is the intended behavior change of the v2 filter,
+    made explicit here instead of silently retuning old fixtures."""
+    arr2d = [(0.0, 0.0), (0.5, 0.5)]
+    valid = [True, True]
+    parents = [-1, 0]
+    assert arkit_segments(arr2d, valid, parents) == []
+    # ...and the env-tunable knob restores it for close-up shots.
+    assert len(arkit_segments(arr2d, valid, parents, max_len=0.8)) == 1
