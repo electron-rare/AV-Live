@@ -1,11 +1,11 @@
 """Every generated .matrix must carry the default globalActions mapping
-(slots: LH open=fill, LH closed=drop, RH open=evolve, RH closed=breakdown).
+(8 actions: fill doubleTime washReverb muteDrums relanceEvolve halfTime next muteMelo).
 Run: cd .../matrix_presets && uv run python test_global_actions.py"""
 import sys, os, glob
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import generate_presets as G
 
-EXPECT = r"'globalActions': [ \fill, \drop, \breakdown, \evolve, \muteDrums, \muteMelo, \washReverb, \next ]"
+EXPECT = r"'globalActions': [ \fill, \doubleTime, \washReverb, \muteDrums, \relanceEvolve, \halfTime, \next, \muteMelo ]"
 ok = True
 
 def check(c, m):

@@ -32,27 +32,29 @@ VI = {v: i for i, v in enumerate(VOICES)}
 BARS = 64
 
 # --- per-voice valid instrument choices (mirror of matrix.scd ~matInstChoices) ---
+# Includes 10 vintage SynthDefs landed in commits a6556e8+876afc0:
+#   tr909_snare hoover m1_piano m1_organ dx7_epiano brass_stab nord_lead virus_saw rave_stab reese_juno
 INST_CHOICES = {
     "kick":  ["lp_kick", "tr909_kick", "tr808_kick", "sp1200", "do_kick", "do_quake_sub"],
     "hats":  ["lp_hat", "tr909_hat", "tr808_hat", "sp1200", "do_hat"],
-    "clap":  ["lp_clap", "tr909_clap", "tr808_clap", "sp1200", "lp_rim"],
+    "clap":  ["lp_clap", "tr909_clap", "tr909_snare", "tr808_clap", "sp1200", "lp_rim"],
     "perc":  ["lp_perc", "tr808_cowbell", "sp1200", "akai_s", "do_strike"],
-    "sub":   ["lp_sub", "sh101", "minimoog", "system100", "lp_reese"],
+    "sub":   ["lp_sub", "sh101", "minimoog", "system100", "lp_reese", "m1_organ", "reese_juno"],
     "acid":  ["lp_acid", "tb303", "ms20", "system100", "lp_pluck"],
-    "arp":   ["lp_pluck", "tb303", "supersaw", "juno", "do_strike"],
-    "lead":  ["lp_pluck", "ms20", "supersaw", "do_plane", "sh101"],
-    "stab":  ["lp_pluck", "ms20", "supersaw", "tb303", "lp_acid"],
-    "pad":   ["lp_pad", "juno", "supersaw", "ms20", "lp_reese"],
+    "arp":   ["lp_pluck", "tb303", "supersaw", "juno", "do_strike", "nord_lead", "virus_saw"],
+    "lead":  ["lp_pluck", "ms20", "supersaw", "do_plane", "sh101", "hoover", "virus_saw"],
+    "stab":  ["lp_pluck", "ms20", "supersaw", "tb303", "lp_acid", "brass_stab", "rave_stab"],
+    "pad":   ["lp_pad", "juno", "supersaw", "ms20", "lp_reese", "reese_juno"],
     "ride":  ["lp_ride", "tr909_ride", "lp_hat", "do_hat"],
     "rim":   ["lp_rim", "tr808_cowbell", "tr909_clap", "sp1200"],
     "tom":   ["lp_tom", "sp1200", "do_strike", "do_quake_sub"],
-    "reese": ["lp_reese", "ms20", "minimoog", "system100", "supersaw"],
-    "bells": ["lp_bells", "dx7", "akai_s", "do_plane"],
+    "reese": ["lp_reese", "ms20", "minimoog", "system100", "supersaw", "hoover", "reese_juno"],
+    "bells": ["lp_bells", "dx7", "akai_s", "do_plane", "dx7_epiano"],
     "sweep": ["lp_sweep", "akai_s", "lp_pad", "lp_reese"],
-    "melody": ["lp_pluck", "supersaw", "ms20", "sh101", "dx7"],
-    "chord": ["lp_pad", "juno", "supersaw", "ms20"],
+    "melody": ["lp_pluck", "supersaw", "ms20", "sh101", "dx7", "dx7_epiano", "nord_lead"],
+    "chord": ["lp_pad", "juno", "supersaw", "ms20", "m1_piano", "m1_organ", "dx7_epiano"],
     "fx":    ["lp_fx", "akai_s", "lp_sweep"],
-    "snare": ["lp_snare", "tr909_clap", "tr808_clap", "lp_clap"],
+    "snare": ["lp_snare", "tr909_snare", "tr909_clap", "tr808_clap", "lp_clap"],
     "crash": ["lp_crash", "tr909_ride", "akai_s"],
     "shaker": ["lp_shaker", "tr909_hat", "tr808_hat"],
 }
@@ -579,9 +581,9 @@ for v in ("sub", "acid", "arp", "lead", "stab", "pad", "reese", "bells", "perc",
 # Per-role default bindings (source, target, depth). Soloists -> hand sources
 # (expressive, close-up); energy/structure -> body sources (robust at distance).
 _ROLE_MODS = {
-    "lead":   [("rHandX", "amp", 0.4), ("rHandY", "pitch", 0.4), ("lHandY", "cutoff", 0.5), ("lHandX", "res", 0.4)],
-    "bells":  [("rHandX", "amp", 0.4), ("rHandY", "pitch", 0.4), ("lHandX", "res", 0.4)],
-    "melody": [("rHandX", "amp", 0.4), ("lHandY", "cutoff", 0.5), ("lHandX", "res", 0.4)],
+    "lead":   [("rHandX", "amp", 0.70), ("rHandY", "pitch", 0.70), ("lHandY", "cutoff", 0.70), ("lHandX", "res", 0.70)],
+    "bells":  [("rHandX", "amp", 0.70), ("rHandY", "pitch", 0.70), ("lHandX", "res", 0.70)],
+    "melody": [("rHandX", "amp", 0.70), ("lHandY", "cutoff", 0.70), ("lHandX", "res", 0.70)],
     "reese":  [("bodyVitesse", "cutoff", 0.5), ("bodyY", "pitch", 0.3), ("limbSpan", "res", 0.4), ("bodyX", "pan", 0.3)],
     "sub":    [("bodyVitesse", "res", 0.4), ("bodyY", "pitch", 0.3), ("bodyX", "pan", 0.3)],
     "pad":    [("bodyVitesse", "cutoff", 0.4), ("limbSpan", "rev", 0.4), ("bodyX", "pan", 0.3)],
@@ -1148,13 +1150,144 @@ def to_sc(name, arc_fn, instkit, melodies, extra, post=None):
             "'colorDefs': [\n%s\n],\n"
             "'voiceMods': [ %s ],\n"
             "'voicePoses': [ %s ],\n"
-            "'globalActions': [ \\fill, \\drop, \\breakdown, \\evolve, "
-            "\\muteDrums, \\muteMelo, \\washReverb, \\next ],\n"
+            "'globalActions': [ \\fill, \\doubleTime, \\washReverb, "
+            "\\muteDrums, \\relanceEvolve, \\halfTime, \\next, \\muteMelo ],\n"
             "'globalSettings': ( 'transientBars': 1, "
             "'breakdownKeep': [ \\kick, \\sub ] ),\n"
             "'pinchHoldMs': 300,\n"
             "'fistThresh': 0.15\n)\n"
             % (rows, isyms, cds, vms, vps))
+
+
+# ============================================================================
+# Live variant generation (4 variants per style = 112 new files)
+# ============================================================================
+import patterns as _pats
+
+# Era kit overlays per style group: 4 eras (house/M1, acid/hoover, virus/nord, rave/909).
+# Each entry overrides selected voices in the base preset kit.
+# All instruments validated against INST_CHOICES above (mirrors matrix.scd ~matInstChoices).
+_VARIANT_ERA_KITS = {
+    "techno": [
+        {"chord": "m1_organ", "stab": "brass_stab", "bells": "dx7_epiano"},          # v1 house/M1
+        {"acid": "tb303", "lead": "hoover", "reese": "hoover"},                        # v2 acid/hoover
+        {"lead": "virus_saw", "arp": "virus_saw", "stab": "rave_stab"},                # v3 virus/nord
+        {"kick": "tr909_kick", "snare": "tr909_snare", "stab": "brass_stab"},          # v4 909/rave
+    ],
+    "psy": [
+        {"pad": "reese_juno", "chord": "m1_organ", "bells": "dx7_epiano"},             # v1 house/M1
+        {"acid": "tb303", "arp": "tb303", "sub": "system100"},                         # v2 acid
+        {"lead": "virus_saw", "arp": "nord_lead", "reese": "reese_juno"},              # v3 virus/nord
+        {"kick": "tr909_kick", "snare": "tr909_snare"},                                # v4 909/rave
+    ],
+    "trance": [
+        {"chord": "m1_piano", "melody": "dx7_epiano", "bells": "dx7_epiano"},          # v1 house/M1
+        {"arp": "tb303", "sub": "system100", "lead": "ms20"},                          # v2 acid/303
+        {"lead": "virus_saw", "arp": "nord_lead", "melody": "nord_lead"},              # v3 virus/nord
+        {"kick": "tr909_kick", "clap": "tr909_snare", "snare": "tr909_snare"},        # v4 909/rave
+    ],
+    "breaks": [
+        {"pad": "juno", "chord": "m1_organ", "bells": "dx7_epiano"},                   # v1 house/M1
+        {"reese": "hoover", "stab": "tb303", "sub": "system100"},                      # v2 acid/hoover
+        {"reese": "reese_juno", "lead": "virus_saw", "pad": "reese_juno"},             # v3 virus/nord
+        {"kick": "sp1200", "snare": "tr909_snare", "stab": "rave_stab"},              # v4 909/rave
+    ],
+    "electro": [
+        {"melody": "dx7_epiano", "chord": "m1_piano", "stab": "brass_stab"},           # v1 house/M1
+        {"acid": "tb303", "sub": "system100"},                                          # v2 acid/303
+        {"lead": "virus_saw", "stab": "nord_lead", "melody": "nord_lead"},             # v3 virus/nord
+        {"kick": "tr808_kick", "clap": "tr808_clap", "snare": "tr909_snare"},         # v4 808/rave
+    ],
+    "industrial": [
+        {"stab": "brass_stab", "reese": "reese_juno"},                                 # v1 (no M1 piano)
+        {"acid": "tb303", "sub": "system100", "reese": "hoover"},                      # v2 acid/hoover
+        {"stab": "rave_stab", "reese": "reese_juno", "lead": "virus_saw"},            # v3 virus/nord
+        {"kick": "tr909_kick", "clap": "tr909_snare", "snare": "tr909_snare"},        # v4 909/rave
+    ],
+    "ambient": [
+        {"pad": "reese_juno", "bells": "dx7_epiano", "chord": "m1_piano"},             # v1 M1/DX7
+        {"pad": "juno", "sub": "system100", "melody": "ms20"},                         # v2 analog
+        {"pad": "reese_juno", "melody": "nord_lead", "bells": "dx7_epiano"},           # v3 nord/reese
+        {"pad": "juno", "melody": "dx7_epiano", "chord": "m1_organ"},                 # v4 M1 organ
+    ],
+}
+
+# Pattern families per style group x variant (drum_family, mel_family).
+# Pairs must be valid or will silently fall back to 'default' in patterns_for().
+_VARIANT_FAMILIES = {
+    "techno":     [("techno", "house"), ("techno", "psy"), ("electro", "default"), ("industrial", "default")],
+    "psy":        [("techno", "psy"),   ("techno", "dub"), ("breaks", "psy"),       ("industrial", "psy")],
+    "trance":     [("techno", "house"), ("techno", "psy"), ("electro", "house"),    ("breaks", "house")],
+    "breaks":     [("breaks", "default"), ("dnb", "default"), ("footwork", "default"), ("breaks", "psy")],
+    "electro":    [("electro", "house"), ("ebm", "house"), ("electro", "default"), ("industrial", "default")],
+    "industrial": [("industrial", "default"), ("electro", "default"), ("breaks", "default"), ("ebm", "default")],
+    "ambient":    [("ambient", "ambient"), ("techno", "ambient"), ("ambient", "dub"), ("ambient", "house")],
+}
+
+# Busy-block profiles for each variant (index 0-3 = v1-v4).
+# busy_blocks: which 16-bar blocks get the recolour pass; busy_color: colour applied.
+_VARIANT_BUSY = [
+    {"busy_blocks": [0, 2], "busy_color": 3},   # v1 octave-up on blocks 0 & 2
+    {"busy_blocks": [1, 3], "busy_color": 2},   # v2 double-time on blocks 1 & 3
+    {"busy_blocks": [0, 3], "busy_color": 3},   # v3 bookend blocks
+    {"busy_blocks": [2, 3], "busy_color": 6},   # v4 accent-roll second half
+]
+
+
+def _make_live_continuous_v(g, style, busy_cfg):
+    """Like make_live_continuous but with a variant-specific busy configuration."""
+    ps, pn = SECTIONS["P"]
+    for row in g:
+        plateau = row[ps:ps + pn]
+        for b in range(len(row)):
+            row[b] = plateau[(b - ps) % pn]
+    prof = LIVE_VAR.get(style, LIVE_VAR["techno"])
+    for blk in busy_cfg["busy_blocks"]:
+        for v in prof["busy"]:
+            vi = VI[v]
+            for b in range(blk * 16, blk * 16 + 16):
+                if g[vi][b] > 0:
+                    g[vi][b] = busy_cfg["busy_color"]
+    for blk in range(BARS // 16):
+        for v in prof["fill"]:
+            vi = VI[v]
+            for b in (blk * 16 + 14, blk * 16 + 15):
+                if g[vi][b] > 0:
+                    g[vi][b] = 6
+    return g
+
+
+def generate_live_variant_sc(name, variant_idx, m):
+    """Build SC string for one live variant file.
+
+    variant_idx: 1-4.  Deterministic: outcome depends only on name + variant_idx.
+    """
+    style_group = LIVE_STYLE.get(name, "techno")
+    vi = variant_idx - 1   # 0-3
+
+    # Pattern family for this variant
+    fam = _VARIANT_FAMILIES.get(style_group, _VARIANT_FAMILIES["techno"])[vi]
+
+    # Build merged kit: base preset kit + era overlay
+    era_kit = _VARIANT_ERA_KITS.get(style_group, _VARIANT_ERA_KITS["techno"])[vi]
+    merged_kit = dict(m["instkit"])
+    for voice, inst in era_kit.items():
+        if voice in INST_CHOICES and inst in INST_CHOICES[voice]:
+            merged_kit[voice] = inst
+
+    # Busy config for the live variation pass
+    busy_cfg = _VARIANT_BUSY[vi]
+
+    # Register variant name in patterns.PRESET_FAMILY so emit_colordefs resolves correctly
+    vname = "%s_live-%d" % (name, variant_idx)
+    _pats.PRESET_FAMILY[vname] = fam
+    try:
+        post = (lambda s, bc: (lambda gg: _make_live_continuous_v(gg, s, bc)))(
+            style_group, busy_cfg)
+        sc = to_sc(vname, m["live"], merged_kit, m["melodies"], m["extra"], post)
+    finally:
+        del _pats.PRESET_FAMILY[vname]
+    return sc
 
 
 def main():
@@ -1169,8 +1302,18 @@ def main():
             with open(os.path.join(here, "%s_%s.matrix" % (name, sec)), "w") as f:
                 f.write(sc)
             n += 1
+    # Generate the 4 live variants per style (112 new files)
+    nv = 0
+    for name, m in MORCEAUX.items():
+        for vi in range(1, 5):
+            sc = generate_live_variant_sc(name, vi, m)
+            path = os.path.join(here, "%s_live-%d.matrix" % (name, vi))
+            with open(path, "w") as f:
+                f.write(sc)
+            nv += 1
     print("wrote %d presets (%d morceaux x intro/live/outro, 22 voices x %d bars)"
           % (n, len(MORCEAUX), BARS))
+    print("wrote %d live-variant presets (%d morceaux x 4 variants)" % (nv, len(MORCEAUX)))
 
 
 if __name__ == "__main__":
