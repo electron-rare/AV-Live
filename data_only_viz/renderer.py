@@ -472,6 +472,15 @@ class MetalRenderer(NSObject):
                     if a >= len(face_kp) or b >= len(face_kp): continue
                     if not push(face_kp[a], face_kp[b], 1.0, pid): break
                 if segs >= SKEL_MAX_SEGS: break
+            # Bold hand strokes: same concentric-offset technique as the
+            # ARKit body (SKEL_LINE_WIDTH), one step thinner so small hands
+            # do not blob.
+            _hw = max(1, getattr(self, "_skel_width", 1) - 1)
+            _ho = 1.0 / max(1, s.height or 720)
+            _hoffs = [(0.0, 0.0)]
+            for _r in range(1, _hw):
+                _hd = _r * _ho
+                _hoffs += [(_hd, 0.0), (-_hd, 0.0), (0.0, _hd), (0.0, -_hd)]
             for i, hand_kp in enumerate(s.persons_hands):
                 if not _hand_draw_flags[i]:
                     continue
@@ -484,7 +493,11 @@ class MetalRenderer(NSObject):
                     A = hand_kp[a]; B = hand_kp[b]
                     if not segment_ok(A, B, size, conf_min=self._hand_conf_min): continue
                     # Decalage palette mains (+5) pour les distinguer
-                    if not push(A, B, min(A.c, B.c), pid + 5): break
+                    _c = min(A.c, B.c)
+                    for _dx, _dy in _hoffs:
+                        if not push_seg(A.x + _dx, A.y + _dy,
+                                        B.x + _dx, B.y + _dy, _c, pid + 5):
+                            break
             # ----- FALLBACK single-person si persons_* vides -----
             if not (s.persons_body or s.persons_face or s.persons_hands):
                 if s.body_present and not use_arkit:
