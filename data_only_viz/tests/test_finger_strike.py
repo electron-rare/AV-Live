@@ -221,3 +221,36 @@ def test_extension_gate_defeat_reproduces_old_behavior():
                         ext_min=0)
     ev = det.step([_relaxed_hand()], 0.1)
     assert len(ev) == 1 and ev[0].state == 1
+
+
+def test_debounce_delays_engage_to_nth_frame():
+    det = PinchDetector(ratio_on=0.45, ratio_off=0.65, refractory_ms=0,
+                        debounce_frames=3)
+    det.step([_pinch_hand(*_OPEN)], 0.00)
+    a = det.step([_pinch_hand(*_PINCH)], 0.10)   # qualifying 1
+    b = det.step([_pinch_hand(*_PINCH)], 0.13)   # qualifying 2
+    c = det.step([_pinch_hand(*_PINCH)], 0.16)   # qualifying 3 -> engage
+    assert a == [] and b == []
+    assert len(c) == 1 and c[0].state == 1 and c[0].finger == 1
+
+
+def test_debounce_jitter_resets_counter():
+    det = PinchDetector(ratio_on=0.45, ratio_off=0.65, refractory_ms=0,
+                        debounce_frames=3)
+    det.step([_pinch_hand(*_PINCH)], 0.00)       # qualifying 1
+    det.step([_pinch_hand(*_PINCH)], 0.03)       # qualifying 2
+    det.step([_pinch_hand(*_OPEN)], 0.06)        # jitter -> counter resets
+    a = det.step([_pinch_hand(*_PINCH)], 0.09)   # qualifying 1 again
+    b = det.step([_pinch_hand(*_PINCH)], 0.12)   # qualifying 2
+    assert a == [] and b == []
+
+
+def test_release_immediate_after_debounced_engage():
+    det = PinchDetector(ratio_on=0.45, ratio_off=0.65, refractory_ms=0,
+                        debounce_frames=3)
+    det.step([_pinch_hand(*_PINCH)], 0.00)
+    det.step([_pinch_hand(*_PINCH)], 0.03)
+    eng = det.step([_pinch_hand(*_PINCH)], 0.06)  # 3rd frame -> engage
+    rel = det.step([_pinch_hand(*_OPEN)], 0.09)   # very next frame
+    assert len(eng) == 1 and eng[0].state == 1
+    assert len(rel) == 1 and rel[0].state == 0

@@ -133,11 +133,12 @@ class PinchEvent:
 
 
 class _PinchState:
-    __slots__ = ("engaged", "last_t")
+    __slots__ = ("engaged", "last_t", "qual")
 
     def __init__(self) -> None:
         self.engaged: bool = False
         self.last_t: float = -1e9
+        self.qual: int = 0        # consecutive qualifying frames (debounce)
 
 
 class PinchDetector:
@@ -217,13 +218,22 @@ class PinchDetector:
                         st.engaged = False
                         events.append(PinchEvent(hand=slot, finger=i + 1, state=0))
                 elif i == winner and (t_now - st.last_t) >= self.refractory_s:
-                    st.engaged = True
-                    st.last_t = t_now
-                    events.append(PinchEvent(hand=slot, finger=i + 1, state=1))
+                    # engage only after debounce_frames consecutive qualifying
+                    # frames; release below stays edge-immediate.
+                    st.qual += 1
+                    if st.qual >= self.debounce_frames:
+                        st.engaged = True
+                        st.last_t = t_now
+                        st.qual = 0
+                        events.append(PinchEvent(hand=slot, finger=i + 1, state=1))
+                else:
+                    st.qual = 0
         for slot in range(len(self._state)):
             if slot not in present:
                 for i in range(4):
-                    if self._state[slot][i].engaged:
-                        self._state[slot][i].engaged = False
+                    st = self._state[slot][i]
+                    st.qual = 0
+                    if st.engaged:
+                        st.engaged = False
                         events.append(PinchEvent(hand=slot, finger=i + 1, state=0))
         return events
