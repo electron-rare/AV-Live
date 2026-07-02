@@ -24,9 +24,23 @@ export function init() {
     if (bar) bar.style.width = `${rms * 100}%`;
   });
 
-  // Tempo
+  // Tempo: slider + -/+ steppers (1 BPM per click), value label kept in sync
   const tempo = document.getElementById("tempo");
-  tempo && tempo.addEventListener("input", () => send("/launch/tempo", +tempo.value));
+  const tempoVal = document.getElementById("tempo-val");
+  const pushTempo = () => {
+    if (tempoVal) tempoVal.textContent = tempo.value;
+    send("/launch/tempo", +tempo.value);
+  };
+  tempo && tempo.addEventListener("input", pushTempo);
+  const stepTempo = (d) => {
+    if (!tempo) return;
+    tempo.value = Math.max(+tempo.min, Math.min(+tempo.max, +tempo.value + d));
+    pushTempo();
+  };
+  const tMinus = document.getElementById("tempo-minus");
+  const tPlus = document.getElementById("tempo-plus");
+  tMinus && tMinus.addEventListener("click", () => stepTempo(-1));
+  tPlus && tPlus.addEventListener("click", () => stepTempo(1));
 
   // Filter
   const filt = document.getElementById("filter");
