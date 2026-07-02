@@ -51,6 +51,19 @@ def rotate_norm_xy(x: float, y: float, mode: str) -> "tuple[float, float]":
     return f(x, y) if f else (x, y)
 
 
+def effective_point_rotate(mode: str, mirror: bool) -> str:
+    """Point-rotation mode equivalent to the video pipeline's transform.
+
+    The VIDEO is horizontally flipped at decode (mirror) THEN rotated by
+    multi.py; the POINTS are rotated here THEN flipped at display time by
+    the renderer. Flip and 90-degree rotations do not commute: under the
+    mirror the point rotation must be the mirror-conjugate of the video
+    rotation (cw <-> ccw swapped; 180 commutes)."""
+    if mirror and mode in ("cw", "ccw"):
+        return "cw" if mode == "ccw" else "ccw"
+    return mode
+
+
 def _make_point(x: float, y: float, z: float, conf: float) -> PoseKp:
     """Wrap raw floats from the wire into a PoseKp landmark.
 
@@ -150,8 +163,9 @@ class IphoneUSBSource:
         self._mirror = mirror and _cfg.concert_mirror
         # VIDEO_ROTATE also applies to the iPhone 2D landmarks (skeleton2D +
         # hands) so they stay aligned with the rotated video (multi.py only
-        # rotates the frame).
-        self._video_rotate = _cfg.video_rotate or "none"
+        # rotates the frame). Mirror-conjugated: see effective_point_rotate.
+        self._video_rotate = effective_point_rotate(
+            _cfg.video_rotate or "none", self._mirror)
         self._codec = av.codec.CodecContext.create("hevc", "r") if av is not None else None
         self._lock = threading.Lock()
         self._frame = None            # latest BGR np.ndarray

@@ -301,3 +301,23 @@ def test_rotate_norm_xy_matches_rot90():
     assert rotate_norm_xy(0.2, 0.7, "180") == pytest.approx((0.8, 0.3))
     assert rotate_norm_xy(0.2, 0.7, "none") == (0.2, 0.7)
     assert rotate_norm_xy(0.2, 0.7, "garbage") == (0.2, 0.7)
+
+
+def test_effective_point_rotate_mirror_conjugation():
+    """Video = flip THEN rotate; points = rotate THEN flip (renderer).
+    Prove the conjugated mode lands points where the video pixel lands:
+    flip_x(T(x,y)) must equal rot(flip_x(x,y)) for T = conjugate(rot)."""
+    from data_only_viz.iphone_usb_source import (
+        effective_point_rotate, rotate_norm_xy,
+    )
+    flip = lambda x, y: (1.0 - x, y)
+    for video_mode in ("ccw", "cw", "180", "none"):
+        pt_mode = effective_point_rotate(video_mode, mirror=True)
+        for (x, y) in [(0.2, 0.7), (0.9, 0.1), (0.5, 0.5)]:
+            video_dest = rotate_norm_xy(*flip(x, y), video_mode)
+            point_dest = flip(*rotate_norm_xy(x, y, pt_mode))
+            assert video_dest == pytest.approx(point_dest), (
+                video_mode, x, y)
+    # No mirror: modes pass through untouched
+    assert effective_point_rotate("ccw", mirror=False) == "ccw"
+    assert effective_point_rotate("none", mirror=True) == "none"
