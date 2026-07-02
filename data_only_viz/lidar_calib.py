@@ -54,7 +54,8 @@ def load_extrinsic(path: Path | None = None) -> Extrinsic:
 
 
 def _path_from_env() -> Path:
-    p = os.environ.get("ICP_LIDAR_EXTRINSIC")
+    from .config import VizConfig
+    p = VizConfig.from_env().icp_lidar_extrinsic
     return Path(p) if p else DEFAULT_EXTRINSIC_PATH
 
 

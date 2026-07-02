@@ -232,10 +232,11 @@ class MultiHMRRemoteBackend:
         self._sock: socket.socket | None = None
         self._lock = threading.Lock()
 
-        self.use_jpeg = _env_flag("MULTIHMR_REMOTE_JPEG", True)
-        self.jpeg_quality = int(os.environ.get(
-            "MULTIHMR_REMOTE_JPEG_QUALITY", "80"))
-        self.use_async = _env_flag("MULTIHMR_REMOTE_ASYNC", True)
+        from .config import VizConfig as _VizConfig
+        _cfg = _VizConfig.from_env()
+        self.use_jpeg = _cfg.multihmr_remote_jpeg
+        self.jpeg_quality = _cfg.multihmr_remote_jpeg_quality
+        self.use_async = _cfg.multihmr_remote_async
 
         # Async pipeline state.
         # Multi-buffer queues (2 in / 3 out) absorb jitter without
@@ -290,10 +291,10 @@ class MultiHMRRemoteBackend:
     @staticmethod
     def is_available(host: str | None = None, port: int | None = None
                      ) -> bool:
-        host = host or os.environ.get(
-            "MULTIHMR_REMOTE_HOST", "192.168.0.175")
-        port = port or int(os.environ.get(
-            "MULTIHMR_REMOTE_PORT", "57140"))
+        from .config import VizConfig as _VizConfig
+        _cfg = _VizConfig.from_env()
+        host = host or _cfg.multihmr_remote_host
+        port = port or _cfg.multihmr_remote_port
         try:
             s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             s.settimeout(1.0)

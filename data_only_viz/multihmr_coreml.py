@@ -184,7 +184,8 @@ class MultiHMRCoreMLBackend:
         # Standalone (no contention) FP32 = 139 ms = 7.2 fps. Default
         # stays CPU+GPU. Override with COREML_COMPUTE_UNITS env var
         # (`all`, `cpu_and_gpu`, `cpu_and_ne`, `cpu_only`) for A/B testing.
-        cu_env = os.environ.get("COREML_COMPUTE_UNITS", "").strip().lower()
+        from .config import VizConfig as _VizConfig
+        cu_env = _VizConfig.from_env().coreml_compute_units
         cu_map = {"cpu_only": 0, "cpu_and_gpu": 1, "all": 2,
                   "cpu_and_ne": 3}
         cu = cu_map.get(cu_env, 1)

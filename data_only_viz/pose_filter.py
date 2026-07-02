@@ -457,7 +457,8 @@ class IKConstraints:
 # --------------------------- chain wrapper ------------------------------
 
 def _parse_env_stages() -> tuple[str, ...]:
-    raw = os.environ.get("POSE_FILTER")
+    from .config import VizConfig
+    raw = VizConfig.from_env().pose_filter
     if raw is None:
         return DEFAULT_STAGES
     raw = raw.strip().lower()
@@ -709,7 +710,8 @@ class ArkitFuse:
 # (median + Kalman 2D + lookahead) — no IK, no spring.
 
 def _parse_env_face_stages() -> tuple[str, ...]:
-    raw = os.environ.get("POSE_FILTER_FACE")
+    from .config import VizConfig
+    raw = VizConfig.from_env().pose_filter_face
     if raw is None:
         return ("median", "kalman", "lookahead")
     raw = raw.strip().lower()
@@ -720,7 +722,8 @@ def _parse_env_face_stages() -> tuple[str, ...]:
 
 
 def _parse_env_hand_stages() -> tuple[str, ...]:
-    raw = os.environ.get("POSE_FILTER_HAND")
+    from .config import VizConfig
+    raw = VizConfig.from_env().pose_filter_hand
     if raw is None:
         return ("median", "kalman", "lookahead")
     raw = raw.strip().lower()

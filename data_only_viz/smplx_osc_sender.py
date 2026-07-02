@@ -45,9 +45,10 @@ class SMPLXTCPSender:
     def __init__(self, state: State, host: str = "127.0.0.1",
                  port: int = PORT, target_fps: float = 30.0,
                  enable_rigging: bool = True) -> None:
-        import os as _os
+        from .config import VizConfig as _VizConfig
+        _cfg = _VizConfig.from_env()
         self.state = state
-        self.host = _os.environ.get("AVBODY_HOST", host)
+        self.host = _cfg.avbody_host
         self.port = port
         self.period = 1.0 / max(1.0, target_fps)
         self._stop = threading.Event()
@@ -57,7 +58,7 @@ class SMPLXTCPSender:
         # on translate le mesh via le delta pelvis Apple Vision (30 fps).
         # MULTIHMR_REID: 'dino' (try DINOv2 + IoU fusion, fallback IoU) /
         # 'iou' (pure IoU). Default: 'dino' if mlpackage exists.
-        reid_mode = os.environ.get("MULTIHMR_REID", "dino").lower()
+        reid_mode = _cfg.multihmr_reid
         dino = None
         if enable_rigging and reid_mode == "dino" and DinoReid is not None:
             try:
@@ -70,7 +71,7 @@ class SMPLXTCPSender:
             except Exception as e:  # noqa: BLE001
                 LOG.warning("MeshRigger: dino load failed (%s), IoU only", e)
                 dino = None
-        dino_weight = float(os.environ.get("MULTIHMR_REID_ALPHA", "0.5"))
+        dino_weight = _cfg.multihmr_reid_alpha
         self._rigger = MeshRigger(
             state, dino_weight=dino_weight,
             dino_reid=dino) if enable_rigging else None

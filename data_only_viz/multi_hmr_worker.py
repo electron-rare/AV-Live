@@ -83,9 +83,8 @@ class MultiHMRWorker:
         # backend: 'pytorch' (default) or 'coreml'. CoreML uses the
         # .mlpackage at COREML_MLPACKAGE, bypasses MPS torch, and runs
         # on ANE/GPU/CPU via CoreML.framework natively (3-4x faster).
-        self.backend = (backend
-                        or os.environ.get("MULTIHMR_BACKEND", "pytorch")
-                        ).strip().lower()
+        from .config import VizConfig as _VizConfig
+        self.backend = (backend or _VizConfig.from_env().multihmr_backend).strip().lower()
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None
         self._smooth_shape = [
@@ -107,7 +106,8 @@ class MultiHMRWorker:
 
     @staticmethod
     def is_available() -> bool:
-        backend = os.environ.get("MULTIHMR_BACKEND", "pytorch").strip().lower()
+        from .config import VizConfig as _VizConfig
+        backend = _VizConfig.from_env().multihmr_backend
         if backend == "coreml":
             return COREML_MLPACKAGE.exists()
         if backend == "remote":
@@ -264,9 +264,10 @@ class MultiHMRWorker:
             # autocast MPS teste 2026-05-13 : plus lent (400ms vs 270ms
             # baseline) car overhead de cast dans le forward. Defaut OFF.
             # Opt-in via MULTIHMR_AUTOCAST=1.
+            from .config import VizConfig as _VizConfig
             self._use_autocast = (
                 device == "mps"
-                and os.environ.get("MULTIHMR_AUTOCAST", "0") == "1")
+                and _VizConfig.from_env().multihmr_autocast)
             if self._use_autocast:
                 LOG.info("Multi-HMR PyTorch : MPS autocast (fp16) enabled")
             # torch.compile teste 2026-05-13 : plante en runtime avec
@@ -575,12 +576,12 @@ class MultiHMRWorker:
             return
         try:
             if remote:
+                from .config import VizConfig as _VizConfig
                 from .multihmr_remote import MultiHMRRemoteBackend
-                host = os.environ.get(
-                    "MULTIHMR_REMOTE_HOST", "192.168.0.175")
-                port = int(os.environ.get(
-                    "MULTIHMR_REMOTE_PORT", "57140"))
-                backend = MultiHMRRemoteBackend(host=host, port=port)
+                _rc = _VizConfig.from_env()
+                backend = MultiHMRRemoteBackend(
+                    host=_rc.multihmr_remote_host,
+                    port=_rc.multihmr_remote_port)
                 LOG.info("Multi-HMR remote backend (%s:%d)", host, port)
             else:
                 from .multihmr_coreml import MultiHMRCoreMLBackend

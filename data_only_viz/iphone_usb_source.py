@@ -127,8 +127,8 @@ class IphoneUSBSource:
         # Mirror the video horizontally so the performer facing the camera
         # interacts naturally (move right -> goes right; raise right arm ->
         # the right side responds). Env CONCERT_MIRROR=0 disables it.
-        import os as _os
-        self._mirror = mirror and (_os.environ.get("CONCERT_MIRROR", "1") != "0")
+        from .config import VizConfig as _VizConfig
+        self._mirror = mirror and _VizConfig.from_env().concert_mirror
         self._codec = av.codec.CodecContext.create("hevc", "r") if av is not None else None
         self._lock = threading.Lock()
         self._frame = None            # latest BGR np.ndarray

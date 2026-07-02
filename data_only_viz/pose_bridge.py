@@ -86,16 +86,15 @@ class PoseSoundBridge:
         self._client = SimpleUDPClient(sclang_host, sclang_port)
         # Broadcast secondaire vers AV-Live-Body (Swift) pour overlay
         # skeleton dans la fenetre RealityKit. Silent si pas connecte.
-        import os as _os
-        _avbody_host = _os.environ.get("AVBODY_HOST", "127.0.0.1")
-        self._avbody = SimpleUDPClient(_avbody_host, 57126)
+        from .config import VizConfig as _VizConfig
+        _cfg = _VizConfig.from_env()
+        self._avbody = SimpleUDPClient(_cfg.avbody_host, 57126)
         # Optional VDMX (VJ) OSC mirror. Off by default; when VDMX_OSC_HOST is
         # set, the VJ-useful pose signals (hands/kin/center/action/count) are
         # forwarded to VDMX's OSC input so the body can drive any VDMX param.
-        _vdmx_host = _os.environ.get("VDMX_OSC_HOST")
         self._vdmx = (
-            SimpleUDPClient(_vdmx_host, int(_os.environ.get("VDMX_OSC_PORT", "1234")))
-            if _vdmx_host else None
+            SimpleUDPClient(_cfg.vdmx_osc_host, _cfg.vdmx_osc_port)
+            if _cfg.vdmx_osc_host else None
         )
         self._period = 1.0 / max(1.0, throttle_hz)
         self._last_t = 0.0
