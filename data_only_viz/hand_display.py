@@ -263,6 +263,11 @@ class HandPersistenceGate:
 
     min_frames=1 disables gating: every incoming hand is drawable on the
     first call (useful for the single-person MediaPipe fallback path).
+
+    Known limit: matching is greedy nearest-track — two hands crossing
+    within `radius` can inherit each other's track (and a ghost appearing
+    exactly where a real hand just left inherits its count). Acceptable
+    for a display gate; do not reuse for gesture-state tracking.
     """
 
     def __init__(self, min_frames: int = 3, radius: float = 0.15) -> None:
@@ -288,8 +293,11 @@ class HandPersistenceGate:
         used: set[int] = set()
 
         for h_idx, hand in enumerate(hands):
-            wx = hand[0].x
-            wy = hand[0].y
+            try:
+                wx = hand[0].x
+                wy = hand[0].y
+            except (TypeError, IndexError, AttributeError):
+                continue   # malformed entry: never drawable, no track
 
             # Find the nearest existing track within radius (greedy).
             best_dist = float("inf")

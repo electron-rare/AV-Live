@@ -89,24 +89,25 @@ def test_mirror_flips_cx_fallback_order():
 
 
 # ---------------------------------------------------------------------------
-# swap: exchanges the two slots at the very end (both paths)
+# swap: inverts the CHIRALITY interpretation only (source chirality flipped);
+# the cx fallback is screen-relative and must never be affected.
 # ---------------------------------------------------------------------------
 
-def test_swap_swaps_chirality_slots():
+def test_swap_inverts_chirality_mapping():
     h_l = _hand(cx=0.8)  # Vision says left (chir=0) but source is inverted
     h_r = _hand(cx=0.2)  # Vision says right (chir=1)
     result = route_hands([h_l, h_r], [0, 1], swap=True)
-    assert result[0] is h_r   # slots exchanged at the end
-    assert result[1] is h_l
+    assert result[0] is h_r   # chir 1 -> left slot under swap
+    assert result[1] is h_l   # chir 0 -> right slot under swap
 
 
-def test_swap_swaps_cx_fallback_slots():
-    """swap=True also exchanges the slots on the cx fallback path."""
+def test_swap_does_not_alter_cx_fallback():
+    """swap only concerns chirality; the cx fallback stays screen-relative."""
     h_a = _hand(cx=0.2)
     h_b = _hand(cx=0.8)
     result = route_hands([h_a, h_b], None, swap=True)
-    assert result[0] is h_b
-    assert result[1] is h_a
+    assert result[0] is h_a   # unchanged: leftmost keeps slot 0
+    assert result[1] is h_b
 
 
 def test_swap_single_hand_moves_slot():

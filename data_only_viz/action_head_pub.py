@@ -200,9 +200,10 @@ class ActionHeadPublisher(threading.Thread):
         # "iphone" / "mediapipe".
         self._finger_source = os.environ.get("FINGER_SOURCE", "auto").lower()
         self._fdbg_n = 0
-        # Safety knob: swap the two routed slots if the iPhone app's camera
-        # config inverts Vision chirality (fix live without redeploy).
-        self._hand_swap_lr = os.environ.get("HAND_SWAP_LR", "0") not in (
+        # ARBodyTracker's Vision chirality arrives inverted vs the user's
+        # mirrored view (observed live 2026-07-02); default-swap corrects it.
+        # Set HAND_SWAP_LR=0 if a future app build fixes chirality at source.
+        self._hand_swap_lr = os.environ.get("HAND_SWAP_LR", "1") not in (
             "0", "", "false", "False",
         )
         self._hand_near_min = float(os.environ.get("HAND_NEAR_MIN", "0.10"))

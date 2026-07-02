@@ -7,9 +7,11 @@ First match per slot wins; extras dropped.
 Fallback (chirality absent/misaligned): sort valid hands by screen cx ascending
 (flipped when mirror=True) and assign leftmost to slot 0, next to slot 1.
 
-`swap=True`: swaps the two slots at the very end (safety knob: if the iPhone
-app's camera config inverts Vision chirality, HAND_SWAP_LR=1 fixes the
-direction live without redeploy).
+`swap=True`: inverts the chirality INTERPRETATION only (chir 0 -> right slot,
+1 -> left slot). ARBodyTracker's Vision chirality arrives inverted vs the
+user's mirrored view (observed live 2026-07-02), so HAND_SWAP_LR defaults to
+1 in the consumers; set 0 if a future app build fixes chirality at the
+source. The cx fallback is screen-relative and is never swapped.
 
 `near_min > 0`: after routing, replace a slot with None when the hand's
 wrist-to-middle-MCP distance (normalised) is below `near_min`.
@@ -72,8 +74,9 @@ def route_hands(
     chirality: int list aligned 1-to-1 with `hands` (0=left, 1=right).
                None / wrong length -> cx fallback.
     mirror:    flip cx for the fallback path so screen-left stays slot 0.
-    swap:      swap the two slots at the very end (both paths). Safety knob
-               for a source whose Vision chirality arrives inverted.
+    swap:      invert the chirality mapping (0 -> right, 1 -> left). Safety
+               knob for a source whose Vision chirality arrives inverted.
+               Never touches the cx fallback (already screen-relative).
     near_min:  replace a routed slot with None when hand_size < near_min.
     """
     chir_aligned = (
@@ -94,9 +97,12 @@ def route_hands(
     slots: list = [None, None]
 
     if chir_aligned and any(c is not None for c, _ in valid_pairs):
-        # ---- Chirality path: chir 0 -> slot 0 (left), 1 -> slot 1 (right) ----
+        # ---- Chirality path: chir 0 -> slot 0 (left), 1 -> slot 1 (right);
+        # swap inverts the mapping when the source chirality is flipped ----
         for c, hand in valid_pairs:
             target = c if c in (0, 1) else None
+            if target is not None and swap:
+                target = 1 - target
             if target is not None and slots[target] is None:
                 slots[target] = hand
     else:
@@ -117,9 +123,5 @@ def route_hands(
         for i in range(2):
             if slots[i] is not None and _hand_size(slots[i]) < near_min:
                 slots[i] = None
-
-    # ---- swap: exchange the two slots at the very end (safety knob) ----
-    if swap:
-        slots[0], slots[1] = slots[1], slots[0]
 
     return slots
