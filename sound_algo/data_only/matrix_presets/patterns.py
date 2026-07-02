@@ -609,3 +609,14 @@ def patterns_for(voice, preset_name):
     if fam == "default":
         cols = [cols[0]] + derive_mel_colors(cols[0])
     return cols
+
+
+# === Composed families: melodic composition engine (7 styles x 8 roles x 6 colours) ===
+# New MEL[role]["composed_<style>"] entries alongside hand-authored families.
+# patterns_for() picks them up by family name; no existing entries are modified.
+from composition import build_composed_families as _build_cf
+for _ck, _rd in _build_cf().items():
+    for _role, _six in _rd.items():
+        MEL.setdefault(_role, {})
+        MEL[_role][_ck] = _six
+del _build_cf, _ck, _rd, _role, _six
