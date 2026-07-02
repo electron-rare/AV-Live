@@ -261,7 +261,7 @@ class VizConfig:
             pinch_debounce_frames=_int("PINCH_DEBOUNCE_FRAMES", 3),
             hand_conf_min=_float("HAND_CONF_MIN", 0.45),
             hand_persist_frames=_int("HAND_PERSIST_FRAMES", 3),
-            hand_swap_lr=_bool_std("HAND_SWAP_LR", True),
+            hand_swap_lr=_bool_std("HAND_SWAP_LR", False),
             hand_near_min=_float("HAND_NEAR_MIN", 0.10),
             arkit_bone_max=_float("ARKIT_BONE_MAX", 0.5),
             # ARKIT_FULL_SKELETON uses != "0" convention (empty = True)
