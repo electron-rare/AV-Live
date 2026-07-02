@@ -44,7 +44,7 @@ from Metal import (
 from MetalKit import MTKView  # noqa: F401  (utilise par d'autres modules)
 
 from .arkit_skeleton import arkit_segments
-from .hand_display import hand_plausible, hand_size, segment_ok
+from .hand_display import hand_plausible, hand_size, segment_ok, panel_frame, panel_segments
 from .mesh_topology import (
     BODY_TRIANGLES,
     FACE_TRIANGLES,
@@ -363,6 +363,25 @@ class MetalRenderer(NSObject):
             segs += 1
             return True
 
+        def push_panel(ax, ay, bx, by, conf, pid):
+            """Like push_seg but NEVER applies mirror.
+
+            Panel coords are final screen coords [0,1] — they must not be
+            flipped again even when the video background is mirrored.
+            """
+            nonlocal segs
+            if segs >= SKEL_MAX_SEGS:
+                return False
+            cax = ax * 2.0 - 1.0; cay = 1.0 - ay * 2.0
+            cbx = bx * 2.0 - 1.0; cby = 1.0 - by * 2.0
+            i = segs * 10
+            buf[i+0] = cax; buf[i+1] = cay; buf[i+2] = 0.0
+            buf[i+3] = conf; buf[i+4] = float(pid)
+            buf[i+5] = cbx; buf[i+6] = cby; buf[i+7] = 0.0
+            buf[i+8] = conf; buf[i+9] = float(pid)
+            segs += 1
+            return True
+
         if use_arkit:
             parents = s.arkit_parents
             for pid, arr2d in s.persons_arkit_2d.items():
@@ -435,6 +454,52 @@ class MetalRenderer(NSObject):
                 A = s.pose_kp[a]; B = s.pose_kp[b]
                 if A.c < 0.2 or B.c < 0.2: continue
                 if not push(A, B, min(A.c, B.c), 0): break
+
+        # ---- SIDE PANELS: left/right hand front-view zoomed wireframe ----
+        # Runs on every path (arkit + mediapipe + fallback COCO).
+        # Hands always come from s.persons_hands regardless of use_arkit.
+        if self._mp_bones is not None:
+            _body_b, _face_b, lhand_bones_p, _ = self._mp_bones
+            hands = s.persons_hands
+            chir = getattr(s, "persons_hands_chirality", None) or []
+            asp = float(s.width) / float(s.height) if s.height else 1.0
+
+            # Route hands to left/right panels via chirality when available,
+            # otherwise by screen position (mirror-aware).
+            left_kp = None
+            right_kp = None
+            if chir and len(chir) == len(hands):
+                # chirality: 0 = left hand, 1 = right hand
+                for h_kp, c in zip(hands, chir):
+                    if c == 0 and left_kp is None:
+                        left_kp = h_kp
+                    elif c == 1 and right_kp is None:
+                        right_kp = h_kp
+            else:
+                # Fallback: order plausible hands by screen cx, mirror-aware.
+                # Screen left has low cx normally; high cx when video is mirrored.
+                plausible = [
+                    (h_kp, sum(p.x for p in h_kp) / len(h_kp))
+                    for h_kp in hands
+                    if hand_plausible(h_kp)
+                ]
+                plausible.sort(key=lambda t: -t[1] if mirror else t[1])
+                if plausible:
+                    left_kp = plausible[0][0]
+                if len(plausible) >= 2:
+                    right_kp = plausible[1][0]
+
+            # Draw frame (pid 7) then wireframe (pid 5 left / 6 right)
+            for side_name, h_kp, pid_s in (
+                ("left",  left_kp,  5),
+                ("right", right_kp, 6),
+            ):
+                if h_kp is None:
+                    continue
+                for seg in panel_frame(side_name, asp):
+                    push_panel(*seg, 1.0, 7)
+                for seg in panel_segments(h_kp, side_name, lhand_bones_p, asp, mirror=mirror):
+                    push_panel(*seg, 1.0, pid_s)
 
         if segs == 0:
             return 0
