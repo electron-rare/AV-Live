@@ -162,53 +162,45 @@ class ActionHeadPublisher(threading.Thread):
                 hands = [h for h in (lkp, rkp) if h is not None and len(h) > 0]
                 chirality = []
         feats = self._hand_ext.step(hands, chirality or None,
-                                    swap=getattr(self, "_hand_swap_lr", True))
+                                    swap=getattr(self, "_hand_swap_lr", False))
         with self.state.lock():
             self.state.hand_feats = feats
         self.bridge.send_hands(feats, t_now)
 
     def _init_finger_piano(self) -> None:
         """Read FINGER_* env config and build the strike + pinch detectors."""
-        import os
+        from data_only_viz.config import VizConfig
         from data_only_viz.finger_strike import (
             FingerStrikeDetector, PinchDetector,
         )
-        self._finger_enabled = os.environ.get("FINGER_PIANO", "0") not in (
-            "0", "", "false", "False",
-        )
+        cfg = VizConfig.from_env()
+        self._finger_enabled = cfg.finger_piano
         # Pinch detection is gated independently of the air-piano finger-strike:
         # the matrix global actions want pinches WITHOUT the finger-strike "piano".
-        self._pinch_enabled = os.environ.get("PINCH_ENABLE", "0") not in (
-            "0", "", "false", "False",
-        )
-        vel = float(os.environ.get("FINGER_STRIKE_VEL", "0.02"))
-        refr = float(os.environ.get("FINGER_STRIKE_REFRACTORY_MS", "120"))
+        self._pinch_enabled = cfg.pinch_enable
         self._finger_det = FingerStrikeDetector(
-            vel_thresh=vel, refractory_ms=refr,
+            vel_thresh=cfg.finger_strike_vel,
+            refractory_ms=cfg.finger_strike_refractory_ms,
         )
         self._pinch_det = PinchDetector(
-            ratio_on=float(os.environ.get("PINCH_RATIO_ON", "0.45")),
-            ratio_off=float(os.environ.get("PINCH_RATIO_OFF", "0.65")),
-            refractory_ms=float(os.environ.get("PINCH_REFRACTORY_MS", "250")),
-            margin=float(os.environ.get("PINCH_MARGIN", "0.20")),
-            ext_ratio=float(os.environ.get("PINCH_EXT_RATIO", "1.35")),
-            ext_min=int(os.environ.get("PINCH_EXT_MIN", "2")),
-            debounce_frames=int(os.environ.get("PINCH_DEBOUNCE_FRAMES", "3")),
+            ratio_on=cfg.pinch_ratio_on,
+            ratio_off=cfg.pinch_ratio_off,
+            refractory_ms=cfg.pinch_refractory_ms,
+            margin=cfg.pinch_margin,
+            ext_ratio=cfg.pinch_ext_ratio,
+            ext_min=cfg.pinch_ext_min,
+            debounce_frames=cfg.pinch_debounce_frames,
         )
-        self._finger_dbg = os.environ.get("FINGER_DEBUG", "0") not in (
-            "0", "", "false", "False",
-        )
+        self._finger_dbg = cfg.finger_debug
         # auto = iPhone Vision hands if fresh, else MediaPipe. Or force
         # "iphone" / "mediapipe".
-        self._finger_source = os.environ.get("FINGER_SOURCE", "auto").lower()
+        self._finger_source = cfg.finger_source
         self._fdbg_n = 0
-        # ARBodyTracker's Vision chirality arrives inverted vs the user's
-        # mirrored view (observed live 2026-07-02); default-swap corrects it.
-        # Set HAND_SWAP_LR=0 if a future app build fixes chirality at source.
-        self._hand_swap_lr = os.environ.get("HAND_SWAP_LR", "1") not in (
-            "0", "", "false", "False",
-        )
-        self._hand_near_min = float(os.environ.get("HAND_NEAR_MIN", "0.10"))
+        # Safety knob: invert Vision chirality interpretation.
+        # Chirality validated correct live 2026-07-02; keep False unless a
+        # future iPhone app build flips it.
+        self._hand_swap_lr = cfg.hand_swap_lr
+        self._hand_near_min = cfg.hand_near_min
 
     def _pick_hands(self) -> tuple[list, list, str, bool]:
         """Return (hands, chirality, source_label, ip_fresh) per FINGER_SOURCE policy."""
@@ -234,7 +226,7 @@ class ActionHeadPublisher(threading.Thread):
         hands, chirality, used, ip_fresh = self._pick_hands()
         slotted = route_hands(
             hands, chirality or None,
-            swap=getattr(self, "_hand_swap_lr", True),
+            swap=getattr(self, "_hand_swap_lr", False),
             near_min=getattr(self, "_hand_near_min", 0.10),
         )
         events = self._finger_det.step(slotted, t_now)
@@ -254,7 +246,7 @@ class ActionHeadPublisher(threading.Thread):
         hands, chirality, used, _ip = self._pick_hands()
         slotted = route_hands(
             hands, chirality or None,
-            swap=getattr(self, "_hand_swap_lr", True),
+            swap=getattr(self, "_hand_swap_lr", False),
             near_min=getattr(self, "_hand_near_min", 0.10),
         )
         for ev in self._pinch_det.step(slotted, t_now):

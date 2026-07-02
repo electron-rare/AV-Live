@@ -160,17 +160,15 @@ class MetalRenderer(NSObject):
         self._mesh_buf = self._device.newBufferWithLength_options_(
             MESH_MAX_TRIS * 3 * MESH_VERT_FLOATS * 4, MTLResourceStorageModeShared)
         self._mp_bones = _mediapipe_bones()  # None si pas dispo
-        self._hand_conf_min = float(os.environ.get("HAND_CONF_MIN", "0.45"))
-        self._arkit_bone_max = float(os.environ.get("ARKIT_BONE_MAX", "0.5"))
-        self._hand_gate = HandPersistenceGate(
-            min_frames=int(os.environ.get("HAND_PERSIST_FRAMES", "3"))
-        )
-        # ARBodyTracker's Vision chirality arrives inverted vs the user's
-        # mirrored view (observed live 2026-07-02); default-swap corrects it.
-        # Set HAND_SWAP_LR=0 if a future app build fixes chirality at source.
-        self._hand_swap_lr = os.environ.get("HAND_SWAP_LR", "1") not in (
-            "0", "", "false", "False",
-        )
+        from .config import VizConfig as _VizConfig
+        _cfg = _VizConfig.from_env()
+        self._hand_conf_min = _cfg.hand_conf_min
+        self._arkit_bone_max = _cfg.arkit_bone_max
+        self._hand_gate = HandPersistenceGate(min_frames=_cfg.hand_persist_frames)
+        # Safety knob: invert Vision chirality interpretation.
+        # Chirality validated correct live 2026-07-02; keep False unless a
+        # future iPhone app build flips it.
+        self._hand_swap_lr = _cfg.hand_swap_lr
         self._init_skel_cpu_buffer()
         self._init_mesh_cpu_buffer()
         self._build_pipelines()
