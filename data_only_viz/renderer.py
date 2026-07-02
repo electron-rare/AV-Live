@@ -589,8 +589,14 @@ class MetalRenderer(NSObject):
         ids_b = s.persons_body_ids or list(range(len(s.persons_body)))
         ids_f = s.persons_face_ids or list(range(len(s.persons_face)))
 
-        # Body
-        for i, body_kp in enumerate(s.persons_body):
+        # Body — SKIPPED whenever ARKit is the body source (iphone-usb: the
+        # ARKit topology arrived). persons_body is then the ARKit->MP33
+        # conversion with c forced to 1.0, so garbage/stale joints would pass
+        # the confidence filter and paint solid triangles anywhere on screen
+        # (the "blue blob"). The body is the gated ARKit wireframe instead.
+        arkit_body = (getattr(self, "_arkit_full", ARKIT_FULL)
+                      and bool(s.arkit_parents))
+        for i, body_kp in enumerate([] if arkit_body else s.persons_body):
             pid = ids_b[i] if i < len(ids_b) else i
             for a, b, c in BODY_TRIANGLES:
                 if not push_tri(body_kp, a, b, c, pid):
