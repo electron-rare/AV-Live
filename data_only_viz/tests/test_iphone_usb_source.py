@@ -286,3 +286,18 @@ def test_apply_skeleton_joints_does_not_mutate_prev():
 
     # arr1 must be byte-for-byte identical to what it was before the call
     np.testing.assert_array_equal(arr1, arr1_copy)
+
+
+# ---------------------------------------------------------------------------
+# VIDEO_ROTATE normalized-point counterpart
+# ---------------------------------------------------------------------------
+
+def test_rotate_norm_xy_matches_rot90():
+    from data_only_viz.iphone_usb_source import rotate_norm_xy
+    # np.rot90 k=1 (ccw): original (x, y) lands at (y, 1-x)
+    assert rotate_norm_xy(0.2, 0.7, "ccw") == pytest.approx((0.7, 0.8))
+    # cw (k=3): (x, y) -> (1-y, x)
+    assert rotate_norm_xy(0.2, 0.7, "cw") == pytest.approx((0.3, 0.2))
+    assert rotate_norm_xy(0.2, 0.7, "180") == pytest.approx((0.8, 0.3))
+    assert rotate_norm_xy(0.2, 0.7, "none") == (0.2, 0.7)
+    assert rotate_norm_xy(0.2, 0.7, "garbage") == (0.2, 0.7)

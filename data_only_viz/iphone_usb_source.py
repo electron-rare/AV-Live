@@ -33,6 +33,24 @@ _HAND_BYTES = 1 + 21 * 12   # chirality:u8 + 21 × (x,y,z) × 4 bytes BE f32
 _ARKIT_JOINTS = 91
 
 
+# Normalized-coordinate counterpart of multi._apply_video_rotate (np.rot90
+# conventions): the iPhone computes 2D landmarks on the UNROTATED sensor
+# frame, so when VIDEO_ROTATE turns the displayed video the 2D points must
+# turn the same way or overlays/panels/gestures go misaligned. ARKit 3D
+# world joints are gravity-aligned and unaffected.
+_ROT_XY = {
+    "ccw": lambda x, y: (y, 1.0 - x),
+    "cw": lambda x, y: (1.0 - y, x),
+    "180": lambda x, y: (1.0 - x, 1.0 - y),
+}
+
+
+def rotate_norm_xy(x: float, y: float, mode: str) -> "tuple[float, float]":
+    """Rotate a normalized (x, y) like np.rot90 rotates the frame."""
+    f = _ROT_XY.get(mode)
+    return f(x, y) if f else (x, y)
+
+
 def _make_point(x: float, y: float, z: float, conf: float) -> PoseKp:
     """Wrap raw floats from the wire into a PoseKp landmark.
 
@@ -128,7 +146,12 @@ class IphoneUSBSource:
         # interacts naturally (move right -> goes right; raise right arm ->
         # the right side responds). Env CONCERT_MIRROR=0 disables it.
         from .config import VizConfig as _VizConfig
-        self._mirror = mirror and _VizConfig.from_env().concert_mirror
+        _cfg = _VizConfig.from_env()
+        self._mirror = mirror and _cfg.concert_mirror
+        # VIDEO_ROTATE also applies to the iPhone 2D landmarks (skeleton2D +
+        # hands) so they stay aligned with the rotated video (multi.py only
+        # rotates the frame).
+        self._video_rotate = _cfg.video_rotate or "none"
         self._codec = av.codec.CodecContext.create("hevc", "r") if av is not None else None
         self._lock = threading.Lock()
         self._frame = None            # latest BGR np.ndarray
@@ -197,8 +220,11 @@ class IphoneUSBSource:
                     elif tag == TAG_SKELETON2D and self.state is not None:
                         pts = decode_skeleton2D(payload)
                         if pts is not None:
-                            arr = np.array([[x, y] for (x, y, _v) in pts],
-                                           dtype=np.float32)
+                            _rot = self._video_rotate
+                            arr = np.array(
+                                [rotate_norm_xy(x, y, _rot)
+                                 for (x, y, _v) in pts],
+                                dtype=np.float32)
                             valid = np.array([v for (_x, _y, v) in pts],
                                              dtype=bool)
                             with self.state.lock():
@@ -217,6 +243,11 @@ class IphoneUSBSource:
                         result = _decode_hands(payload)
                         if result is not None and self.state is not None:
                             hands, chirality = result
+                            if self._video_rotate != "none":
+                                for hand in hands:
+                                    for p in hand:
+                                        p.x, p.y = rotate_norm_xy(
+                                            p.x, p.y, self._video_rotate)
                             with self.state.lock():
                                 # Always expose iPhone Vision hands (stable,
                                 # rotation-invariant) for the air-piano.

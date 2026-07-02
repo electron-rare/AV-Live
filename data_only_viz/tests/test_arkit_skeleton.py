@@ -93,3 +93,13 @@ def test_segments_legacy_diagonal_bone_now_filtered():
     assert arkit_segments(arr2d, valid, parents) == []
     # ...and the env-tunable knob restores it for close-up shots.
     assert len(arkit_segments(arr2d, valid, parents, max_len=0.8)) == 1
+
+
+def test_finger_joint_mask_hides_fingers_keeps_wrist():
+    from data_only_viz.arkit_skeleton import finger_joint_mask
+    names = ["root", "left_hand_joint", "left_handIndexStart_joint",
+             "left_handThumb1_joint", "right_handMid2_joint",
+             "right_handPinkyEnd_joint", "head_joint", "right_hand_joint",
+             "left_handRing3_joint"]
+    mask = finger_joint_mask(names)
+    assert mask == [False, False, True, True, True, True, False, False, True]

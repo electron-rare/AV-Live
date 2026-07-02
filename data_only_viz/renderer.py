@@ -43,7 +43,7 @@ from Metal import (
 # pyobjc detecte automatiquement l'implementation par signature.
 from MetalKit import MTKView  # noqa: F401  (utilise par d'autres modules)
 
-from .arkit_skeleton import arkit_segments
+from .arkit_skeleton import arkit_segments, finger_joint_mask
 from .hand_display import (
     HandPersistenceGate,
     arkit_2d_fresh,
@@ -408,11 +408,24 @@ class MetalRenderer(NSObject):
 
         if use_arkit:
             parents = s.arkit_parents
+            # Hide ARKit's per-finger joints ("false hands"): the display
+            # shows the filtered Vision hands instead. Mask cached until the
+            # topology changes.
+            fmask = getattr(self, "_finger_mask", None)
+            if fmask is None or len(fmask) != len(s.arkit_joint_names):
+                fmask = np.asarray(
+                    finger_joint_mask(s.arkit_joint_names), dtype=bool)
+                self._finger_mask = fmask
             for pid, arr2d in s.persons_arkit_2d.items():
                 ts = s.persons_arkit_2d_t.get(pid)
                 if ts is None or (_arkit_now - ts) >= 1.0:
                     continue  # skip stale or unknown pid
                 valid = s.persons_arkit_2d_valid.get(pid)
+                if len(fmask):
+                    if valid is None:
+                        valid = ~fmask
+                    elif len(valid) == len(fmask):
+                        valid = valid & ~fmask
                 for (ax, ay, bx, by) in arkit_segments(
                     arr2d, valid, parents, max_len=self._arkit_bone_max
                 ):

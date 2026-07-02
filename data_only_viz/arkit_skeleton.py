@@ -50,3 +50,20 @@ def arkit_segments(arr2d, valid, parents, max_len: float = 0.5, bounds: float = 
             continue
         segs.append((ax, ay, bx, by))
     return segs
+
+
+# ARKit's 91-joint body includes per-finger joints whose 2D projection is
+# unreliable (the user sees them as "false hands" glued to the skeleton).
+# The display uses the filtered Vision hands instead; these joints are
+# masked out of the wireframe. The wrist anchors (left_hand_joint /
+# right_hand_joint) are kept so the forearm bone still terminates.
+_FINGER_TOKENS = ("thumb", "index", "mid", "ring", "little", "pinky")
+
+
+def finger_joint_mask(names: list) -> list[bool]:
+    """True for each ARKit joint that belongs to a finger (to be hidden)."""
+    out = []
+    for n in names:
+        ln = str(n).lower()
+        out.append("hand" in ln and any(t in ln for t in _FINGER_TOKENS))
+    return out
