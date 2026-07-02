@@ -239,6 +239,14 @@ class IphoneUSBSource:
             # USB hiccup ends iter_frames; we re-establish :7000).
             with self._lock:
                 self._frame = None
+            # Clear stale hand state so the renderer doesn't freeze on the
+            # last known hands after a stream drop.
+            if self.state is not None:
+                with self.state.lock():
+                    self.state.persons_hands_iphone = []
+                    self.state.persons_hands_chirality = []
+                    if self._write_hands:
+                        self.state.persons_hands = []
             self._opened = False
             sock = None                           # forces the reconnect at the loop top
             if not self._stop.is_set():
