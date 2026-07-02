@@ -44,10 +44,10 @@ from Metal import (
 from MetalKit import MTKView  # noqa: F401  (utilise par d'autres modules)
 
 from .arkit_skeleton import arkit_segments
+from .hand_display import hand_plausible, hand_size, segment_ok
 from .mesh_topology import (
     BODY_TRIANGLES,
     FACE_TRIANGLES,
-    HAND_TRIANGLES,
     build_face_triangles_dynamic,
 )
 from .state import State
@@ -396,10 +396,15 @@ class MetalRenderer(NSObject):
                 if segs >= SKEL_MAX_SEGS: break
             for i, hand_kp in enumerate(s.persons_hands):
                 pid = ids_h[i] if i < len(ids_h) else i
+                if not hand_plausible(hand_kp):
+                    continue
+                size = hand_size(hand_kp)
                 for a, b in lhand_bones:
                     if a >= len(hand_kp) or b >= len(hand_kp): continue
+                    A = hand_kp[a]; B = hand_kp[b]
+                    if not segment_ok(A, B, size): continue
                     # Decalage palette mains (+5) pour les distinguer
-                    if not push(hand_kp[a], hand_kp[b], 1.0, pid + 5): break
+                    if not push(A, B, min(A.c, B.c), pid + 5): break
             # ----- FALLBACK single-person si persons_* vides -----
             if not (s.persons_body or s.persons_face or s.persons_hands):
                 if s.body_present and not use_arkit:
@@ -416,9 +421,14 @@ class MetalRenderer(NSObject):
                     for kp_list in (s.left_hand_kp, s.right_hand_kp):
                         if not any(p.x != 0.0 or p.y != 0.0 for p in kp_list):
                             continue
+                        if not hand_plausible(kp_list):
+                            continue
+                        size = hand_size(kp_list)
                         for a, b in lhand_bones:
                             if a >= len(kp_list) or b >= len(kp_list): continue
-                            if not push(kp_list[a], kp_list[b], 1.0, 0): break
+                            A = kp_list[a]; B = kp_list[b]
+                            if not segment_ok(A, B, size): continue
+                            if not push(A, B, min(A.c, B.c), 0): break
         else:
             # Fallback COCO 17 (YOLO legacy)
             for a, b in COCO_BONES:
@@ -503,15 +513,6 @@ class MetalRenderer(NSObject):
             tri_list = build_face_triangles_dynamic(pts_xy) or FACE_TRIANGLES
             for a, b, c in tri_list:
                 if not push_tri(face_kp, a, b, c, pid):
-                    break
-            if n_verts >= MESH_MAX_VERTS:
-                break
-
-        # Hands — decalage palette +5 comme dans le skel
-        for i, hand_kp in enumerate(s.persons_hands):
-            pid = (ids_h[i] if i < len(ids_h) else i) + 5
-            for a, b, c in HAND_TRIANGLES:
-                if not push_tri(hand_kp, a, b, c, pid):
                     break
             if n_verts >= MESH_MAX_VERTS:
                 break
