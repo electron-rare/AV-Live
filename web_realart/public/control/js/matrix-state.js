@@ -65,7 +65,8 @@ export const POSE_EVENT_CHOICES = [
 export const GLOBAL_ACTION_CHOICES = [
   { id: "none", label: "—" }, { id: "fill", label: "Fill" },
   { id: "drop", label: "Drop" }, { id: "breakdown", label: "Breakdown" },
-  { id: "evolve", label: "Relance + evolve" },
+  { id: "evolve", label: "Évolue" },
+  { id: "relanceEvolve", label: "Relance+evolve" },
   { id: "muteDrums", label: "Mute drums" }, { id: "muteMelo", label: "Mute mélo" },
   { id: "doubleTime", label: "Double-time" }, { id: "halfTime", label: "Half-time" },
   { id: "washReverb", label: "Wash reverb" }, { id: "next", label: "Suivant" },
@@ -76,10 +77,10 @@ export const GLOBAL_SLOTS = [
   { key: 4, label: "Pince MD index" }, { key: 5, label: "Pince MD majeur" },
   { key: 6, label: "Pince MD annulaire" }, { key: 7, label: "Pince MD auriculaire" },
 ];
-export let matGlobalActions = ["fill", "drop", "breakdown", "evolve", "muteDrums", "muteMelo", "washReverb", "next"];
+export let matGlobalActions = ["fill", "doubleTime", "washReverb", "muteDrums", "relanceEvolve", "halfTime", "next", "muteMelo"];
 export function setGlobalAction(slot, id) { if (slot >= 0 && slot < 8) matGlobalActions[slot] = id; }
 export function resetGlobalActions() {
-  matGlobalActions = ["fill", "drop", "breakdown", "evolve", "muteDrums", "muteMelo", "washReverb", "next"];
+  matGlobalActions = ["fill", "doubleTime", "washReverb", "muteDrums", "relanceEvolve", "halfTime", "next", "muteMelo"];
 }
 
 export let matGlobalSettings = { transientBars: 1, breakdownKeep: ["kick", "sub"] };

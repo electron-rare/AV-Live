@@ -213,10 +213,14 @@ File.exists(~matDir).not.if({ ("mkdir -p " ++ ~matDir.quote).systemCmd });
         [\freq, Pfunc({ |e| (e[\freq] ? 440) * freqRatio })]  // pitch mod step-path only (no degree here)
     }, { [] });
     var modPairs = ~matModPairs.(name, spec, volOf);
+    // drum feel: drum voices get feel-based stretch; other voices use global transient stretch
+    var txStretch = (~matDrumVoices.includes(name)).if({
+        (~matDrumFeel == \double).if({ 0.5 }, { (~matDrumFeel == \half).if({ 2.0 }, { ~matTxStretch.value }) })
+    }, { ~matTxStretch.value });
     Pchain(
         Pbind(*([
             \matGlow, Pfunc { |e| ~matEmitTrig.(vi, (e[\amp] ? spec[\amp]).clip(0, 1)); 0 },
-            \stretch, (spec[\stretch] * ~matTxStretch.value),
+            \stretch, (spec[\stretch] * txStretch),
             \amp,     Pfunc({ (spec[\amp] ? 1.0) * volOf.value })
         ] ++ instPair ++ cdPairs ++ freqPair ++ modPairs)),
         base
@@ -233,6 +237,10 @@ File.exists(~matDir).not.if({ ("mkdir -p " ++ ~matDir.quote).systemCmd });
     var freqPair = pitched.includes(name).if({
         [\freq, Pfunc { |e| (~lpNote.notNil).if({ ~lpNote.(e[\degree] + ~matPitchOffset.(name), 0).midicps * freqRatio }, { 440 }) }]
     }, { [] });
+    // drum feel: drum voices get feel-based stretch; other voices use global transient stretch
+    var txStretch = (~matDrumVoices.includes(name)).if({
+        (~matDrumFeel == \double).if({ 0.5 }, { (~matDrumFeel == \half).if({ 2.0 }, { ~matTxStretch.value }) })
+    }, { ~matTxStretch.value });
     Pbind(*([
         \stepIdx, Pseq((0..15), inf),
         \matGlow, Pfunc { |e|
@@ -245,7 +253,7 @@ File.exists(~matDir).not.if({ ("mkdir -p " ++ ~matDir.quote).systemCmd });
         \amp, Pfunc { |e|
             var s = spec[\steps][e[\stepIdx]];
             ((spec[\amp] ? 1.0) * (s.isNil.if({ 0 }, { s[\vel] }))) * volOf.value },
-        \stretch, (spec[\stretch] * ~matTxStretch.value),
+        \stretch, (spec[\stretch] * txStretch),
         \dur, ~matBeatsPerBar / 16
     ] ++ freqPair ++ instPair ++ cdPairs ++ modPairs))
 };
@@ -371,9 +379,12 @@ File.exists(~matDir).not.if({ ("mkdir -p " ++ ~matDir.quote).systemCmd });
 // -- global morceau actions: momentary transient overrides + gesture mapping --
 ~matTransient     = ~matTransient     ? nil;          // (kind:, voices:[Symbol], bars:Int) or nil
 ~matGlobalSettings = ~matGlobalSettings ? ( transientBars: 1, breakdownKeep: [\kick, \sub] );
-~matGlobalActions = ~matGlobalActions ? [\fill, \drop, \breakdown, \evolve, \muteDrums, \muteMelo, \washReverb, \next];  // 8 pinch slots 0..7
+~matGlobalActions = ~matGlobalActions ? [\fill, \doubleTime, \washReverb, \muteDrums, \relanceEvolve, \halfTime, \next, \muteMelo];  // 8 pinch slots 0..7
 ~matDrumVoices = ~matDrumVoices ? [\kick,\hats,\clap,\ride,\rim,\sweep,\fx,\snare,\crash,\shaker,\perc,\tom];
 ~matMeloVoices = ~matMeloVoices ? [\sub,\acid,\arp,\lead,\stab,\pad,\reese,\bells,\melody,\chord];
+// drum feel toggle (\normal/\double/\half): drum-only subdivison feel, persists as toggle, resets on preset load
+~matDrumFeel = ~matDrumFeel ? \normal;
+~matDrumFeelPush = { ~toscSend !? { ~toscSend.("/matrix/drumfeel", ~matDrumFeel.asString) } };
 // transient param channels read by ~matVariation (1.0/0.0 when no transient or a colour-only kind)
 ~matTxStretch = { (~matTransient.notNil).if({ ~matTransient[\stretch] ? 1.0 }, { 1.0 }) };
 ~matTxRev     = { (~matTransient.notNil).if({ ~matTransient[\rev] ? 0.0 }, { 0.0 }) };
@@ -432,10 +443,22 @@ File.exists(~matDir).not.if({ ("mkdir -p " ++ ~matDir.quote).systemCmd });
     (act == \drop).if({ ~matSetTransient.(\drop, []) });
     (act == \breakdown).if({ ~matSetTransient.(\breakdown, ~matGlobalSettings[\breakdownKeep] ? [\kick, \sub]) });
     (act == \evolve).if({ ~matRelanceEvolve.() });
+    (act == \relanceEvolve).if({ ~matSeek.(0); ~matRelanceEvolve.() });
     (act == \muteDrums).if({ ~matSetTransient.(\mute, ~matDrumVoices) });
     (act == \muteMelo).if({ ~matSetTransient.(\mute, ~matMeloVoices) });
-    (act == \doubleTime).if({ ~matSetTransient.(\doubleTime, []) });
-    (act == \halfTime).if({ ~matSetTransient.(\halfTime, []) });
+    // drum feel: toggle \normal/\double and \normal/\half; mutually exclusive
+    (act == \doubleTime).if({
+        (~matDrumFeel == \double).if({ ~matDrumFeel = \normal }, { ~matDrumFeel = \double });
+        ~matVoices.do { |nm, vi| (~matDrumVoices.includes(nm)).if({ ~matLastColor[vi] = -1 }) };
+        (~lp[\matPlaying] == true).if({ ~matApplyBar.(~lp[\matBar] ? 0) });
+        ~matDrumFeelPush.();
+    });
+    (act == \halfTime).if({
+        (~matDrumFeel == \half).if({ ~matDrumFeel = \normal }, { ~matDrumFeel = \half });
+        ~matVoices.do { |nm, vi| (~matDrumVoices.includes(nm)).if({ ~matLastColor[vi] = -1 }) };
+        (~lp[\matPlaying] == true).if({ ~matApplyBar.(~lp[\matBar] ? 0) });
+        ~matDrumFeelPush.();
+    });
     (act == \washReverb).if({ ~matSetTransient.(\washReverb, []) });
     (act == \next).if({ ~matNextPreset.() });
 };
@@ -886,7 +909,7 @@ OSCdef(\mat_steps_get, { |msg, time, addr|
                 }
             });
             // restore global morceau actions (default when absent/legacy)
-            ~matGlobalActions = [\fill, \drop, \breakdown, \evolve, \muteDrums, \muteMelo, \washReverb, \next];
+            ~matGlobalActions = [\fill, \doubleTime, \washReverb, \muteDrums, \relanceEvolve, \halfTime, \next, \muteMelo];
             ((raw.isArray.not) and: { raw[\globalActions].notNil and: { raw[\globalActions].isArray } }).if({
                 raw[\globalActions].do { |s, i| (i < 8 and: { s.notNil }).if({ ~matGlobalActions[i] = s.asSymbol }) }
             });
@@ -900,6 +923,7 @@ OSCdef(\mat_steps_get, { |msg, time, addr|
             });
             ~matPinchHoldMs = ((raw.isArray.not) and: { raw[\pinchHoldMs].notNil }).if({ raw[\pinchHoldMs].asFloat.clip(50, 2000) }, { 300 });
             // fistThresh key accepted from old presets but no longer used (fist gestures removed 2026-07-02)
+            ~matDrumFeel = \normal;    // reset drum feel toggle on preset load
             ~lp[\matPlaying].if({ ~matApplyBar.(~lp[\matBar]) });
             ~matGridPush.();
             ~matInstrPush.();
@@ -910,6 +934,7 @@ OSCdef(\mat_steps_get, { |msg, time, addr|
             ~matGlobalActionsPush.();
             ~matGlobalSettingsPush.();
             ~matPinchHoldPush.();
+            ~matDrumFeelPush.();
             ("[matrix] loaded " ++ path).postln;
             true
         }, {
@@ -1147,6 +1172,10 @@ OSCdef(\mat_pinchhold_get, { |msg, time, addr|
     ~toscTouch !? { ~toscTouch.(addr) };
     ~matPinchHoldPush.()
 }, '/matrix/pinchhold/get');
+OSCdef(\mat_drumfeel_get, { |msg, time, addr|
+    ~toscTouch !? { ~toscTouch.(addr) };
+    ~matDrumFeelPush.()
+}, '/matrix/drumfeel/get');
 OSCdef(\mat_bpm, { |msg, time, addr|
     ~toscTouch !? { ~toscTouch.(addr) };
     ~matSetBpm.((msg[1] ? 120))

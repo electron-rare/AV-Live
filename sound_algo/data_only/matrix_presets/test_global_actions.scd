@@ -12,7 +12,7 @@ feat.load;
 ~lp[\matPlaying] = false;
 
 // -- A: defaults --
-(~matGlobalActions == [\fill, \drop, \breakdown, \evolve, \muteDrums, \muteMelo, \washReverb, \next]).not.if({ pass = false; "FAIL: default mapping".postln });
+(~matGlobalActions == [\fill, \doubleTime, \washReverb, \muteDrums, \relanceEvolve, \halfTime, \next, \muteMelo]).not.if({ pass = false; "FAIL: default mapping".postln });
 
 // -- B: fill -> active voices read colour 6, silent voices stay 0 --
 ~matSetTransient.(\fill, []);
@@ -48,7 +48,7 @@ feat.load;
 ~matSavedNames  = ~matSavedNames  ? Set.new;
 ~matGlobalActions = [\evolve, \breakdown, \fill, \drop, \muteMelo, \washReverb, \muteDrums, \next];     // non-default 8-slot
 ~matSave.("zz_gact_test");
-~matGlobalActions = [\fill, \drop, \breakdown, \evolve, \muteDrums, \muteMelo, \washReverb, \next];     // clobber, then reload
+~matGlobalActions = [\fill, \doubleTime, \washReverb, \muteDrums, \relanceEvolve, \halfTime, \next, \muteMelo];     // clobber, then reload
 ~matLoadFile.(~matDir +/+ "zz_gact_test.matrix");
 (~matGlobalActions == [\evolve, \breakdown, \fill, \drop, \muteMelo, \washReverb, \muteDrums, \next]).not.if({ pass = false; "FAIL: globalActions not round-tripped".postln });
 ("rm -f '" ++ (~matDir +/+ "zz_gact_test.matrix") ++ "'").systemCmd;
@@ -116,7 +116,7 @@ feat.load;
 
 // -- P: pinch hold-to-fire (engage doesn't fire; fires past hold; release cancels) --
 ~matPinchRoutine !? { ~matPinchRoutine.stop };
-~matGlobalActions = [\fill, \drop, \breakdown, \evolve, \muteDrums, \muteMelo, \washReverb, \next];
+~matGlobalActions = [\fill, \doubleTime, \washReverb, \muteDrums, \relanceEvolve, \halfTime, \next, \muteMelo];
 ~matPinchHoldMs = 300; ~matTransient = nil;
 ~matPinchHeld = Array.fill(8, nil); ~matPinchFired = Array.fill(8, false);
 OSCdef(\mat_ev_pinch).func.value(['/pose/pinch', 0, 0, 1, 1]);   // L index engage -> slot 0 held
@@ -147,6 +147,28 @@ OSCdef(\mat_pinchhold).func.value(['/matrix/pinchhold', 500]);
 ("rm -f '" ++ (~matDir +/+ "zz_phms_test.matrix") ++ "'").systemCmd;
 
 // Q: fist gestures removed 2026-07-02 (user request; FIST_ENABLE=0 at the source)
+
+// -- R: drum feel toggle (doubleTime/halfTime) — structure check only --
+~matDrumFeel = \normal;
+~matGlobalActions = [\doubleTime, \halfTime, \none, \none, \none, \none, \none, \none];
+~matFireGlobal.(0);   // slot 0 = doubleTime: normal->double
+(~matDrumFeel == \double).not.if({ pass = false; "FAIL: doubleTime did not set \double".postln });
+~matFireGlobal.(0);   // toggle off: double->normal
+(~matDrumFeel == \normal).not.if({ pass = false; "FAIL: doubleTime toggle did not return \normal".postln });
+~matFireGlobal.(1);   // slot 1 = halfTime: normal->half
+(~matDrumFeel == \half).not.if({ pass = false; "FAIL: halfTime did not set \half".postln });
+~matFireGlobal.(0);   // doubleTime while half active: half->double (mutual exclusion)
+(~matDrumFeel == \double).not.if({ pass = false; "FAIL: doubleTime did not clear halfTime".postln });
+~matDrumFeel = \normal;
+
+// -- S: relanceEvolve resets playhead to 0 then evolves --
+~lp[\matBar] = 5;
+~matEvolve = false; ~matBaseGrid = nil;
+~lp[\matrix][0][5] = 3;
+~matGlobalActions = [\relanceEvolve, \none, \none, \none, \none, \none, \none, \none];
+~matFireGlobal.(0);   // slot 0 = relanceEvolve
+(~lp[\matBar] == 0).not.if({ pass = false; "FAIL: relanceEvolve did not seek to bar 0".postln });
+(~matBaseGrid.isNil).not.if({ pass = false; "FAIL: relanceEvolve leaked baseGrid".postln });
 
 pass.if({ "GLOBALACT PASS".postln }, { "GLOBALACT FAIL".postln });
 0.exit;
