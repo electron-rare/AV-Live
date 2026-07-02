@@ -107,6 +107,9 @@ class State:
     # so the air-piano can prefer this stabler, rotation-invariant source.
     persons_hands_iphone: list[list[PoseKp]] = field(default_factory=list)
     persons_hands_iphone_t: float = 0.0
+    # Chirality for each entry in persons_hands_iphone: 0=left, 1=right.
+    # Aligned 1:1 with persons_hands_iphone (same length after each TAG_HANDS update).
+    persons_hands_chirality: list[int] = field(default_factory=list)
     hand_feats: dict | None = None
     # MediaPipe pose_world_landmarks per person : 33 keypoints in meters,
     # relative to the hip-center. Optional companion of persons_body

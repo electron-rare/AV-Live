@@ -33,35 +33,49 @@ _HAND_BYTES = 1 + 21 * 12   # chirality:u8 + 21 × (x,y,z) × 4 bytes BE f32
 _ARKIT_JOINTS = 91
 
 
-def _make_point(x: float, y: float, z: float) -> PoseKp:
-    """Wrap raw floats from the wire into a PoseKp landmark."""
-    return PoseKp(x=x, y=y, z=z, c=1.0)
+def _make_point(x: float, y: float, z: float, conf: float) -> PoseKp:
+    """Wrap raw floats from the wire into a PoseKp landmark.
+
+    z receives the raw wire value; c is clamped to [0, 1] from conf (≈ Vision
+    confidence, transmitted in the z slot of the wire format).
+    """
+    return PoseKp(x=x, y=y, z=z, c=max(0.0, min(1.0, conf)))
 
 
-def _decode_hands(payload: bytes):
-    """Decode TAG_HANDS payload → list[list[PoseKp]] (may be empty) or None.
+def _decode_hands(
+    payload: bytes,
+) -> "tuple[list[list[PoseKp]], list[int]] | None":
+    """Decode TAG_HANDS payload.
+
+    Returns ``(hands, chirality)`` where *chirality[i]* is 0=left / 1=right
+    (wire byte 1=right, any other value → 0=left).  Returns ``([], [])`` when
+    count==0.  Returns ``None`` only on empty payload.
 
     Wire layout: count:u8, then per hand: chirality:u8 (1=right) followed by
     21 × (x, y, z) big-endian f32. x,y are normalized image coords; z≈confidence.
-    Returns None only on empty payload; an empty list when count==0.
+    Landmark .z = raw wire z; .c = clamp(z, 0, 1).
     """
     if not payload:
         return None
     n = payload[0]
     if n == 0:
-        return []
+        return ([], [])
     off = 1
     hands: list[list[PoseKp]] = []
+    chirality: list[int] = []
     for _ in range(n):
         if off + _HAND_BYTES > len(payload):
             break
-        off += 1   # skip chirality byte (not used by HandFeatureExtractor)
+        chir_byte = payload[off]
+        chirality.append(1 if chir_byte == 1 else 0)
+        off += 1
         pts = struct.unpack(">" + "f" * 63, payload[off:off + 21 * 12])
         off += 21 * 12
-        hand = [_make_point(pts[i * 3], pts[i * 3 + 1], pts[i * 3 + 2])
+        hand = [_make_point(pts[i * 3], pts[i * 3 + 1], pts[i * 3 + 2],
+                            pts[i * 3 + 2])
                 for i in range(21)]
         hands.append(hand)
-    return hands
+    return (hands, chirality)
 
 
 def _to_annexb(data: bytes) -> bytes:
@@ -174,14 +188,16 @@ class IphoneUSBSource:
                                 self.state.arkit_joint_names = names
                                 self.state.arkit_parents = parents
                     elif tag == TAG_HANDS:
-                        hands = _decode_hands(payload)
-                        if hands is not None and self.state is not None:
+                        result = _decode_hands(payload)
+                        if result is not None and self.state is not None:
+                            hands, chirality = result
                             with self.state.lock():
                                 # Always expose iPhone Vision hands (stable,
                                 # rotation-invariant) for the air-piano.
                                 self.state.persons_hands_iphone = hands
                                 self.state.persons_hands_iphone_t = \
                                     time.perf_counter()
+                                self.state.persons_hands_chirality = chirality
                                 if self._write_hands:
                                     self.state.persons_hands = hands
             except OSError as e:
