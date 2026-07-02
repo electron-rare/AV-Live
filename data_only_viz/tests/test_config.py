@@ -413,3 +413,9 @@ def test_viz_source_keys_default_off():
     cfg = VizConfig.from_env({})
     assert cfg.viz_source_keys is False
     assert VizConfig.from_env({"VIZ_SOURCE_KEYS": "1"}).viz_source_keys is True
+
+
+def test_viz_audio_keys_default_off():
+    cfg = VizConfig.from_env({})
+    assert cfg.viz_audio_keys is False
+    assert VizConfig.from_env({"VIZ_AUDIO_KEYS": "1"}).viz_audio_keys is True

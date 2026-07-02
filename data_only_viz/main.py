@@ -72,7 +72,9 @@ class AppDelegate(NSObject):
         self._scClient = SimpleUDPClient("127.0.0.1", opts.sclang_port)
         self._pose_worker = None
         from .config import VizConfig as _VizConfig
-        self._source_keys = _VizConfig.from_env().viz_source_keys
+        _kcfg = _VizConfig.from_env()
+        self._source_keys = _kcfg.viz_source_keys
+        self._audio_keys = _kcfg.viz_audio_keys
         return self
 
     def applicationDidFinishLaunching_(self, notification):  # noqa: N802
@@ -635,8 +637,11 @@ class AppDelegate(NSObject):
             self._user_viz_lock_t = _t.monotonic()
             LOG.info("[key] m -> scene stop + viz openpos (matrix mode)")
             return None
-        # qsdfghjkl -> audio (scene SC)
-        for kk, scene in KEYMAP_AUDIO:
+        # qsdfghjkl -> audio (scene SC): gated OFF by default like wxcvbn
+        # (VIZ_AUDIO_KEYS=1 re-enables) — stray keys fire auto-synth scenes
+        # mid-performance. The m matrix-mode shortcut above stays active.
+        _audio_maps = KEYMAP_AUDIO if getattr(self, "_audio_keys", False) else ()
+        for kk, scene in _audio_maps:
             if k == kk:
                 self._scClient.send_message("/control/doScene", [scene])
                 with self._state.lock():

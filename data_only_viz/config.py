@@ -43,6 +43,7 @@ ARKIT_BONE_MAX              0.5       float  max bone length (norm) for ARKit sk
 ARKIT_FULL_SKELETON         "1"       bool   draw full 91-joint ARKit body (!=0 = True)
 VIZ_HUD                     "0"       bool   show debug HUD overlay
 VIZ_SOURCE_KEYS             "0"       bool   wxcvbn source-bundle shortcuts (off: perf safety)
+VIZ_AUDIO_KEYS              "0"       bool   qsdfghjkl audio-scene shortcuts (off: perf safety; m stays)
 IPHONE_OSC_PORT             57128     int    UDP port for iPhone ARBodyTracker /body3d/kp
 CONCERT_MIRROR              "1"       bool   mirror video horizontally (!=0 = True)
 ICP_FUSION                  "0"       bool   enable ICP LiDAR fusion (only "1" = True)
@@ -137,6 +138,9 @@ class VizConfig:
     # keypress during a matrix performance switches the audio scene
     # (user-disabled live 2026-07-02). VIZ_SOURCE_KEYS=1 re-enables.
     viz_source_keys: bool = False
+    # Audio-scene row (qsdfghjkl): same perf-safety gate, same date. The
+    # special m key (matrix mode: scene stop + openpos viz) stays active.
+    viz_audio_keys: bool = False
 
     # ---- iPhone OSC ------------------------------------------------------
     iphone_osc_port: int = 57128
@@ -285,6 +289,7 @@ class VizConfig:
             arkit_full_skeleton=_bool_ne0("ARKIT_FULL_SKELETON", True),
             viz_hud=_bool_std("VIZ_HUD", False),
             viz_source_keys=_bool_std("VIZ_SOURCE_KEYS", False),
+            viz_audio_keys=_bool_std("VIZ_AUDIO_KEYS", False),
             iphone_osc_port=_int("IPHONE_OSC_PORT", 57128),
             concert_mirror=_bool_ne0("CONCERT_MIRROR", True),
             # ICP_FUSION / MULTIHMR_AUTOCAST use strict "1" convention
