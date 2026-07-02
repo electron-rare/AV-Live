@@ -187,6 +187,9 @@ class ActionHeadPublisher(threading.Thread):
             ratio_off=float(os.environ.get("PINCH_RATIO_OFF", "0.65")),
             refractory_ms=float(os.environ.get("PINCH_REFRACTORY_MS", "250")),
             margin=float(os.environ.get("PINCH_MARGIN", "0.20")),
+            ext_ratio=float(os.environ.get("PINCH_EXT_RATIO", "1.35")),
+            ext_min=int(os.environ.get("PINCH_EXT_MIN", "2")),
+            debounce_frames=int(os.environ.get("PINCH_DEBOUNCE_FRAMES", "3")),
         )
         self._finger_dbg = os.environ.get("FINGER_DEBUG", "0") not in (
             "0", "", "false", "False",

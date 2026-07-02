@@ -96,3 +96,23 @@ def test_emit_fingers_off_when_only_pinch_enabled(monkeypatch):
     pub.state.persons_hands = [_hand(0.46)]
     pub._emit_fingers(0.04)
     assert not pub.bridge.send_finger.called
+
+
+def test_pinch_gate_env_plumbing(monkeypatch):
+    monkeypatch.setenv("PINCH_EXT_RATIO", "1.5")
+    monkeypatch.setenv("PINCH_EXT_MIN", "3")
+    monkeypatch.setenv("PINCH_DEBOUNCE_FRAMES", "5")
+    pub = _pub_envs(monkeypatch, finger_piano="0", pinch_enable="1")
+    assert pub._pinch_det.ext_ratio == 1.5
+    assert pub._pinch_det.ext_min == 3
+    assert pub._pinch_det.debounce_frames == 5
+
+
+def test_pinch_gate_env_defaults_are_strict(monkeypatch):
+    # Live defaults: gate ON (2 extended fingers) + 3-frame debounce.
+    for k in ("PINCH_EXT_RATIO", "PINCH_EXT_MIN", "PINCH_DEBOUNCE_FRAMES"):
+        monkeypatch.delenv(k, raising=False)
+    pub = _pub_envs(monkeypatch, finger_piano="0", pinch_enable="1")
+    assert pub._pinch_det.ext_ratio == 1.35
+    assert pub._pinch_det.ext_min == 2
+    assert pub._pinch_det.debounce_frames == 3

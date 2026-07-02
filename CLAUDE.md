@@ -77,6 +77,9 @@ Toujours répondre en français à l'utilisateur. Code, commentaires de code, co
 | `PINCH_RATIO_ON` | `0.45` | thumb-to-finger distance / hand size below which a pinch engages (clip toggle) |
 | `PINCH_RATIO_OFF` | `0.65` | distance/size above which the pinch re-arms (hysteresis) |
 | `PINCH_REFRACTORY_MS` | `250` | min ms between pinches per finger |
+| `PINCH_EXT_RATIO` | `1.35` | tip-to-wrist distance / hand size above which a finger counts as extended (open-hand pinch gate) |
+| `PINCH_EXT_MIN` | `2` | min extended non-pinching fingers required for a pinch to engage; `0` disables the open-hand gate |
+| `PINCH_DEBOUNCE_FRAMES` | `3` | consecutive qualifying frames before a pinch engage fires (release stays immediate); `1` disables |
 
 ## Conventions globales
 
