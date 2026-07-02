@@ -1,8 +1,8 @@
-"""Tests for hand_slots.route_hands."""
+"""Tests for hand_slots.route_hands and GestureSlotStabilizer."""
 from __future__ import annotations
 
 import pytest
-from data_only_viz.hand_slots import route_hands
+from data_only_viz.hand_slots import route_hands, GestureSlotStabilizer
 
 
 # ---------------------------------------------------------------------------
@@ -198,3 +198,106 @@ def test_result_always_length_2():
     ]:
         r = route_hands(hands, chir)
         assert len(r) == 2, f"expected 2 slots, got {len(r)} for {chir}"
+
+
+# ---------------------------------------------------------------------------
+# GestureSlotStabilizer
+# ---------------------------------------------------------------------------
+
+def _near_hand(cx: float = 0.5, size: float = 0.15) -> list:
+    """Hand with hand_size == size (near enough for near_on=0.10)."""
+    return _hand(cx=cx, size=size)
+
+
+def _far_hand(cx: float = 0.5) -> list:
+    """Hand with hand_size == 0.02 (below near_on=0.10)."""
+    return _hand(cx=cx, size=0.02)
+
+
+def test_stab_hold_last_one_frame_hole():
+    """A 1-frame Vision hole keeps the last hand in the slot."""
+    stab = GestureSlotStabilizer(hold_frames=2, near_on=0.10, near_off=0.08)
+    h = _near_hand()
+    stab.step([h, None])    # activate slot 0
+    stab.step([h, None])    # slot 0 established
+    out = stab.step([None, None])  # miss=1 <= hold -> slot 0 holds last hand
+    assert out[0] is h, "slot 0 should hold last hand on 1-frame miss"
+    assert out[1] is None
+
+
+def test_stab_hold_last_two_frame_hole():
+    """A 2-frame Vision hole keeps the last hand both frames."""
+    stab = GestureSlotStabilizer(hold_frames=2, near_on=0.10, near_off=0.08)
+    h = _near_hand()
+    stab.step([h, None])
+    out1 = stab.step([None, None])  # miss=1
+    out2 = stab.step([None, None])  # miss=2 <= hold=2
+    assert out1[0] is h
+    assert out2[0] is h
+
+
+def test_stab_slot_goes_none_after_hold_frames():
+    """After hold_frames+1 consecutive misses the slot yields None."""
+    stab = GestureSlotStabilizer(hold_frames=2, near_on=0.10, near_off=0.08)
+    h = _near_hand()
+    stab.step([h, None])
+    stab.step([None, None])   # miss=1
+    stab.step([None, None])   # miss=2 (still holding)
+    out = stab.step([None, None])  # miss=3 > hold=2 -> None for real
+    assert out[0] is None
+
+
+def test_stab_hysteresis_stays_active_above_near_off():
+    """Once active, hand stays active while size >= near_off."""
+    stab = GestureSlotStabilizer(hold_frames=2, near_on=0.10, near_off=0.08)
+    h_on = _near_hand(size=0.11)   # size >= near_on -> activates
+    h_mid = _near_hand(size=0.09)  # near_off <= size < near_on -> stays active
+    out1 = stab.step([h_on, None])
+    assert out1[0] is h_on
+    out2 = stab.step([h_mid, None])
+    assert out2[0] is h_mid, "should stay active at size 0.09 (>= near_off 0.08)"
+
+
+def test_stab_hysteresis_deactivates_below_near_off():
+    """Hand deactivates when size drops below near_off."""
+    stab = GestureSlotStabilizer(hold_frames=2, near_on=0.10, near_off=0.08)
+    h_on = _near_hand(size=0.11)
+    h_off = _near_hand(size=0.07)   # size < near_off -> deactivate
+    stab.step([h_on, None])
+    out = stab.step([h_off, None])
+    assert out[0] is None, "slot should deactivate below near_off"
+
+
+def test_stab_hysteresis_needs_near_on_to_reactivate():
+    """After deactivation, size must reach near_on again to re-activate."""
+    stab = GestureSlotStabilizer(hold_frames=2, near_on=0.10, near_off=0.08)
+    h_on  = _near_hand(size=0.11)
+    h_off = _near_hand(size=0.07)   # deactivates
+    h_mid = _near_hand(size=0.09)   # between near_off and near_on -> stays inactive
+    h_on2 = _near_hand(size=0.11)   # back to near_on -> reactivates
+    stab.step([h_on, None])
+    stab.step([h_off, None])         # deactivated
+    out_mid = stab.step([h_mid, None])
+    assert out_mid[0] is None, "should stay inactive at 0.09 after deactivation"
+    out_on2 = stab.step([h_on2, None])
+    assert out_on2[0] is h_on2, "should re-activate at near_on"
+
+
+def test_stab_fresh_far_hand_returns_none():
+    """A far hand on a fresh stabilizer yields None (not near)."""
+    stab = GestureSlotStabilizer(near_on=0.10, near_off=0.08)
+    h = _far_hand()
+    out = stab.step([h, None])
+    assert out[0] is None
+
+
+def test_stab_active_flags_reflect_current_output():
+    """active_flags() matches the last step() output per slot."""
+    stab = GestureSlotStabilizer(near_on=0.10, near_off=0.08)
+    h = _near_hand()
+    stab.step([h, None])
+    flags = stab.active_flags()
+    assert flags == (True, False)
+    stab.step([None, None])          # miss=1 -> hold
+    flags2 = stab.active_flags()
+    assert flags2 == (True, False)   # still holding

@@ -125,3 +125,88 @@ def route_hands(
                 slots[i] = None
 
     return slots
+
+
+class GestureSlotStabilizer:
+    """Stateful per-slot stabilizer for the gesture detection path.
+
+    Applied AFTER route_hands (with near_min=0.0) and BEFORE the gesture
+    detectors (FingerStrikeDetector, PinchDetector).
+
+    Two behaviours:
+    - **Hold-last**: when a slot is None this call but held a hand within the
+      last ``hold_frames`` calls, output the LAST seen hand for that slot.
+      Fills 1-2 frame Vision holes so pinch debounce never sees a spurious
+      absence.  After ``hold_frames`` consecutive misses the slot yields None
+      for real.
+    - **Near hysteresis**: a slot ACTIVATES when hand_size >= ``near_on`` and
+      stays active until hand_size < ``near_off``.  Inactive slot -> None output
+      (but hold-last still tracks so re-activation is instant).
+    """
+
+    def __init__(
+        self,
+        hold_frames: int = 2,
+        near_on: float = 0.10,
+        near_off: float = 0.08,
+    ) -> None:
+        self._hold = hold_frames
+        self._near_on = near_on
+        self._near_off = near_off
+        # Per-slot state
+        self._last: list = [None, None]       # last seen hand object
+        self._miss: list[int] = [0, 0]        # consecutive miss count
+        self._near_active: list[bool] = [False, False]
+        self._out: list = [None, None]         # last step() output (for active_flags)
+
+    def step(self, slotted: list) -> list:
+        """Stabilize a 2-element [left|None, right|None] slot list.
+
+        Args:
+            slotted: output of route_hands (near_min=0.0) — length 2.
+
+        Returns:
+            Stabilized 2-element list; each slot is the stabilized hand or None.
+        """
+        out: list = [None, None]
+        for i in range(2):
+            hand = slotted[i] if i < len(slotted) else None
+            if hand is not None:
+                # Hand present this frame
+                size = _hand_size(hand)
+                # Update near hysteresis
+                if self._near_active[i]:
+                    if size < self._near_off:
+                        self._near_active[i] = False
+                else:
+                    if size >= self._near_on:
+                        self._near_active[i] = True
+                # Track the hand regardless of near state
+                self._last[i] = hand
+                self._miss[i] = 0
+                # Output only if near-active
+                out[i] = hand if self._near_active[i] else None
+            else:
+                # Hand absent this frame
+                self._miss[i] += 1
+                if self._miss[i] <= self._hold:
+                    # Hold: output last hand if it was near-active
+                    if self._near_active[i] and self._last[i] is not None:
+                        out[i] = self._last[i]
+                    # else: not near-active, nothing to hold
+                else:
+                    # Past hold limit — clear near_active so next appearance
+                    # must re-qualify from near_on.
+                    self._near_active[i] = False
+                    out[i] = None
+        self._out = out
+        return out
+
+    def active_flags(self) -> tuple:
+        """Return (slot0_active, slot1_active).
+
+        True when the last step() yielded a non-None for that slot — meaning the
+        hand is established (held or present) AND within the near zone.  Used by
+        action_head_pub._emit_hands to gate the fist feature.
+        """
+        return (self._out[0] is not None, self._out[1] is not None)

@@ -147,6 +147,10 @@ class ActionHeadPublisher(threading.Thread):
             self.head.forget(gone)
             self.bridge.send_leave(pid=gone)
         self._last_pids = current_pids
+        if getattr(self, "_stab", None) is not None:
+            self._stab_slotted = self._step_stab()
+        else:
+            self._stab_slotted = None
         self._emit_hands(t_now)
         self._emit_fingers(t_now)
         self._emit_pinch(t_now)
@@ -201,6 +205,14 @@ class ActionHeadPublisher(threading.Thread):
         # future iPhone app build flips it.
         self._hand_swap_lr = cfg.hand_swap_lr
         self._hand_near_min = cfg.hand_near_min
+        self._hand_near_off = cfg.hand_near_off
+        self._hand_hold_frames = cfg.hand_hold_frames
+        from data_only_viz.hand_slots import GestureSlotStabilizer
+        self._stab = GestureSlotStabilizer(
+            hold_frames=cfg.hand_hold_frames,
+            near_on=cfg.hand_near_min,
+            near_off=cfg.hand_near_off,
+        )
 
     def _pick_hands(self) -> tuple[list, list, str, bool]:
         """Return (hands, chirality, source_label, ip_fresh) per FINGER_SOURCE policy."""
@@ -219,16 +231,31 @@ class ActionHeadPublisher(threading.Thread):
             return ip_hands, ip_chir, "iphone", ip_fresh
         return mp_hands, [], "mediapipe", ip_fresh
 
+    def _step_stab(self) -> list:
+        """Pick hands, route with near_min=0, step gesture stabilizer.
+
+        Called once per tick from _tick() to share the result across all
+        three gesture emitters.  Also callable directly from emitters when
+        _stab_slotted is not yet set (e.g. in unit tests that call emitters
+        without going through _tick).
+        """
+        hands, chir, _, _ = self._pick_hands()
+        from data_only_viz.hand_slots import route_hands as _rh
+        raw = _rh(
+            hands, chir or None,
+            swap=getattr(self, "_hand_swap_lr", False),
+            near_min=0.0,
+        )
+        return self._stab.step(raw)
+
     def _emit_fingers(self, t_now: float) -> None:
         """Detect finger strikes (air-piano) and emit /pose/finger."""
         if not getattr(self, "_finger_enabled", False):
             return
         hands, chirality, used, ip_fresh = self._pick_hands()
-        slotted = route_hands(
-            hands, chirality or None,
-            swap=getattr(self, "_hand_swap_lr", False),
-            near_min=getattr(self, "_hand_near_min", 0.10),
-        )
+        slotted = getattr(self, "_stab_slotted", None)
+        if slotted is None:
+            slotted = self._step_stab()
         events = self._finger_det.step(slotted, t_now)
         if getattr(self, "_finger_dbg", False):
             self._fdbg_n += 1
@@ -244,11 +271,9 @@ class ActionHeadPublisher(threading.Thread):
         if not getattr(self, "_pinch_enabled", False):
             return
         hands, chirality, used, _ip = self._pick_hands()
-        slotted = route_hands(
-            hands, chirality or None,
-            swap=getattr(self, "_hand_swap_lr", False),
-            near_min=getattr(self, "_hand_near_min", 0.10),
-        )
+        slotted = getattr(self, "_stab_slotted", None)
+        if slotted is None:
+            slotted = self._step_stab()
         for ev in self._pinch_det.step(slotted, t_now):
             if getattr(self, "_finger_dbg", False):
                 LOG.info("pinch dbg: src=%s hand=%d finger=%d",
