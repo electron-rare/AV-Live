@@ -42,6 +42,24 @@ export function init() {
   tMinus && tMinus.addEventListener("click", () => stepTempo(-1));
   tPlus && tPlus.addEventListener("click", () => stepTempo(1));
 
+  // Master gain: slider + -/+ steppers (0.05 per click), SC /control/doMaster (0..2)
+  const master = document.getElementById("master");
+  const masterVal = document.getElementById("master-val");
+  const pushMaster = () => {
+    if (masterVal) masterVal.textContent = (+master.value).toFixed(2);
+    send("/control/doMaster", +master.value);
+  };
+  master && master.addEventListener("input", pushMaster);
+  const stepMaster = (d) => {
+    if (!master) return;
+    master.value = Math.max(+master.min, Math.min(+master.max, +master.value + d)).toFixed(2);
+    pushMaster();
+  };
+  const mMinus = document.getElementById("master-minus");
+  const mPlus = document.getElementById("master-plus");
+  mMinus && mMinus.addEventListener("click", () => stepMaster(-0.05));
+  mPlus && mPlus.addEventListener("click", () => stepMaster(0.05));
+
   // Filter
   const filt = document.getElementById("filter");
   filt && filt.addEventListener("input", () => send("/control/fx/filter", +filt.value));
