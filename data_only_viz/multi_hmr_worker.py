@@ -582,7 +582,8 @@ class MultiHMRWorker:
                 backend = MultiHMRRemoteBackend(
                     host=_rc.multihmr_remote_host,
                     port=_rc.multihmr_remote_port)
-                LOG.info("Multi-HMR remote backend (%s:%d)", host, port)
+                LOG.info("Multi-HMR remote backend (%s:%d)",
+                         _rc.multihmr_remote_host, _rc.multihmr_remote_port)
             else:
                 from .multihmr_coreml import MultiHMRCoreMLBackend
                 backend = MultiHMRCoreMLBackend(COREML_MLPACKAGE)

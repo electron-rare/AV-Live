@@ -45,10 +45,13 @@ class SMPLXTCPSender:
     def __init__(self, state: State, host: str = "127.0.0.1",
                  port: int = PORT, target_fps: float = 30.0,
                  enable_rigging: bool = True) -> None:
+        import os as _os
         from .config import VizConfig as _VizConfig
         _cfg = _VizConfig.from_env()
         self.state = state
-        self.host = _cfg.avbody_host
+        # AVBODY_HOST env wins; otherwise honor the caller-supplied host
+        # (pre-VizConfig contract: environ.get("AVBODY_HOST", host)).
+        self.host = _cfg.avbody_host if "AVBODY_HOST" in _os.environ else host
         self.port = port
         self.period = 1.0 / max(1.0, target_fps)
         self._stop = threading.Event()
