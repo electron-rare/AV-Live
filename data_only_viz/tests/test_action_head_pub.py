@@ -28,8 +28,20 @@ class _FakeState:
 
 
 def _make_smplx_person(pid: int, seed: int = 0) -> dict:
+    """Build a legacy dict-format person (backward-compat test fixture)."""
     rng = np.random.default_rng(seed)
     return {"pid": pid, "v3d": rng.normal(size=(10475, 3)).astype(np.float32)}
+
+
+def _make_real_smplx_person(pid: int, seed: int = 0):
+    """Build a real SMPLXPerson dataclass (as emitted by multi_hmr_worker)."""
+    from data_only_viz.state import SMPLXPerson
+    rng = np.random.default_rng(seed)
+    return SMPLXPerson(
+        pid=pid,
+        vertices_3d=rng.normal(size=(10475, 3)).astype(np.float32),
+        expression=np.zeros(10, dtype=np.float32),
+    )
 
 
 def test_publisher_smplx_source_emits_osc() -> None:
@@ -240,3 +252,50 @@ def test_emit_hands_once_for_two_pids() -> None:
     pub._tick(t_now=0.0)
 
     assert bridge.send_hands.call_count == 1
+
+
+# ---------------------------------------------------------------------------
+# B3 contract: real SMPLXPerson dataclass (multi_hmr_worker output)
+# ---------------------------------------------------------------------------
+
+def test_publisher_smplx_real_dataclass_emits_osc() -> None:
+    """SMPLXPerson dataclass (vertices_3d, not v3d) must not raise AttributeError."""
+    from data_only_viz.action_head_pub import ActionHeadPublisher
+    state = _FakeState()
+    bridge = MagicMock()
+    pub = ActionHeadPublisher(state, bridge, ckpt_path=None)
+    state.persons_smplx = [_make_real_smplx_person(7)]
+    state.smplx_last_t = 1.0
+    pub._tick(t_now=0.0)
+    actions = bridge.send_action.call_args_list
+    assert len(actions) == 1
+    assert actions[0].kwargs.get("pid", actions[0].args[0]) == 7
+    bridge.send_enter.assert_called_with(pid=7)
+
+
+def test_publisher_smplx_real_dataclass_expression_used() -> None:
+    """Expression from SMPLXPerson.expression (ndarray) must not crash."""
+    from data_only_viz.action_head_pub import ActionHeadPublisher
+    state = _FakeState()
+    bridge = MagicMock()
+    pub = ActionHeadPublisher(state, bridge, ckpt_path=None)
+    p = _make_real_smplx_person(0)
+    p.expression = np.ones(10, dtype=np.float32) * 0.5
+    state.persons_smplx = [p]
+    state.smplx_last_t = 1.0
+    pub._tick(t_now=0.0)
+    bridge.send_action.assert_called_once()
+
+
+def test_publisher_dict_format_still_works() -> None:
+    """Legacy dict format {"pid": ..., "v3d": ...} must remain supported."""
+    from data_only_viz.action_head_pub import ActionHeadPublisher
+    state = _FakeState()
+    bridge = MagicMock()
+    pub = ActionHeadPublisher(state, bridge, ckpt_path=None)
+    state.persons_smplx = [_make_smplx_person(99)]
+    state.smplx_last_t = 1.0
+    pub._tick(t_now=0.0)
+    actions = bridge.send_action.call_args_list
+    assert len(actions) == 1
+    assert actions[0].kwargs.get("pid", actions[0].args[0]) == 99

@@ -274,8 +274,12 @@ class ActionHeadPublisher(threading.Thread):
         if t_smplx > self._last_smplx_t:
             out: list[tuple[int, np.ndarray, np.ndarray, float, np.ndarray]] = []
             for i, p in enumerate(persons_smplx or []):
-                pid = int(p.get("pid", i))
-                v3d = p.get("v3d")
+                # Support both SMPLXPerson dataclass (multi_hmr_worker, field
+                # names: pid / vertices_3d / expression) and legacy dict format
+                # (keys: "pid" / "v3d" / "expression").
+                _is_dict = isinstance(p, dict)
+                pid = int(p.get("pid", i) if _is_dict else p.pid)
+                v3d = p.get("v3d") if _is_dict else p.vertices_3d
                 if v3d is None:
                     continue
                 # CoreMLArray wraps a numpy array but has no __array__
@@ -286,8 +290,8 @@ class ActionHeadPublisher(threading.Thread):
                 if v3d_np.shape[0] < max(SMPLX_JOINT_ANCHOR_VERTS) + 1:
                     continue
                 j3d32 = v3d_np[list(SMPLX_JOINT_ANCHOR_VERTS)].astype(np.float32)
-                # expression
-                expr = p.get("expression")
+                # expression — field name matches in both dict and dataclass
+                expr = p.get("expression") if _is_dict else p.expression
                 if expr is not None:
                     if hasattr(expr, "numpy") and not isinstance(expr, np.ndarray):
                         expr = expr.numpy()
