@@ -271,8 +271,11 @@ class HandPersistenceGate:
 
     Known limit: matching is greedy nearest-track — two hands crossing
     within `radius` can inherit each other's track (and a ghost appearing
-    exactly where a real hand just left inherits its count). Acceptable
-    for a display gate; do not reuse for gesture-state tracking.
+    exactly where a real hand just left inherits its count). Grace widens
+    that inheritance window to `grace` frames after the hand leaves, and a
+    ghost re-flashing at one spot every (grace+1)th frame can accumulate to
+    min_frames. Acceptable for a display gate; do not reuse for
+    gesture-state tracking.
     """
 
     def __init__(self, min_frames: int = 3, radius: float = 0.15, grace: int = 0) -> None:

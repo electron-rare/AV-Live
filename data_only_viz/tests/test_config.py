@@ -66,6 +66,10 @@ def test_defaults_hand_display():
     assert cfg.hand_near_min == pytest.approx(0.10)
     assert cfg.arkit_bone_max == pytest.approx(0.5)
     assert cfg.arkit_full_skeleton is True
+    # detection v3 stabilizer knobs
+    assert cfg.hand_persist_grace == 2
+    assert cfg.hand_near_off == pytest.approx(0.08)
+    assert cfg.hand_hold_frames == 2
 
 
 def test_defaults_misc():

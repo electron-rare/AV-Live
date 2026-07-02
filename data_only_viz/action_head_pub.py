@@ -243,8 +243,7 @@ class ActionHeadPublisher(threading.Thread):
         without going through _tick).
         """
         hands, chir, _, _ = self._pick_hands()
-        from data_only_viz.hand_slots import route_hands as _rh
-        raw = _rh(
+        raw = route_hands(
             hands, chir or None,
             swap=getattr(self, "_hand_swap_lr", False),
             near_min=0.0,
