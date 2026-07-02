@@ -80,6 +80,9 @@ Toujours répondre en français à l'utilisateur. Code, commentaires de code, co
 | `PINCH_EXT_RATIO` | `1.35` | tip-to-wrist distance / hand size above which a finger counts as extended (open-hand pinch gate) |
 | `PINCH_EXT_MIN` | `2` | min extended non-pinching fingers required for a pinch to engage; `0` disables the open-hand gate |
 | `PINCH_DEBOUNCE_FRAMES` | `3` | consecutive qualifying frames before a pinch engage fires (release stays immediate); `1` disables |
+| `HAND_CONF_MIN` | `0.45` | min Vision hand confidence to draw (raised from 0.3; applies to both overlay and side panels) |
+| `HAND_PERSIST_FRAMES` | `3` | consecutive frames a hand track must match before being drawn (1 = off, all hands drawn immediately) |
+| `ARKIT_BONE_MAX` | `0.5` | max ARKit body bone length in normalized units; longer bones are skipped (tracking-loss garbage filter) |
 
 ## Conventions globales
 
