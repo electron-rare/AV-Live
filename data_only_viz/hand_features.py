@@ -62,8 +62,12 @@ class HandFeatureExtractor:
     def _features(self, lm: list) -> dict:
         xs = [_finite(_coord(p, "x", 0), 0.5) for p in lm[:21]]
         ys = [_finite(_coord(p, "y", 1), 0.5) for p in lm[:21]]
-        cx = _clamp(sum(xs) / len(xs), 0.0, 1.0)
-        cy = _clamp(sum(ys) / len(ys), 0.0, 1.0)
+        # cx/cy anchor = the WRIST (kp 0), not the landmark centroid: the
+        # centroid shifts when fingers open/pinch, cross-talking gestures
+        # into the X/Y voice mods. The wrist decouples them (user request
+        # live 2026-07-02).
+        cx = _clamp(xs[WRIST], 0.0, 1.0)
+        cy = _clamp(ys[WRIST], 0.0, 1.0)
         size = math.hypot(xs[MIDDLE_MCP] - xs[WRIST], ys[MIDDLE_MCP] - ys[WRIST])
         size = size if size > 1e-4 else 1e-4
         span = math.hypot(xs[THUMB_TIP] - xs[PINKY_TIP],

@@ -575,6 +575,16 @@ class MetalRenderer(NSObject):
                     content_pid=pid_s,
                 ):
                     push_panel(ax, ay, bx, by, gconf, gpid)
+                # Wrist marker ON the video: the X/Y voice mods are anchored
+                # to the wrist, so its control point stays visible whenever
+                # features exist (even for far hands the overlay filters
+                # out). push_seg applies the video mirror like the overlay.
+                if _g_cx is not None and _g_cy is not None:
+                    _mx = 0.015 / asp
+                    push_seg(_g_cx - _mx, _g_cy, _g_cx + _mx, _g_cy,
+                             1.0, pid_s)
+                    push_seg(_g_cx, _g_cy - 0.015, _g_cx, _g_cy + 0.015,
+                             1.0, pid_s)
                 if h_kp is not None:
                     for seg in panel_segments(
                         h_kp, side_name, lhand_bones_p, asp,
