@@ -150,7 +150,8 @@ class PinchDetector:
 
     def __init__(self, ratio_on: float = 0.45, ratio_off: float = 0.65,
                  refractory_ms: float = 250.0, history_slots: int = 2,
-                 margin: float = 0.20) -> None:
+                 margin: float = 0.20, ext_ratio: float = 1.35,
+                 ext_min: int = 0, debounce_frames: int = 1) -> None:
         self.ratio_on = ratio_on
         self.ratio_off = ratio_off
         self.refractory_s = refractory_ms / 1000.0
@@ -158,6 +159,18 @@ class PinchDetector:
         # least `margin` (in size-normalized units) nearer than the runner-up.
         # Rejects the adjacent-finger ambiguity when fingers curl together.
         self.margin = margin
+        # Open-hand gate: the winner may engage only when at least ext_min
+        # of the 3 non-pinching fingers are extended (tip-to-wrist distance
+        # above ext_ratio hand-sizes). Rejects relaxed-hand/fist false
+        # pinches during full-body play. ext_min=0 disables the gate; the
+        # live defaults come from the PINCH_EXT_* env vars (action_head_pub),
+        # constructor defaults preserve legacy behavior.
+        self.ext_ratio = ext_ratio
+        self.ext_min = int(ext_min)
+        # Engage fires only after debounce_frames consecutive qualifying
+        # frames; release stays immediate. 1 = no debounce. (Enforced in
+        # step(); wired fully by the debounce task.)
+        self.debounce_frames = max(1, int(debounce_frames))
         self._state = [[_PinchState() for _ in range(4)]
                        for _ in range(history_slots)]
 
@@ -175,17 +188,26 @@ class PinchDetector:
             size = math.hypot(mx - wx, my - wy)
             size = size if size > 1e-4 else 1e-4
             ratios = []
+            exts = []
             for tip_idx in PINCH_TIPS:
                 fx = _finite(_coord(lm[tip_idx], "x", 0), 0.5)
                 fy = _finite(_coord(lm[tip_idx], "y", 1), 0.5)
                 ratios.append(math.hypot(fx - tx, fy - ty) / size)
+                exts.append(math.hypot(fx - wx, fy - wy) / size)
             # closest-wins + margin: pick the single nearest fingertip, and treat
             # it as a pinch only if it is clearly nearer than the runner-up.
             order = sorted(range(4), key=lambda j: ratios[j])
             nearest, runner = order[0], order[1]
+            # open-hand gate: a deliberate pinch keeps the other fingers
+            # extended; a fist/relaxed hand has them curled at the wrist.
+            open_ok = self.ext_min <= 0 or sum(
+                1 for j in range(4)
+                if j != nearest and exts[j] >= self.ext_ratio
+            ) >= self.ext_min
             winner = nearest if (
                 ratios[nearest] < self.ratio_on
                 and (ratios[runner] - ratios[nearest]) >= self.margin
+                and open_ok
             ) else -1
             for i in range(4):
                 st = self._state[slot][i]

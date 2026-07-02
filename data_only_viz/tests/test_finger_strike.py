@@ -178,3 +178,46 @@ def test_pinch_ambiguous_adjacent_fires_nothing():
     ev = det.step([_pinch_hand_multi((0.5, 0.5),
                                      {0: (0.52, 0.5), 1: (0.53, 0.5)})], 0.1)
     assert ev == []
+
+
+def _relaxed_hand():
+    """Relaxed/fist hand: thumb touches the index tip, but middle/ring/
+    pinky are curled near the wrist (NOT extended). The runner-up tip is
+    far from the thumb so the closest-wins margin passes -- only the
+    extension gate can reject this hand."""
+    lm = [[0.5, 0.5, 0.0] for _ in range(21)]
+    lm[0] = [0.5, 0.8, 0.0]        # WRIST
+    lm[9] = [0.5, 0.5, 0.0]        # MIDDLE_MCP -> hand size 0.3
+    lm[4] = [0.45, 0.55, 0.0]      # THUMB_TIP
+    lm[8] = [0.47, 0.55, 0.0]      # INDEX_TIP: ratio 0.067 (pinch-close)
+    lm[12] = [0.60, 0.62, 0.0]     # MIDDLE_TIP curled (ext ~0.69)
+    lm[16] = [0.62, 0.65, 0.0]     # RING_TIP curled (ext ~0.64)
+    lm[20] = [0.64, 0.68, 0.0]     # LITTLE_TIP curled (ext ~0.62)
+    return lm
+
+
+def test_relaxed_hand_rejected_by_extension_gate():
+    det = PinchDetector(ratio_on=0.45, ratio_off=0.65, refractory_ms=0,
+                        ext_min=2)
+    out = []
+    for i in range(10):
+        out += det.step([_relaxed_hand()], i * 0.033)
+    assert out == []
+
+
+def test_open_hand_pinch_passes_extension_gate():
+    # _pinch_hand parks middle/ring/little far from the wrist
+    # (ext 1.67 / 1.49 / 1.37, all >= 1.35) -> 3 extended >= ext_min 2.
+    det = PinchDetector(ratio_on=0.45, ratio_off=0.65, refractory_ms=0,
+                        ext_min=2)
+    det.step([_pinch_hand(*_OPEN)], 0.0)
+    ev = det.step([_pinch_hand(*_PINCH)], 0.1)
+    assert len(ev) == 1 and ev[0].state == 1 and ev[0].finger == 1
+
+
+def test_extension_gate_defeat_reproduces_old_behavior():
+    # ext_min=0 disables the gate: the relaxed hand fires like today.
+    det = PinchDetector(ratio_on=0.45, ratio_off=0.65, refractory_ms=0,
+                        ext_min=0)
+    ev = det.step([_relaxed_hand()], 0.1)
+    assert len(ev) == 1 and ev[0].state == 1
