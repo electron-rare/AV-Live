@@ -42,6 +42,7 @@ HAND_HOLD_FRAMES            2         int    gesture slot hold: frames to carry 
 ARKIT_BONE_MAX              0.5       float  max bone length (norm) for ARKit skeleton
 ARKIT_FULL_SKELETON         "1"       bool   draw full 91-joint ARKit body (!=0 = True)
 VIZ_HUD                     "0"       bool   show debug HUD overlay
+VIZ_SOURCE_KEYS             "0"       bool   wxcvbn source-bundle shortcuts (off: perf safety)
 IPHONE_OSC_PORT             57128     int    UDP port for iPhone ARBodyTracker /body3d/kp
 CONCERT_MIRROR              "1"       bool   mirror video horizontally (!=0 = True)
 ICP_FUSION                  "0"       bool   enable ICP LiDAR fusion (only "1" = True)
@@ -110,12 +111,12 @@ class VizConfig:
 
     # ---- Pinch detection -------------------------------------------------
     pinch_enable: bool = False
-    pinch_ratio_on: float = 0.45
+    pinch_ratio_on: float = 0.50
     pinch_ratio_off: float = 0.65
     pinch_refractory_ms: float = 250.0
-    pinch_margin: float = 0.20
+    pinch_margin: float = 0.05
     pinch_ext_ratio: float = 1.35
-    pinch_ext_min: int = 2
+    pinch_ext_min: int = 1
     pinch_debounce_frames: int = 3
 
     # ---- Hand display / gesture ------------------------------------------
@@ -132,6 +133,10 @@ class VizConfig:
 
     # ---- HUD -------------------------------------------------------------
     viz_hud: bool = False
+    # Source-bundle keyboard shortcuts (wxcvbn): OFF by default — a stray
+    # keypress during a matrix performance switches the audio scene
+    # (user-disabled live 2026-07-02). VIZ_SOURCE_KEYS=1 re-enables.
+    viz_source_keys: bool = False
 
     # ---- iPhone OSC ------------------------------------------------------
     iphone_osc_port: int = 57128
@@ -260,12 +265,12 @@ class VizConfig:
             finger_source=_str_lower("FINGER_SOURCE", "auto"),
             finger_debug=_bool_std("FINGER_DEBUG", False),
             pinch_enable=_bool_std("PINCH_ENABLE", False),
-            pinch_ratio_on=_float("PINCH_RATIO_ON", 0.45),
+            pinch_ratio_on=_float("PINCH_RATIO_ON", 0.50),
             pinch_ratio_off=_float("PINCH_RATIO_OFF", 0.65),
             pinch_refractory_ms=_float("PINCH_REFRACTORY_MS", 250.0),
-            pinch_margin=_float("PINCH_MARGIN", 0.20),
+            pinch_margin=_float("PINCH_MARGIN", 0.05),
             pinch_ext_ratio=_float("PINCH_EXT_RATIO", 1.35),
-            pinch_ext_min=_int("PINCH_EXT_MIN", 2),
+            pinch_ext_min=_int("PINCH_EXT_MIN", 1),
             pinch_debounce_frames=_int("PINCH_DEBOUNCE_FRAMES", 3),
             hand_conf_min=_float("HAND_CONF_MIN", 0.45),
             hand_persist_frames=_int("HAND_PERSIST_FRAMES", 3),
@@ -279,6 +284,7 @@ class VizConfig:
             # ARKIT_FULL_SKELETON uses != "0" convention (empty = True)
             arkit_full_skeleton=_bool_ne0("ARKIT_FULL_SKELETON", True),
             viz_hud=_bool_std("VIZ_HUD", False),
+            viz_source_keys=_bool_std("VIZ_SOURCE_KEYS", False),
             iphone_osc_port=_int("IPHONE_OSC_PORT", 57128),
             concert_mirror=_bool_ne0("CONCERT_MIRROR", True),
             # ICP_FUSION / MULTIHMR_AUTOCAST use strict "1" convention

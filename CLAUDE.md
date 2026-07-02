@@ -74,11 +74,12 @@ Toujours répondre en français à l'utilisateur. Code, commentaires de code, co
 | `FINGER_STRIKE_REFRACTORY_MS` | `120` | min ms between strikes per finger |
 | `FINGER_SOURCE` | `auto` | hand source for finger gestures: `auto` (iPhone Vision hands if fresh, else MediaPipe), `iphone`, `mediapipe` |
 | `FINGER_DEBUG` | `0` | `1` logs each detected strike/pinch (hand, finger) — for threshold tuning |
-| `PINCH_RATIO_ON` | `0.45` | thumb-to-finger distance / hand size below which a pinch engages (clip toggle) |
+| `PINCH_RATIO_ON` | `0.50` | thumb-to-finger distance / hand size below which a pinch engages (0.50 validated live 2026-07-02 for ring/pinky reach) |
 | `PINCH_RATIO_OFF` | `0.65` | distance/size above which the pinch re-arms (hysteresis) |
 | `PINCH_REFRACTORY_MS` | `250` | min ms between pinches per finger |
+| `PINCH_MARGIN` | `0.05` | closest-wins margin between nearest and runner-up fingertip (0.05 validated live: 0.20 rejected middle/ring/pinky pinches) |
 | `PINCH_EXT_RATIO` | `1.35` | tip-to-wrist distance / hand size above which a finger counts as extended (open-hand pinch gate) |
-| `PINCH_EXT_MIN` | `2` | min extended non-pinching fingers required for a pinch to engage; `0` disables the open-hand gate |
+| `PINCH_EXT_MIN` | `1` | min extended non-pinching fingers required for a pinch to engage; `0` disables the open-hand gate (1 validated live: inner-finger pinches curl neighbours) |
 | `PINCH_DEBOUNCE_FRAMES` | `3` | consecutive qualifying frames before a pinch engage fires (release stays immediate); `1` disables |
 | `HAND_CONF_MIN` | `0.45` | min Vision hand confidence to draw (raised from 0.3; applies to both overlay and side panels) |
 | `HAND_PERSIST_FRAMES` | `3` | consecutive frames a hand track must match before being drawn (1 = off, all hands drawn immediately) |

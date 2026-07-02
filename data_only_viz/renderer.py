@@ -343,8 +343,10 @@ class MetalRenderer(NSObject):
         _arkit_now = time.perf_counter()
         use_arkit = (getattr(self, '_arkit_full', ARKIT_FULL) and bool(s.arkit_parents)
                      and arkit_2d_fresh(s.persons_arkit_2d_t, _arkit_now))
-        if not use_arkit and not s.pose_alive():
-            return 0
+        # NO early-return when nothing is detected: the panel frames and the
+        # X/Y gauges are permanent screen furniture (user request: indicators
+        # must stay visible with no hands). The overlay loops below iterate
+        # empty collections at negligible cost.
 
         buf = self._skel_cpu_buf
         segs = 0

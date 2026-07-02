@@ -48,12 +48,12 @@ def test_defaults_finger_piano():
 def test_defaults_pinch():
     cfg = VizConfig.from_env({})
     assert cfg.pinch_enable is False
-    assert cfg.pinch_ratio_on == pytest.approx(0.45)
+    assert cfg.pinch_ratio_on == pytest.approx(0.50)
     assert cfg.pinch_ratio_off == pytest.approx(0.65)
     assert cfg.pinch_refractory_ms == pytest.approx(250.0)
-    assert cfg.pinch_margin == pytest.approx(0.20)
+    assert cfg.pinch_margin == pytest.approx(0.05)
     assert cfg.pinch_ext_ratio == pytest.approx(1.35)
-    assert cfg.pinch_ext_min == 2
+    assert cfg.pinch_ext_min == 1
     assert cfg.pinch_debounce_frames == 3
 
 
@@ -407,3 +407,9 @@ def test_hand_face_min_env_override():
     """HAND_FACE_MIN env var is parsed as float and stored in hand_face_min."""
     cfg = VizConfig.from_env({"HAND_FACE_MIN": "0.3"})
     assert cfg.hand_face_min == pytest.approx(0.3)
+
+
+def test_viz_source_keys_default_off():
+    cfg = VizConfig.from_env({})
+    assert cfg.viz_source_keys is False
+    assert VizConfig.from_env({"VIZ_SOURCE_KEYS": "1"}).viz_source_keys is True

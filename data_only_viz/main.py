@@ -71,6 +71,8 @@ class AppDelegate(NSObject):
         # Sender vers sclang pour les changements de scene depuis le clavier
         self._scClient = SimpleUDPClient("127.0.0.1", opts.sclang_port)
         self._pose_worker = None
+        from .config import VizConfig as _VizConfig
+        self._source_keys = _VizConfig.from_env().viz_source_keys
         return self
 
     def applicationDidFinishLaunching_(self, notification):  # noqa: N802
@@ -627,8 +629,13 @@ class AppDelegate(NSObject):
                     self._state.active_scene = scene
                 LOG.info("[audio] scene -> %s", scene)
                 return None
-        # wxcvbn + 0-9 -> preset bundle (source + scene audio + viz video)
-        for kk, source, scene, viz in (*KEYMAP_SOURCE, *KEYMAP_SOURCE_NUM):
+        # wxcvbn -> preset bundle: gated OFF by default (VIZ_SOURCE_KEYS=1
+        # re-enables) — a stray keypress mid-performance switches the audio
+        # scene. The 0-9 numeric bundles stay active.
+        _src_maps = ((*KEYMAP_SOURCE, *KEYMAP_SOURCE_NUM)
+                     if getattr(self, "_source_keys", False)
+                     else KEYMAP_SOURCE_NUM)
+        for kk, source, scene, viz in _src_maps:
             if key == kk or k == kk:
                 # Audio : envoie a sclang
                 self._scClient.send_message("/control/doScene", [scene])
