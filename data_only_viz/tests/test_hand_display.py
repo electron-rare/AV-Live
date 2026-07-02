@@ -10,6 +10,7 @@ from dataclasses import dataclass
 import pytest
 
 from data_only_viz.hand_display import (
+    arkit_2d_fresh,
     hand_plausible,
     hand_size,
     segment_ok,
@@ -345,3 +346,54 @@ def test_panel_frame_traces_rect():
                 for cx, cy in corners
             )
             assert on_corner, f"Endpoint ({ex:.4f}, {ey:.4f}) not a corner of panel rect"
+
+
+# ---------------------------------------------------------------------------
+# arkit_2d_fresh
+# ---------------------------------------------------------------------------
+
+def test_arkit_2d_fresh_empty_dict_is_false() -> None:
+    """No pids → never fresh."""
+    assert arkit_2d_fresh({}, now=1000.0) is False
+
+
+def test_arkit_2d_fresh_single_fresh_pid() -> None:
+    """A timestamp 0.5 s old with max_age=1.0 → fresh."""
+    ts_by_pid = {0: 999.5}
+    assert arkit_2d_fresh(ts_by_pid, now=1000.0) is True
+
+
+def test_arkit_2d_fresh_single_stale_pid() -> None:
+    """A timestamp 2 s old with max_age=1.0 → stale."""
+    ts_by_pid = {0: 998.0}
+    assert arkit_2d_fresh(ts_by_pid, now=1000.0) is False
+
+
+def test_arkit_2d_fresh_exactly_at_max_age_is_stale() -> None:
+    """age == max_age is NOT fresh (strict less-than)."""
+    ts_by_pid = {0: 999.0}
+    assert arkit_2d_fresh(ts_by_pid, now=1000.0, max_age=1.0) is False
+
+
+def test_arkit_2d_fresh_mix_stale_and_fresh() -> None:
+    """At least one fresh pid makes the whole dict fresh."""
+    ts_by_pid = {0: 990.0, 1: 999.8}  # pid 0 stale, pid 1 fresh
+    assert arkit_2d_fresh(ts_by_pid, now=1000.0) is True
+
+
+def test_arkit_2d_fresh_all_pids_stale() -> None:
+    """All pids stale → False."""
+    ts_by_pid = {0: 990.0, 1: 980.0}
+    assert arkit_2d_fresh(ts_by_pid, now=1000.0) is False
+
+
+def test_arkit_2d_fresh_custom_max_age() -> None:
+    """max_age=0.5 makes a 0.4 s old timestamp fresh."""
+    ts_by_pid = {5: 999.6}
+    assert arkit_2d_fresh(ts_by_pid, now=1000.0, max_age=0.5) is True
+
+
+def test_arkit_2d_fresh_custom_max_age_stale() -> None:
+    """max_age=0.5 makes a 0.6 s old timestamp stale."""
+    ts_by_pid = {5: 999.4}
+    assert arkit_2d_fresh(ts_by_pid, now=1000.0, max_age=0.5) is False

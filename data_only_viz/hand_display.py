@@ -30,6 +30,25 @@ class _HasXYC(Protocol):
     c: float
 
 
+def arkit_2d_fresh(ts_by_pid: dict, now: float, max_age: float = 1.0) -> bool:
+    """Return True if any pid has a timestamp younger than *max_age* seconds.
+
+    Args:
+        ts_by_pid: mapping pid -> perf_counter timestamp (from
+                   ``State.persons_arkit_2d_t``).
+        now:       current ``time.perf_counter()`` value.
+        max_age:   staleness threshold in seconds (exclusive: age < max_age).
+
+    Returns:
+        True if at least one entry satisfies ``now - ts < max_age``.
+        False if the dict is empty or every entry is stale.
+    """
+    for ts in ts_by_pid.values():
+        if (now - ts) < max_age:
+            return True
+    return False
+
+
 def hand_size(kp: list[_HasXYC]) -> float:
     """Euclidean distance wrist(0) -> middle-MCP(9) in normalised image units."""
     w = kp[0]

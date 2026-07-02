@@ -44,7 +44,7 @@ from Metal import (
 from MetalKit import MTKView  # noqa: F401  (utilise par d'autres modules)
 
 from .arkit_skeleton import arkit_segments
-from .hand_display import hand_plausible, hand_size, segment_ok, panel_frame, panel_segments
+from .hand_display import arkit_2d_fresh, hand_plausible, hand_size, segment_ok, panel_frame, panel_segments
 from .mesh_topology import (
     BODY_TRIANGLES,
     FACE_TRIANGLES,
@@ -320,8 +320,9 @@ class MetalRenderer(NSObject):
 
         Priorise MediaPipe (body 33 + face 478 + 2 mains 21) si disponible
         et present ; sinon fallback COCO 17 keypoints YOLO."""
+        _arkit_now = time.perf_counter()
         use_arkit = (ARKIT_FULL and bool(s.arkit_parents)
-                     and bool(s.persons_arkit_2d))
+                     and arkit_2d_fresh(s.persons_arkit_2d_t, _arkit_now))
         if not use_arkit and not s.pose_alive():
             return 0
 
@@ -385,6 +386,9 @@ class MetalRenderer(NSObject):
         if use_arkit:
             parents = s.arkit_parents
             for pid, arr2d in s.persons_arkit_2d.items():
+                ts = s.persons_arkit_2d_t.get(pid)
+                if ts is None or (_arkit_now - ts) >= 1.0:
+                    continue  # skip stale or unknown pid
                 valid = s.persons_arkit_2d_valid.get(pid)
                 for (ax, ay, bx, by) in arkit_segments(arr2d, valid, parents):
                     if not push_seg(ax, ay, bx, by, 1.0, pid):
