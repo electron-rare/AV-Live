@@ -589,26 +589,38 @@ class MetalRenderer(NSObject):
                 if _q >= 0.85 or _st == 3:
                     for ax, ay, bx, by in _frame_segs:
                         push_panel(ax + 0.002, ay, bx + 0.002, by, _fconf, _fpid)
-                # Position gauges (X below / Y outer-side)
+                # Position gauges (X below / Y outer-side). SC's mod cache
+                # HOLDS the last received value when a hand vanishes, so the
+                # markers must stay visible at that last value too (user:
+                # "X et Y toujours visibles") — live = full conf, held = dim.
                 _slot_key = "L" if side_name == "left" else "R"
                 _slot_hf = _hf_all.get(_slot_key)
-                _g_cx = _slot_hf["cx"] if _slot_hf else None
-                _g_cy = _slot_hf["cy"] if _slot_hf else None
+                if not hasattr(self, "_gauge_hold"):
+                    self._gauge_hold = {"L": (None, None), "R": (None, None)}
+                _live = _slot_hf is not None
+                if _live:
+                    self._gauge_hold[_slot_key] = (_slot_hf["cx"],
+                                                   _slot_hf["cy"])
+                _g_cx, _g_cy = self._gauge_hold[_slot_key]
+                _mk_conf = 1.0 if _live else 0.45
                 for ax, ay, bx, by, gconf, gpid in gauge_segments(
                     _g_cx, _g_cy, side_name, asp, mirror,
                     content_pid=pid_s,
                 ):
-                    push_panel(ax, ay, bx, by, gconf, gpid)
+                    push_panel(ax, ay, bx, by,
+                               min(gconf, _mk_conf) if gpid == pid_s
+                               else gconf, gpid)
                 # Wrist marker ON the video: the X/Y voice mods are anchored
                 # to the wrist, so its control point stays visible whenever
-                # features exist (even for far hands the overlay filters
-                # out). push_seg applies the video mirror like the overlay.
+                # a value exists (held at the last position when the hand
+                # drops, matching what SC hears). push_seg applies the
+                # video mirror like the overlay.
                 if _g_cx is not None and _g_cy is not None:
                     _mx = 0.015 / asp
                     push_seg(_g_cx - _mx, _g_cy, _g_cx + _mx, _g_cy,
-                             1.0, pid_s)
+                             _mk_conf, pid_s)
                     push_seg(_g_cx, _g_cy - 0.015, _g_cx, _g_cy + 0.015,
-                             1.0, pid_s)
+                             _mk_conf, pid_s)
                 if h_kp is not None:
                     for seg in panel_segments(
                         h_kp, side_name, lhand_bones_p, asp,
