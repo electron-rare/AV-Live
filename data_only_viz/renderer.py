@@ -44,7 +44,15 @@ from Metal import (
 from MetalKit import MTKView  # noqa: F401  (utilise par d'autres modules)
 
 from .arkit_skeleton import arkit_segments
-from .hand_display import arkit_2d_fresh, hand_plausible, hand_size, segment_ok, panel_frame, panel_segments
+from .hand_display import (
+    HandPersistenceGate,
+    arkit_2d_fresh,
+    hand_plausible,
+    hand_size,
+    segment_ok,
+    panel_frame,
+    panel_segments,
+)
 from .mesh_topology import (
     BODY_TRIANGLES,
     FACE_TRIANGLES,
@@ -151,6 +159,11 @@ class MetalRenderer(NSObject):
         self._mesh_buf = self._device.newBufferWithLength_options_(
             MESH_MAX_TRIS * 3 * MESH_VERT_FLOATS * 4, MTLResourceStorageModeShared)
         self._mp_bones = _mediapipe_bones()  # None si pas dispo
+        self._hand_conf_min = float(os.environ.get("HAND_CONF_MIN", "0.45"))
+        self._arkit_bone_max = float(os.environ.get("ARKIT_BONE_MAX", "0.5"))
+        self._hand_gate = HandPersistenceGate(
+            min_frames=int(os.environ.get("HAND_PERSIST_FRAMES", "3"))
+        )
         self._init_skel_cpu_buffer()
         self._init_mesh_cpu_buffer()
         self._build_pipelines()
@@ -383,6 +396,10 @@ class MetalRenderer(NSObject):
             segs += 1
             return True
 
+        # Gate called once per frame on the full persons_hands list.
+        # Used for both the overlay loop and the side panels below.
+        _hand_draw_flags = self._hand_gate.step(s.persons_hands)
+
         if use_arkit:
             parents = s.arkit_parents
             for pid, arr2d in s.persons_arkit_2d.items():
@@ -390,7 +407,9 @@ class MetalRenderer(NSObject):
                 if ts is None or (_arkit_now - ts) >= 1.0:
                     continue  # skip stale or unknown pid
                 valid = s.persons_arkit_2d_valid.get(pid)
-                for (ax, ay, bx, by) in arkit_segments(arr2d, valid, parents):
+                for (ax, ay, bx, by) in arkit_segments(
+                    arr2d, valid, parents, max_len=self._arkit_bone_max
+                ):
                     if not push_seg(ax, ay, bx, by, 1.0, pid):
                         break
 
@@ -418,14 +437,16 @@ class MetalRenderer(NSObject):
                     if not push(face_kp[a], face_kp[b], 1.0, pid): break
                 if segs >= SKEL_MAX_SEGS: break
             for i, hand_kp in enumerate(s.persons_hands):
+                if not _hand_draw_flags[i]:
+                    continue
                 pid = ids_h[i] if i < len(ids_h) else i
-                if not hand_plausible(hand_kp):
+                if not hand_plausible(hand_kp, conf_min=self._hand_conf_min):
                     continue
                 size = hand_size(hand_kp)
                 for a, b in lhand_bones:
                     if a >= len(hand_kp) or b >= len(hand_kp): continue
                     A = hand_kp[a]; B = hand_kp[b]
-                    if not segment_ok(A, B, size): continue
+                    if not segment_ok(A, B, size, conf_min=self._hand_conf_min): continue
                     # Decalage palette mains (+5) pour les distinguer
                     if not push(A, B, min(A.c, B.c), pid + 5): break
             # ----- FALLBACK single-person si persons_* vides -----
@@ -444,13 +465,13 @@ class MetalRenderer(NSObject):
                     for kp_list in (s.left_hand_kp, s.right_hand_kp):
                         if not any(p.x != 0.0 or p.y != 0.0 for p in kp_list):
                             continue
-                        if not hand_plausible(kp_list):
+                        if not hand_plausible(kp_list, conf_min=self._hand_conf_min):
                             continue
                         size = hand_size(kp_list)
                         for a, b in lhand_bones:
                             if a >= len(kp_list) or b >= len(kp_list): continue
                             A = kp_list[a]; B = kp_list[b]
-                            if not segment_ok(A, B, size): continue
+                            if not segment_ok(A, B, size, conf_min=self._hand_conf_min): continue
                             if not push(A, B, min(A.c, B.c), 0): break
         else:
             # Fallback COCO 17 (YOLO legacy)
@@ -460,13 +481,18 @@ class MetalRenderer(NSObject):
                 if not push(A, B, min(A.c, B.c), 0): break
 
         # ---- SIDE PANELS: left/right hand front-view zoomed wireframe ----
-        # Runs on every path (arkit + mediapipe + fallback COCO).
-        # Hands always come from s.persons_hands regardless of use_arkit.
+        # Gated on self._mp_bones (panels need _mp_bones for hand bone topology,
+        # even when use_arkit is True). Hands from s.persons_hands only.
         if self._mp_bones is not None:
             _body_b, _face_b, lhand_bones_p, _ = self._mp_bones
-            hands = s.persons_hands
-            chir = getattr(s, "persons_hands_chirality", None) or []
-            asp = float(s.width) / float(s.height) if s.height else 1.0
+            # Filter hands by persistence gate before routing to panels.
+            hands = [h for h, ok in zip(s.persons_hands, _hand_draw_flags) if ok]
+            chir_src = getattr(s, "persons_hands_chirality", None) or []
+            if chir_src and len(chir_src) == len(s.persons_hands):
+                chir = [c for c, ok in zip(chir_src, _hand_draw_flags) if ok]
+            else:
+                chir = []
+            asp = float(s.width) / float(s.height) if s.width and s.height else 1.0
 
             # Route hands to left/right panels via chirality when available,
             # otherwise by screen position (mirror-aware).
@@ -485,7 +511,7 @@ class MetalRenderer(NSObject):
                 plausible = [
                     (h_kp, sum(p.x for p in h_kp) / len(h_kp))
                     for h_kp in hands
-                    if hand_plausible(h_kp)
+                    if hand_plausible(h_kp, conf_min=self._hand_conf_min)
                 ]
                 plausible.sort(key=lambda t: -t[1] if mirror else t[1])
                 if plausible:
@@ -502,7 +528,10 @@ class MetalRenderer(NSObject):
                     continue
                 for seg in panel_frame(side_name, asp):
                     push_panel(*seg, 1.0, 7)
-                for seg in panel_segments(h_kp, side_name, lhand_bones_p, asp, mirror=mirror):
+                for seg in panel_segments(
+                    h_kp, side_name, lhand_bones_p, asp,
+                    mirror=mirror, conf_min=self._hand_conf_min,
+                ):
                     push_panel(*seg, 1.0, pid_s)
 
         if segs == 0:
@@ -513,7 +542,7 @@ class MetalRenderer(NSObject):
         return segs
 
     def _update_mesh(self, s: State) -> int:
-        """Remplit self._mesh_buf avec des triangles face/hand/body.
+        """Remplit self._mesh_buf avec des triangles face/body.
 
         Retourne le nombre de triangles ecrits (chacun = 3 vertices).
         Filtre les triangles dont au moins un sommet a confiance < 0.3.
@@ -563,7 +592,6 @@ class MetalRenderer(NSObject):
 
         ids_b = s.persons_body_ids or list(range(len(s.persons_body)))
         ids_f = s.persons_face_ids or list(range(len(s.persons_face)))
-        ids_h = s.persons_hands_ids or list(range(len(s.persons_hands)))
 
         # Body
         for i, body_kp in enumerate(s.persons_body):

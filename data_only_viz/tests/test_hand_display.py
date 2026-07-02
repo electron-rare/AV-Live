@@ -10,6 +10,7 @@ from dataclasses import dataclass
 import pytest
 
 from data_only_viz.hand_display import (
+    HandPersistenceGate,
     arkit_2d_fresh,
     hand_plausible,
     hand_size,
@@ -397,3 +398,107 @@ def test_arkit_2d_fresh_custom_max_age_stale() -> None:
     """max_age=0.5 makes a 0.6 s old timestamp stale."""
     ts_by_pid = {5: 999.4}
     assert arkit_2d_fresh(ts_by_pid, now=1000.0, max_age=0.5) is False
+
+
+# ---------------------------------------------------------------------------
+# hand_plausible — wrist out-of-frame rejection
+# ---------------------------------------------------------------------------
+
+def test_plausible_wrist_out_of_frame_x_neg_rejected():
+    """Wrist x < -0.1 → ghost anchor, reject."""
+    kp = _make_hand(wrist_x=-0.2, wrist_y=0.5, size=0.12, c=1.0)
+    assert hand_plausible(kp) is False
+
+
+def test_plausible_wrist_out_of_frame_x_pos_rejected():
+    """Wrist x > 1.1 → ghost anchor, reject."""
+    kp = _make_hand(wrist_x=1.2, wrist_y=0.5, size=0.12, c=1.0)
+    assert hand_plausible(kp) is False
+
+
+def test_plausible_wrist_out_of_frame_y_rejected():
+    """Wrist y < -0.1 → ghost anchor, reject."""
+    kp = _make_hand(wrist_x=0.5, wrist_y=-0.15, size=0.12, c=1.0)
+    assert hand_plausible(kp) is False
+
+
+def test_plausible_wrist_at_exact_boundary_accepted():
+    """Wrist at x=-0.1 is at the boundary — still accepted (inclusive)."""
+    kp = _make_hand(wrist_x=-0.1, wrist_y=0.5, size=0.12, c=1.0)
+    assert hand_plausible(kp) is True
+
+
+# ---------------------------------------------------------------------------
+# HandPersistenceGate
+# ---------------------------------------------------------------------------
+
+def test_gate_ghost_two_frames_never_draws():
+    """A hand appearing only 2 times is never drawn (min_frames=3)."""
+    gate = HandPersistenceGate(min_frames=3)
+    hand = _make_hand(wrist_x=0.5, wrist_y=0.5)
+    assert gate.step([hand]) == [False]   # frame 1: count=1
+    assert gate.step([hand]) == [False]   # frame 2: count=2
+
+
+def test_gate_steady_hand_appears_at_third_frame():
+    """A steady hand becomes drawable from the 3rd consecutive frame."""
+    gate = HandPersistenceGate(min_frames=3)
+    hand = _make_hand(wrist_x=0.5, wrist_y=0.5)
+    assert gate.step([hand]) == [False]   # frame 1
+    assert gate.step([hand]) == [False]   # frame 2
+    assert gate.step([hand]) == [True]    # frame 3: count=3 >= min_frames
+    assert gate.step([hand]) == [True]    # frame 4: count=4, stays drawable
+
+
+def test_gate_teleporting_hand_never_draws():
+    """A hand that jumps >radius every frame never accumulates a track."""
+    gate = HandPersistenceGate(min_frames=3, radius=0.15)
+    for px in (0.1, 0.5, 0.9):  # each jump is 0.4 > radius=0.15
+        hand = _make_hand(wrist_x=px, wrist_y=0.5)
+        assert gate.step([hand]) == [False]
+
+
+def test_gate_two_steady_hands_both_drawable():
+    """Two hands that remain steady both become drawable at frame 3."""
+    gate = HandPersistenceGate(min_frames=3)
+    lh = _make_hand(wrist_x=0.3, wrist_y=0.5)
+    rh = _make_hand(wrist_x=0.7, wrist_y=0.5)
+    for _ in range(2):
+        gate.step([lh, rh])
+    result = gate.step([lh, rh])
+    assert result == [True, True]
+
+
+def test_gate_min_frames_one_immediate():
+    """min_frames=1 makes any hand drawable on first appearance."""
+    gate = HandPersistenceGate(min_frames=1)
+    hand = _make_hand(wrist_x=0.5, wrist_y=0.5)
+    assert gate.step([hand]) == [True]
+
+
+def test_gate_track_resets_after_absence():
+    """A track that disappears for one frame must re-accumulate from scratch."""
+    gate = HandPersistenceGate(min_frames=3)
+    hand = _make_hand(wrist_x=0.5, wrist_y=0.5)
+    gate.step([hand])
+    gate.step([hand])  # count=2, not yet drawable
+    gate.step([])       # hand absent → track dropped
+    # Reappears: back to count=1
+    assert gate.step([hand]) == [False]
+
+
+def test_gate_empty_input_returns_empty():
+    """step([]) always returns []."""
+    gate = HandPersistenceGate()
+    assert gate.step([]) == []
+
+
+def test_gate_greedy_no_double_assign():
+    """Two hands close together: each matches its own track, not the same one."""
+    gate = HandPersistenceGate(min_frames=2, radius=0.15)
+    h1 = _make_hand(wrist_x=0.3, wrist_y=0.5)
+    h2 = _make_hand(wrist_x=0.4, wrist_y=0.5)  # 0.1 apart, both within radius
+    gate.step([h1, h2])
+    result = gate.step([h1, h2])
+    # Both should have count=2 >= min_frames=2
+    assert result == [True, True]

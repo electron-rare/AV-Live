@@ -66,10 +66,14 @@ def hand_plausible(
 
     Rejects:
     - fewer than 21 landmarks
+    - wrist (kp[0]) outside [-0.1, 1.1] in x or y (out-of-frame ghost anchor)
     - size (wrist->middle-MCP) outside [size_min, size_max]
     - mean confidence below conf_min
     """
     if len(kp) < 21:
+        return False
+    w = kp[0]
+    if not (-0.1 <= w.x <= 1.1 and -0.1 <= w.y <= 1.1):
         return False
     size = hand_size(kp)
     if size < size_min or size > size_max:
@@ -153,6 +157,7 @@ def panel_segments(
     bones: list[tuple[int, int]],
     aspect: float,
     mirror: bool = True,
+    conf_min: float = 0.3,
 ) -> list[tuple[float, float, float, float]]:
     """Map hand landmarks into a side panel using uniform pixel-space scale.
 
@@ -173,17 +178,18 @@ def panel_segments(
     the mirrored video background (i.e. the panel always shows a "front view").
 
     Args:
-        kp:     21+ keypoints with .x, .y (normalized image coords, y down), .c.
-        side:   "left" or "right".
-        bones:  List of (index_a, index_b) pairs defining which keypoints to connect.
-        aspect: view width / view height.
-        mirror: If True, flip X within the panel.
+        kp:       21+ keypoints with .x, .y (normalized image coords, y down), .c.
+        side:     "left" or "right".
+        bones:    List of (index_a, index_b) pairs defining which keypoints to connect.
+        aspect:   view width / view height.
+        mirror:   If True, flip X within the panel.
+        conf_min: Minimum confidence for hand_plausible and segment_ok checks.
 
     Returns:
         List of (ax, ay, bx, by) in normalized [0,1] screen coords, y down.
         Returns [] if hand_plausible(kp) fails.
     """
-    if not hand_plausible(kp):
+    if not hand_plausible(kp, conf_min=conf_min):
         return []
 
     x0, y0, x1, y1 = panel_rect(side, aspect)
@@ -234,10 +240,78 @@ def panel_segments(
             continue
         A = kp[a]
         B = kp[b]
-        if not segment_ok(A, B, sz):
+        if not segment_ok(A, B, sz, conf_min=conf_min):
             continue
         ax, ay = _map(A)
         bx, by = _map(B)
         result.append((ax, ay, bx, by))
 
     return result
+
+
+# ---------------------------------------------------------------------------
+# Hand temporal persistence gate
+# ---------------------------------------------------------------------------
+
+class HandPersistenceGate:
+    """Suppress ghost hand detections that only flash for 1-2 frames.
+
+    Tracks each hand by wrist position (landmark 0).  A hand is only
+    drawable once the same wrist position has been matched for
+    *min_frames* consecutive calls.  A track that goes unmatched for even
+    one frame is immediately dropped (resets the consecutive count).
+
+    min_frames=1 disables gating: every incoming hand is drawable on the
+    first call (useful for the single-person MediaPipe fallback path).
+    """
+
+    def __init__(self, min_frames: int = 3, radius: float = 0.15) -> None:
+        self._min_frames = min_frames
+        self._radius = radius
+        # Each track: [wrist_x, wrist_y, consecutive_count]
+        self._tracks: list[list] = []
+
+    def step(self, hands: list) -> list[bool]:
+        """Update tracks and return a draw flag per hand.
+
+        Args:
+            hands: list of 21-landmark hand objects; landmark 0 is the wrist
+                   and must expose .x and .y attributes.
+
+        Returns:
+            list[bool] of length len(hands).  True = this hand has been
+            seen at the same position for at least min_frames consecutive
+            calls and should be drawn.
+        """
+        result: list[bool] = [False] * len(hands)
+        new_tracks: list[list] = []
+        used: set[int] = set()
+
+        for h_idx, hand in enumerate(hands):
+            wx = hand[0].x
+            wy = hand[0].y
+
+            # Find the nearest existing track within radius (greedy).
+            best_dist = float("inf")
+            best_t = -1
+            for t_idx, (tx, ty, _count) in enumerate(self._tracks):
+                if t_idx in used:
+                    continue
+                d = math.hypot(wx - tx, wy - ty)
+                if d < best_dist and d < self._radius:
+                    best_dist = d
+                    best_t = t_idx
+
+            if best_t >= 0:
+                used.add(best_t)
+                new_count = self._tracks[best_t][2] + 1
+                new_tracks.append([wx, wy, new_count])
+                result[h_idx] = new_count >= self._min_frames
+            else:
+                # New track — starts at count 1.
+                new_tracks.append([wx, wy, 1])
+                result[h_idx] = 1 >= self._min_frames
+
+        # Unmatched tracks are dropped (not carried into new_tracks).
+        self._tracks = new_tracks
+        return result

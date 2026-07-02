@@ -109,6 +109,7 @@ class State:
     persons_hands_iphone_t: float = 0.0
     # Chirality for each entry in persons_hands_iphone: 0=left, 1=right.
     # Aligned 1:1 with persons_hands_iphone (same length after each TAG_HANDS update).
+    # Not valid for MediaPipe-written persons_hands (stays empty on that path).
     persons_hands_chirality: list[int] = field(default_factory=list)
     hand_feats: dict | None = None
     # MediaPipe pose_world_landmarks per person : 33 keypoints in meters,
