@@ -82,7 +82,7 @@ Toujours répondre en français à l'utilisateur. Code, commentaires de code, co
 | `PINCH_DEBOUNCE_FRAMES` | `3` | consecutive qualifying frames before a pinch engage fires (release stays immediate); `1` disables |
 | `HAND_CONF_MIN` | `0.45` | min Vision hand confidence to draw (raised from 0.3; applies to both overlay and side panels) |
 | `HAND_PERSIST_FRAMES` | `3` | consecutive frames a hand track must match before being drawn (1 = off, all hands drawn immediately) |
-| `HAND_SWAP_LR` | `1` | invert the Vision chirality interpretation when routing hands (gestures + panels); cx fallback untouched. Default `1`: ARBodyTracker chirality arrives inverted vs the mirrored view (observed live 2026-07-02); set `0` if a future app build fixes it at source |
+| `HAND_SWAP_LR` | `0` | Safety knob: invert the Vision chirality interpretation when routing hands (gestures + panels). Chirality validated correct live 2026-07-02; default `0`. Set `1` if a future iPhone app build delivers inverted chirality |
 | `HAND_NEAR_MIN` | `0.10` | Minimum wrist-to-middle-MCP distance (normalised) for a hand to trigger pinch/strike. Hands smaller than this are gated out. Display panels are unaffected |
 | `ARKIT_BONE_MAX` | `0.5` | max ARKit body bone length in normalized units; longer bones are skipped (tracking-loss garbage filter) |
 
