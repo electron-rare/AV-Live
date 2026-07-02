@@ -206,9 +206,19 @@ class AppDelegate(NSObject):
         # 2d) Auto-engage du mode openpos (#9) quand des personnes sont
         # detectees. Si l'utilisateur a force un mode au clavier dans
         # les 8 dernieres secondes, on n'override pas (lock manuel).
+        # VIZ_DEFAULT_MODE=<name> fixes the boot mode and DISABLES the
+        # auto-switch entirely (user request: t/voronoi always active).
         self._user_viz_lock_t = 0.0   # set par _on_key, lu par autoOpenpos
-        self._autoOpenposTimer = NSTimer.scheduledTimerWithTimeInterval_target_selector_userInfo_repeats_(
-            0.5, self, "autoOpenpos:", None, True)
+        from .config import VizConfig as _VC
+        _vmode = _VC.from_env().viz_default_mode
+        self._autoOpenposTimer = None
+        if _vmode != "auto" and _vmode in self._state.viz_mode_names:
+            with self._state.lock():
+                self._state.viz_mode = self._state.viz_mode_names.index(_vmode)
+            LOG.info("[viz] fixed default mode %s (auto-openpos disabled)", _vmode)
+        else:
+            self._autoOpenposTimer = NSTimer.scheduledTimerWithTimeInterval_target_selector_userInfo_repeats_(
+                0.5, self, "autoOpenpos:", None, True)
 
         if self._opts.fullscreen:
             self._window.toggleFullScreen_(None)

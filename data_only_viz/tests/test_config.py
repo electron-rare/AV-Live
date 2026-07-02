@@ -419,3 +419,9 @@ def test_viz_audio_keys_default_off():
     cfg = VizConfig.from_env({})
     assert cfg.viz_audio_keys is False
     assert VizConfig.from_env({"VIZ_AUDIO_KEYS": "1"}).viz_audio_keys is True
+
+
+def test_viz_default_mode():
+    assert VizConfig.from_env({}).viz_default_mode == "auto"
+    assert VizConfig.from_env(
+        {"VIZ_DEFAULT_MODE": "voronoi"}).viz_default_mode == "voronoi"

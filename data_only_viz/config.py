@@ -44,6 +44,7 @@ ARKIT_FULL_SKELETON         "1"       bool   draw full 91-joint ARKit body (!=0 
 VIZ_HUD                     "0"       bool   show debug HUD overlay
 VIZ_SOURCE_KEYS             "0"       bool   wxcvbn + 0-9 source-bundle shortcuts (off: perf safety)
 VIZ_AUDIO_KEYS              "0"       bool   qsdfghjkl audio-scene shortcuts (off: perf safety; m stays)
+VIZ_DEFAULT_MODE            "auto"    str    fixed boot viz mode (e.g. voronoi); disables auto-openpos
 IPHONE_OSC_PORT             57128     int    UDP port for iPhone ARBodyTracker /body3d/kp
 CONCERT_MIRROR              "1"       bool   mirror video horizontally (!=0 = True)
 ICP_FUSION                  "0"       bool   enable ICP LiDAR fusion (only "1" = True)
@@ -141,6 +142,11 @@ class VizConfig:
     # Audio-scene row (qsdfghjkl): same perf-safety gate, same date. The
     # special m key (matrix mode: scene stop + openpos viz) stays active.
     viz_audio_keys: bool = False
+    # Fixed viz mode at boot (a viz_mode_names entry, e.g. "voronoi").
+    # "auto" = historical behavior (mode 0 + auto-openpos when persons
+    # appear). A fixed mode also DISABLES the auto-openpos timer so it is
+    # truly always on (user request live 2026-07-02: t/voronoi permanent).
+    viz_default_mode: str = "auto"
 
     # ---- iPhone OSC ------------------------------------------------------
     iphone_osc_port: int = 57128
@@ -290,6 +296,7 @@ class VizConfig:
             viz_hud=_bool_std("VIZ_HUD", False),
             viz_source_keys=_bool_std("VIZ_SOURCE_KEYS", False),
             viz_audio_keys=_bool_std("VIZ_AUDIO_KEYS", False),
+            viz_default_mode=_str("VIZ_DEFAULT_MODE", "auto"),
             iphone_osc_port=_int("IPHONE_OSC_PORT", 57128),
             concert_mirror=_bool_ne0("CONCERT_MIRROR", True),
             # ICP_FUSION / MULTIHMR_AUTOCAST use strict "1" convention

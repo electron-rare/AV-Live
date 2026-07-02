@@ -29,6 +29,9 @@ export PINCH_ENABLE="${PINCH_ENABLE:-1}"
 # displayed video ccw. The 2D landmark streams arrive already uprighted
 # (see iphone_usb_source) and are not rotated.
 export VIDEO_ROTATE="${VIDEO_ROTATE:-ccw}"
+# Fixed viz mode: voronoi (the t-key effect) always active — the auto
+# openpos switch is disabled by data_only_viz when a mode is fixed.
+export VIZ_DEFAULT_MODE="${VIZ_DEFAULT_MODE:-voronoi}"
 # Gestures use the iPhone Vision hands exclusively (stable, rotation-invariant);
 # the Mac MediaPipe hand detector is skipped under --iphone-usb (multi.py).
 export FINGER_SOURCE="${FINGER_SOURCE:-iphone}"
