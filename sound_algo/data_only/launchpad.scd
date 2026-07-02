@@ -349,6 +349,141 @@ SynthDef(\lp_fx, { |out=0, amp=0.4, pan=0, rev=0, len=1.5|
     ~doReverbBus.notNil.if({ Out.ar(~doReverbBus, sig * rev) });
 }).add;
 
+// ===================================================================
+//  Vintage 90s/2000s additions — 10 new classic-machine emulations.
+//  All note-terminating; cutoff+res args where matrix ~matResVoices
+//  targets exist for the assigned voice(s). Standard UGens only.
+// ===================================================================
+// --- Roland TR-909 Snare (2 sines + HPF noise, percussive) ---
+SynthDef(\tr909_snare, { |out=0, amp=0.5, snappy=0.6, pan=0, rev=0|
+    var tenv  = EnvGen.kr(Env.perc(0.001, 0.09, 1, -4));
+    var nenv  = EnvGen.kr(Env.perc(0.001, 0.22, 1, -3), doneAction: 2);
+    var tone  = (SinOsc.ar(180) + SinOsc.ar(330)) * tenv * 0.35;
+    var noise = HPF.ar(WhiteNoise.ar, 1500) * nenv * snappy;
+    var sig   = Pan2.ar(((tone + noise) * 2.0).tanh, pan.clip(-1,1)) * amp;
+    Out.ar(out, sig);
+    ~doReverbBus.notNil.if({ Out.ar(~doReverbBus, sig * rev) });
+}).add;
+// --- Alpha Juno-2 Hoover / Mentasm (PWM saw + pitch-drop + BBD chorus, gated) ---
+SynthDef(\hoover, { |out=0, freq=110, amp=0.4, cutoff=8000, res=0.2, gate=1, pan=0, rev=0|
+    var env  = EnvGen.kr(Env.asr(0.01, 1, 0.3), gate, doneAction: 2);
+    var penv = EnvGen.kr(Env([1.5, 1.5, 1.0, 1.0], [0.01, 0.28, 0.5], [\lin, \exp, \lin]));
+    var f    = freq.clip(40, 2000) * penv;
+    var osc  = Saw.ar(f * (1 + SinOsc.kr(8, 0, 0.04)));
+    var sub  = LFPulse.ar(f * 0.5, 0, 0.5) * 0.18;
+    var rq   = res.clip(0, 1).linexp(0, 1, 1.0, 0.1);
+    var flt  = RLPF.ar(osc + sub, cutoff.clip(200, 14000), rq);
+    var ch   = flt
+        + DelayC.ar(flt, 0.02, SinOsc.kr(0.5, 0, 0.004, 0.007))
+        + DelayC.ar(flt, 0.02, SinOsc.kr(0.6, pi, 0.004, 0.007));
+    var sig  = Pan2.ar(ch * 0.33 * env, pan.clip(-1,1)) * amp;
+    Out.ar(out, sig);
+    ~doReverbBus.notNil.if({ Out.ar(~doReverbBus, sig * rev) });
+}).add;
+// --- Korg M1 House Piano (additive + key-click, percussive) ---
+SynthDef(\m1_piano, { |out=0, freq=440, amp=0.5, cutoff=8000, res=0.5, pan=0, rev=0|
+    var f     = freq.clip(80, 4000);
+    var click = SinOsc.ar(f * 8) * EnvGen.kr(Env.perc(0.0005, 0.008)) * 0.3;
+    var env   = EnvGen.kr(Env.perc(0.001, 0.38, 1, -5), doneAction: 2);
+    var osc   = Mix(SinOsc.ar(f * [1.0, 2.0, 3.0, 4.1, 5.2, 6.3, 7.5, 8.8], 0,
+                    [1.0, 0.32, 0.12, 0.06, 0.03, 0.015, 0.008, 0.004]));
+    var rq    = res.clip(0, 1).linexp(0, 1, 1.0, 0.1);
+    var sig   = RLPF.ar((osc + click) * env, cutoff.clip(200, 14000), rq).tanh * 0.5;
+    sig = Pan2.ar(sig, pan.clip(-1,1)) * amp;
+    Out.ar(out, sig);
+    ~doReverbBus.notNil.if({ Out.ar(~doReverbBus, sig * rev) });
+}).add;
+// --- Korg M1 Organ (drawbar additive harmonics, gated) ---
+SynthDef(\m1_organ, { |out=0, freq=55, amp=0.3, cutoff=4000, res=0.3, gate=1, pan=0, rev=0|
+    var f   = freq.clip(20, 1000);
+    var osc = Mix(SinOsc.ar(f * [1, 2, 3, 4, 5, 6, 8], 0,
+                  [0.8, 0.8, 0.6, 0.4, 0.2, 0.1, 0.1]));
+    var env = EnvGen.kr(Env.asr(0.008, 1, 0.06), gate, doneAction: 2);
+    var rq  = res.clip(0, 1).linexp(0, 1, 1.0, 0.1);
+    var sig = RLPF.ar(osc * 0.12, cutoff.clip(200, 12000), rq).tanh;
+    sig = Pan2.ar(sig * env, pan.clip(-1,1)) * amp * 0.55;
+    Out.ar(out, sig);
+    ~doReverbBus.notNil.if({ Out.ar(~doReverbBus, sig * rev) });
+}).add;
+// --- Yamaha DX7 Electric Piano (high-ratio FM tine click + body, percussive) ---
+SynthDef(\dx7_epiano, { |out=0, freq=220, amp=0.4, cutoff=8000, res=0.5, modidx=0.3, pan=0, rev=0|
+    var f    = freq.clip(40, 4000);
+    var menv = EnvGen.kr(Env.perc(0.0003, 0.012, 1, -3));
+    var mod  = SinOsc.ar(f * 14) * f * 14 * modidx * menv;
+    var env  = EnvGen.kr(Env.perc(0.001, 0.5, 1, -3), doneAction: 2);
+    var rq   = res.clip(0, 1).linexp(0, 1, 1.0, 0.1);
+    var sig  = RLPF.ar(SinOsc.ar(f + mod) * env, cutoff.clip(200, 14000), rq) * 0.5;
+    sig = Pan2.ar(sig, pan.clip(-1,1)) * amp;
+    Out.ar(out, sig);
+    ~doReverbBus.notNil.if({ Out.ar(~doReverbBus, sig * rev) });
+}).add;
+// --- JP-8000 / Jupiter-8 Brass Stab (filter-env stab on dual saws, gated) ---
+SynthDef(\brass_stab, { |out=0, freq=220, amp=0.4, cutoff=800, res=0.3, gate=1, pan=0, rev=0|
+    var fenv = EnvGen.kr(Env.perc(0.003, 0.12, 1, -4));
+    var aenv = EnvGen.kr(Env.asr(0.003, 1, 0.15), gate, doneAction: 2);
+    var f    = freq.clip(30, 3000);
+    var osc  = Mix(Saw.ar([f, f * 1.006])) + (Pulse.ar((f * 0.5).clip(10, 1500), 0.5) * 0.3);
+    var rq   = res.clip(0, 1).linexp(0, 1, 1.0, 0.1);
+    var sig  = RLPF.ar(osc, (cutoff + (fenv * 2000)).clip(100, 12000), rq);
+    sig = Pan2.ar(sig * aenv, pan.clip(-1,1)) * amp * 0.45;
+    Out.ar(out, sig);
+    ~doReverbBus.notNil.if({ Out.ar(~doReverbBus, sig * rev) });
+}).add;
+// --- Nord Lead 2 VA Lead (2 detuned saws + delayed vibrato + filter, gated) ---
+SynthDef(\nord_lead, { |out=0, freq=220, amp=0.3, cutoff=4000, res=0.3, gate=1, pan=0, rev=0|
+    var env  = EnvGen.kr(Env.asr(0.005, 1, 0.2), gate, doneAction: 2);
+    var f    = freq.clip(40, 5000);
+    var vib  = SinOsc.kr(5) * 0.004 * EnvGen.kr(Env([0, 0, 1, 1], [0.2, 0.05, 0.5]));
+    var f2   = f * (1 + vib);
+    var osc  = Mix(Saw.ar([f2, f2 * 1.007]));
+    var rq   = res.clip(0, 1).linexp(0, 1, 1.0, 0.1);
+    var sig  = RLPF.ar(osc, (cutoff * (1 + (env * 0.3))).clip(200, 14000), rq);
+    sig = Pan2.ar(sig * env, pan.clip(-1,1)) * amp * 0.5;
+    Out.ar(out, sig);
+    ~doReverbBus.notNil.if({ Out.ar(~doReverbBus, sig * rev) });
+}).add;
+// --- Access Virus Hypersaw (9 detuned saws + soft saturation, gated) ---
+SynthDef(\virus_saw, { |out=0, freq=220, amp=0.3, cutoff=6000, res=0.25, detune=0.08, gate=1, pan=0, rev=0|
+    var env  = EnvGen.kr(Env.asr(0.002, 1, 0.2), gate, doneAction: 2);
+    var f    = freq.clip(20, 5000);
+    var dets = [-0.7, -0.5, -0.33, -0.17, 0, 0.17, 0.33, 0.5, 0.7] * detune;
+    var osc  = HPF.ar((Mix(Saw.ar(f * (1 + dets))) * (1/9) * 3).tanh, 60);
+    var rq   = res.clip(0, 1).linexp(0, 1, 1.0, 0.1);
+    var sig  = RLPF.ar(osc, cutoff.clip(100, 18000), rq);
+    sig = Pan2.ar(sig * env, pan.clip(-1,1)) * amp * 0.5;
+    Out.ar(out, sig);
+    ~doReverbBus.notNil.if({ Out.ar(~doReverbBus, sig * rev) });
+}).add;
+// --- Rave Piano Stab (M1/S950 inharmonic additive, percussive) ---
+SynthDef(\rave_stab, { |out=0, freq=440, amp=0.5, cutoff=8000, res=0.5, pan=0, rev=0|
+    var f   = freq.clip(80, 4000);
+    var osc = Mix(SinOsc.ar(f * [1.0, 2.002, 3.005, 4.007, 5.009, 6.012, 7.014, 8.016], 0,
+                  [1.0, 0.4, 0.15, 0.08, 0.04, 0.02, 0.01, 0.005]));
+    var env = EnvGen.kr(Env.perc(0.001, 0.3, 1, -4), doneAction: 2);
+    var rq  = res.clip(0, 1).linexp(0, 1, 1.0, 0.1);
+    var sig = RLPF.ar(osc * env, cutoff.clip(200, 14000), rq).tanh * 0.8;
+    sig = Pan2.ar(sig, pan.clip(-1,1)) * amp * 0.5;
+    Out.ar(out, sig);
+    ~doReverbBus.notNil.if({ Out.ar(~doReverbBus, sig * rev) });
+}).add;
+// --- Juno-106 Reese Bass (PWM pulse + BBD chorus, distinct from lp_reese multi-saw, gated) ---
+SynthDef(\reese_juno, { |out=0, freq=55, amp=0.0, cutoff=0, res=0.3, gate=1, pan=0, rev=0|
+    var env  = EnvGen.kr(Env.asr(0.02, 1, 0.12), gate, doneAction: 2);
+    var f    = freq.clip(20, 200);
+    var lfo  = SinOsc.kr(0.5);
+    var pw   = lfo.range(0.3, 0.7);
+    var osc  = Pulse.ar(f, pw) + (Pulse.ar(f * 1.007, 1.0 - pw) * 0.85);
+    var ch   = osc
+        + DelayC.ar(osc, 0.02, SinOsc.kr(0.6, 0, 0.003, 0.007))
+        + DelayC.ar(osc, 0.02, SinOsc.kr(0.5, pi, 0.003, 0.007));
+    var cut  = Select.kr(cutoff > 0, [(f * 5), cutoff]).clip(80, 3000);
+    var rq   = res.clip(0, 1).linexp(0, 1, 1.0, 0.15);
+    var sig  = LeakDC.ar(RLPF.ar(ch * 0.35, cut, rq)) * env;
+    sig = Pan2.ar(sig, pan.clip(-1,1)) * amp.lag(0.1);
+    Out.ar(out, sig);
+    ~doReverbBus.notNil.if({ Out.ar(~doReverbBus, sig * rev) });
+}).add;
+
 s.sync;
 
 ~lp = ~lp ? ();
