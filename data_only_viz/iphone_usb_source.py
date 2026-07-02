@@ -161,18 +161,17 @@ class IphoneUSBSource:
         from .config import VizConfig as _VizConfig
         _cfg = _VizConfig.from_env()
         self._mirror = mirror and _cfg.concert_mirror
-        # VIDEO_ROTATE also applies to the iPhone skeleton2D landmarks
-        # (ARKit projects into the raw sensor frame) so they stay aligned
-        # with the rotated video (multi.py only rotates the frame).
-        # Mirror-conjugated: see effective_point_rotate.
-        self._video_rotate = effective_point_rotate(
-            _cfg.video_rotate or "none", self._mirror)
-        # Vision hands are computed by the app with a HARDCODED
-        # orientation (.right, ARBodySession.swift) — their coords live in
-        # an already-uprighted frame, NOT the sensor frame. They get their
-        # own rotation knob (IPHONE_HANDS_ROTATE, default none) so they can
-        # be aligned independently of the skeleton.
+        # The iPhone app delivers BOTH 2D streams in an already-uprighted
+        # frame in portrait: Vision hands run with a hardcoded orientation
+        # (.right, ARBodySession.swift) and the ARKit skeleton2D projection
+        # follows the interface orientation. VIDEO_ROTATE therefore only
+        # rotates the VIDEO (multi.py); the 2D points are NOT rotated by
+        # default. Two independent knobs remain for exotic app/device
+        # combinations (mirror-conjugated, see effective_point_rotate):
+        # IPHONE_SKEL_ROTATE and IPHONE_HANDS_ROTATE (none/ccw/cw/180).
         import os as _os
+        self._skel_rotate = effective_point_rotate(
+            _os.environ.get("IPHONE_SKEL_ROTATE", "none"), self._mirror)
         self._hands_rotate = effective_point_rotate(
             _os.environ.get("IPHONE_HANDS_ROTATE", "none"), self._mirror)
         self._codec = av.codec.CodecContext.create("hevc", "r") if av is not None else None
@@ -243,7 +242,7 @@ class IphoneUSBSource:
                     elif tag == TAG_SKELETON2D and self.state is not None:
                         pts = decode_skeleton2D(payload)
                         if pts is not None:
-                            _rot = self._video_rotate
+                            _rot = self._skel_rotate
                             arr = np.array(
                                 [rotate_norm_xy(x, y, _rot)
                                  for (x, y, _v) in pts],
