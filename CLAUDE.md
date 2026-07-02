@@ -84,6 +84,9 @@ Toujours répondre en français à l'utilisateur. Code, commentaires de code, co
 | `HAND_PERSIST_FRAMES` | `3` | consecutive frames a hand track must match before being drawn (1 = off, all hands drawn immediately) |
 | `HAND_SWAP_LR` | `0` | Safety knob: invert the Vision chirality interpretation when routing hands (gestures + panels). Chirality validated correct live 2026-07-02; default `0`. Set `1` if a future iPhone app build delivers inverted chirality |
 | `HAND_NEAR_MIN` | `0.10` | Minimum wrist-to-middle-MCP distance (normalised) for a hand to trigger pinch/strike. Hands smaller than this are gated out. Display panels are unaffected |
+| `HAND_PERSIST_GRACE` | `2` | grace frames before dropping a hand track (0 = strict per-frame) |
+| `HAND_NEAR_OFF` | `0.08` | hand size hysteresis off-threshold for gesture slot stabilizer |
+| `HAND_HOLD_FRAMES` | `2` | gesture slot: frames to hold last hand on Vision miss |
 | `ARKIT_BONE_MAX` | `0.5` | max ARKit body bone length in normalized units; longer bones are skipped (tracking-loss garbage filter) |
 
 ## Conventions globales
