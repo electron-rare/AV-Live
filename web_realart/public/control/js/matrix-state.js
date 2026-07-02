@@ -88,8 +88,6 @@ export function resetGlobalSettings() { matGlobalSettings = { transientBars: 1, 
 
 export let matPinchHoldMs = 300;
 export function setPinchHoldMs(v) { matPinchHoldMs = v; }
-export let matFistThresh = 0.15;
-export function setFistThresh(v) { matFistThresh = v; }
 // Decode /matrix/globalsettings args: [transientBars, keepN, keep0..]
 export function parseGlobalSettings(args) {
   const transientBars = Math.round(Number(args[0]));
@@ -192,8 +190,7 @@ export function saveMatState() {
   try { localStorage.setItem(MATRIX_STORAGE_KEY,
     JSON.stringify({ grid: matGrid, inst: matInst, cdef: matColorDefs,
                      vmod: matVoiceMods, vpose: matVoicePoses,
-                     gact: matGlobalActions, gset: matGlobalSettings, phms: matPinchHoldMs,
-                     fth: matFistThresh })); } catch (_e) {}
+                     gact: matGlobalActions, gset: matGlobalSettings, phms: matPinchHoldMs })); } catch (_e) {}
 }
 
 export function loadMatState() {
@@ -223,7 +220,6 @@ export function loadMatState() {
       if (raw.gset && typeof raw.gset === "object" && Array.isArray(raw.gset.breakdownKeep))
         matGlobalSettings = raw.gset;
       if (Number.isFinite(raw.phms)) matPinchHoldMs = raw.phms;
-      if (Number.isFinite(raw.fth)) matFistThresh = raw.fth;
       return; }
     if (Array.isArray(raw) && raw.length === MATRIX_VOICES.length) { matGrid = raw; return; }   // legacy: bare grid
   } catch (_e) {}

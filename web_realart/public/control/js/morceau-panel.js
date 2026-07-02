@@ -6,7 +6,6 @@ import {
   GLOBAL_ACTION_CHOICES, GLOBAL_SLOTS, matGlobalActions, setGlobalAction, saveMatState,
   matGlobalSettings, setGlobalSetting, parseGlobalSettings,
   matPinchHoldMs, setPinchHoldMs,
-  matFistThresh, setFistThresh,
 } from "./matrix-state.js";
 import { MATRIX_VOICES } from "./matrix-state.js";
 
@@ -91,23 +90,6 @@ export function init() {
     });
     onOpen(() => send("/matrix/pinchhold/get"));
     send("/matrix/pinchhold/get");
-    // --- Sensibilite poing slider (in Reglages) ---
-    const fRow = document.createElement("label");
-    fRow.className = "morceau-set-row";
-    const fSpan = document.createElement("span"); fSpan.textContent = "Sensibilité poing";
-    const fInp = document.createElement("input");
-    fInp.type = "range"; fInp.min = 0.05; fInp.max = 0.5; fInp.step = 0.01; fInp.value = matFistThresh;
-    const fOut = document.createElement("output"); fOut.textContent = matFistThresh;
-    fInp.addEventListener("input", () => { fOut.textContent = fInp.value; });
-    fInp.addEventListener("change", () => { setFistThresh(+fInp.value); send("/matrix/fisthresh", +fInp.value); saveMatState(); });
-    fRow.append(fSpan, fInp, fOut);
-    sHost.appendChild(fRow);
-    on("/matrix/fisthresh", (args) => {
-      const v = Number(args[0]);
-      if (Number.isFinite(v)) { fInp.value = v; fOut.textContent = v; setFistThresh(v); saveMatState(); }
-    });
-    onOpen(() => send("/matrix/fisthresh/get"));
-    send("/matrix/fisthresh/get");
     const keepWrap = document.createElement("div");
     keepWrap.className = "morceau-keep";
     const keepTitle = document.createElement("span");
@@ -138,29 +120,6 @@ export function init() {
     });
     onOpen(() => send("/matrix/globalsettings/get"));
     send("/matrix/globalsettings/get");
-  }
-  // --- Fist indicators (hand 0 = Poing G -> charger, hand 1 = Poing D -> suivant) ---
-  const fistHost = document.getElementById("morceau-fists");
-  if (fistHost) {
-    const fistFills = [];
-    [["Poing G → charger"], ["Poing D → suivant"]].forEach((lbl, hand) => {
-      const row = document.createElement("div");
-      row.className = "morceau-fist";
-      row.textContent = lbl[0];
-      const fl = document.createElement("div");
-      fl.className = "morceau-slot-fill";
-      row.appendChild(fl);
-      fistFills[hand] = fl;
-      fistHost.appendChild(row);
-    });
-    on("/matrix/fistprogress", (args) => {
-      const hand = Math.round(Number(args[0]));
-      const prog = Number(args[1]) || 0;
-      const fl = fistFills[hand];
-      if (!fl) return;
-      fl.style.width = (prog * 100) + "%";
-      fl.classList.toggle("fired", prog >= 1);
-    });
   }
   const bpm = document.getElementById("matrix-bpm");
   const bpmOut = document.getElementById("matrix-bpm-out");

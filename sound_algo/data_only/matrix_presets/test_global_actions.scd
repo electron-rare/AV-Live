@@ -146,37 +146,7 @@ OSCdef(\mat_pinchhold).func.value(['/matrix/pinchhold', 500]);
 (~matPinchHoldMs == 420).not.if({ pass = false; "FAIL: pinchHoldMs not restored".postln });
 ("rm -f '" ++ (~matDir +/+ "zz_phms_test.matrix") ++ "'").systemCmd;
 
-// -- Q: fist hold-to-fire (engage records, tick fires, release/absent cancel, threshold, save) --
-~matPinchRoutine !? { ~matPinchRoutine.stop };
-~matPinchHoldMs = 300; ~matFistThresh = 0.15;
-~matFistState = Array.fill(2, \unknown); ~matFistHeld = Array.fill(2, nil); ~matFistFired = Array.fill(2, false);
-~loadedFist = nil; ~matCurrentName = \zztest_morceau;
-~matLoadReal = ~matLoad; ~matLoad = { |n| ~loadedFist = n.asSymbol };
-~matFistEdge.(0, 0.5, 0.05);                              // L fist engage -> held, no fire
-(~matFistHeld[0].isNil).if({ pass = false; "FAIL: L fist engage not held".postln });
-~matFistTick.();
-(~loadedFist.notNil).if({ pass = false; "FAIL: L fist fired before hold".postln });
-~matFistHeld[0] = Main.elapsedTime - 0.5;                 // 500ms held (> 300)
-~matFistTick.();
-(~loadedFist == \zztest_morceau).not.if({ pass = false; "FAIL: L fist hold did not reload current".postln });
-~loadedFist = nil; ~matFistState = Array.fill(2, \unknown); ~matFistHeld = Array.fill(2, nil); ~matFistFired = Array.fill(2, false);
-~matFistEdge.(1, 0.5, 0.05);                              // R fist engage
-~matFistEdge.(1, 0.5, 0.40);                              // open (>= 0.30) -> release
-~matFistTick.();
-(~matFistHeld[1].isNil).not.if({ pass = false; "FAIL: R fist release did not clear".postln });
-~matFistState = Array.fill(2, \unknown); ~matFistHeld = Array.fill(2, nil);
-~matFistEdge.(0, 0.0, 0.0);                               // absent hand (x=0, openness 0) must NOT engage
-(~matFistHeld[0].isNil).not.if({ pass = false; "FAIL: absent hand engaged a fist".postln });
-OSCdef(\mat_fisthresh).func.value(['/matrix/fisthresh', 0.25]);
-(~matFistThresh == 0.25).not.if({ pass = false; "FAIL: fisthresh not set".postln });
-~matFistThresh = 0.15; ~matLoad = ~matLoadReal;
-~matInstruments = ~matInstruments ? Array.fill(~matVoices.size, { \default });
-~matColorDefs   = ~matColorDefs   ? Array.fill(~matVoices.size, { ~matDefaultColorDefs.value });
-~matSavedNames  = ~matSavedNames  ? Set.new;
-~matFistThresh = 0.22; ~matSave.("zz_fth_test"); ~matFistThresh = 0.15;
-~matLoadFile.(~matDir +/+ "zz_fth_test.matrix");
-(~matFistThresh == 0.22).not.if({ pass = false; "FAIL: fistThresh not restored".postln });
-("rm -f '" ++ (~matDir +/+ "zz_fth_test.matrix") ++ "'").systemCmd;
+// Q: fist gestures removed 2026-07-02 (user request; FIST_ENABLE=0 at the source)
 
 pass.if({ "GLOBALACT PASS".postln }, { "GLOBALACT FAIL".postln });
 0.exit;
