@@ -170,18 +170,27 @@ def test_publisher_passes_hands_kp_to_step() -> None:
 # Task-3 tests: _emit_hands wired into _tick
 # ---------------------------------------------------------------------------
 
-def _fake_hand_21(seed: int = 0):
-    """Return a list of 21 objects with .x and .y float attributes."""
+def _fake_hand_21(seed: int = 0, c: float = 1.0):
+    """Return a list of 21 landmark-like objects with .x .y .c attrs.
+
+    Wrist (slot 0) at (0.3, 0.6) and middle-MCP (slot 9) at (0.3, 0.45)
+    so hand_plausible passes: size=0.15 > 0.02, c=1.0 >= 0.45, in-frame.
+    """
     import types
     rng = __import__("random").Random(seed)
-    return [
-        types.SimpleNamespace(x=rng.random(), y=rng.random())
+    lm = [
+        types.SimpleNamespace(x=rng.random() * 0.4 + 0.2,
+                              y=rng.random() * 0.4 + 0.2, c=c)
         for _ in range(21)
     ]
+    lm[0] = types.SimpleNamespace(x=0.3, y=0.6, c=c)    # wrist in frame
+    lm[9] = types.SimpleNamespace(x=0.3, y=0.45, c=c)   # middle-MCP, size=0.15
+    return lm
 
 
-def test_emit_hands_called_once_per_tick_with_hands() -> None:
+def test_emit_hands_called_once_per_tick_with_hands(monkeypatch) -> None:
     """`bridge.send_hands` must be called once per tick with L/R/dist keys."""
+    monkeypatch.setenv("HAND_PERSIST_FRAMES", "1")  # instant establishment
     from data_only_viz.action_head_pub import ActionHeadPublisher
     state = _FakeState()
     bridge = MagicMock()
@@ -299,3 +308,37 @@ def test_publisher_dict_format_still_works() -> None:
     actions = bridge.send_action.call_args_list
     assert len(actions) == 1
     assert actions[0].kwargs.get("pid", actions[0].args[0]) == 99
+
+
+# ---------------------------------------------------------------------------
+# Gesture validation: feature path requires established hands (spec test d)
+# ---------------------------------------------------------------------------
+
+def test_emit_hands_features_require_establishment(monkeypatch) -> None:
+    """(d) _emit_hands yields None for hands not yet established, non-None after.
+
+    Ghost = plausible hand present for 1-2 ticks only (never established).
+    Real  = same plausible hand held for HAND_PERSIST_FRAMES ticks.
+    """
+    monkeypatch.setenv("HAND_PERSIST_FRAMES", "3")
+    from data_only_viz.action_head_pub import ActionHeadPublisher
+    state = _FakeState()
+    bridge = MagicMock()
+    pub = ActionHeadPublisher(state, bridge, ckpt_path=None)
+
+    good_hand = _fake_hand_21(0)
+    state.persons_hands = [good_hand]
+    state.persons_smplx = [_make_smplx_person(0)]
+
+    # Ticks 1-2: hand count < 3 → not yet established → features are None
+    for t in range(1, 3):
+        state.smplx_last_t = float(t)
+        pub._tick(t_now=float(t))
+    feats_early, _ = bridge.send_hands.call_args_list[-1][0]
+    assert feats_early["L"] is None   # not established yet
+
+    # Tick 3: count reaches min_frames → established → features populated
+    state.smplx_last_t = 3.0
+    pub._tick(t_now=3.0)
+    feats_est, _ = bridge.send_hands.call_args_list[-1][0]
+    assert feats_est["L"] is not None  # now established
