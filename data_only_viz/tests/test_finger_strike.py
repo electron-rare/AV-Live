@@ -254,3 +254,84 @@ def test_release_immediate_after_debounced_engage():
     rel = det.step([_pinch_hand(*_OPEN), None], 0.09)   # very next frame
     assert len(eng) == 1 and eng[0].state == 1
     assert len(rel) == 1 and rel[0].state == 0
+
+
+# ---------------------------------------------------------------------------
+# FingerStrikeDetector.reset_slot — phantom-strike prevention
+# ---------------------------------------------------------------------------
+
+def _strike_hand(tip_y: float, base_y: float = 0.4, cx: float = 0.3) -> list:
+    """Hand where index finger tip_y controls the relative position."""
+    return _hand({1: tip_y}, base_y=base_y, cx=cx)
+
+
+def test_reset_slot_prevents_phantom_strike_on_reappear():
+    """After reset_slot, the first real-hand frame primes without firing.
+
+    Scenario: prime detector, hold the last hand (frozen coords),
+    then reset_slot before the real hand returns with a large delta.
+    Expected: no strike on reappear (first frame after reset is a prime).
+    """
+    det = FingerStrikeDetector(vel_thresh=0.02, refractory_ms=0)
+
+    # Prime: index tip at 0.40
+    det.step([_strike_hand(0.40), None], t_now=0.00)
+
+    # "Held" frames: stabilizer would replay the same hand — same coords,
+    # vel=0, no strike, but prev_rel stays at 0.40.
+    det.step([_strike_hand(0.40), None], t_now=0.03)
+    det.step([_strike_hand(0.40), None], t_now=0.06)
+
+    # Simulate held -> real transition: reset before consuming new position.
+    det.reset_slot(0)
+
+    # Real hand reappears with a large downward delta (0.40 -> 0.70 = 0.30 >> thresh).
+    events = det.step([_strike_hand(0.70), None], t_now=0.09)
+    assert events == [], (
+        "after reset_slot, first frame should prime without firing "
+        f"(got {events})"
+    )
+
+
+def test_without_reset_big_delta_fires_strike():
+    """Control: WITHOUT reset_slot, the same scenario fires a phantom strike."""
+    det = FingerStrikeDetector(vel_thresh=0.02, refractory_ms=0)
+
+    det.step([_strike_hand(0.40), None], t_now=0.00)   # prime
+    det.step([_strike_hand(0.40), None], t_now=0.03)   # held
+    det.step([_strike_hand(0.40), None], t_now=0.06)   # held
+
+    # No reset — prev_rel is still 0.40 → delta 0.30 > thresh → fires
+    events = det.step([_strike_hand(0.70), None], t_now=0.09)
+    assert len(events) > 0, "without reset_slot, phantom strike must fire (control)"
+
+
+def test_reset_slot_clears_all_five_fingers():
+    """reset_slot clears every finger state for the specified slot."""
+    det = FingerStrikeDetector(vel_thresh=0.02, refractory_ms=0)
+    # Prime all 5 fingers by stepping a neutral hand
+    neutral = _hand({f: 0.40 for f in range(5)}, base_y=0.40)
+    det.step([neutral, None], t_now=0.00)
+    # All prev_rel should be non-None now
+    for f in range(5):
+        assert det._state[0][f].prev_rel is not None
+
+    det.reset_slot(0)
+
+    for f in range(5):
+        assert det._state[0][f].prev_rel is None, f"finger {f} prev_rel not cleared"
+        assert det._state[0][f].armed is True, f"finger {f} not re-armed"
+
+
+def test_reset_slot_does_not_affect_other_slot():
+    """Resetting slot 0 leaves slot 1 state intact."""
+    det = FingerStrikeDetector(vel_thresh=0.02, refractory_ms=0)
+    h = _hand({1: 0.40})
+    det.step([h, h], t_now=0.00)   # prime both slots
+    # slot 1 finger 1 should have a non-None prev_rel
+    assert det._state[1][1].prev_rel is not None
+
+    det.reset_slot(0)
+
+    # slot 1 unchanged
+    assert det._state[1][1].prev_rel is not None, "slot 1 must be unaffected"

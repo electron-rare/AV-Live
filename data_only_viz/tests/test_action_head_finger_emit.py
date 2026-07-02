@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import threading
+import pytest
 from unittest.mock import MagicMock
 
 from data_only_viz.finger_strike import FINGERTIPS, FINGER_BASES
@@ -10,6 +11,7 @@ from data_only_viz.finger_strike import FINGERTIPS, FINGER_BASES
 class _FakeState:
     def __init__(self) -> None:
         self.persons_hands = []
+        self.mirror_2d = False
         self._lock = threading.RLock()
 
     def lock(self):
@@ -118,3 +120,43 @@ def test_pinch_gate_env_defaults_are_strict(monkeypatch):
     assert pub._pinch_det.ext_ratio == 1.35
     assert pub._pinch_det.ext_min == 2
     assert pub._pinch_det.debounce_frames == 3
+
+
+# ---------------------------------------------------------------------------
+# Item 1a: mirror_2d coherence — _emit_hands passes mirror to extractor
+# ---------------------------------------------------------------------------
+
+def _make_hand_row(cx: float) -> list:
+    """21 landmarks as [x, y, z] rows with enough geometry for features."""
+    lm = [[cx, 0.5, 0.0] for _ in range(21)]
+    lm[0] = [cx, 0.6, 0.0]   # wrist
+    lm[9] = [cx, 0.45, 0.0]  # middle-MCP -> hand_size 0.15 > near threshold
+    return lm
+
+
+def test_emit_hands_mirror_2d_flips_cx_slot_assignment(monkeypatch):
+    """With state.mirror_2d=True, the cx fallback in _emit_hands assigns
+    the RIGHT-screen hand to the L slot — coherent with the mirrored renderer."""
+    from data_only_viz.hand_features import HandFeatureExtractor
+    pub = _pub(monkeypatch, enabled=False)
+    pub._hand_ext = HandFeatureExtractor()   # not set by _pub/_init_finger_piano
+
+    h_low_cx  = _make_hand_row(0.2)   # screen-left
+    h_high_cx = _make_hand_row(0.8)   # screen-right
+    pub.state.persons_hands = [h_low_cx, h_high_cx]
+    # No chirality -> cx fallback path
+    # (persons_hands_chirality absent -> getattr returns None -> [] -> None)
+
+    # Without mirror: screen-left (cx=0.2) -> slot L
+    pub.state.mirror_2d = False
+    pub._emit_hands(0.0)
+    feats_plain = pub.state.hand_feats
+    assert feats_plain["L"] is not None
+    assert feats_plain["L"]["cx"] == pytest.approx(0.2, abs=0.05)
+
+    # With mirror: cx fallback flips -> screen-right (cx=0.8) -> slot L
+    pub.state.mirror_2d = True
+    pub._emit_hands(0.0)
+    feats_mirror = pub.state.hand_feats
+    assert feats_mirror["L"] is not None
+    assert feats_mirror["L"]["cx"] == pytest.approx(0.8, abs=0.05)

@@ -178,6 +178,28 @@ def test_fist_enabled_true_computes_fist():
     assert hand["fist"] > 0.9
 
 
+def test_mirror_flips_cx_fallback_slot_assignment():
+    """mirror=True inverts the cx fallback so screen-right hand goes to slot L."""
+    ext = HandFeatureExtractor()
+    h_low  = _hand(0.2, 0.5, span=0.10)   # cx=0.2 -> slot L normally (leftmost)
+    h_high = _hand(0.8, 0.5, span=0.10)   # cx=0.8 -> slot R normally
+    # No chirality -> cx fallback
+    plain   = ext.step([h_low, h_high], chirality=None, mirror=False)
+    mirrored = ext.step([h_low, h_high], chirality=None, mirror=True)
+    assert plain["L"]["cx"] == pytest.approx(0.2, abs=0.02), "non-mirrored: L gets leftmost"
+    assert mirrored["L"]["cx"] == pytest.approx(0.8, abs=0.02), "mirrored: L gets rightmost"
+
+
+def test_mirror_default_false_unchanged():
+    """mirror defaults to False; existing tests that pass no mirror kwarg are unaffected."""
+    ext = HandFeatureExtractor()
+    h_a = _hand(0.2, 0.5, span=0.10)
+    h_b = _hand(0.8, 0.5, span=0.10)
+    no_kwarg  = ext.step([h_a, h_b])
+    explicit  = ext.step([h_a, h_b], mirror=False)
+    assert no_kwarg["L"]["cx"] == pytest.approx(explicit["L"]["cx"], abs=1e-6)
+
+
 def test_fist_enabled_per_slot_independence():
     """fist_enabled masks only the specified slot."""
     ext = HandFeatureExtractor()

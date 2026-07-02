@@ -80,11 +80,13 @@ class HandFeatureExtractor:
         return _clamp(spd, 0.0, 1.0)
 
     def step(self, hands: list, chirality=None, swap: bool = False,
-             fist_enabled: tuple = (True, True)) -> dict:
+             fist_enabled: tuple = (True, True), mirror: bool = False) -> dict:
         from data_only_viz.hand_slots import route_hands
         # swap must mirror the gesture path (HAND_SWAP_LR) or per-voice
         # L/R mods contradict pinch/strike in the same performance.
-        left_lm, right_lm = route_hands(hands, chirality, swap=swap)
+        # mirror must match state.mirror_2d so the cx fallback slot assignment
+        # stays coherent with the renderer panel layout on chirality dropout.
+        left_lm, right_lm = route_hands(hands, chirality, swap=swap, mirror=mirror)
 
         if left_lm is None and right_lm is None:
             self._buf[0].clear()

@@ -158,6 +158,10 @@ class GestureSlotStabilizer:
         self._miss: list[int] = [0, 0]        # consecutive miss count
         self._near_active: list[bool] = [False, False]
         self._out: list = [None, None]         # last step() output (for active_flags)
+        # Hold-tracking: True when previous step() output was a held replay.
+        self._held_flag: list[bool] = [False, False]
+        # Resumed: True when this step() transitioned held -> real for that slot.
+        self._resumed: list[bool] = [False, False]
 
     def step(self, slotted: list) -> list:
         """Stabilize a 2-element [left|None, right|None] slot list.
@@ -171,10 +175,15 @@ class GestureSlotStabilizer:
         out: list = [None, None]
         for i in range(2):
             hand = slotted[i] if i < len(slotted) else None
+            prev_held = self._held_flag[i]
             if hand is not None:
-                # Hand present this frame
-                size = _hand_size(hand)
+                # Real hand present this frame.
+                # Transition held -> real: mark resumed so callers can reset
+                # per-finger state before consuming this step's output.
+                self._resumed[i] = prev_held
+                self._held_flag[i] = False
                 # Update near hysteresis
+                size = _hand_size(hand)
                 if self._near_active[i]:
                     if size < self._near_off:
                         self._near_active[i] = False
@@ -188,15 +197,20 @@ class GestureSlotStabilizer:
                 out[i] = hand if self._near_active[i] else None
             else:
                 # Hand absent this frame
+                self._resumed[i] = False
                 self._miss[i] += 1
                 if self._miss[i] <= self._hold:
                     # Hold: output last hand if it was near-active
                     if self._near_active[i] and self._last[i] is not None:
+                        self._held_flag[i] = True
                         out[i] = self._last[i]
-                    # else: not near-active, nothing to hold
+                    else:
+                        # Not near-active: no hold replay; slot stays None
+                        self._held_flag[i] = False
                 else:
                     # Past hold limit — clear near_active so next appearance
                     # must re-qualify from near_on.
+                    self._held_flag[i] = False
                     self._near_active[i] = False
                     out[i] = None
         self._out = out
@@ -210,3 +224,20 @@ class GestureSlotStabilizer:
         action_head_pub._emit_hands to gate the fist feature.
         """
         return (self._out[0] is not None, self._out[1] is not None)
+
+    def resumed_flags(self) -> tuple[bool, bool]:
+        """Return (slot0_resumed, slot1_resumed).
+
+        True for a slot when the current step() transitioned from a "held
+        replay" (Vision hole, last hand replayed) back to a real hand.  Callers
+        that track per-frame deltas (e.g. FingerStrikeDetector) should reset
+        their state for that slot BEFORE consuming the step output to avoid
+        phantom events caused by the compressed motion accumulated during the
+        hold window.
+
+        Semantics: True only for the ONE step where the transition occurs;
+        False on all subsequent frames where the hand stays real, and False
+        after an expired hold (miss > hold_frames, slot went None) since the
+        absent-slot logic in gesture detectors already resets per-finger state.
+        """
+        return (self._resumed[0], self._resumed[1])

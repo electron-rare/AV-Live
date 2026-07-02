@@ -149,6 +149,12 @@ class ActionHeadPublisher(threading.Thread):
         self._last_pids = current_pids
         if getattr(self, "_stab", None) is not None:
             self._stab_slotted = self._step_stab()
+            # Reset finger-strike state for slots that just transitioned from
+            # "held replay" back to a real hand, preventing phantom strikes from
+            # the compressed motion delta accumulated during the hold window.
+            for i, resumed in enumerate(self._stab.resumed_flags()):
+                if resumed:
+                    self._finger_det.reset_slot(i)
         else:
             self._stab_slotted = None
         self._emit_hands(t_now)
@@ -160,6 +166,7 @@ class ActionHeadPublisher(threading.Thread):
         with self.state.lock():
             hands = list(getattr(self.state, "persons_hands", None) or [])
             chirality = list(getattr(self.state, "persons_hands_chirality", None) or [])
+            mirror = bool(getattr(self.state, "mirror_2d", False))
             if not hands and getattr(self.state, "hands_present", False):
                 lkp = getattr(self.state, "left_hand_kp", None)
                 rkp = getattr(self.state, "right_hand_kp", None)
@@ -169,7 +176,8 @@ class ActionHeadPublisher(threading.Thread):
         fist_enabled = stab.active_flags() if stab is not None else (True, True)
         feats = self._hand_ext.step(hands, chirality or None,
                                     swap=getattr(self, "_hand_swap_lr", False),
-                                    fist_enabled=fist_enabled)
+                                    fist_enabled=fist_enabled,
+                                    mirror=mirror)
         with self.state.lock():
             self.state.hand_feats = feats
         self.bridge.send_hands(feats, t_now)
@@ -217,22 +225,29 @@ class ActionHeadPublisher(threading.Thread):
             near_off=cfg.hand_near_off,
         )
 
-    def _pick_hands(self) -> tuple[list, list, str, bool]:
-        """Return (hands, chirality, source_label, ip_fresh) per FINGER_SOURCE policy."""
+    def _pick_hands(self) -> tuple[list, list, str, bool, bool]:
+        """Return (hands, chirality, source_label, ip_fresh, mirror).
+
+        mirror is read from state.mirror_2d under the lock so it is consistent
+        with the chirality dropout decision made in the same tick.  Callers
+        pass it through to route_hands so the cx fallback slot assignment stays
+        coherent with the renderer's panel layout when chirality is absent.
+        """
         with self.state.lock():
             mp_hands = list(getattr(self.state, "persons_hands", None) or [])
             ip_hands = list(getattr(self.state, "persons_hands_iphone", None) or [])
             ip_t = getattr(self.state, "persons_hands_iphone_t", 0.0)
             ip_chir = list(getattr(self.state, "persons_hands_chirality", None) or [])
+            mirror = bool(getattr(self.state, "mirror_2d", False))
         ip_fresh = bool(ip_hands) and (time.perf_counter() - ip_t) < 0.5
         src = getattr(self, "_finger_source", "auto")
         if src == "iphone":
-            return ip_hands, ip_chir, "iphone", ip_fresh
+            return ip_hands, ip_chir, "iphone", ip_fresh, mirror
         if src == "mediapipe":
-            return mp_hands, [], "mediapipe", ip_fresh
+            return mp_hands, [], "mediapipe", ip_fresh, mirror
         if ip_fresh:
-            return ip_hands, ip_chir, "iphone", ip_fresh
-        return mp_hands, [], "mediapipe", ip_fresh
+            return ip_hands, ip_chir, "iphone", ip_fresh, mirror
+        return mp_hands, [], "mediapipe", ip_fresh, mirror
 
     def _step_stab(self) -> list:
         """Pick hands, route with near_min=0, step gesture stabilizer.
@@ -242,11 +257,12 @@ class ActionHeadPublisher(threading.Thread):
         _stab_slotted is not yet set (e.g. in unit tests that call emitters
         without going through _tick).
         """
-        hands, chir, _, _ = self._pick_hands()
+        hands, chir, _, _, mirror = self._pick_hands()
         raw = route_hands(
             hands, chir or None,
             swap=getattr(self, "_hand_swap_lr", False),
             near_min=0.0,
+            mirror=mirror,
         )
         return self._stab.step(raw)
 
@@ -254,7 +270,7 @@ class ActionHeadPublisher(threading.Thread):
         """Detect finger strikes (air-piano) and emit /pose/finger."""
         if not getattr(self, "_finger_enabled", False):
             return
-        hands, chirality, used, ip_fresh = self._pick_hands()
+        hands, chirality, used, ip_fresh, _ = self._pick_hands()
         slotted = getattr(self, "_stab_slotted", None)
         if slotted is None:
             slotted = self._step_stab()
@@ -272,7 +288,7 @@ class ActionHeadPublisher(threading.Thread):
         /pose/pinch. Gated by PINCH_ENABLE, independently of the air-piano."""
         if not getattr(self, "_pinch_enabled", False):
             return
-        hands, chirality, used, _ip = self._pick_hands()
+        hands, chirality, used, _ip, _ = self._pick_hands()
         slotted = getattr(self, "_stab_slotted", None)
         if slotted is None:
             slotted = self._step_stab()

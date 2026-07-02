@@ -301,3 +301,58 @@ def test_stab_active_flags_reflect_current_output():
     stab.step([None, None])          # miss=1 -> hold
     flags2 = stab.active_flags()
     assert flags2 == (True, False)   # still holding
+
+
+# ---------------------------------------------------------------------------
+# GestureSlotStabilizer.resumed_flags
+# ---------------------------------------------------------------------------
+
+def test_resumed_flags_true_exactly_one_step_on_reappear():
+    """resumed_flags True on the one step that transitions held -> real."""
+    stab = GestureSlotStabilizer(hold_frames=2, near_on=0.10, near_off=0.08)
+    h = _near_hand()
+    h2 = _near_hand(cx=0.4)
+    stab.step([h, None])              # activate slot 0
+    stab.step([None, None])           # miss=1 -> held replay
+    stab.step([h2, None])             # real hand returns -> resumed
+    assert stab.resumed_flags()[0] is True, "should be True on first real frame after hold"
+    # next step, still real -> False
+    stab.step([h2, None])
+    assert stab.resumed_flags()[0] is False, "should be False once hand stays real"
+
+
+def test_resumed_flags_false_steady():
+    """Continuously present hand -> resumed_flags never True."""
+    stab = GestureSlotStabilizer(hold_frames=2, near_on=0.10, near_off=0.08)
+    h = _near_hand()
+    stab.step([h, None])
+    stab.step([h, None])
+    assert stab.resumed_flags()[0] is False
+
+
+def test_resumed_flags_false_after_expired_hold():
+    """Hand returning after hold window expired does not trigger resumed (slot went None)."""
+    stab = GestureSlotStabilizer(hold_frames=2, near_on=0.10, near_off=0.08)
+    h = _near_hand()
+    h2 = _near_hand(cx=0.4)
+    stab.step([h, None])              # activate
+    stab.step([None, None])           # miss=1, held
+    stab.step([None, None])           # miss=2, held
+    stab.step([None, None])           # miss=3 > hold -> near_active cleared, out=None
+    stab.step([h2, None])             # reappear after expired hold
+    # _held_flag was False (hold expired), so resumed must be False
+    assert stab.resumed_flags()[0] is False, "expired hold: held_flag reset, no resume"
+
+
+def test_resumed_flags_independent_per_slot():
+    """Each slot tracks held/resumed independently."""
+    stab = GestureSlotStabilizer(hold_frames=2, near_on=0.10, near_off=0.08)
+    h0 = _near_hand(cx=0.3)
+    h1 = _near_hand(cx=0.7)
+    h0b = _near_hand(cx=0.3)
+    stab.step([h0, h1])               # activate both
+    stab.step([None, h1])             # slot 0 held, slot 1 real
+    stab.step([h0b, h1])              # slot 0 resumed, slot 1 unchanged
+    r = stab.resumed_flags()
+    assert r[0] is True,  "slot 0 just transitioned held -> real"
+    assert r[1] is False, "slot 1 was never held"

@@ -56,6 +56,21 @@ class FingerStrikeDetector:
         self._state = [[_FingerState() for _ in range(5)]
                        for _ in range(history_slots)]
 
+    def reset_slot(self, slot: int) -> None:
+        """Clear per-finger prev_rel and re-arm for the given slot.
+
+        Call this BEFORE step() when GestureSlotStabilizer.resumed_flags()
+        reports a held -> real transition for that slot.  During a Vision hole
+        the stabilizer replays the last hand (frozen coords, vel=0), but when
+        the real hand returns within the hold window the first delta compresses
+        several frames of motion into one large velocity spike, causing a
+        phantom strike.  Clearing prev_rel makes the first real frame a
+        no-op prime that restarts tracking from the new position.
+        """
+        for f in range(5):
+            self._state[slot][f].prev_rel = None
+            self._state[slot][f].armed = True
+
     def step(self, slotted: list, t_now: float) -> list[StrikeEvent]:
         """Process a pre-routed 2-slot hand list [left|None, right|None].
 
