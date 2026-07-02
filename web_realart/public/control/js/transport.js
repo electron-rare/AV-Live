@@ -24,41 +24,37 @@ export function init() {
     if (bar) bar.style.width = `${rms * 100}%`;
   });
 
-  // Tempo: slider + -/+ steppers (1 BPM per click), value label kept in sync
-  const tempo = document.getElementById("tempo");
-  const tempoVal = document.getElementById("tempo-val");
-  const pushTempo = () => {
-    if (tempoVal) tempoVal.textContent = tempo.value;
-    send("/launch/tempo", +tempo.value);
+  // Tempo / Master: sliders + -/+ steppers, duplicated on the LIVE and
+  // MATRICE tabs — every group member drives the same OSC address and all
+  // members stay visually in sync.
+  const bindStepGroup = (groups, step, fmt, addr) => {
+    const push = (v) => {
+      groups.forEach((g) => {
+        const s = document.getElementById(g.slider);
+        const l = document.getElementById(g.val);
+        if (s) s.value = v;
+        if (l) l.textContent = fmt(v);
+      });
+      send(addr, +v);
+    };
+    groups.forEach((g) => {
+      const s = document.getElementById(g.slider);
+      const clamp = (v) => Math.max(+s.min, Math.min(+s.max, v));
+      const m = document.getElementById(g.minus);
+      const p = document.getElementById(g.plus);
+      s && s.addEventListener("input", () => push(+s.value));
+      s && m && m.addEventListener("click", () => push(clamp(+s.value - step)));
+      s && p && p.addEventListener("click", () => push(clamp(+s.value + step)));
+    });
   };
-  tempo && tempo.addEventListener("input", pushTempo);
-  const stepTempo = (d) => {
-    if (!tempo) return;
-    tempo.value = Math.max(+tempo.min, Math.min(+tempo.max, +tempo.value + d));
-    pushTempo();
-  };
-  const tMinus = document.getElementById("tempo-minus");
-  const tPlus = document.getElementById("tempo-plus");
-  tMinus && tMinus.addEventListener("click", () => stepTempo(-1));
-  tPlus && tPlus.addEventListener("click", () => stepTempo(1));
-
-  // Master gain: slider + -/+ steppers (0.05 per click), SC /control/doMaster (0..2)
-  const master = document.getElementById("master");
-  const masterVal = document.getElementById("master-val");
-  const pushMaster = () => {
-    if (masterVal) masterVal.textContent = (+master.value).toFixed(2);
-    send("/control/doMaster", +master.value);
-  };
-  master && master.addEventListener("input", pushMaster);
-  const stepMaster = (d) => {
-    if (!master) return;
-    master.value = Math.max(+master.min, Math.min(+master.max, +master.value + d)).toFixed(2);
-    pushMaster();
-  };
-  const mMinus = document.getElementById("master-minus");
-  const mPlus = document.getElementById("master-plus");
-  mMinus && mMinus.addEventListener("click", () => stepMaster(-0.05));
-  mPlus && mPlus.addEventListener("click", () => stepMaster(0.05));
+  bindStepGroup([
+    { slider: "tempo", minus: "tempo-minus", plus: "tempo-plus", val: "tempo-val" },
+    { slider: "matrix-tempo", minus: "matrix-tempo-minus", plus: "matrix-tempo-plus", val: "matrix-tempo-val" },
+  ], 1, (v) => String(Math.round(v)), "/launch/tempo");
+  bindStepGroup([
+    { slider: "master", minus: "master-minus", plus: "master-plus", val: "master-val" },
+    { slider: "matrix-master", minus: "matrix-master-minus", plus: "matrix-master-plus", val: "matrix-master-val" },
+  ], 0.05, (v) => (+v).toFixed(2), "/control/doMaster");
 
   // Filter
   const filt = document.getElementById("filter");
