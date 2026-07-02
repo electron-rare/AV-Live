@@ -45,7 +45,8 @@ def _clamp(v: float, lo: float, hi: float) -> float:
 class HandFeatureExtractor:
     def __init__(self, history: int = 5):
         self._history = max(2, history)
-        # two screen slots: 0 = leftmost (L), 1 = rightmost (R)
+        # two routed slots (hand_slots.route_hands): 0 = user's left (L),
+        # 1 = user's right (R); cx fallback when chirality is absent.
         self._buf = [deque(maxlen=self._history), deque(maxlen=self._history)]
 
     def _features(self, lm: list) -> dict:
@@ -78,9 +79,11 @@ class HandFeatureExtractor:
         buf.append((cx, cy))
         return _clamp(spd, 0.0, 1.0)
 
-    def step(self, hands: list, chirality=None) -> dict:
+    def step(self, hands: list, chirality=None, swap: bool = False) -> dict:
         from data_only_viz.hand_slots import route_hands
-        left_lm, right_lm = route_hands(hands, chirality)
+        # swap must mirror the gesture path (HAND_SWAP_LR) or per-voice
+        # L/R mods contradict pinch/strike in the same performance.
+        left_lm, right_lm = route_hands(hands, chirality, swap=swap)
 
         if left_lm is None and right_lm is None:
             self._buf[0].clear()

@@ -131,3 +131,25 @@ def test_one_extended_finger_breaks_the_fist():
     h[8] = LM(0.5 + 0.80 * 0.10, 0.5)                       # ...except the index
     out = HandFeatureExtractor().step([h])
     assert (out["L"] or out["R"])["fist"] < 0.1            # min over fingers
+
+
+def test_swap_routes_inverted_chirality_to_user_slots():
+    """C1 pin: with the inverted-source swap ON (HAND_SWAP_LR default),
+    a physical LEFT hand arriving labeled chir=1 must land in feature
+    slot L — consistent with the pinch/strike gesture path."""
+    ext = HandFeatureExtractor()
+    left_hand = _hand(0.30, 0.5, span=0.20)   # user's left (source says 1)
+    right_hand = _hand(0.70, 0.5, span=0.06)  # user's right (source says 0)
+    out = ext.step([left_hand, right_hand], [1, 0], swap=True)
+    assert out["L"] is not None and out["R"] is not None
+    assert out["L"]["cx"] == pytest.approx(0.30, abs=0.01)   # left hand in L
+    assert out["R"]["cx"] == pytest.approx(0.70, abs=0.01)
+
+
+def test_no_swap_keeps_source_chirality():
+    ext = HandFeatureExtractor()
+    a = _hand(0.30, 0.5, span=0.20)
+    b = _hand(0.70, 0.5, span=0.06)
+    out = ext.step([a, b], [1, 0], swap=False)
+    assert out["L"]["cx"] == pytest.approx(0.70, abs=0.01)   # chir 0 -> L
+    assert out["R"]["cx"] == pytest.approx(0.30, abs=0.01)

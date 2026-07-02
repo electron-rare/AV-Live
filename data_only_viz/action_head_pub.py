@@ -24,6 +24,7 @@ from data_only_viz.action_head import (
     J3D_FINGERS_PER_HAND,
     LABELS,
 )
+from data_only_viz.hand_slots import route_hands
 
 LOG = logging.getLogger("action_head_pub")
 
@@ -160,7 +161,8 @@ class ActionHeadPublisher(threading.Thread):
                 rkp = getattr(self.state, "right_hand_kp", None)
                 hands = [h for h in (lkp, rkp) if h is not None and len(h) > 0]
                 chirality = []
-        feats = self._hand_ext.step(hands, chirality or None)
+        feats = self._hand_ext.step(hands, chirality or None,
+                                    swap=getattr(self, "_hand_swap_lr", True))
         with self.state.lock():
             self.state.hand_feats = feats
         self.bridge.send_hands(feats, t_now)
@@ -229,11 +231,10 @@ class ActionHeadPublisher(threading.Thread):
         """Detect finger strikes (air-piano) and emit /pose/finger."""
         if not getattr(self, "_finger_enabled", False):
             return
-        from data_only_viz.hand_slots import route_hands
         hands, chirality, used, ip_fresh = self._pick_hands()
         slotted = route_hands(
             hands, chirality or None,
-            swap=getattr(self, "_hand_swap_lr", False),
+            swap=getattr(self, "_hand_swap_lr", True),
             near_min=getattr(self, "_hand_near_min", 0.10),
         )
         events = self._finger_det.step(slotted, t_now)
@@ -250,11 +251,10 @@ class ActionHeadPublisher(threading.Thread):
         /pose/pinch. Gated by PINCH_ENABLE, independently of the air-piano."""
         if not getattr(self, "_pinch_enabled", False):
             return
-        from data_only_viz.hand_slots import route_hands
         hands, chirality, used, _ip = self._pick_hands()
         slotted = route_hands(
             hands, chirality or None,
-            swap=getattr(self, "_hand_swap_lr", False),
+            swap=getattr(self, "_hand_swap_lr", True),
             near_min=getattr(self, "_hand_near_min", 0.10),
         )
         for ev in self._pinch_det.step(slotted, t_now):
