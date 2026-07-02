@@ -77,10 +77,10 @@ export const GLOBAL_SLOTS = [
   { key: 4, label: "Pince MD index" }, { key: 5, label: "Pince MD majeur" },
   { key: 6, label: "Pince MD annulaire" }, { key: 7, label: "Pince MD auriculaire" },
 ];
-export let matGlobalActions = ["fill", "doubleTime", "washReverb", "muteDrums", "relanceEvolve", "halfTime", "next", "muteMelo"];
+export let matGlobalActions = ["fill", "doubleTime", "washReverb", "muteDrums", "breakdown", "halfTime", "next", "muteMelo"];
 export function setGlobalAction(slot, id) { if (slot >= 0 && slot < 8) matGlobalActions[slot] = id; }
 export function resetGlobalActions() {
-  matGlobalActions = ["fill", "doubleTime", "washReverb", "muteDrums", "relanceEvolve", "halfTime", "next", "muteMelo"];
+  matGlobalActions = ["fill", "doubleTime", "washReverb", "muteDrums", "breakdown", "halfTime", "next", "muteMelo"];
 }
 
 export let matGlobalSettings = { transientBars: 1, breakdownKeep: ["kick", "sub"] };

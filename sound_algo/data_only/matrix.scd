@@ -909,7 +909,7 @@ OSCdef(\mat_steps_get, { |msg, time, addr|
                 }
             });
             // restore global morceau actions (default when absent/legacy)
-            ~matGlobalActions = [\fill, \doubleTime, \washReverb, \muteDrums, \relanceEvolve, \halfTime, \next, \muteMelo];
+            ~matGlobalActions = [\fill, \doubleTime, \washReverb, \muteDrums, \breakdown, \halfTime, \next, \muteMelo];
             ((raw.isArray.not) and: { raw[\globalActions].notNil and: { raw[\globalActions].isArray } }).if({
                 raw[\globalActions].do { |s, i| (i < 8 and: { s.notNil }).if({ ~matGlobalActions[i] = s.asSymbol }) }
             });

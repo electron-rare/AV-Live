@@ -16,7 +16,7 @@ import generate_presets as G
 
 here = os.path.dirname(os.path.abspath(__file__))
 
-EXPECTED_ACTIONS = r"'globalActions': [ \fill, \doubleTime, \washReverb, \muteDrums, \relanceEvolve, \halfTime, \next, \muteMelo ]"
+EXPECTED_ACTIONS = r"'globalActions': [ \fill, \doubleTime, \washReverb, \muteDrums, \breakdown, \halfTime, \next, \muteMelo ]"
 EXPECTED_N_VARIANTS = 112
 
 ok = True

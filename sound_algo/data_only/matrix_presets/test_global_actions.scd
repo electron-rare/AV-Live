@@ -12,7 +12,7 @@ feat.load;
 ~lp[\matPlaying] = false;
 
 // -- A: defaults --
-(~matGlobalActions == [\fill, \doubleTime, \washReverb, \muteDrums, \relanceEvolve, \halfTime, \next, \muteMelo]).not.if({ pass = false; "FAIL: default mapping".postln });
+(~matGlobalActions == [\fill, \doubleTime, \washReverb, \muteDrums, \breakdown, \halfTime, \next, \muteMelo]).not.if({ pass = false; "FAIL: default mapping".postln });
 
 // -- B: fill -> active voices read colour 6, silent voices stay 0 --
 ~matSetTransient.(\fill, []);
@@ -48,7 +48,7 @@ feat.load;
 ~matSavedNames  = ~matSavedNames  ? Set.new;
 ~matGlobalActions = [\evolve, \breakdown, \fill, \drop, \muteMelo, \washReverb, \muteDrums, \next];     // non-default 8-slot
 ~matSave.("zz_gact_test");
-~matGlobalActions = [\fill, \doubleTime, \washReverb, \muteDrums, \relanceEvolve, \halfTime, \next, \muteMelo];     // clobber, then reload
+~matGlobalActions = [\fill, \doubleTime, \washReverb, \muteDrums, \breakdown, \halfTime, \next, \muteMelo];     // clobber, then reload
 ~matLoadFile.(~matDir +/+ "zz_gact_test.matrix");
 (~matGlobalActions == [\evolve, \breakdown, \fill, \drop, \muteMelo, \washReverb, \muteDrums, \next]).not.if({ pass = false; "FAIL: globalActions not round-tripped".postln });
 ("rm -f '" ++ (~matDir +/+ "zz_gact_test.matrix") ++ "'").systemCmd;
@@ -116,7 +116,7 @@ feat.load;
 
 // -- P: pinch hold-to-fire (engage doesn't fire; fires past hold; release cancels) --
 ~matPinchRoutine !? { ~matPinchRoutine.stop };
-~matGlobalActions = [\fill, \doubleTime, \washReverb, \muteDrums, \relanceEvolve, \halfTime, \next, \muteMelo];
+~matGlobalActions = [\fill, \doubleTime, \washReverb, \muteDrums, \breakdown, \halfTime, \next, \muteMelo];
 ~matPinchHoldMs = 300; ~matTransient = nil;
 ~matPinchHeld = Array.fill(8, nil); ~matPinchFired = Array.fill(8, false);
 OSCdef(\mat_ev_pinch).func.value(['/pose/pinch', 0, 0, 1, 1]);   // L index engage -> slot 0 held
