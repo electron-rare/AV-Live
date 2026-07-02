@@ -82,6 +82,8 @@ Toujours répondre en français à l'utilisateur. Code, commentaires de code, co
 | `PINCH_DEBOUNCE_FRAMES` | `3` | consecutive qualifying frames before a pinch engage fires (release stays immediate); `1` disables |
 | `HAND_CONF_MIN` | `0.45` | min Vision hand confidence to draw (raised from 0.3; applies to both overlay and side panels) |
 | `HAND_PERSIST_FRAMES` | `3` | consecutive frames a hand track must match before being drawn (1 = off, all hands drawn immediately) |
+| `HAND_SWAP_LR` | `0` | swap the two routed hand slots (gestures + panels). Safety knob: set `1` live if the iPhone app's camera config inverts Vision chirality — fixes the L/R direction without redeploy |
+| `HAND_NEAR_MIN` | `0.10` | Minimum wrist-to-middle-MCP distance (normalised) for a hand to trigger pinch/strike. Hands smaller than this are gated out. Display panels are unaffected |
 | `ARKIT_BONE_MAX` | `0.5` | max ARKit body bone length in normalized units; longer bones are skipped (tracking-loss garbage filter) |
 
 ## Conventions globales
