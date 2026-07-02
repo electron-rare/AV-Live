@@ -351,3 +351,13 @@ def test_iphone_usb_skips_ensure_model():
     assert ensure_calls == [], (
         f"_ensure_model was called under iphone_usb=True: {ensure_calls}"
     )
+
+
+@pytest.mark.parametrize("val,expected", [
+    ("0", False),
+    ("1", True),
+    ("", True),   # ne0: "" != "0" = True (drift to _bool_std would break this)
+])
+def test_bool_ne0_mesh_rig(val, expected):
+    cfg = VizConfig.from_env({"MESH_RIG": val})
+    assert cfg.mesh_rig is expected

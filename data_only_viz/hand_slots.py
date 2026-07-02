@@ -8,10 +8,10 @@ Fallback (chirality absent/misaligned): sort valid hands by screen cx ascending
 (flipped when mirror=True) and assign leftmost to slot 0, next to slot 1.
 
 `swap=True`: inverts the chirality INTERPRETATION only (chir 0 -> right slot,
-1 -> left slot). ARBodyTracker's Vision chirality arrives inverted vs the
-user's mirrored view (observed live 2026-07-02), so HAND_SWAP_LR defaults to
-1 in the consumers; set 0 if a future app build fixes chirality at the
-source. The cx fallback is screen-relative and is never swapped.
+1 -> left slot). Safety knob for a source delivering flipped chirality;
+ARBodyTracker chirality was validated CORRECT live 2026-07-02, so
+HAND_SWAP_LR defaults to 0 in the consumers. The cx fallback is
+screen-relative and is never swapped.
 
 `near_min > 0`: after routing, replace a slot with None when the hand's
 wrist-to-middle-MCP distance (normalised) is below `near_min`.
