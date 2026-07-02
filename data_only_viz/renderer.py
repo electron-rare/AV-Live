@@ -407,7 +407,10 @@ class MetalRenderer(NSObject):
 
         # Gate called once per frame on the full persons_hands list.
         # Used for both the overlay loop and the side panels below.
-        _hand_draw_flags = self._hand_gate.step(s.persons_hands)
+        # getattr: unit tests build the renderer via __new__ (no Metal init).
+        _gate = getattr(self, "_hand_gate", None)
+        _hand_draw_flags = (_gate.step(s.persons_hands) if _gate is not None
+                            else [True] * len(s.persons_hands))
 
         if use_arkit:
             parents = s.arkit_parents

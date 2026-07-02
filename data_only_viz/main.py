@@ -621,7 +621,21 @@ class AppDelegate(NSObject):
                     self._user_viz_lock_t = _t.monotonic()
                     LOG.info("[video] viz -> %s (%d) (lock 8s)", name, idx)
                 return None
-        # qsdfghjklm -> audio (scene SC)
+        # m = matrix performance mode: stop the auto data-synth scene AND
+        # force the openpos viz (the matrix is not a scene — it keeps
+        # playing). User request live 2026-07-02.
+        if k == "m":
+            self._scClient.send_message("/control/doScene", ["stop"])
+            names = list(self._state.viz_mode_names)
+            idx = names.index("openpos") if "openpos" in names else 0
+            with self._state.lock():
+                self._state.viz_mode = idx
+                self._state.active_scene = "stop"
+            import time as _t
+            self._user_viz_lock_t = _t.monotonic()
+            LOG.info("[key] m -> scene stop + viz openpos (matrix mode)")
+            return None
+        # qsdfghjkl -> audio (scene SC)
         for kk, scene in KEYMAP_AUDIO:
             if k == kk:
                 self._scClient.send_message("/control/doScene", [scene])

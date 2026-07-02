@@ -141,7 +141,7 @@ def test_pinch_gate_env_defaults_are_strict(monkeypatch):
         monkeypatch.delenv(k, raising=False)
     pub = _pub_envs(monkeypatch, finger_piano="0", pinch_enable="1")
     assert pub._pinch_det.ext_ratio == 1.35
-    assert pub._pinch_det.ext_min == 2
+    assert pub._pinch_det.ext_min == 1   # 1 since 2026-07-02 (inner-finger fix)
     assert pub._pinch_det.debounce_frames == 3
 
 
