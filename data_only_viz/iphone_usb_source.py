@@ -161,11 +161,20 @@ class IphoneUSBSource:
         from .config import VizConfig as _VizConfig
         _cfg = _VizConfig.from_env()
         self._mirror = mirror and _cfg.concert_mirror
-        # VIDEO_ROTATE also applies to the iPhone 2D landmarks (skeleton2D +
-        # hands) so they stay aligned with the rotated video (multi.py only
-        # rotates the frame). Mirror-conjugated: see effective_point_rotate.
+        # VIDEO_ROTATE also applies to the iPhone skeleton2D landmarks
+        # (ARKit projects into the raw sensor frame) so they stay aligned
+        # with the rotated video (multi.py only rotates the frame).
+        # Mirror-conjugated: see effective_point_rotate.
         self._video_rotate = effective_point_rotate(
             _cfg.video_rotate or "none", self._mirror)
+        # Vision hands are computed by the app with a HARDCODED
+        # orientation (.right, ARBodySession.swift) — their coords live in
+        # an already-uprighted frame, NOT the sensor frame. They get their
+        # own rotation knob (IPHONE_HANDS_ROTATE, default none) so they can
+        # be aligned independently of the skeleton.
+        import os as _os
+        self._hands_rotate = effective_point_rotate(
+            _os.environ.get("IPHONE_HANDS_ROTATE", "none"), self._mirror)
         self._codec = av.codec.CodecContext.create("hevc", "r") if av is not None else None
         self._lock = threading.Lock()
         self._frame = None            # latest BGR np.ndarray
@@ -257,11 +266,11 @@ class IphoneUSBSource:
                         result = _decode_hands(payload)
                         if result is not None and self.state is not None:
                             hands, chirality = result
-                            if self._video_rotate != "none":
+                            if self._hands_rotate != "none":
                                 for hand in hands:
                                     for p in hand:
                                         p.x, p.y = rotate_norm_xy(
-                                            p.x, p.y, self._video_rotate)
+                                            p.x, p.y, self._hands_rotate)
                             with self.state.lock():
                                 # Always expose iPhone Vision hands (stable,
                                 # rotation-invariant) for the air-piano.
