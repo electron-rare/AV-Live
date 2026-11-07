@@ -1,0 +1,70 @@
+- generic [active] [ref=e1]:
+  - banner [ref=e2]:
+    - heading "AV-Live Control" [level=1] [ref=e3]
+  - navigation [ref=e7]:
+    - button "LIVE" [ref=e8] [cursor=pointer]
+    - button "FX / HARMONIE / CONCERT" [ref=e9] [cursor=pointer]
+    - button "SÉQUENCEURS" [ref=e10] [cursor=pointer]
+    - button "SECTIONS" [ref=e11] [cursor=pointer]
+    - button "MATRICE" [ref=e12] [cursor=pointer]
+  - generic [ref=e14]:
+    - heading "Patterns" [level=2] [ref=e15]
+    - generic [ref=e16]:
+      - generic [ref=e17]:
+        - button "Kick" [ref=e18] [cursor=pointer]
+        - slider [ref=e19]: "0.8"
+      - generic [ref=e20]:
+        - button "Hats" [ref=e21] [cursor=pointer]
+        - slider [ref=e22]: "0.8"
+      - generic [ref=e23]:
+        - button "Clap" [ref=e24] [cursor=pointer]
+        - slider [ref=e25]: "0.8"
+      - generic [ref=e26]:
+        - button "Perc" [ref=e27] [cursor=pointer]
+        - slider [ref=e28]: "0.8"
+      - generic [ref=e29]:
+        - button "Sub" [ref=e30] [cursor=pointer]
+        - slider [ref=e31]: "0.8"
+      - generic [ref=e32]:
+        - button "Acid" [ref=e33] [cursor=pointer]
+        - slider [ref=e34]: "0.8"
+      - generic [ref=e35]:
+        - button "Arp" [ref=e36] [cursor=pointer]
+        - slider [ref=e37]: "0.8"
+      - generic [ref=e38]:
+        - button "Lead" [ref=e39] [cursor=pointer]
+        - slider [ref=e40]: "0.8"
+      - generic [ref=e41]:
+        - button "Stab" [ref=e42] [cursor=pointer]
+        - slider [ref=e43]: "0.8"
+      - generic [ref=e44]:
+        - button "Pad" [ref=e45] [cursor=pointer]
+        - slider [ref=e46]: "0.8"
+      - generic [ref=e47]:
+        - button "Ride" [ref=e48] [cursor=pointer]
+        - slider [ref=e49]: "0.8"
+      - generic [ref=e50]:
+        - button "Rim" [ref=e51] [cursor=pointer]
+        - slider [ref=e52]: "0.8"
+      - generic [ref=e53]:
+        - button "Tom" [ref=e54] [cursor=pointer]
+        - slider [ref=e55]: "0.8"
+      - generic [ref=e56]:
+        - button "Reese" [ref=e57] [cursor=pointer]
+        - slider [ref=e58]: "0.8"
+      - generic [ref=e59]:
+        - button "Bells" [ref=e60] [cursor=pointer]
+        - slider [ref=e61]: "0.8"
+      - generic [ref=e62]:
+        - button "Sweep" [ref=e63] [cursor=pointer]
+        - slider [ref=e64]: "0.8"
+    - button "Tout couper" [ref=e65] [cursor=pointer]
+    - generic [ref=e66]:
+      - text: Tempo
+      - slider "Tempo" [ref=e67]: "126"
+    - generic [ref=e68]:
+      - generic [ref=e69]: Quant
+      - button "½" [ref=e70] [cursor=pointer]
+      - button "1" [ref=e71] [cursor=pointer]
+      - button "1 mes" [ref=e72] [cursor=pointer]
+      - button "2 mes" [ref=e73] [cursor=pointer]

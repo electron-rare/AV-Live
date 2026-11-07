@@ -1,0 +1,44 @@
+{
+    "configurations": [
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:AV-Live}/launcher",
+            "name": "Debug AVLiveLauncher (launcher)",
+            "target": "AVLiveLauncher",
+            "configuration": "debug",
+            "preLaunchTask": "swift: Build Debug AVLiveLauncher (launcher)"
+        },
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:AV-Live}/launcher",
+            "name": "Release AVLiveLauncher (launcher)",
+            "target": "AVLiveLauncher",
+            "configuration": "release",
+            "preLaunchTask": "swift: Build Release AVLiveLauncher (launcher)"
+        },
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:AV-Live}/iphone-arbody/ARBodyTracker.swiftpm",
+            "name": "Debug ARBodyTracker (iphone-arbody/ARBodyTracker.swiftpm)",
+            "target": "ARBodyTracker",
+            "configuration": "debug",
+            "preLaunchTask": "swift: Build Debug ARBodyTracker (iphone-arbody/ARBodyTracker.swiftpm)"
+        },
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:AV-Live}/iphone-arbody/ARBodyTracker.swiftpm",
+            "name": "Release ARBodyTracker (iphone-arbody/ARBodyTracker.swiftpm)",
+            "target": "ARBodyTracker",
+            "configuration": "release",
+            "preLaunchTask": "swift: Build Release ARBodyTracker (iphone-arbody/ARBodyTracker.swiftpm)"
+        }
+    ]
+}

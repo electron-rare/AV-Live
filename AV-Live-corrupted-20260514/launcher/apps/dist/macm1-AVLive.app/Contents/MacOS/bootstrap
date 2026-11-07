@@ -1,0 +1,100 @@
+#!/usr/bin/env bash
+# Bootstrap for macm1-AVLive — launches Python worker + AVLiveBody.
+set -u
+APP_RES="${0%/MacOS/bootstrap}/Resources"
+LOG_DIR="${HOME}/Library/Logs/AVLive"
+mkdir -p "${LOG_DIR}"
+LOG="${LOG_DIR}/macm1-AVLive.log"
+PYLOG="${LOG_DIR}/macm1-AVLive.python.log"
+exec >>"${LOG}" 2>&1
+echo "[bootstrap] $(date -Iseconds) launching macm1-AVLive"
+
+REPO="/Users/electron/Documents/Projets/AV-Live"
+PEER="192.168.0.159"
+ROLE="sink"
+
+# Pick uv from common install spots.
+UV=""
+for cand in /opt/homebrew/bin/uv "${HOME}/.local/bin/uv" /usr/local/bin/uv; do
+    if [ -x "$cand" ]; then UV="$cand"; break; fi
+done
+if [ -z "$UV" ]; then
+    osascript -e 'display alert "AVLive" message "uv not found. Install Homebrew uv or pip install uv."'
+    exit 1
+fi
+
+# Compute the THIS-host LAN IP so we put it in AVBODY_HOSTS too
+# (loopback + peer + self for the same-LAN OSC fan-out).
+SELF=$(ipconfig getifaddr en0 2>/dev/null || ipconfig getifaddr en1 2>/dev/null || echo 127.0.0.1)
+HOSTS="127.0.0.1,${PEER}"
+
+if [ "${ROLE}" = "source" ]; then
+    # GrosMac (M5 16 GB) : capture cam + publish JPEG to macm1 +
+    # run MediaPipe Multi locally for the face / hand wireframe
+    # routes (face 68 / hand 21x2 OSC). Heavy Multi-HMR is
+    # delegated to macm1 ; the local Multi-HMR worker is force-
+    # disabled via MULTIHMR_BACKEND=disabled so the local PyTorch
+    # ckpt fallback does not fire and reopen AVCapture.
+    export AV_PUBLISH_MCAST=1
+    export AV_MCAST_GROUP="${PEER}"
+    export AVBODY_HOSTS="${HOSTS}"
+    export AV_SHARED_CAM=1
+    export MULTIHMR_BACKEND=disabled
+    export AV_LIVE_PARALLEL_POSE=mediapipe
+    export MEDIAPIPE_DELEGATE=cpu
+    EXTRA="--extra pose"
+    ARGS="--multi-hmr --motion-gate 0 -v"
+else
+    # macm1 (M1 Max 32 GB) is the dedicated inference host : all
+    # pose + face + hand workers run here, GrosMac becomes capture
+    # + render only. WebcamSource subscribes to the mcast feed and
+    # writes state.latest_bgr ; every other worker reads from there.
+    export MULTIHMR_BACKEND=coreml
+    export AVBODY_HOSTS="${HOSTS}"
+    export AV_SHARED_CAM=1
+    export AV_WEBCAM_SOURCE=mcast
+    # apple_vision = body 19 joints on ANE for the mesh_rigger
+    # interpolation between Multi-HMR keyframes (3 fps fresh -> 30
+    # fps interpolated TCP). NO MediaPipe here : it competes with
+    # CoreML on the GPU and crushed Multi-HMR latency 95ms -> 1.5s.
+    # Face / hand live on GrosMac's local MediaPipe instead.
+    export AV_LIVE_PARALLEL_POSE=apple_vision
+    # 28 GB RSS budget out of 32 GB unified, leaves 4 GB for the
+    # AVLiveBody renderer + system. CoreML caches can grow large
+    # without triggering the watchdog recycle prematurely.
+    export AV_MAX_RSS_GB=28
+    export MEDIAPIPE_DELEGATE=cpu
+    EXTRA="--extra multihmr --extra pose --extra hamer"
+    ARGS="--multi-hmr --motion-gate 0 -v"
+fi
+
+cd "${REPO}"
+echo "[bootstrap] python role=${ROLE} peer=${PEER} hosts=${HOSTS}"
+# Prefer venv python directly to avoid uv's TCC-blocked writes when
+# launched via Finder/open. Deps must be sync'd beforehand
+# (uv sync ${EXTRA}). Fallback to uv if venv missing.
+VENV_PY="${REPO}/data_only_viz/.venv/bin/python"
+if [ -x "${VENV_PY}" ]; then
+    # PYTHONPATH=REPO needed because data_only_viz package is not
+    # installed in the venv (would need pip install -e on a proper
+    # setup.py — instead we expose it directly to the interpreter).
+    PYTHONPATH="${REPO}" "${VENV_PY}" -u -m data_only_viz.main ${ARGS} >"${PYLOG}" 2>&1 &
+else
+    "${UV}" run --project data_only_viz ${EXTRA} python -u -m data_only_viz.main ${ARGS} \
+        >"${PYLOG}" 2>&1 &
+fi
+PY_PID=$!
+echo "[bootstrap] python pid=${PY_PID}"
+
+# Make sure Python dies when the bundle goes away.
+cleanup() {
+    echo "[bootstrap] terminating python pid=${PY_PID}"
+    kill "${PY_PID}" 2>/dev/null || true
+    sleep 1
+    kill -9 "${PY_PID}" 2>/dev/null || true
+}
+trap cleanup EXIT INT TERM
+
+# Run AVLiveBody in foreground. When the user quits the window, control
+# returns here and the EXIT trap kills the python child.
+"${APP_RES}/AVLiveBody"

@@ -1,0 +1,1 @@
+- [AV-Live validation baseline](project_av_live_validation_baseline.md) — commandes de validation Python/Swift/C++ + test multihmr_remote cassé connu (pré-existant, pas une régression) + oF non installé

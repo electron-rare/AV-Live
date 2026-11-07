@@ -1,0 +1,3 @@
+[    7548ms] [ERROR] Failed to load resource: the server responded with a status of 404 () @ https://enfants.saillant.cc/favicon.ico:0
+[    9934ms] [LOG] Localization initialized in 233ms @ https://grist.saillant.cc/v/unknown/form.bundle.js:1
+[   13179ms] [ERROR] Failed to load resource: the server responded with a status of 401 () @ https://enfants.saillant.cc/api/me:0
