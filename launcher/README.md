@@ -9,6 +9,13 @@ choisi au demarrage.
 
 Requires Swift 6.0+ and Xcode Command Line Tools.
 
+The launcher's web services require Node.js 20 or later. Install their dependencies from the AV-Live repository root before starting them:
+
+```sh
+npm --prefix sound_algo/web ci       # Control and Hydra UI on port 3000
+npm --prefix data_only_viz/web ci    # Data-only dashboard on port 3211
+```
+
 ```sh
 cd launcher
 ./build.sh                                    # universal arm64+x86_64
