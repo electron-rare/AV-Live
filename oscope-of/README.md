@@ -18,22 +18,24 @@ Trois modes superposés :
 
 ## Installation
 
-### Étape 1 — Cloner dans l'arbre openFrameworks
+### Step 1 — Locate the project in AV-Live
 
-Le projet doit vivre dans `<OF_ROOT>/apps/myApps/oscope-of` pour que le Makefile générique fonctionne :
+The source is included in the AV-Live checkout. From the repository root:
 
 ```bash
-cd <OF_ROOT>/apps/myApps/
-git clone git@github.com:electron-rare/oscope-of.git
 cd oscope-of
 ```
 
-Si vous le placez ailleurs, ajustez `OF_ROOT` dans `config.make`.
+Set `OF_ROOT` to the absolute path to your openFrameworks installation:
+
+```bash
+OF_ROOT="/absolute/path/to/openFrameworks"
+```
 
 ### Étape 2 — Régénérer le projet Xcode
 
 ```bash
-<OF_ROOT>/projectGenerator -u apps/myApps/oscope-of
+"$OF_ROOT/projectGenerator" -u "$PWD"
 ```
 
 Cela crée `oscope-of.xcodeproj/` à partir des fichiers `addons.make` et `config.make`.
@@ -78,8 +80,8 @@ Ouvrir `oscope-of.xcodeproj` dans Xcode, sélectionner la scheme `oscope-of Rele
 Ou en CLI :
 
 ```bash
-make Release
-make RunRelease
+make OF_ROOT="$OF_ROOT" Release
+make OF_ROOT="$OF_ROOT" RunRelease
 ```
 
 ## Modes et contrôles clavier
