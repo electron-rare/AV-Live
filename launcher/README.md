@@ -1,9 +1,9 @@
 # AVLiveLauncher
 
-macOS menubar launcher for AV-Live. Coordonne le lancement / arret de
-toutes les briques (sclang, oscope-of, data_only_viz, data_feeds, web
-UI, dashboard data-only, AV-Live-Body RealityKit) selon le **mode**
-choisi au demarrage.
+macOS menubar launcher for AV-Live. It starts and stops every building
+block (sclang, oscope-of, data_only_viz, data_feeds, web UI, data-only
+dashboard, AV-Live-Body RealityKit) according to the **mode** chosen at
+startup.
 
 ## Build
 
