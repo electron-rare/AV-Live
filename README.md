@@ -308,22 +308,26 @@ brew install --cask supercollider
 brew install libusb node uv
 # openFrameworks 0.12 : https://openframeworks.cc/download/  (extract to ~/of)
 
-# 3. Build the launcher (universal binary arm64+x86_64)
+# 3. Install the web services' dependencies (the launcher starts both)
+npm --prefix sound_algo/web ci       # Control and Hydra UI on port 3000
+npm --prefix data_only_viz/web ci    # Data-only dashboard on port 3211
+
+# 4. Build the launcher (universal binary arm64+x86_64)
 cd launcher && bash build.sh
 
-# 4. Build oscope-of (one-time symlink for oF make)
+# 5. Build oscope-of (one-time symlink for oF make)
 ln -s "$PWD/../oscope-of" ~/of/apps/myApps/oscope-of
 cd ~/of/apps/myApps/oscope-of
 make OF_ROOT=$HOME/of -j4 Release
 
-# 5. (optional) data_only_viz Metal pose viz
+# 6. (optional) data_only_viz Metal pose viz
 cd ../../../data_only_viz
 uv sync                       # base (Metal + OSC + tracker)
 uv sync --extra pose          # + MediaPipe / YOLOv8 / Ultralytics
 # uv sync --extra nlf         # + NLF SMPL body mesh (CUDA only)
 uv run python -m data_only_viz.main
 
-# 6. Run the whole stack
+# 7. Run the whole stack
 open AV-Live/launcher/build/AVLiveLauncher.app
 ```
 
@@ -374,6 +378,8 @@ GPL-3.0-or-later. See [`LICENSE`](LICENSE).
 ## Credits & homages
 
 Built by **L'Électron Rare** (Clément Saillant). Greetings to all the live coders, the demoscene legends, the openFrameworks community, the SuperCollider community, the Saillans festival 2026 artists, and everyone keeping the phosphor alive.
+
+Thanks to [@jorisesch](https://github.com/jorisesch) for the first outside contribution: the fresh-checkout setup fixes (`npm ci` for the web services, oscope-of build from the AV-Live tree).
 
 The GREETINGS scroller in `oscope-of/bin/data/sprites/greetings.txt` is the soul of the project — edit it freely and make it yours.
 
