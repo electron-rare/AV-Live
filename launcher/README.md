@@ -1,13 +1,20 @@
 # AVLiveLauncher
 
-macOS menubar launcher for AV-Live. Coordonne le lancement / arret de
-toutes les briques (sclang, oscope-of, data_only_viz, data_feeds, web
-UI, dashboard data-only, AV-Live-Body RealityKit) selon le **mode**
-choisi au demarrage.
+macOS menubar launcher for AV-Live. It starts and stops every building
+block (sclang, oscope-of, data_only_viz, data_feeds, web UI, data-only
+dashboard, AV-Live-Body RealityKit) according to the **mode** chosen at
+startup.
 
 ## Build
 
 Requires Swift 6.0+ and Xcode Command Line Tools.
+
+The launcher's web services require Node.js 20 or later. Install their dependencies from the AV-Live repository root before starting them:
+
+```sh
+npm --prefix sound_algo/web ci       # Control and Hydra UI on port 3000
+npm --prefix data_only_viz/web ci    # Data-only dashboard on port 3211
+```
 
 ```sh
 cd launcher
